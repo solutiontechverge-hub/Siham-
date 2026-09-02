@@ -8,6 +8,11 @@ import AppDropdown from "../AppDropdown";
 import AppModal from "../AppModal";
 import { BodyText } from "../../ui/typography";
 import type { CalendarBookingStatus } from "../../../app/professionals/fixed-location/calendar/calendar.data";
+import type { TemplateCategoryRow } from "../../../lib/businessTemplateCatalog";
+import {
+  isConfiguredColor,
+  UNCONFIGURED_GRAY,
+} from "../../../lib/calendarDesign.utils";
 
 export type CalendarDesignDraft = {
   scope: "Categories" | "Services";
@@ -28,6 +33,7 @@ type CalendarDesignModalProps = {
   setDraft: React.Dispatch<React.SetStateAction<CalendarDesignDraft>>;
   serviceOptions?: readonly string[];
   categoryOptions?: readonly { key: string; label: string }[];
+  templateCategoryRows?: readonly TemplateCategoryRow[];
 };
 
 export function getCalendarDesignCategoryLabel(
@@ -38,7 +44,9 @@ export function getCalendarDesignCategoryLabel(
   return entry?.label ?? key;
 }
 
-type ColorRow = { key: string; label: string };
+type ColorRow =
+  | { kind: "group"; key: string; label: string }
+  | { kind: "color"; key: string; label: string };
 
 export default function CalendarDesignModal({
   open,
@@ -49,6 +57,7 @@ export default function CalendarDesignModal({
   setDraft,
   serviceOptions = [],
   categoryOptions = [],
+  templateCategoryRows = [],
 }: CalendarDesignModalProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -56,17 +65,44 @@ export default function CalendarDesignModal({
 
   const colorRows = React.useMemo<ColorRow[]>(() => {
     if (isServices) {
-      return serviceOptions.map((label) => ({ key: label, label }));
+      if (templateCategoryRows.length) {
+        const rows: ColorRow[] = [];
+        for (const category of templateCategoryRows) {
+          rows.push({
+            kind: "group",
+            key: `group:${category.key}`,
+            label: category.label,
+          });
+          for (const serviceName of category.services) {
+            rows.push({
+              kind: "color",
+              key: serviceName,
+              label: serviceName,
+            });
+          }
+        }
+        return rows;
+      }
+      return serviceOptions.map((label) => ({
+        kind: "color" as const,
+        key: label,
+        label,
+      }));
     }
-    return categoryOptions.map((entry) => ({
+    const source = templateCategoryRows.length
+      ? templateCategoryRows.map((row) => ({ key: row.key, label: row.label }))
+      : categoryOptions;
+    return source.map((entry) => ({
+      kind: "color" as const,
       key: entry.key,
       label: getCalendarDesignCategoryLabel(entry.key, categoryOptions),
     }));
-  }, [isServices, serviceOptions, categoryOptions]);
+  }, [isServices, serviceOptions, categoryOptions, templateCategoryRows]);
 
   const setColor = React.useCallback(
     (key: string, hex: string) => {
       const safe = hex?.startsWith("#") ? hex : `#${hex}`;
+      onColorSelect?.(key, safe);
       setDraft((p) => {
         if (isServices) {
           return {
@@ -80,7 +116,7 @@ export default function CalendarDesignModal({
         };
       });
     },
-    [isServices, setDraft],
+    [isServices, onColorSelect, setDraft],
   );
 
   return (
@@ -129,8 +165,8 @@ export default function CalendarDesignModal({
               }))
             }
             options={[
-              { label: "Categories", value: "Categories" },
-              { label: "Services", value: "Services" },
+              { label: "Category-based", value: "Categories" },
+              { label: "Service-based", value: "Services" },
             ]}
             placeholder="Select scope"
             fullWidth
@@ -144,13 +180,43 @@ export default function CalendarDesignModal({
               overflow: "hidden",
             }}
           >
-            {colorRows.map(({ key, label }) => {
-              const color = isServices
-                ? draft.colorsByService?.[key]
-                : draft.colorsByCategory[key];
+            {colorRows.map((row) => {
+              if (row.kind === "group") {
+                return (
+                  <Box
+                    key={row.key}
+                    sx={{
+                      px: 1.75,
+                      py: 0.85,
+                      bgcolor: alpha(m.navy, 0.03),
+                      borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
+                    }}
+                  >
+                    <BodyText
+                      sx={{
+                        fontSize: 11,
+                        fontWeight: 800,
+                        letterSpacing: "0.02em",
+                        textTransform: "uppercase",
+                        color: alpha(m.navy, 0.45),
+                      }}
+                    >
+                      {row.label}
+                    </BodyText>
+                  </Box>
+                );
+              }
+
+              const rawColor = isServices
+                ? draft.colorsByService?.[row.key]
+                : draft.colorsByCategory[row.key];
+              const configured = isConfiguredColor(rawColor);
+              const color = configured ? rawColor : undefined;
+              const swatch = color || UNCONFIGURED_GRAY;
+
               return (
                 <Box
-                  key={key}
+                  key={row.key}
                   sx={{
                     display: "grid",
                     gridTemplateColumns: "minmax(0, 1fr) auto",
@@ -158,6 +224,7 @@ export default function CalendarDesignModal({
                     gap: 1,
                     px: 1.75,
                     py: 1.1,
+                    pl: isServices ? 2.5 : 1.75,
                     borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
                     "&:last-of-type": { borderBottom: "none" },
                   }}
@@ -169,7 +236,7 @@ export default function CalendarDesignModal({
                       color: alpha(m.navy, 0.7),
                     }}
                   >
-                    {label}
+                    {row.label}
                   </BodyText>
 
                   <AppButton
@@ -191,27 +258,24 @@ export default function CalendarDesignModal({
                           width: 16,
                           height: 16,
                           borderRadius: "4px",
-                          bgcolor: color || "transparent",
-                          border: `1px dashed ${alpha(m.navy, color ? 0.18 : 0.22)}`,
-                          ...(color
-                            ? {
-                                borderStyle: "solid",
-                                borderColor: alpha(m.navy, 0.18),
-                              }
-                            : null),
+                          bgcolor: swatch,
+                          border: `1px solid ${alpha(m.navy, 0.18)}`,
+                          opacity: configured ? 1 : 0.7,
                         }}
                       />
                       <span>
-                        {color ? color.toUpperCase() : "Choose color"}
+                        {configured
+                          ? (color as string).toUpperCase()
+                          : "Choose color"}
                       </span>
                     </Stack>
                     <input
                       type="color"
                       // Uncontrolled: no colour is selected until the professional picks one.
-                      key={`${key}-${color || "unset"}`}
-                      defaultValue={color || "#FFFFFF"}
+                      key={`${row.key}-${color || "unset"}`}
+                      defaultValue={color || UNCONFIGURED_GRAY}
                       onChange={(e) => {
-                        setColor(key, e.target.value);
+                        setColor(row.key, e.target.value);
                       }}
                       style={{
                         position: "absolute",

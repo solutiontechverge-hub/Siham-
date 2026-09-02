@@ -3,42 +3,24 @@ import type { Interval } from "./calendar.utils";
 import {
   addDaysIso,
   intersectIntervals,
+  isBlockTimeRangeFullyPast,
   mergeIntervals,
   minutesSinceMidnight,
-  parseIsoDate,
   subtractIntervals,
+  toIsoLocalDate,
+  weekdayNameFromIso,
 } from "./calendar.utils";
-import type { BlockTimeDraft } from "./calendar.utils";
 import type { ScheduleAvailabilityRow, ScheduleDateOverride } from "./calendar-settings.types";
-
-const dayNameToDow: Record<BlockTimeDraft["dayFrom"], number> = {
-  Sunday: 0,
-  Monday: 1,
-  Tuesday: 2,
-  Wednesday: 3,
-  Thursday: 4,
-  Friday: 5,
-  Saturday: 6,
-};
-
-const isDayInRange = (dow: number, dayFrom: BlockTimeDraft["dayFrom"], dayTo: BlockTimeDraft["dayTo"]) => {
-  const fromDow = dayNameToDow[dayFrom];
-  const toDow = dayNameToDow[dayTo];
-  if (fromDow <= toDow) return dow >= fromDow && dow <= toDow;
-  return dow >= fromDow || dow <= toDow;
-};
 
 export function makeScheduleRowId() {
   return `sch-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 }
 
+/** Match by date span only — dayFrom/dayTo are display-only. */
 export function rowMatchesDate(row: ScheduleAvailabilityRow, iso: string) {
   if (row.archived) return false;
   if (row.excludedDates?.includes(iso)) return false;
-  if (iso < row.dateFrom || iso > row.dateTo) return false;
-  const dow = parseIsoDate(iso).getUTCDay();
-  const singleDay = row.dateFrom === row.dateTo;
-  return singleDay || isDayInRange(dow, row.dayFrom, row.dayTo);
+  return iso >= row.dateFrom && iso <= row.dateTo;
 }
 
 export function getScheduleRowsForDate(
@@ -195,15 +177,60 @@ export function hasAvailabilityOnDate(
   return relevant.some((row) => rowMatchesDate(row, iso));
 }
 
+/** Mark availability rows archived when their full Date–Date range is before today. */
+export function archiveFullyPastScheduleRows(
+  rows: readonly ScheduleAvailabilityRow[],
+  todayIso = toIsoLocalDate(new Date()),
+): ScheduleAvailabilityRow[] {
+  let changed = false;
+  const next = rows.map((row) => {
+    if (row.archived) return row;
+    if (
+      !isBlockTimeRangeFullyPast(
+        row.dateFrom,
+        row.dateTo || row.dateFrom,
+        todayIso,
+      )
+    ) {
+      return row;
+    }
+    changed = true;
+    return { ...row, archived: true };
+  });
+  return changed ? next : (rows as ScheduleAvailabilityRow[]);
+}
+
+/** True when the member has non-archived availability or a block on the given date. */
+export function resourceHasScheduleOrBlockOnDate(
+  resourceId: string,
+  iso: string,
+  rows: readonly ScheduleAvailabilityRow[],
+  blocks: readonly { resourceId: string; date: string }[],
+) {
+  if (hasAvailabilityOnDate(rows, iso, resourceId)) return true;
+  return blocks.some(
+    (block) => block.resourceId === resourceId && block.date === iso,
+  );
+}
+
+export function resourceHasScheduleOrBlockOnAnyDate(
+  resourceId: string,
+  isos: readonly string[],
+  rows: readonly ScheduleAvailabilityRow[],
+  blocks: readonly { resourceId: string; date: string }[],
+) {
+  return isos.some((iso) =>
+    resourceHasScheduleOrBlockOnDate(resourceId, iso, rows, blocks),
+  );
+}
+
 export function expandRowDates(row: ScheduleAvailabilityRow): string[] {
   const dates: string[] = [];
   let cursor = row.dateFrom;
   const end = row.dateTo;
-  const singleDay = row.dateFrom === end;
 
   while (cursor <= end) {
-    const dow = parseIsoDate(cursor).getUTCDay();
-    if (!row.excludedDates?.includes(cursor) && (singleDay || isDayInRange(dow, row.dayFrom, row.dayTo))) {
+    if (!row.excludedDates?.includes(cursor)) {
       dates.push(cursor);
     }
     cursor = addDaysIso(cursor, 1);
@@ -227,8 +254,8 @@ export function splitScheduleRowForDate(
     locations: next.locations,
     dateFrom: iso,
     dateTo: iso,
-    dayFrom: "Monday",
-    dayTo: "Sunday",
+    dayFrom: weekdayNameFromIso(iso),
+    dayTo: weekdayNameFromIso(iso),
     shifts: next.shifts,
     excludedDates: [],
   };

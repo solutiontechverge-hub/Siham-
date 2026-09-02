@@ -8,13 +8,14 @@ import { Box, IconButton, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDatePicker from "../AppDatePicker";
 import AppDropdown from "../AppDropdown";
+import AppTextField from "../AppTextField";
 import AppTimePicker from "../AppTimePicker";
 import AppModal from "../AppModal";
 import type {
   CalendarBookingLocation,
   CalendarResource,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
-import type { BlockTimeDraft } from "./calendar.utils";
+import { weekdayNameFromIso, type BlockTimeDraft } from "./calendar.utils";
 import type { ScheduleShift } from "./calendar-settings.types";
 
 export type AvailabilityDraft = {
@@ -39,16 +40,6 @@ type CalendarAvailabilityModalProps = {
   title?: string;
 };
 
-const dayOptions = [
-  { label: "Monday", value: "Monday" },
-  { label: "Tuesday", value: "Tuesday" },
-  { label: "Wednesday", value: "Wednesday" },
-  { label: "Thursday", value: "Thursday" },
-  { label: "Friday", value: "Friday" },
-  { label: "Saturday", value: "Saturday" },
-  { label: "Sunday", value: "Sunday" },
-];
-
 export default function CalendarAvailabilityModal({
   availableLocations,
   draft,
@@ -62,6 +53,53 @@ export default function CalendarAvailabilityModal({
 }: CalendarAvailabilityModalProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
+
+  const showDays =
+    Boolean(draft.dateFrom) &&
+    Boolean(draft.dateTo) &&
+    draft.dateFrom !== draft.dateTo;
+
+  const dayFromLabel = draft.dateFrom
+    ? weekdayNameFromIso(draft.dateFrom)
+    : draft.dayFrom;
+  const dayToLabel = draft.dateTo
+    ? weekdayNameFromIso(draft.dateTo)
+    : draft.dayTo;
+
+  const patchDates = React.useCallback(
+    (patch: { dateFrom?: string; dateTo?: string }) => {
+      setDraft((p) => {
+        const dateFrom = patch.dateFrom ?? p.dateFrom;
+        let dateTo = patch.dateTo ?? p.dateTo;
+        if (dateFrom && dateTo && dateTo < dateFrom) dateTo = dateFrom;
+        return {
+          ...p,
+          dateFrom,
+          dateTo,
+          dayFrom: dateFrom ? weekdayNameFromIso(dateFrom) : p.dayFrom,
+          dayTo: dateTo
+            ? weekdayNameFromIso(dateTo)
+            : dateFrom
+              ? weekdayNameFromIso(dateFrom)
+              : p.dayTo,
+        };
+      });
+    },
+    [setDraft],
+  );
+
+  React.useEffect(() => {
+    if (!open) return;
+    if (!draft.dateFrom && !draft.dateTo) return;
+    const nextFrom = draft.dateFrom
+      ? weekdayNameFromIso(draft.dateFrom)
+      : draft.dayFrom;
+    const nextTo = draft.dateTo
+      ? weekdayNameFromIso(draft.dateTo)
+      : draft.dayTo;
+    if (nextFrom === draft.dayFrom && nextTo === draft.dayTo) return;
+    setDraft((p) => ({ ...p, dayFrom: nextFrom, dayTo: nextTo }));
+  }, [open, draft.dateFrom, draft.dateTo, draft.dayFrom, draft.dayTo, setDraft]);
 
   return (
     <AppModal
@@ -150,7 +188,7 @@ export default function CalendarAvailabilityModal({
               <AppDatePicker
                 label="Date (from)"
                 value={draft.dateFrom}
-                onChange={(val) => setDraft((p) => ({ ...p, dateFrom: val }))}
+                onChange={(val) => patchDates({ dateFrom: val })}
                 fullWidth
               />
             </Box>
@@ -158,43 +196,33 @@ export default function CalendarAvailabilityModal({
               <AppDatePicker
                 label="Date (To)"
                 value={draft.dateTo}
-                onChange={(val) => setDraft((p) => ({ ...p, dateTo: val }))}
+                onChange={(val) => patchDates({ dateTo: val })}
                 min={draft.dateFrom || undefined}
                 fullWidth
               />
             </Box>
           </Stack>
 
-          <Stack direction="row" spacing={1.25}>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <AppDropdown
-                label="Day (From)"
-                value={draft.dayFrom}
-                onChange={(val) =>
-                  setDraft((p) => ({
-                    ...p,
-                    dayFrom: String(val) as AvailabilityDraft["dayFrom"],
-                  }))
-                }
-                options={dayOptions}
-                fullWidth
-              />
-            </Box>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <AppDropdown
-                label="Day (To)"
-                value={draft.dayTo}
-                onChange={(val) =>
-                  setDraft((p) => ({
-                    ...p,
-                    dayTo: String(val) as AvailabilityDraft["dayTo"],
-                  }))
-                }
-                options={dayOptions}
-                fullWidth
-              />
-            </Box>
-          </Stack>
+          {showDays ? (
+            <Stack direction="row" spacing={1.25}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <AppTextField
+                  label="Day (From)"
+                  value={dayFromLabel}
+                  fullWidth
+                  disabled
+                />
+              </Box>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <AppTextField
+                  label="Day (To)"
+                  value={dayToLabel}
+                  fullWidth
+                  disabled
+                />
+              </Box>
+            </Stack>
+          ) : null}
 
           {draft.shifts.map((shift, index) => (
             <Stack

@@ -45,6 +45,13 @@ export type CreateFinanceTransactionRequest = {
   totalPrice: number;
   discountAmount?: number;
   lines: Array<{ name: string; quantity: number; unitPrice: number }>;
+  /** Link to booking unique_code or UUID for add-on / booking-linked sales */
+  bookingId?: string;
+  bookingRef?: string;
+  paymentPhase?: "full" | "prepay" | "addon";
+  addonId?: string;
+  entryType?: "onlineBooking" | "offlineBooking" | "manualEntry";
+  entryLabel?: string;
 };
 
 export type BulkFinanceTransactionAction = {
@@ -124,7 +131,7 @@ const financeApi = baseApi.injectEndpoints({
         method: "POST",
         body,
       }),
-      invalidatesTags: ["FinanceTransactions"],
+      invalidatesTags: ["FinanceTransactions", "Bookings"],
     }),
 
     updateFinanceTransaction: builder.mutation<
@@ -151,7 +158,7 @@ const financeApi = baseApi.injectEndpoints({
         method: "POST",
         body,
       }),
-      invalidatesTags: ["FinanceTransactions"],
+      invalidatesTags: ["FinanceTransactions", "Bookings"],
     }),
 
     replaceFinanceTransaction: builder.mutation<
@@ -253,6 +260,7 @@ export const {
   useUpdateFinanceTransactionOptionsMutation,
   useUpdateFinanceStripeStatusMutation,
   useGetFinanceTransactionsQuery,
+  useLazyGetFinanceTransactionsQuery,
   useCreateFinanceTransactionMutation,
   useUpdateFinanceTransactionMutation,
   useBulkFinanceTransactionActionMutation,

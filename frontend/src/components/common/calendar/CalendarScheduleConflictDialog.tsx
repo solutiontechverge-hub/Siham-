@@ -9,13 +9,15 @@ import AppModal from "../AppModal";
 export type CalendarScheduleConflictKind =
   | "availability_set"
   | "timeslot_blocked"
-  | "overlap_booking";
+  | "overlap_booking"
+  | "staff_double_book";
 
 type CalendarScheduleConflictDialogProps = {
   open: boolean;
   kind: CalendarScheduleConflictKind | null;
   onClose: () => void;
   onConfirm: () => void;
+  messageOverride?: string | null;
 };
 
 const COPY: Record<
@@ -41,6 +43,13 @@ const COPY: Record<
     confirmLabel: "Continue",
     confirmTone: "primary",
   },
+  staff_double_book: {
+    title: "Overlapping staff time",
+    message:
+      "One or more services overlap for the same team member. You can still save this booking.",
+    confirmLabel: "Continue",
+    confirmTone: "primary",
+  },
 };
 
 export default function CalendarScheduleConflictDialog({
@@ -48,11 +57,14 @@ export default function CalendarScheduleConflictDialog({
   kind,
   onClose,
   onConfirm,
+  messageOverride = null,
 }: CalendarScheduleConflictDialogProps) {
   const m = useTheme().palette.mollure;
   if (!kind) return null;
   const copy = COPY[kind];
-  const ackOnly = kind !== "overlap_booking";
+  const message = messageOverride?.trim() || copy.message;
+  const ackOnly =
+    kind !== "overlap_booking" && kind !== "staff_double_book";
 
   return (
     <AppModal
@@ -111,7 +123,7 @@ export default function CalendarScheduleConflictDialog({
             px: 1,
           }}
         >
-          {copy.message}
+          {message}
         </Typography>
       </Box>
     </AppModal>

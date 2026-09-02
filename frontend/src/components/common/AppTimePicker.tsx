@@ -19,6 +19,8 @@ export type AppTimePickerProps = {
   disabled?: boolean;
   fullWidth?: boolean;
   minuteStep?: number;
+  /** When set, only these `HH:MM` times can be selected. */
+  allowedTimes?: readonly string[];
   sx?: SxProps<Theme>;
 };
 
@@ -28,6 +30,11 @@ export type AppTimePanelProps = {
   onDone?: () => void;
   compact?: boolean;
   minuteStep?: number;
+  /** When set, only these `HH:MM` times can be selected. */
+  allowedTimes?: readonly string[];
+  /** Hide the teal header strip (useful when parent already has a label). */
+  hideHeader?: boolean;
+  disabled?: boolean;
 };
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, index) => index);
@@ -63,9 +70,39 @@ function toTimeValue(hour: number, minute: number) {
 }
 
 function nearestMinuteOption(minute: number, options: readonly number[]) {
+  if (!options.length) return 0;
   return options.reduce((closest, current) =>
     Math.abs(current - minute) < Math.abs(closest - minute) ? current : closest,
   );
+}
+
+function nearestHourOption(hour: number, options: readonly number[]) {
+  if (!options.length) return 0;
+  return options.reduce((closest, current) =>
+    Math.abs(current - hour) < Math.abs(closest - hour) ? current : closest,
+  );
+}
+
+function parseAllowedTimes(allowedTimes: readonly string[] | undefined) {
+  if (!allowedTimes?.length) return null;
+
+  const byHour = new Map<number, number[]>();
+  for (const raw of allowedTimes) {
+    if (!/^\d{2}:\d{2}$/.test(raw)) continue;
+    const { hour, minute } = parseTimeValue(raw);
+    const list = byHour.get(hour) ?? [];
+    if (!list.includes(minute)) list.push(minute);
+    byHour.set(hour, list);
+  }
+
+  if (!byHour.size) return null;
+
+  for (const list of byHour.values()) {
+    list.sort((a, b) => a - b);
+  }
+
+  const hours = [...byHour.keys()].sort((a, b) => a - b);
+  return { hours, byHour };
 }
 
 function TimeWheelColumn({
@@ -73,11 +110,13 @@ function TimeWheelColumn({
   values,
   selected,
   onSelect,
+  disabled = false,
 }: {
   label: string;
   values: readonly number[];
   selected: number;
   onSelect: (value: number) => void;
+  disabled?: boolean;
 }) {
   const m = useTheme().palette.mollure;
   const itemH = 36;
@@ -97,9 +136,10 @@ function TimeWheelColumn({
 
   React.useEffect(() => {
     scrollToValue(selected);
-  }, [selected, scrollToValue]);
+  }, [selected, scrollToValue, values]);
 
   const handleScroll = () => {
+    if (disabled || !values.length) return;
     if (scrollFrameRef.current != null) {
       cancelAnimationFrame(scrollFrameRef.current);
     }
@@ -137,6 +177,7 @@ function TimeWheelColumn({
           border: `1px solid ${alpha(m.navy, 0.08)}`,
           bgcolor: alpha(m.navy, 0.02),
           overflow: "hidden",
+          opacity: disabled ? 0.55 : 1,
         }}
       >
         <Box
@@ -159,11 +200,15 @@ function TimeWheelColumn({
           onScroll={handleScroll}
           sx={{
             height: itemH * 5,
-            overflowY: "auto",
+            overflowY: disabled ? "hidden" : "auto",
             scrollSnapType: "y mandatory",
             position: "relative",
             zIndex: 2,
             "&::-webkit-scrollbar": { width: 4 },
+            "&::-webkit-scrollbar-thumb": {
+              bgcolor: alpha(m.navy, 0.25),
+              borderRadius: 4,
+            },
           }}
         >
           <Box sx={{ height: itemH * 2 }} />
@@ -173,6 +218,7 @@ function TimeWheelColumn({
               <Box
                 key={value}
                 onClick={() => {
+                  if (disabled) return;
                   onSelect(value);
                   scrollToValue(value, "smooth");
                 }}
@@ -184,7 +230,7 @@ function TimeWheelColumn({
                   fontSize: 14,
                   fontWeight: active ? 800 : 600,
                   color: active ? m.teal : alpha(m.navy, 0.55),
-                  cursor: "pointer",
+                  cursor: disabled ? "default" : "pointer",
                   userSelect: "none",
                 }}
               >
@@ -205,69 +251,103 @@ export function AppTimePanel({
   onDone,
   compact = false,
   minuteStep = 1,
+  allowedTimes,
+  hideHeader = false,
+  disabled = false,
 }: AppTimePanelProps) {
   const m = useTheme().palette.mollure;
-  const parsed = parseTimeValue(value);
-  const minuteOptions = React.useMemo(
+  const allowed = React.useMemo(
+    () => parseAllowedTimes(allowedTimes),
+    [allowedTimes],
+  );
+  const defaultMinuteOptions = React.useMemo(
     () => buildMinuteOptions(minuteStep),
     [minuteStep],
   );
-  const [hour, setHour] = React.useState(parsed.hour);
+  const hourOptions = allowed?.hours ?? HOUR_OPTIONS;
+
+  const parsed = parseTimeValue(value);
+  const initialHour = nearestHourOption(parsed.hour, hourOptions);
+  const initialMinuteOptions =
+    allowed?.byHour.get(initialHour) ?? defaultMinuteOptions;
+
+  const [hour, setHour] = React.useState(initialHour);
   const [minute, setMinute] = React.useState(() =>
-    nearestMinuteOption(parsed.minute, minuteOptions),
+    nearestMinuteOption(parsed.minute, initialMinuteOptions),
   );
+
+  const minuteOptions =
+    allowed?.byHour.get(hour) ?? defaultMinuteOptions;
 
   React.useEffect(() => {
     const next = parseTimeValue(value);
-    setHour(next.hour);
-    setMinute(nearestMinuteOption(next.minute, minuteOptions));
-  }, [minuteOptions, value]);
+    const nextHour = nearestHourOption(next.hour, hourOptions);
+    const nextMinutes = allowed?.byHour.get(nextHour) ?? defaultMinuteOptions;
+    setHour(nextHour);
+    setMinute(nearestMinuteOption(next.minute, nextMinutes));
+  }, [allowed, defaultMinuteOptions, hourOptions, value]);
 
   const applyTime = (nextHour: number, nextMinute: number) => {
-    const safeMinute = nearestMinuteOption(nextMinute, minuteOptions);
-    setHour(nextHour);
+    if (disabled) return;
+    const safeHour = nearestHourOption(nextHour, hourOptions);
+    const nextMinutes = allowed?.byHour.get(safeHour) ?? defaultMinuteOptions;
+    const safeMinute = nearestMinuteOption(nextMinute, nextMinutes);
+    setHour(safeHour);
     setMinute(safeMinute);
-    onChange(toTimeValue(nextHour, safeMinute));
+    onChange(toTimeValue(safeHour, safeMinute));
   };
 
   return (
-    <Box sx={{ width: compact ? "100%" : 280, bgcolor: "#fff" }}>
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          px: 1.75,
-          py: 1.25,
-          borderBottom: `1px solid ${alpha(m.navy, 0.07)}`,
-          bgcolor: alpha(m.teal, 0.04),
-          gap: 0.75,
-        }}
-      >
-        <AccessTimeRoundedIcon sx={{ fontSize: 18, color: m.teal }} />
-        <Typography
+    <Box
+      sx={{
+        width: compact ? "100%" : 280,
+        bgcolor: "#fff",
+        pointerEvents: disabled ? "none" : "auto",
+      }}
+    >
+      {!hideHeader ? (
+        <Box
           sx={{
-            flex: 1,
-            fontSize: 13,
-            fontWeight: 800,
-            color: alpha(m.navy, 0.82),
+            display: "flex",
+            alignItems: "center",
+            px: 1.75,
+            py: 1.25,
+            borderBottom: `1px solid ${alpha(m.navy, 0.07)}`,
+            bgcolor: alpha(m.teal, 0.04),
+            gap: 0.75,
           }}
         >
-          {formatTimeDisplay(toTimeValue(hour, minute)) || "Select time"}
-        </Typography>
-      </Box>
+          <AccessTimeRoundedIcon sx={{ fontSize: 18, color: m.teal }} />
+          <Typography
+            sx={{
+              flex: 1,
+              fontSize: 13,
+              fontWeight: 800,
+              color: alpha(m.navy, 0.82),
+            }}
+          >
+            {formatTimeDisplay(toTimeValue(hour, minute)) || "Select time"}
+          </Typography>
+        </Box>
+      ) : null}
 
-      <Box sx={{ px: 1.5, py: 1.25 }}>
+      <Box sx={{ px: hideHeader ? 0 : 1.5, py: hideHeader ? 0 : 1.25 }}>
         <Stack direction="row" spacing={1}>
           <TimeWheelColumn
             label="Hour"
-            values={HOUR_OPTIONS}
+            values={hourOptions}
             selected={hour}
-            onSelect={(nextHour) => applyTime(nextHour, minute)}
+            disabled={disabled || !hourOptions.length}
+            onSelect={(nextHour) => {
+              const mins = allowed?.byHour.get(nextHour) ?? defaultMinuteOptions;
+              applyTime(nextHour, nearestMinuteOption(minute, mins));
+            }}
           />
           <TimeWheelColumn
             label="Minute"
             values={minuteOptions}
             selected={minute}
+            disabled={disabled || !minuteOptions.length}
             onSelect={(nextMinute) => applyTime(hour, nextMinute)}
           />
         </Stack>
@@ -277,6 +357,7 @@ export function AppTimePanel({
             tone="primary"
             fullWidth
             onClick={onDone}
+            disabled={disabled}
             sx={{
               mt: 1.25,
             }}
@@ -297,6 +378,7 @@ export default function AppTimePicker({
   disabled = false,
   fullWidth = true,
   minuteStep = 1,
+  allowedTimes,
   sx,
 }: AppTimePickerProps) {
   const m = useTheme().palette.mollure;
@@ -383,6 +465,8 @@ export default function AppTimePicker({
           onChange={onChange}
           onDone={closePicker}
           minuteStep={minuteStep}
+          allowedTimes={allowedTimes}
+          disabled={disabled}
         />
       </Popover>
     </>

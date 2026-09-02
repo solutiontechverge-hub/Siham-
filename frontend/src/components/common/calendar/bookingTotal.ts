@@ -12,6 +12,8 @@ export type BookingPriceInput = {
   lateCancellationFeePercent?: number | string;
   showLateRescheduling?: boolean;
   lateRescheduleFeePercent?: number | string;
+  showNoShowFee?: boolean;
+  noShowFeePercent?: number | string;
   showPrepayment?: boolean;
   prepaymentPercent?: number | string;
   /** When true, prepaid amount is deducted from the payable total. */
@@ -27,6 +29,7 @@ export type BookingPriceBreakdown = {
   afterDiscount: number;
   lateCancellationFeeAmount: number;
   lateRescheduleFeeAmount: number;
+  noShowFeeAmount: number;
   feesTotal: number;
   /** Booking value after discount + fees (persisted as total_price). */
   bookingTotal: number;
@@ -178,6 +181,7 @@ export function buildBookingPriceSummaryLines(input: {
   discountAmount?: number;
   lateCancellationFeeAmount?: number;
   lateRescheduleFeeAmount?: number;
+  noShowFeeAmount?: number;
 }): BookingPriceSummaryLine[] {
   const servicesTotal = input.servicesTotal ?? 0;
   const guestsTotal = input.guestsTotal ?? 0;
@@ -188,6 +192,7 @@ export function buildBookingPriceSummaryLines(input: {
   const discountAmount = input.discountAmount ?? 0;
   const lateCancellationFeeAmount = input.lateCancellationFeeAmount ?? 0;
   const lateRescheduleFeeAmount = input.lateRescheduleFeeAmount ?? 0;
+  const noShowFeeAmount = input.noShowFeeAmount ?? 0;
   const hasBreakdown =
     guestsTotal > 0 ||
     addOnsTotal > 0 ||
@@ -196,7 +201,8 @@ export function buildBookingPriceSummaryLines(input: {
     extrasAmount > 0 ||
     discountAmount > 0 ||
     lateCancellationFeeAmount > 0 ||
-    lateRescheduleFeeAmount > 0;
+    lateRescheduleFeeAmount > 0 ||
+    noShowFeeAmount > 0;
   if (!hasBreakdown) return [];
   const lines: BookingPriceSummaryLine[] = [];
   if (servicesTotal > 0) lines.push({ label: "Services", amount: servicesTotal });
@@ -223,6 +229,9 @@ export function buildBookingPriceSummaryLines(input: {
       label: "Late reschedule fee",
       amount: lateRescheduleFeeAmount,
     });
+  }
+  if (noShowFeeAmount > 0) {
+    lines.push({ label: "No-show fee", amount: noShowFeeAmount });
   }
   return lines;
 }
@@ -274,6 +283,8 @@ export function summarizeClientBookingPrice(input: ClientBookingPriceInput) {
     lateCancellationFeePercent: input.lateCancellationFeePercent,
     showLateRescheduling: input.showLateRescheduling,
     lateRescheduleFeePercent: input.lateRescheduleFeePercent,
+    showNoShowFee: input.showNoShowFee,
+    noShowFeePercent: input.noShowFeePercent,
     showPrepayment: input.showPrepayment,
     prepaymentPercent: input.prepaymentPercent,
     prepaymentPaid: input.prepaymentPaid,
@@ -286,6 +297,7 @@ export function summarizeClientBookingPrice(input: ClientBookingPriceInput) {
     discountAmount: breakdown.discountAmount,
     lateCancellationFeeAmount: breakdown.lateCancellationFeeAmount,
     lateRescheduleFeeAmount: breakdown.lateRescheduleFeeAmount,
+    noShowFeeAmount: breakdown.noShowFeeAmount,
   });
   const display = resolveBookingPriceDisplay({
     breakdown,
@@ -333,8 +345,11 @@ export function computeBookingPrice(
   const lateRescheduleFeeAmount = input.showLateRescheduling
     ? percentOf(afterDiscount, input.lateRescheduleFeePercent)
     : 0;
+  const noShowFeeAmount = input.showNoShowFee
+    ? percentOf(afterDiscount, input.noShowFeePercent)
+    : 0;
   const feesTotal = roundMoney(
-    lateCancellationFeeAmount + lateRescheduleFeeAmount,
+    lateCancellationFeeAmount + lateRescheduleFeeAmount + noShowFeeAmount,
   );
 
   const bookingTotal = roundMoney(afterDiscount + feesTotal);
@@ -361,6 +376,7 @@ export function computeBookingPrice(
     afterDiscount,
     lateCancellationFeeAmount,
     lateRescheduleFeeAmount,
+    noShowFeeAmount,
     feesTotal,
     bookingTotal,
     prepaymentAmount,

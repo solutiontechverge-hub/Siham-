@@ -40,8 +40,11 @@ import type { BookingCatalogService } from "../../../../data/bookingServiceCatal
 import { applyBusinessServiceDiscount } from "../../../../data/businessServiceModal.data";
 import { buildDesiredLocationFromSetupFields } from "../../../../data/businessPublicProfile.data";
 import {
+  buildServiceNameToCategoryKeyMap,
   buildServiceOrderFromTemplate,
   buildTemplateCategoryOptions,
+  buildTemplateCategoryRows,
+  type TemplateCategoryRow,
 } from "../../../../lib/businessTemplateCatalog";
 import { useBookingRealtimeSync } from "../../../../hooks/useBookingRealtimeSync";
 import {
@@ -297,6 +300,16 @@ export function useFixedLocationCalendarPage() {
     [setupData],
   );
 
+  const templateCategoryRows = React.useMemo<TemplateCategoryRow[]>(
+    () => buildTemplateCategoryRows(setupData?.data?.service_details),
+    [setupData],
+  );
+
+  const serviceNameToCategoryKey = React.useMemo(
+    () => buildServiceNameToCategoryKeyMap(setupData?.data?.service_details),
+    [setupData],
+  );
+
   const serviceOrderDefaults = React.useMemo(() => {
     const setup = setupData?.data;
     const fromTemplate = buildServiceOrderFromTemplate(setup?.service_details);
@@ -316,6 +329,7 @@ export function useFixedLocationCalendarPage() {
         mollureUserId: client.mollure_user_id,
         phone: client.phone ?? "",
         clientKind: client.client_kind,
+        isMollure: Boolean(client.is_mollure || client.mollure_user_id),
       })),
     [professionalClientsData],
   );
@@ -328,6 +342,16 @@ export function useFixedLocationCalendarPage() {
   const lateRescheduleFeePercentDefault =
     setupData?.data?.late_reschedule_fee_percentage != null
       ? String(setupData.data.late_reschedule_fee_percentage)
+      : undefined;
+
+  const lateCancellationFeePercentDefault =
+    setupData?.data?.late_cancellation_fee_percentage != null
+      ? String(setupData.data.late_cancellation_fee_percentage)
+      : undefined;
+
+  const noShowFeePercentDefault =
+    setupData?.data?.no_show_fee_percentage != null
+      ? String(setupData.data.no_show_fee_percentage)
       : undefined;
 
   const prepaymentPercentDefault =
@@ -494,12 +518,16 @@ export function useFixedLocationCalendarPage() {
     calendarSettings,
     serviceOptions,
     categoryOptions,
+    templateCategoryRows,
+    serviceNameToCategoryKey,
     serviceCatalog,
     serviceOrderDefaults,
     clientOptions,
     professionalClients: professionalClientsData?.data ?? [],
     fixedLocationAddress,
     lateRescheduleFeePercentDefault,
+    lateCancellationFeePercentDefault,
+    noShowFeePercentDefault,
     prepaymentPercentDefault,
     cancellationBeforeHours: setupData?.data?.cancellation_before_hours ?? null,
     cancellationBeforeMinutes: setupData?.data?.cancellation_before_minutes ?? null,

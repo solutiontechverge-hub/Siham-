@@ -91,10 +91,15 @@ export function useCalendarClientProfile(
   );
 
   const addIdentityToClientList = React.useCallback(
-    async (identity: CalendarClientIdentity) => {
+    async (
+      identity: CalendarClientIdentity,
+      options?: { silent?: boolean },
+    ) => {
       const eligibility = canAddIdentityToClientList(identity);
       if (!eligibility.ok) {
-        showSnackbar({ severity: "warning", message: eligibility.reason });
+        if (!options?.silent) {
+          showSnackbar({ severity: "warning", message: eligibility.reason });
+        }
         return false;
       }
 
@@ -116,13 +121,18 @@ export function useCalendarClientProfile(
           const created = await createProfessionalClient({
             mollure_user_id: mollureUserId,
           }).unwrap();
-          showSnackbar({
-            severity: "success",
-            message: "Client added to your Client List.",
-          });
-          setNotInListPopover(null);
-          setBookingDrawerNotListedIdentity(null);
-          openListedClient(created.data.id);
+          if (!options?.silent) {
+            showSnackbar({
+              severity: "success",
+              message: "Client added to your Client List.",
+            });
+            setNotInListPopover(null);
+            setBookingDrawerNotListedIdentity(null);
+            openListedClient(created.data.id);
+          } else {
+            setNotInListPopover(null);
+            setBookingDrawerNotListedIdentity(null);
+          }
           return true;
         }
 
@@ -150,19 +160,26 @@ export function useCalendarClientProfile(
               },
         ).unwrap();
 
-        showSnackbar({
-          severity: "success",
-          message: "Client added to your Client List.",
-        });
-        setNotInListPopover(null);
-        setBookingDrawerNotListedIdentity(null);
-        openListedClient(created.data.id);
+        if (!options?.silent) {
+          showSnackbar({
+            severity: "success",
+            message: "Client added to your Client List.",
+          });
+          setNotInListPopover(null);
+          setBookingDrawerNotListedIdentity(null);
+          openListedClient(created.data.id);
+        } else {
+          setNotInListPopover(null);
+          setBookingDrawerNotListedIdentity(null);
+        }
         return true;
       } catch (error) {
-        showSnackbar({
-          severity: "error",
-          message: getApiErrorMessage(error, "Unable to add client."),
-        });
+        if (!options?.silent) {
+          showSnackbar({
+            severity: "error",
+            message: getApiErrorMessage(error, "Unable to add client."),
+          });
+        }
         return false;
       }
     },

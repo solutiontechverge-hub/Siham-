@@ -24,6 +24,7 @@ import type {
 export type SalesCardMenuAction =
   | "editSales"
   | "cancelSales"
+  | "refundSales"
   | "downloadInvoicePdf"
   | "downloadInvoiceExcel"
   | "addNote"
@@ -185,6 +186,7 @@ function useActionsMenu(onAction?: (action: SalesCardMenuAction) => void) {
 
 function SalesActionsMenu({
   limitedMenu,
+  showRefund,
   menuAnchor,
   downloadAnchor,
   setDownloadAnchor,
@@ -192,6 +194,8 @@ function SalesActionsMenu({
   run,
 }: {
   limitedMenu?: boolean;
+  /** Show Refund when the sale has received money and is not already muted. */
+  showRefund?: boolean;
   menuAnchor: HTMLElement | null;
   downloadAnchor: HTMLElement | null;
   setDownloadAnchor: (el: HTMLElement | null) => void;
@@ -211,6 +215,7 @@ function SalesActionsMenu({
     : [
         { id: "editSales", label: "Edit Sales" },
         { id: "cancelSales", label: "Cancel Sales" },
+        ...(showRefund ? [{ id: "refundSales" as const, label: "Refund" }] : []),
         { id: "downloadInvoice", label: "Download Invoice" },
         { id: "addNote", label: "Add note" },
       ];
@@ -486,6 +491,9 @@ function SubSummaryCard({
 
       <SalesActionsMenu
         limitedMenu={limitedMenu}
+        showRefund={
+          sub.paymentState === "paid" || sub.paymentState === "prepaid"
+        }
         menuAnchor={menuAnchor}
         downloadAnchor={downloadAnchor}
         setDownloadAnchor={setDownloadAnchor}
@@ -829,6 +837,10 @@ export default function SalesOverviewCard({
 
       <SalesActionsMenu
         limitedMenu={card.limitedMenu}
+        showRefund={
+          !muted &&
+          (card.paymentState === "paid" || card.paymentState === "prepaid")
+        }
         menuAnchor={menuAnchor}
         downloadAnchor={downloadAnchor}
         setDownloadAnchor={setDownloadAnchor}

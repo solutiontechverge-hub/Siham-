@@ -2,20 +2,33 @@
 
 import * as React from "react";
 import type { RankingFactor } from "../../adminMockData";
-import {
-  LIVE_FACTORS_BY_ID,
-  liveRankingFactors,
-  reorderIds,
-} from "./listing-ranking.data";
+import { useGetAdminListingRankingQuery } from "../../../../store/services/adminApi";
+import { reorderIds } from "./listing-ranking.data";
 
 export function useAdminListingRankingPage() {
-  const [orderedIds, setOrderedIds] = React.useState(
-    liveRankingFactors.map((f) => f.id),
-  );
+  const { data } = useGetAdminListingRankingQuery();
+  const liveFactors = (data?.data?.factors ?? []) as RankingFactor[];
+
+  const [orderedIds, setOrderedIds] = React.useState<string[]>([]);
   const [draggingId, setDraggingId] = React.useState<string | null>(null);
 
+  React.useEffect(() => {
+    if (!liveFactors.length) return;
+    setOrderedIds((prev) => {
+      if (prev.length === liveFactors.length && prev.every((id) => liveFactors.some((f) => f.id === id))) {
+        return prev;
+      }
+      return liveFactors.map((f) => f.id);
+    });
+  }, [liveFactors]);
+
+  const byId = React.useMemo(
+    () => Object.fromEntries(liveFactors.map((f) => [f.id, f])),
+    [liveFactors],
+  );
+
   const factors = orderedIds
-    .map((id) => LIVE_FACTORS_BY_ID[id])
+    .map((id) => byId[id])
     .filter((f): f is RankingFactor => Boolean(f));
 
   const total = factors.reduce((sum, f) => sum + f.weight, 0);

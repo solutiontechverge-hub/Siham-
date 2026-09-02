@@ -10,17 +10,13 @@ import {
   Stack,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import AppMultiSelect from "../AppMultiSelect";
 import AppDropdown from "../AppDropdown";
 import AppTextField from "../AppTextField";
 import AppTimePicker from "../AppTimePicker";
 import AppModal from "../AppModal";
-import { AppCalendarPanel } from "../AppDatePicker";
 import { BodyText } from "../../ui/typography";
 
-const DEFAULT_NOT_AVAILABLE_NOTE = "Shop will be remain close";
-
-type DatePickMode = "single" | "range";
+export const PUBLIC_HOURS_NOTE_MAX_LENGTH = 120;
 
 export type PublicBusinessHoursLocation = "FL" | "DL";
 
@@ -33,7 +29,7 @@ export type PublicBusinessHoursDay =
   | "Saturday"
   | "Sunday";
 
-/** Persisted public business hours row (one location + one day). */
+/** Persisted public business hours row (one location + one weekday). */
 export type PublicBusinessHoursEntry = {
   location: "" | PublicBusinessHoursLocation;
   schedule: "" | "fixed" | "variable";
@@ -46,66 +42,223 @@ export type PublicBusinessHoursEntry = {
   note: string;
 };
 
-/** Modal draft — location is multi-select; expanded to entries on apply. */
-export type PublicBusinessHoursDraft = Omit<PublicBusinessHoursEntry, "location"> & {
-  locations: PublicBusinessHoursLocation[];
+export type PublicHoursDayConfig = {
+  day: PublicBusinessHoursDay;
+  startTime: string;
+  endTime: string;
+  off: boolean;
 };
 
-const ISO_DOW_TO_DAY_NAME: PublicBusinessHoursDay[] = [
-  "Sunday",
+/** Modal draft — one location at a time; Mon–Sun day configs. */
+export type PublicBusinessHoursDraft = {
+  location: "" | PublicBusinessHoursLocation;
+  /** @deprecated multi-select removed; kept for legacy callers */
+  locations: PublicBusinessHoursLocation[];
+  schedule: "" | "fixed" | "variable";
+  day: "" | PublicBusinessHoursDay;
+  dateFrom: string;
+  dateTo: string;
+  startTime: string;
+  endTime: string;
+  notAvailable: boolean;
+  note: string;
+  days: PublicHoursDayConfig[];
+};
+
+export const WEEKDAY_ORDER: PublicBusinessHoursDay[] = [
   "Monday",
   "Tuesday",
   "Wednesday",
   "Thursday",
   "Friday",
   "Saturday",
+  "Sunday",
 ];
 
-function dayNameFromIso(iso: string): PublicBusinessHoursDay | "" {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "";
-  const [y, m, d] = iso.split("-").map(Number);
-  return ISO_DOW_TO_DAY_NAME[new Date(Date.UTC(y, m - 1, d)).getUTCDay()] ?? "";
+export function createDefaultPublicHoursDayConfigs(): PublicHoursDayConfig[] {
+  return WEEKDAY_ORDER.map((day) => ({
+    day,
+    startTime: "09:00",
+    endTime: "17:00",
+    off: false,
+  }));
 }
 
+export function createEmptyPublicBusinessHoursDraft(
+  location?: PublicBusinessHoursLocation,
+): PublicBusinessHoursDraft {
+  return {
+    location: location ?? "",
+    locations: location ? [location] : [],
+    schedule: location === "DL" ? "variable" : location === "FL" ? "fixed" : "",
+    day: "",
+    dateFrom: "",
+    dateTo: "",
+    startTime: "09:00",
+    endTime: "17:00",
+    notAvailable: false,
+    note: "",
+    days: createDefaultPublicHoursDayConfigs(),
+  };
+}
+
+export function offLabelForLocation(
+  location: "" | PublicBusinessHoursLocation | undefined,
+) {
+  return location === "DL" ? "Not Available" : "Closed";
+}
+
+export function scheduleLabelForType(
+  schedule: "" | "fixed" | "variable" | undefined,
+) {
+  if (schedule === "variable") return "Variable Schedule";
+  if (schedule === "fixed") return "Fixed Schedule";
+  return "Schedule";
+}
+
+/** Build modal draft from saved weekly entries for one location. */
+export function draftFromPublicBusinessHoursEntries(
+  entries: readonly PublicBusinessHoursEntry[],
+  location: PublicBusinessHoursLocation,
+): PublicBusinessHoursDraft {
+  const forLocation = entries.filter((entry) => entry.location === location);
+  const schedule =
+    forLocation.find((entry) => entry.schedule)?.schedule ||
+    (location === "DL" ? "variable" : "fixed");
+  const note =
+    forLocation.find((entry) => entry.note?.trim())?.note?.trim() || "";
+
+  const days = WEEKDAY_ORDER.map((day) => {
+    const match = [...forLocation]
+      .reverse()
+      .find((entry) => entry.day === day);
+    if (!match) {
+      return {
+        day,
+        startTime: "09:00",
+        endTime: "17:00",
+        off: false,
+      };
+    }
+    return {
+      day,
+      startTime: match.startTime || "09:00",
+      endTime: match.endTime || "17:00",
+      off: Boolean(match.notAvailable),
+    };
+  });
+
+  return {
+    location,
+    locations: [location],
+    schedule,
+    day: "",
+    dateFrom: "",
+    dateTo: "",
+    startTime: "09:00",
+    endTime: "17:00",
+    notAvailable: false,
+    note: schedule === "variable" ? note.slice(0, PUBLIC_HOURS_NOTE_MAX_LENGTH) : "",
+    days,
+  };
+}
+
+/** Expand draft into persisted weekday rows (no date range). */
 export function expandPublicBusinessHoursDraft(
   draft: PublicBusinessHoursDraft,
 ): PublicBusinessHoursEntry[] {
-  const dateFrom = draft.dateFrom;
-  const dateTo = draft.dateTo || draft.dateFrom;
-  const isRange = Boolean(dateFrom && dateTo && dateFrom !== dateTo);
+  const location =
+    draft.location ||
+    draft.locations[0] ||
+    ("" as "" | PublicBusinessHoursLocation);
+  if (!location) return [];
 
-  // Range without a specific day → one row per weekday (shown as week in settings).
-  const days: Array<"" | PublicBusinessHoursDay> = draft.day
-    ? [draft.day]
-    : isRange
-      ? [
-          "Monday",
-          "Tuesday",
-          "Wednesday",
-          "Thursday",
-          "Friday",
-          "Saturday",
-          "Sunday",
-        ]
-      : [dayNameFromIso(dateFrom) || ""];
+  const dayConfigs =
+    draft.days?.length === 7
+      ? draft.days
+      : createDefaultPublicHoursDayConfigs().map((row) =>
+          row.day === draft.day
+            ? {
+                ...row,
+                startTime: draft.startTime || row.startTime,
+                endTime: draft.endTime || row.endTime,
+                off: draft.notAvailable,
+              }
+            : row,
+        );
 
-  const entries: PublicBusinessHoursEntry[] = [];
-  for (const location of draft.locations) {
-    for (const day of days) {
-      entries.push({
-        location,
-        schedule: draft.schedule,
-        day,
-        dateFrom,
-        dateTo,
-        startTime: draft.startTime,
-        endTime: draft.endTime,
-        notAvailable: draft.notAvailable,
-        note: draft.note,
-      });
-    }
-  }
-  return entries;
+  const note =
+    draft.schedule === "variable"
+      ? draft.note.trim().slice(0, PUBLIC_HOURS_NOTE_MAX_LENGTH)
+      : "";
+
+  return dayConfigs.map((dayConfig) => ({
+    location,
+    schedule: draft.schedule,
+    day: dayConfig.day,
+    dateFrom: "",
+    dateTo: "",
+    startTime: dayConfig.off ? "" : dayConfig.startTime,
+    endTime: dayConfig.off ? "" : dayConfig.endTime,
+    notAvailable: dayConfig.off,
+    note,
+  }));
+}
+
+/** Replace all entries for draft location(s); keep other locations intact. */
+export function replacePublicBusinessHoursForLocations(
+  existing: readonly PublicBusinessHoursEntry[],
+  draft: PublicBusinessHoursDraft,
+): PublicBusinessHoursEntry[] {
+  const locations = new Set<PublicBusinessHoursLocation>(
+    draft.location
+      ? [draft.location]
+      : draft.locations.length
+        ? draft.locations
+        : [],
+  );
+  if (!locations.size) return [...existing];
+  const kept = existing.filter(
+    (entry) =>
+      !entry.location ||
+      !locations.has(entry.location as PublicBusinessHoursLocation),
+  );
+  return [...kept, ...expandPublicBusinessHoursDraft(draft)];
+}
+
+export function locationHasPublicHoursConfigured(
+  entries: readonly PublicBusinessHoursEntry[],
+  location: PublicBusinessHoursLocation,
+) {
+  return entries.some(
+    (entry) =>
+      entry.location === location &&
+      Boolean(entry.day) &&
+      (entry.notAvailable || Boolean(entry.startTime && entry.endTime)),
+  );
+}
+
+export function variableNoteForLocation(
+  entries: readonly PublicBusinessHoursEntry[],
+  location: PublicBusinessHoursLocation,
+) {
+  const match = entries.find(
+    (entry) =>
+      entry.location === location &&
+      entry.schedule === "variable" &&
+      Boolean(entry.note?.trim()),
+  );
+  return match?.note?.trim() || "";
+}
+
+export function scheduleTypeForLocation(
+  entries: readonly PublicBusinessHoursEntry[],
+  location: PublicBusinessHoursLocation,
+): "" | "fixed" | "variable" {
+  const match = [...entries]
+    .reverse()
+    .find((entry) => entry.location === location && entry.schedule);
+  return match?.schedule || "";
 }
 
 type CalendarPublicBusinessHoursModalProps = {
@@ -116,30 +269,6 @@ type CalendarPublicBusinessHoursModalProps = {
   setDraft: React.Dispatch<React.SetStateAction<PublicBusinessHoursDraft>>;
 };
 
-const dayOptions: Array<{
-  label: string;
-  value: PublicBusinessHoursDay;
-}> = [
-  { label: "Monday", value: "Monday" },
-  { label: "Tuesday", value: "Tuesday" },
-  { label: "Wednesday", value: "Wednesday" },
-  { label: "Thursday", value: "Thursday" },
-  { label: "Friday", value: "Friday" },
-  { label: "Saturday", value: "Saturday" },
-  { label: "Sunday", value: "Sunday" },
-];
-
-const locationOptions = [
-  { label: "FL", value: "FL" },
-  { label: "DL", value: "DL" },
-];
-
-function formatDisplayDate(iso: string): string {
-  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "";
-  const [y, m, d] = iso.split("-");
-  return `${d}/${m}/${y}`;
-}
-
 export default function CalendarPublicBusinessHoursModal({
   open,
   onClose,
@@ -149,89 +278,70 @@ export default function CalendarPublicBusinessHoursModal({
 }: CalendarPublicBusinessHoursModalProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
-  const [datePickMode, setDatePickMode] = React.useState<DatePickMode>("single");
+  const location =
+    draft.location || draft.locations[0] || ("" as PublicBusinessHoursLocation | "");
+  const offLabel = offLabelForLocation(location);
+  const isVariable = draft.schedule === "variable";
+  const selectedDay = draft.day || WEEKDAY_ORDER[0];
+  const dayConfigs = draft.days?.length
+    ? draft.days
+    : createDefaultPublicHoursDayConfigs();
+  const activeDay =
+    dayConfigs.find((row) => row.day === selectedDay) ?? dayConfigs[0];
 
-  React.useEffect(() => {
-    if (open) setDatePickMode("single");
-  }, [open]);
-
-  const dayLockedToCalendar =
-    datePickMode === "single" ||
-    Boolean(draft.dateFrom && !draft.dateTo);
-
-  const handleDatePickModeChange = React.useCallback(
-    (mode: DatePickMode) => {
-      setDatePickMode(mode);
-      setDraft((p) => {
-        if (mode === "single") {
-          const iso = p.dateFrom || p.dateTo || "";
-          return {
-            ...p,
-            dateFrom: iso,
-            dateTo: iso,
-            day: iso ? dayNameFromIso(iso) : p.day,
-          };
-        }
-        // Range mode: Day field is hidden; clear day so hours cover the whole span.
-        if (p.dateFrom && p.dateTo && p.dateFrom === p.dateTo) {
-          return { ...p, dateTo: "", day: "" };
-        }
-        return { ...p, day: "" };
+  const updateActiveDay = React.useCallback(
+    (patch: Partial<PublicHoursDayConfig>) => {
+      setDraft((prev) => {
+        const days = (prev.days?.length
+          ? prev.days
+          : createDefaultPublicHoursDayConfigs()
+        ).map((row) =>
+          row.day === (prev.day || WEEKDAY_ORDER[0])
+            ? { ...row, ...patch }
+            : row,
+        );
+        const nextActive =
+          days.find((row) => row.day === (prev.day || WEEKDAY_ORDER[0])) ??
+          days[0];
+        return {
+          ...prev,
+          days,
+          startTime: nextActive.startTime,
+          endTime: nextActive.endTime,
+          notAvailable: nextActive.off,
+        };
       });
     },
     [setDraft],
   );
 
-  const handleCalendarDaySelect = React.useCallback(
-    (iso: string) => {
-      setDraft((p) => {
-        if (datePickMode === "single") {
-          return {
-            ...p,
-            dateFrom: iso,
-            dateTo: iso,
-            day: dayNameFromIso(iso),
-          };
-        }
-
-        // Range: first click (or restart after a complete range).
-        if (!p.dateFrom || (p.dateFrom && p.dateTo)) {
-          return {
-            ...p,
-            dateFrom: iso,
-            dateTo: "",
-            day: "",
-          };
-        }
-        // Second click: set end (swap if earlier than start).
-        if (iso < p.dateFrom) {
-          return {
-            ...p,
-            dateFrom: iso,
-            dateTo: p.dateFrom,
-            day: "",
-          };
-        }
-        return {
-          ...p,
-          dateTo: iso,
-          day: "",
-        };
-      });
-    },
-    [datePickMode, setDraft],
-  );
-
-  const dateLabel = React.useMemo(() => {
-    if (datePickMode === "single") {
-      if (!draft.dateFrom) return "Select a day";
-      return formatDisplayDate(draft.dateFrom);
-    }
-    if (!draft.dateFrom) return "Select start date, then end date";
-    const from = formatDisplayDate(draft.dateFrom);
-    if (!draft.dateTo) return `${from} → select end date`;
-    return `${from} – ${formatDisplayDate(draft.dateTo)}`;
-  }, [datePickMode, draft.dateFrom, draft.dateTo]);
+  React.useEffect(() => {
+    if (!open) return;
+    setDraft((prev) => {
+      const nextLocation =
+        prev.location || prev.locations[0] || ("" as PublicBusinessHoursLocation | "");
+      const days =
+        prev.days?.length === 7
+          ? prev.days
+          : createDefaultPublicHoursDayConfigs();
+      const day = prev.day || WEEKDAY_ORDER[0];
+      const active = days.find((row) => row.day === day) ?? days[0];
+      return {
+        ...prev,
+        location: nextLocation,
+        locations: nextLocation ? [nextLocation] : prev.locations,
+        day,
+        days,
+        startTime: active.startTime,
+        endTime: active.endTime,
+        notAvailable: active.off,
+        note:
+          prev.schedule === "variable"
+            ? prev.note.slice(0, PUBLIC_HOURS_NOTE_MAX_LENGTH)
+            : "",
+      };
+    });
+  }, [open, setDraft]);
 
   return (
     <AppModal
@@ -246,20 +356,14 @@ export default function CalendarPublicBusinessHoursModal({
             <AppButton
               tone="secondary"
               onClick={onClose}
-              sx={{
-                height: 38,
-                minWidth: 110,
-              }}
+              sx={{ height: 38, minWidth: 110 }}
             >
               Cancel
             </AppButton>
             <AppButton
               tone="primary"
               onClick={onApply}
-              sx={{
-                height: 38,
-                minWidth: 110,
-              }}
+              sx={{ height: 38, minWidth: 110 }}
             >
               Apply
             </AppButton>
@@ -269,22 +373,25 @@ export default function CalendarPublicBusinessHoursModal({
     >
       <Box sx={{ px: 2.5, py: 2 }}>
         <Stack spacing={1.75}>
-          <AppMultiSelect
+          <AppDropdown
             label="Location"
-            value={draft.locations}
-            onChange={(val) =>
+            value={location}
+            onChange={(val) => {
+              const next = String(val) as PublicBusinessHoursLocation;
               setDraft((p) => ({
                 ...p,
-                locations: val as PublicBusinessHoursLocation[],
-              }))
-            }
-            options={locationOptions}
-            placeholder="Select Location"
-            renderValue={(selected) => {
-              if (!selected.length) return "Select Location";
-              if (selected.length === locationOptions.length) return "All";
-              return selected.join(", ");
+                location: next,
+                locations: [next],
+                schedule:
+                  p.schedule ||
+                  (next === "DL" ? "variable" : "fixed"),
+              }));
             }}
+            options={[
+              { label: "Fixed Location (FL)", value: "FL" },
+              { label: "Desired Location (DL)", value: "DL" },
+            ]}
+            placeholder="Select Location"
             fullWidth
           />
 
@@ -295,6 +402,10 @@ export default function CalendarPublicBusinessHoursModal({
               setDraft((p) => ({
                 ...p,
                 schedule: String(val) as PublicBusinessHoursDraft["schedule"],
+                note:
+                  String(val) === "variable"
+                    ? p.note.slice(0, PUBLIC_HOURS_NOTE_MAX_LENGTH)
+                    : "",
               }))
             }
             options={[
@@ -304,23 +415,6 @@ export default function CalendarPublicBusinessHoursModal({
             placeholder="Select Schedule"
             fullWidth
           />
-
-          {datePickMode === "single" ? (
-            <AppDropdown
-              label="Day"
-              value={draft.day}
-              onChange={(val) =>
-                setDraft((p) => ({
-                  ...p,
-                  day: String(val) as PublicBusinessHoursDraft["day"],
-                }))
-              }
-              options={dayOptions}
-              placeholder="Select Day"
-              fullWidth
-              disabled={dayLockedToCalendar}
-            />
-          ) : null}
 
           <Box>
             <BodyText
@@ -334,116 +428,77 @@ export default function CalendarPublicBusinessHoursModal({
                 mb: 0.75,
               }}
             >
-              Dates
+              Days
             </BodyText>
-            <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
-              {(
-                [
-                  { id: "single", label: "Single day" },
-                  { id: "range", label: "Date range" },
-                ] as const
-              ).map((option) => {
-                const active = datePickMode === option.id;
+            <Stack direction="row" flexWrap="wrap" useFlexGap spacing={0.75}>
+              {dayConfigs.map((row) => {
+                const active = row.day === selectedDay;
                 return (
                   <ButtonBase
-                    key={option.id}
-                    onClick={() => handleDatePickModeChange(option.id)}
+                    key={row.day}
+                    onClick={() =>
+                      setDraft((p) => ({
+                        ...p,
+                        day: row.day,
+                        startTime: row.startTime,
+                        endTime: row.endTime,
+                        notAvailable: row.off,
+                      }))
+                    }
                     sx={{
-                      flex: 1,
+                      px: 1.1,
                       height: 34,
                       borderRadius: "10px",
                       border: `1px solid ${
                         active ? alpha(m.teal, 0.45) : alpha(m.navy, 0.12)
                       }`,
-                      bgcolor: active ? alpha(m.teal, 0.12) : "#fff",
+                      bgcolor: active
+                        ? alpha(m.teal, 0.12)
+                        : row.off
+                          ? alpha(m.navy, 0.04)
+                          : "#fff",
                       color: active ? m.teal : alpha(m.navy, 0.7),
-                      fontSize: 12.5,
+                      fontSize: 12,
                       fontWeight: 800,
                     }}
                   >
-                    {option.label}
+                    {row.day.slice(0, 3)}
+                    {row.off ? "*" : ""}
                   </ButtonBase>
                 );
               })}
             </Stack>
             <BodyText
               sx={{
+                mt: 0.85,
                 fontSize: 12,
                 fontWeight: 700,
                 color: alpha(m.navy, 0.55),
-                mb: 1,
               }}
             >
-              {dateLabel}
+              Editing {selectedDay}
+              {activeDay?.off ? ` (${offLabel})` : ""}
             </BodyText>
-            <Box
-              sx={{
-                border: `1px solid ${alpha(m.navy, 0.12)}`,
-                borderRadius: "12px",
-                overflow: "hidden",
-                display: "flex",
-                justifyContent: "center",
-              }}
-            >
-              <AppCalendarPanel
-                value={draft.dateFrom}
-                onChange={handleCalendarDaySelect}
-                compact
-                daySx={(iso) => {
-                  const from = draft.dateFrom;
-                  const to = draft.dateTo;
-                  if (!from) return undefined;
-                  if (datePickMode === "single") {
-                    if (iso === from) {
-                      return {
-                        bgcolor: m.teal,
-                        color: "#fff",
-                        fontWeight: 900,
-                        borderRadius: "9px",
-                      };
-                    }
-                    return undefined;
-                  }
-                  const isStart = iso === from;
-                  const isEnd = Boolean(to) && iso === to;
-                  const inRange = Boolean(to) && iso > from && iso < to;
-                  if (isStart || isEnd) {
-                    return {
-                      bgcolor: m.teal,
-                      color: "#fff",
-                      fontWeight: 900,
-                      borderRadius: "9px",
-                    };
-                  }
-                  if (inRange) {
-                    return {
-                      bgcolor: alpha(m.teal, 0.14),
-                      color: alpha(m.navy, 0.82),
-                      borderRadius: "9px",
-                    };
-                  }
-                  return undefined;
-                }}
-              />
-            </Box>
           </Box>
 
           <Stack direction="row" spacing={1.25}>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <AppTimePicker
                 label="Start Time (from)"
-                value={draft.startTime}
-                onChange={(val) => setDraft((p) => ({ ...p, startTime: val }))}
+                value={activeDay?.startTime || "09:00"}
+                onChange={(val) => updateActiveDay({ startTime: val, off: false })}
                 fullWidth
+                disabled={Boolean(activeDay?.off)}
                 sx={{ minHeight: 40, py: 0.5 }}
               />
             </Box>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <AppTimePicker
                 label="End Time (to)"
-                value={draft.endTime}
-                onChange={(val) => setDraft((p) => ({ ...p, endTime: val }))}
+                value={activeDay?.endTime || "17:00"}
+                onChange={(val) => updateActiveDay({ endTime: val, off: false })}
                 fullWidth
+                disabled={Boolean(activeDay?.off)}
                 sx={{ minHeight: 40, py: 0.5 }}
               />
             </Box>
@@ -452,22 +507,12 @@ export default function CalendarPublicBusinessHoursModal({
           <FormControlLabel
             control={
               <Checkbox
-                checked={draft.notAvailable}
-                onChange={(e) => {
-                  const checked = e.target.checked;
-                  setDraft((p) => ({
-                    ...p,
-                    notAvailable: checked,
-                    note:
-                      checked && !p.note.trim()
-                        ? DEFAULT_NOT_AVAILABLE_NOTE
-                        : p.note,
-                  }));
-                }}
+                checked={Boolean(activeDay?.off)}
+                onChange={(e) => updateActiveDay({ off: e.target.checked })}
                 size="small"
               />
             }
-            label="Not Availability"
+            label={offLabel}
             sx={{
               "& .MuiFormControlLabel-label": {
                 fontSize: 12.5,
@@ -478,21 +523,23 @@ export default function CalendarPublicBusinessHoursModal({
             }}
           />
 
-          <AppTextField
-            label={draft.notAvailable ? "Add Note (required)" : "Add Note"}
-            value={draft.note}
-            onChange={(e) => setDraft((p) => ({ ...p, note: e.target.value }))}
-            fullWidth
-            multiline
-            minRows={2}
-            required={draft.notAvailable}
-            error={draft.notAvailable && !draft.note.trim()}
-            helperText={
-              draft.notAvailable && !draft.note.trim()
-                ? "Note is required when Not Availability is selected."
-                : undefined
-            }
-          />
+          {isVariable ? (
+            <AppTextField
+              label="Add Note"
+              value={draft.note}
+              onChange={(e) =>
+                setDraft((p) => ({
+                  ...p,
+                  note: e.target.value.slice(0, PUBLIC_HOURS_NOTE_MAX_LENGTH),
+                }))
+              }
+              fullWidth
+              multiline
+              minRows={2}
+              helperText={`${draft.note.length}/${PUBLIC_HOURS_NOTE_MAX_LENGTH}`}
+              inputProps={{ maxLength: PUBLIC_HOURS_NOTE_MAX_LENGTH }}
+            />
+          ) : null}
         </Stack>
       </Box>
     </AppModal>

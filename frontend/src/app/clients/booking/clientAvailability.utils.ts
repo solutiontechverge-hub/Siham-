@@ -12,7 +12,6 @@ import type {
 } from "../../../components/common/calendar/calendar-settings.types";
 import type { CalendarBookingLocation } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import {
-  getPublicBusinessHoursInterval,
   intervalsOverlap,
   subtractIntervals,
   type Interval,
@@ -47,12 +46,8 @@ export function getMemberWorkingIntervals(
     | "publicBusinessHours"
   >,
 ): Interval[] {
-  const publicInterval = getPublicBusinessHoursInterval(
-    snapshot.publicBusinessHours,
-    dateIso,
-    location,
-  );
-  if (publicInterval) return [publicInterval];
+  // Public Hours are display-only — real bookable windows come from Schedule.
+  void snapshot.publicBusinessHours;
 
   const fromSchedule = getLocationAvailabilityIntervals(
     memberId,

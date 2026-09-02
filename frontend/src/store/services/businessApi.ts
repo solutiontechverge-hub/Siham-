@@ -1158,6 +1158,66 @@ export const businessApi = baseApi.injectEndpoints({
       },
       providesTags: ["Bookings"],
     }),
+    getBookingActivity: builder.query<
+      ApiEnvelope<
+        Array<{
+          id: string;
+          bookingId?: string | null;
+          bookingCode?: string | null;
+          kind: string;
+          title: string;
+          actor?: string;
+          actorLabel?: string | null;
+          subtitle?: string | null;
+          payload?: Record<string, unknown> | null;
+          occurredAt: string;
+        }>
+      >,
+      { bookingId?: string | null; bookingCode?: string | null }
+    >({
+      async queryFn(arg, _api, _extraOptions, fetchWithBQ) {
+        const idOrCode = arg.bookingId || arg.bookingCode;
+        if (!idOrCode) {
+          return { error: customError("Booking id or code is required.") };
+        }
+        const params = new URLSearchParams();
+        if (arg.bookingCode && arg.bookingId) {
+          params.set("code", arg.bookingCode);
+        }
+        const qs = params.toString();
+        const response = await fetchWithBQ({
+          url: `/api/business/bookings/${encodeURIComponent(idOrCode)}/activity${qs ? `?${qs}` : ""}`,
+          method: "GET",
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<
+          Array<{
+            id: string;
+            bookingId?: string | null;
+            bookingCode?: string | null;
+            kind: string;
+            title: string;
+            actor?: string;
+            actorLabel?: string | null;
+            subtitle?: string | null;
+            payload?: Record<string, unknown> | null;
+            occurredAt: string;
+          }>
+        >;
+        if (!data.success) {
+          return { error: customError(data.message || "Unable to load booking activity.") };
+        }
+
+        return { data: { ...data, data: Array.isArray(data.data) ? data.data : [] } };
+      },
+      providesTags: (_result, _error, arg) => [
+        { type: "Bookings", id: `activity-${arg.bookingId || arg.bookingCode || "unknown"}` },
+      ],
+    }),
     createBooking: builder.mutation<ApiEnvelope<CalendarBooking>, CreateBookingRequest>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
         const response = await fetchWithBQ({
@@ -1752,6 +1812,7 @@ export const {
   useUpdateCalendarEntryStatusMutation,
   useDeleteCalendarEntryMutation,
   useGetMyBookingsQuery,
+  useGetBookingActivityQuery,
   useCreateBookingMutation,
   useUpdateBookingStatusMutation,
   useUpdateMyBookingMutation,

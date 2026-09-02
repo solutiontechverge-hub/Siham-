@@ -51,7 +51,6 @@ import {
   type MockProfessional,
   type ProfessionalCategory,
 } from "./professionals.types";
-import { mockProfessionals } from "../../adminMockData";
 import { ADMIN_CARD_PADDING as pad } from "../../adminCardPadding";
 import { exportProfessionalsToExcel } from "../../exportProfessionalsExcel";
 import { exportProfessionalsToPdf } from "../../exportProfessionalsPdf";
@@ -631,7 +630,7 @@ export default function AdminProfessionalsPageView() {
                 </MenuItem>
                 <MenuItem
                   onClick={() => {
-                    const rows = mockProfessionals.filter((p) =>
+                    const rows = filtered.filter((p) =>
                       selected.has(p.id),
                     );
                     const ok = exportProfessionalsToExcel(

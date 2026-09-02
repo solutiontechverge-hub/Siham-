@@ -11,16 +11,11 @@ import { alpha, useTheme } from "@mui/material/styles";
 import type { SvgIconComponent } from "@mui/icons-material";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import AdminSectionCard from "./AdminSectionCard";
-import {
-  mockProfessionals,
-  professionalManagementSummary,
-  professionalTopCategories,
-  professionalVerificationOverview,
-  type ProfessionalCategory,
-} from "./adminMockData";
+import type { ProfessionalCategory } from "./adminMockData";
+import { useGetAdminProfessionalsQuery } from "../../store/services/adminApi";
 import { ADMIN_CHART_SERIES } from "./adminChartColors";
 
-const CATEGORY_ICONS: Record<ProfessionalCategory, SvgIconComponent> = {
+const CATEGORY_ICONS: Record<string, SvgIconComponent> = {
   "Hair & Beauty": ContentCutOutlinedIcon,
   "Wellness & Spa": SpaOutlinedIcon,
   "Fitness & Training": FitnessCenterOutlinedIcon,
@@ -28,16 +23,47 @@ const CATEGORY_ICONS: Record<ProfessionalCategory, SvgIconComponent> = {
   Barber: StorefrontOutlinedIcon,
 };
 
-const CATEGORY_COLORS: Record<
-  ProfessionalCategory,
-  { bg: string; fg: string }
-> = {
+const CATEGORY_COLORS: Record<string, { bg: string; fg: string }> = {
   "Hair & Beauty": { bg: "rgba(33, 184, 191, 0.12)", fg: "#149CA7" },
   "Wellness & Spa": { bg: "rgba(127, 86, 217, 0.12)", fg: "#6941C6" },
   "Fitness & Training": { bg: "rgba(2, 132, 199, 0.12)", fg: "#0284C7" },
   "Make-up & Skincare": { bg: "rgba(236, 72, 153, 0.12)", fg: "#DB2777" },
   Barber: { bg: "rgba(220, 104, 3, 0.14)", fg: "#DC6803" },
 };
+
+const FALLBACK_COLORS = { bg: "rgba(33, 184, 191, 0.12)", fg: "#149CA7" };
+
+function useProfessionalWidgetData() {
+  const { data } = useGetAdminProfessionalsQuery();
+  const items = data?.data?.items ?? [];
+  const summary = data?.data?.summary ?? {
+    total: 0,
+    verified: 0,
+    pending: 0,
+    rejected: 0,
+    inactive: 0,
+    growthTrend: 0,
+  };
+
+  const verificationOverview = [
+    { name: "Verified", value: summary.verified },
+    { name: "Pending", value: summary.pending },
+    { name: "Rejected", value: summary.rejected },
+    { name: "Inactive", value: summary.inactive },
+  ];
+
+  const categoryCounts = new Map<string, number>();
+  for (const item of items) {
+    const key = item.primaryCategory || "Hair & Beauty";
+    categoryCounts.set(key, (categoryCounts.get(key) || 0) + 1);
+  }
+  const topCategories = [...categoryCounts.entries()]
+    .map(([name, count]) => ({ name: name as ProfessionalCategory, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  return { items, summary, verificationOverview, topCategories };
+}
 
 function formatDisplayDate(iso: string) {
   const d = new Date(`${iso}T00:00:00`);
@@ -92,9 +118,10 @@ function SummaryRow({
 
 export function ProfessionalSummaryWidget() {
   const tokens = useTheme().palette.mollure;
-  const { total, verified, pending, rejected, inactive } =
-    professionalManagementSummary;
-  const pct = (n: number) => `${((n / total) * 100).toFixed(1)}% of total`;
+  const { summary } = useProfessionalWidgetData();
+  const { total, verified, pending, rejected, inactive } = summary;
+  const pct = (n: number) =>
+    total ? `${((n / total) * 100).toFixed(1)}% of total` : "0% of total";
 
   return (
     <AdminSectionCard title="Professional Summary" compact>
@@ -133,10 +160,8 @@ export function VerificationOverviewWidget() {
   const theme = useTheme();
   const tokens = theme.palette.mollure;
   const [ready, setReady] = React.useState(false);
-  const total = professionalVerificationOverview.reduce(
-    (sum, d) => sum + d.value,
-    0,
-  );
+  const { verificationOverview } = useProfessionalWidgetData();
+  const total = verificationOverview.reduce((sum, d) => sum + d.value, 0) || 1;
 
   React.useEffect(() => setReady(true), []);
 
@@ -148,7 +173,7 @@ export function VerificationOverviewWidget() {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={professionalVerificationOverview}
+                  data={verificationOverview}
                   cx="50%"
                   cy="50%"
                   innerRadius="52%"
@@ -156,7 +181,7 @@ export function VerificationOverviewWidget() {
                   paddingAngle={2}
                   dataKey="value"
                 >
-                  {professionalVerificationOverview.map((_, i) => (
+                  {verificationOverview.map((_, i) => (
                     <Cell
                       key={i}
                       fill={ADMIN_CHART_SERIES[i % ADMIN_CHART_SERIES.length]}
@@ -204,7 +229,7 @@ export function VerificationOverviewWidget() {
         )}
       </Box>
       <Stack spacing={1} sx={{ mt: 1.5 }}>
-        {professionalVerificationOverview.map((item, i) => (
+        {verificationOverview.map((item, i) => (
           <Stack
             key={item.name}
             direction="row"
@@ -239,14 +264,15 @@ export function VerificationOverviewWidget() {
 
 export function TopCategoriesWidget() {
   const tokens = useTheme().palette.mollure;
-  const maxCount = professionalTopCategories[0]?.count ?? 1;
+  const { topCategories } = useProfessionalWidgetData();
+  const maxCount = topCategories[0]?.count ?? 1;
 
   return (
     <AdminSectionCard title="Top Categories" compact>
       <Stack spacing={1.75}>
-        {professionalTopCategories.map((cat) => {
-          const Icon = CATEGORY_ICONS[cat.name];
-          const colors = CATEGORY_COLORS[cat.name];
+        {topCategories.map((cat) => {
+          const Icon = CATEGORY_ICONS[cat.name] || StorefrontOutlinedIcon;
+          const colors = CATEGORY_COLORS[cat.name] || FALLBACK_COLORS;
           return (
             <Box key={cat.name}>
               <Stack
@@ -308,7 +334,8 @@ export function TopCategoriesWidget() {
 
 export function RecentlyJoinedWidget() {
   const tokens = useTheme().palette.mollure;
-  const recent = [...mockProfessionals]
+  const { items } = useProfessionalWidgetData();
+  const recent = [...items]
     .sort((a, b) => b.registrationDate.localeCompare(a.registrationDate))
     .slice(0, 3);
 
@@ -316,7 +343,7 @@ export function RecentlyJoinedWidget() {
     <AdminSectionCard title="Recently Joined Professionals" compact>
       <Stack spacing={1.75}>
         {recent.map((pro) => {
-          const colors = CATEGORY_COLORS[pro.primaryCategory];
+          const colors = CATEGORY_COLORS[pro.primaryCategory] || FALLBACK_COLORS;
           return (
             <Stack
               key={pro.id}

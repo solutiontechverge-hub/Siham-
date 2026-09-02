@@ -13,6 +13,7 @@ import "./services/notificationsApi";
 import "./services/contactApi";
 import "./services/adminApi";
 import "./services/reviewsApi";
+import "./services/favoritesApi";
 
 export const makeStore = () =>
   configureStore({

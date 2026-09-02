@@ -1,16 +1,27 @@
 import * as React from "react";
 import {
-  clientManagementSummary,
-  mockClients,
-  type MockClient,
-} from "../../adminMockData";
+  useGetAdminClientsQuery,
+  useUpdateAdminClientMutation,
+  type AdminClient,
+} from "../../../../store/services/adminApi";
 import { exportClientsToExcel } from "../../exportClientsExcel";
 import { exportClientsToPdf } from "../../exportClientsPdf";
 import { INITIAL_VISIBLE, PAGE_SIZE } from "./adminClients.data";
 import type { ClientModal, SortOption } from "./adminClients.types";
 
+type MockClient = AdminClient;
+
 export function useAdminClientsPage() {
-  const [clients, setClients] = React.useState<MockClient[]>(mockClients);
+  const { data, isLoading, isError, refetch } = useGetAdminClientsQuery();
+  const [updateAdminClient] = useUpdateAdminClientMutation();
+  const clients = (data?.data?.items ?? []) as MockClient[];
+  const summary = data?.data?.summary ?? {
+    totalIC: 0,
+    totalCC: 0,
+    totalClients: 0,
+    totalBookings: 0,
+  };
+
   const [search, setSearch] = React.useState("");
   const [typeFilter, setTypeFilter] = React.useState<string[]>([]);
   const [statusFilter, setStatusFilter] = React.useState("all");
@@ -133,17 +144,6 @@ export function useAdminClientsPage() {
     setDraftNote("");
   };
 
-  const updateClient = (id: string, patch: Partial<MockClient>) => {
-    setClients((previousClients) =>
-      previousClients.map((client) =>
-        client.id === id ? { ...client, ...patch } : client,
-      ),
-    );
-    setActiveClient((client) =>
-      client?.id === id ? { ...client, ...patch } : client,
-    );
-  };
-
   const handleLoadMore = () => {
     setVisibleCount(PAGE_SIZE);
     if (filtered.length > PAGE_SIZE) {
@@ -152,18 +152,18 @@ export function useAdminClientsPage() {
     }
   };
 
-  const handleApplyStatus = () => {
+  const handleApplyStatus = async () => {
     if (!activeClient || activeClient.accountStatus === "deleted") return;
     const nextStatus =
       activeClient.accountStatus === "active" ? "disabled" : "active";
-    updateClient(activeClient.id, { accountStatus: nextStatus });
+    await updateAdminClient({ id: activeClient.id, accountStatus: nextStatus });
     closeModal();
   };
 
-  const handleApplyDelete = () => {
+  const handleApplyDelete = async () => {
     if (!activeClient) return;
     const id = activeClient.id;
-    setClients((previous) => previous.filter((client) => client.id !== id));
+    await updateAdminClient({ id, delete: true });
     setSelected((previous) => {
       const next = new Set(previous);
       next.delete(id);
@@ -172,13 +172,10 @@ export function useAdminClientsPage() {
     closeModal();
   };
 
-  const handleSaveNote = () => {
+  const handleSaveNote = async () => {
     if (!activeClient) return;
     const trimmedNote = draftNote.trim();
-    updateClient(activeClient.id, {
-      note: trimmedNote,
-      hasNotes: Boolean(trimmedNote),
-    });
+    await updateAdminClient({ id: activeClient.id, note: trimmedNote });
     closeModal();
   };
 
@@ -248,10 +245,9 @@ export function useAdminClientsPage() {
   const somePageSelected =
     displayed.some((row) => selected.has(row.id)) && !allPageSelected;
   const isDisabling = activeClient?.accountStatus === "active";
-  const { totalIC, totalCC, totalClients, totalBookings } =
-    clientManagementSummary;
-  const icPct = ((totalIC / totalClients) * 100).toFixed(1);
-  const ccPct = ((totalCC / totalClients) * 100).toFixed(1);
+  const { totalIC, totalCC, totalClients, totalBookings } = summary;
+  const icPct = totalClients ? ((totalIC / totalClients) * 100).toFixed(1) : "0.0";
+  const ccPct = totalClients ? ((totalCC / totalClients) * 100).toFixed(1) : "0.0";
 
   return {
     activeClient,
@@ -274,11 +270,14 @@ export function useAdminClientsPage() {
     handleSaveNote,
     icPct,
     isDisabling,
+    isError,
+    isLoading,
     modal,
     mounted,
     openClientModal,
     page,
     pageCount,
+    refetch,
     regDateFrom,
     regDateTo,
     resetFilters,

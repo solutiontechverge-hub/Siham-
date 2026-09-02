@@ -1,24 +1,39 @@
 "use client";
 
 import * as React from "react";
-import { ratingCategoryDefaults } from "../../adminMockData";
 import {
-  mockFlaggedKeywordsList,
-  mockFlaggedReviewRows,
-  type FlaggedReviewRow,
-  type ReviewTabId,
-} from "../../reviewsData";
+  useAddAdminKeywordMutation,
+  useDeleteAdminReviewMutation,
+  useGetAdminReviewsModerationQuery,
+  useRemoveAdminKeywordMutation,
+  useUpdateAdminRatingRangesMutation,
+} from "../../../../store/services/adminApi";
+import type { FlaggedReviewRow, ReviewTabId } from "../../reviewsData";
+import { ratingCategoryDefaults } from "../../adminMockData";
 import { exportReviewsToExcel } from "../../exportReviewsExcel";
 import { exportReviewsToPdf } from "../../exportReviewsPdf";
 import { PAGE_SIZE_OPTIONS } from "./reviews.data";
+import type { RatingRanges } from "./reviews.types";
+
+const DEFAULT_RANGES: RatingRanges = ratingCategoryDefaults;
 
 export function useAdminReviewsPage() {
+  const { data, isLoading } = useGetAdminReviewsModerationQuery();
+  const [deleteAdminReview] = useDeleteAdminReviewMutation();
+  const [addAdminKeyword] = useAddAdminKeywordMutation();
+  const [removeAdminKeyword] = useRemoveAdminKeywordMutation();
+  const [updateAdminRatingRanges] = useUpdateAdminRatingRangesMutation();
+
+  const reviews = (data?.data?.items ?? []) as FlaggedReviewRow[];
+  const keywords = data?.data?.keywords ?? [];
+  const ranges: RatingRanges = {
+    ...DEFAULT_RANGES,
+    ...(data?.data?.ranges as Partial<RatingRanges> | undefined),
+  };
+
   const [activeTab, setActiveTab] =
     React.useState<ReviewTabId>("flagged-reviews");
-  const [reviews, setReviews] = React.useState(mockFlaggedReviewRows);
-  const [keywords, setKeywords] = React.useState(mockFlaggedKeywordsList);
   const [newKeyword, setNewKeyword] = React.useState("");
-  const [ranges, setRanges] = React.useState(ratingCategoryDefaults);
   const [search, setSearch] = React.useState("");
   const [professionalFilter, setProfessionalFilter] = React.useState("all");
   const [ratingFilter, setRatingFilter] = React.useState("all");
@@ -31,11 +46,26 @@ export function useAdminReviewsPage() {
   const [deleteTarget, setDeleteTarget] =
     React.useState<FlaggedReviewRow | null>(null);
 
-  const addKeyword = () => {
+  const addKeyword = async () => {
     const keyword = newKeyword.trim().toLowerCase();
     if (!keyword || keywords.includes(keyword)) return;
-    setKeywords((previous) => [...previous, keyword]);
+    await addAdminKeyword(keyword);
     setNewKeyword("");
+  };
+
+  const setKeywords = async (next: string[] | ((prev: string[]) => string[])) => {
+    const resolved = typeof next === "function" ? next(keywords) : next;
+    const removed = keywords.filter((k) => !resolved.includes(k));
+    for (const keyword of removed) {
+      await removeAdminKeyword(keyword);
+    }
+  };
+
+  const setRanges = async (
+    next: RatingRanges | ((prev: RatingRanges) => RatingRanges),
+  ) => {
+    const resolved = typeof next === "function" ? next(ranges) : next;
+    await updateAdminRatingRanges(resolved);
   };
 
   const filteredReviews = React.useMemo(
@@ -104,11 +134,9 @@ export function useAdminReviewsPage() {
     setExportMenuAnchor(null);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteTarget) return;
-    setReviews((previous) =>
-      previous.filter((review) => review.id !== deleteTarget.id),
-    );
+    await deleteAdminReview(deleteTarget.id);
     setDeleteTarget(null);
   };
 
@@ -119,6 +147,7 @@ export function useAdminReviewsPage() {
     deleteTarget,
     exportMenuAnchor,
     filteredReviews,
+    isLoading,
     keywords,
     newKeyword,
     page,

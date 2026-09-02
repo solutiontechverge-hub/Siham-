@@ -97,28 +97,32 @@ export const mockFlaggedReviewRows = generateFlaggedReviews();
 
 export const ratingCategoryConfig = [
   {
-    id: "bad" as const,
-    label: "Bad",
-    emoji: "😞",
-    ...ratingCategoryDefaults.bad,
-    color: "#D92D20",
-    bg: "rgba(217, 45, 32, 0.1)",
+    id: "excellent" as const,
+    emoji: "😊",
+    ...ratingCategoryDefaults.excellent,
+    color: "#2E7D32",
+    bg: "rgba(76, 175, 80, 0.12)",
   },
   {
     id: "good" as const,
-    label: "Good",
-    emoji: "😐",
+    emoji: "🙂",
     ...ratingCategoryDefaults.good,
     color: "#DC6803",
     bg: "rgba(220, 104, 3, 0.12)",
   },
   {
-    id: "excellent" as const,
-    label: "Excellent",
-    emoji: "😊",
-    ...ratingCategoryDefaults.excellent,
-    color: "#2E7D32",
-    bg: "rgba(76, 175, 80, 0.12)",
+    id: "average" as const,
+    emoji: "😐",
+    ...ratingCategoryDefaults.average,
+    color: "#B54708",
+    bg: "rgba(181, 71, 8, 0.1)",
+  },
+  {
+    id: "poor" as const,
+    emoji: "😞",
+    ...ratingCategoryDefaults.poor,
+    color: "#D92D20",
+    bg: "rgba(217, 45, 32, 0.1)",
   },
 ];
 

@@ -1,6 +1,11 @@
 import express from "express";
 import { body, param } from "express-validator";
 import { getProfile, setProfessionalValidation, updateProfile } from "../controllers/user.controller.js";
+import {
+  listUserFavorites,
+  putUserFavorites,
+  toggleUserFavorite,
+} from "../controllers/favorites.controller.js";
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { validateRequest } from "../middleware/validate.middleware.js";
 import { upload } from "../middleware/upload.middleware.js";
@@ -9,6 +14,16 @@ import { optionalOtherLink, optionalWebsite } from "../validators/optionalWebUrl
 const router = express.Router();
 
 router.get("/profile", authenticateUser, getProfile);
+
+router.get("/favorites", authenticateUser, listUserFavorites);
+router.put("/favorites", authenticateUser, putUserFavorites);
+router.post(
+  "/favorites/:businessSetupId/toggle",
+  authenticateUser,
+  [param("businessSetupId").isUUID().withMessage("businessSetupId must be a valid UUID.")],
+  validateRequest,
+  toggleUserFavorite,
+);
 
 router.put(
   "/profile",

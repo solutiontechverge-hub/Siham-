@@ -5,6 +5,7 @@ import { Box, Checkbox, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import SpaOutlinedIcon from "@mui/icons-material/SpaOutlined";
 import CategoryOutlinedIcon from "@mui/icons-material/CategoryOutlined";
+import DragIndicatorRoundedIcon from "@mui/icons-material/DragIndicatorRounded";
 import type { ServiceCategorySliderIconId } from "../../../data/businessServiceCategorySlider.data";
 import { SERVICE_CATEGORY_ICON_SRC } from "../ServiceCategoryIcon";
 
@@ -19,6 +20,8 @@ export type CalendarServiceOrderCardProps = {
   /** Soft highlight for the category whose services are being viewed. */
   active?: boolean;
   draggable?: boolean;
+  /** Show a drag-handle affordance while editing / reordering. */
+  showDragHandle?: boolean;
   isDragging?: boolean;
   onCheckedChange?: (checked: boolean) => void;
   onDragStart?: () => void;
@@ -71,6 +74,7 @@ export default function CalendarServiceOrderCard({
   showCheckbox = false,
   active = false,
   draggable = false,
+  showDragHandle = false,
   isDragging = false,
   onCheckedChange,
   onDragStart,
@@ -81,17 +85,31 @@ export default function CalendarServiceOrderCard({
 }: CalendarServiceOrderCardProps) {
   const m = useTheme().palette.mollure;
   const teal = m.teal;
+  const didDragRef = React.useRef(false);
 
   return (
     <Box
       draggable={draggable}
-      onClick={onClick}
+      onClick={() => {
+        if (didDragRef.current) {
+          didDragRef.current = false;
+          return;
+        }
+        onClick?.();
+      }}
       onDragStart={(event) => {
+        didDragRef.current = true;
         event.dataTransfer.effectAllowed = "move";
         event.dataTransfer.setData("text/plain", label);
         onDragStart?.();
       }}
-      onDragEnd={onDragEnd}
+      onDragEnd={() => {
+        onDragEnd?.();
+        // Keep didDragRef true until the following click is suppressed.
+        window.setTimeout(() => {
+          didDragRef.current = false;
+        }, 0);
+      }}
       onDragOver={(event) => {
         event.preventDefault();
         onDragOver?.(event);
@@ -109,7 +127,11 @@ export default function CalendarServiceOrderCard({
         maxWidth: 108,
         borderRadius: "10px",
         border: `1px solid ${active ? alpha(teal, 0.55) : alpha(m.navy, 0.12)}`,
-        bgcolor: checked ? "#fff" : alpha(m.navy, 0.03),
+        bgcolor: active
+          ? alpha(teal, 0.06)
+          : checked
+            ? "#fff"
+            : alpha(m.navy, 0.03),
         px: 1,
         pt: 1.5,
         pb: 1.1,
@@ -155,6 +177,26 @@ export default function CalendarServiceOrderCard({
         </Box>
       </Box>
 
+      {showDragHandle ? (
+        <Box
+          aria-hidden
+          sx={{
+            position: "absolute",
+            bottom: 4,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: alpha(m.navy, 0.32),
+            pointerEvents: "none",
+          }}
+        >
+          <DragIndicatorRoundedIcon sx={{ fontSize: 14 }} />
+        </Box>
+      ) : null}
+
       {showCheckbox ? (
         <Checkbox
           size="small"
@@ -183,7 +225,12 @@ export default function CalendarServiceOrderCard({
         spacing={0.6}
         alignItems="center"
         justifyContent="center"
-        sx={{ width: "100%", minHeight: 78, overflow: "hidden" }}
+        sx={{
+          width: "100%",
+          minHeight: 78,
+          overflow: "hidden",
+          pb: showDragHandle ? 1.25 : 0,
+        }}
       >
         <CategoryIcon iconId={iconId} color={teal} />
         <Typography

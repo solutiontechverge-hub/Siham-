@@ -1,6 +1,7 @@
 "use client";
 
 import AppButton from "../AppButton";
+import AppTextField from "../AppTextField";
 import * as React from "react";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
@@ -138,6 +139,9 @@ export default function SalesEditCheckout({
     React.useState<SalesCheckoutPaymentMethod>(
       card.paymentMethod || "onlineDirect",
     );
+  const [checkoutEmail, setCheckoutEmail] = React.useState(
+    () => card.clientEmail?.trim() || "",
+  );
   const [dueDate, setDueDate] = React.useState(card.dueDate || tomorrowIso());
   const [dueDateAnchor, setDueDateAnchor] = React.useState<null | HTMLElement>(
     null,
@@ -311,6 +315,8 @@ export default function SalesEditCheckout({
   const hasItems = lines.length > 0;
   const needsDueDate =
     paymentMethod === "onlineNonDirect" || paymentMethod === "offlineNonDirect";
+  const needsOnlineEmail =
+    paymentMethod === "onlineDirect" || paymentMethod === "onlineNonDirect";
 
   const addLinesFromCatalog = (
     kind: ManualEntryLineKind,
@@ -345,6 +351,7 @@ export default function SalesEditCheckout({
     }
     if (step === "payment") {
       if (needsDueDate && !dueDate) return;
+      if (needsOnlineEmail && !checkoutEmail.trim()) return;
       setStep("summary");
       return;
     }
@@ -355,6 +362,7 @@ export default function SalesEditCheckout({
       totalPrice,
       paymentMethod,
       dueDate: needsDueDate ? dueDate : null,
+      clientEmail: checkoutEmail.trim() || null,
     });
   };
 
@@ -442,17 +450,17 @@ export default function SalesEditCheckout({
                   </Typography>
                 </Box>
               </Stack>
-              {card.clientEmail ? (
-                <Typography
-                  sx={{
-                    fontSize: 12,
-                    fontWeight: 650,
-                    color: alpha(m.navy, 0.5),
-                  }}
-                >
-                  {card.clientEmail}
-                </Typography>
-              ) : null}
+          {checkoutEmail.trim() || card.clientEmail ? (
+            <Typography
+              sx={{
+                fontSize: 12,
+                fontWeight: 650,
+                color: alpha(m.navy, 0.5),
+              }}
+            >
+              {checkoutEmail.trim() || card.clientEmail}
+            </Typography>
+          ) : null}
             </Box>
 
             {people.filter((p) => p.role !== "main_client").length ? (
@@ -740,6 +748,36 @@ export default function SalesEditCheckout({
             })}
           </Stack>
 
+          {needsOnlineEmail ? (
+            <Box sx={{ mt: 1.5 }} onClick={(e) => e.stopPropagation()}>
+              {checkoutEmail.trim() && card.clientEmail?.trim() ? (
+                <Typography
+                  sx={{
+                    fontSize: 12.5,
+                    fontWeight: 650,
+                    color: alpha(m.navy, 0.55),
+                  }}
+                >
+                  Email: {checkoutEmail.trim()}
+                </Typography>
+              ) : (
+                <AppTextField
+                  label="Email"
+                  placeholder="Email for online payment"
+                  value={checkoutEmail}
+                  onChange={(e) => setCheckoutEmail(e.target.value)}
+                  fullWidth
+                  helperText={
+                    !checkoutEmail.trim()
+                      ? "Required for online payment"
+                      : undefined
+                  }
+                  error={!checkoutEmail.trim()}
+                />
+              )}
+            </Box>
+          ) : null}
+
           <Popover
             open={Boolean(dueDateAnchor)}
             anchorEl={dueDateAnchor}
@@ -808,7 +846,7 @@ export default function SalesEditCheckout({
           >
             {card.clientName}
           </Typography>
-          {card.clientEmail ? (
+          {checkoutEmail.trim() || card.clientEmail ? (
             <Typography
               sx={{
                 fontSize: 12,
@@ -817,7 +855,7 @@ export default function SalesEditCheckout({
                 mb: 1.25,
               }}
             >
-              {card.clientEmail}
+              {checkoutEmail.trim() || card.clientEmail}
             </Typography>
           ) : (
             <Box sx={{ mb: 1.25 }} />

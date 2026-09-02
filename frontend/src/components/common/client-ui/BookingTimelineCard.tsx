@@ -112,6 +112,9 @@ export type BookingTimelineCardProps = {
   notePreview?: string | null;
   /** Teal "Updated" pill near status when the other party changed the booking. */
   showUpdated?: boolean;
+  /** Tooltip / click target for the Updated pill (Activity comparison signpost). */
+  updatedSignpostTitle?: string;
+  onUpdatedClick?: React.MouseEventHandler;
   calendarAction?: BookingTimelineCardAction;
   notesAction?: BookingTimelineCardAction;
   messageAction?: BookingTimelineCardAction & { count?: number };
@@ -366,6 +369,8 @@ export default function BookingTimelineCard({
   notesAction,
   notePreview,
   showUpdated = false,
+  updatedSignpostTitle,
+  onUpdatedClick,
   onClick,
   pattern = "lines",
   paymentDue = null,
@@ -526,20 +531,34 @@ export default function BookingTimelineCard({
             />
           ) : null}
           {showUpdated ? (
-            <Chip
-              size="small"
-              label="Updated"
-              sx={{
-                height: 18,
-                borderRadius: "5px",
-                fontSize: 8.5,
-                fontWeight: 800,
-                border: `1px solid ${alpha(m.teal, 0.4)}`,
-                bgcolor: alpha(m.teal, 0.12),
-                color: m.teal,
-                "& .MuiChip-label": { px: 0.85 },
-              }}
-            />
+            <Tooltip
+              title={updatedSignpostTitle || "Updated"}
+              placement="top"
+            >
+              <Chip
+                size="small"
+                label="Updated"
+                onClick={
+                  onUpdatedClick
+                    ? (event) => {
+                        event.stopPropagation();
+                        onUpdatedClick(event);
+                      }
+                    : undefined
+                }
+                sx={{
+                  height: 18,
+                  borderRadius: "5px",
+                  fontSize: 8.5,
+                  fontWeight: 800,
+                  border: `1px solid ${alpha(m.teal, 0.4)}`,
+                  bgcolor: alpha(m.teal, 0.12),
+                  color: m.teal,
+                  cursor: onUpdatedClick ? "pointer" : "default",
+                  "& .MuiChip-label": { px: 0.85 },
+                }}
+              />
+            </Tooltip>
           ) : null}
           {showRequestBadge ? (
             <BookingRequestBadge

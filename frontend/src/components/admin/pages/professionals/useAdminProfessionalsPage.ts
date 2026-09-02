@@ -1,14 +1,26 @@
 import * as React from "react";
 import {
-  mockProfessionals,
-  professionalManagementSummary,
-} from "../../adminMockData";
+  useGetAdminProfessionalsQuery,
+} from "../../../../store/services/adminApi";
 import { exportProfessionalsToExcel } from "../../exportProfessionalsExcel";
 import { exportProfessionalsToPdf } from "../../exportProfessionalsPdf";
 import { isActiveAccount } from "./professionals.data";
 import type { MockProfessional } from "./professionals.types";
 
+const EMPTY_SUMMARY = {
+  total: 0,
+  verified: 0,
+  pending: 0,
+  rejected: 0,
+  inactive: 0,
+  growthTrend: 0,
+};
+
 export function useAdminProfessionalsPage() {
+  const { data, isLoading, isError, refetch } = useGetAdminProfessionalsQuery();
+  const professionals = (data?.data?.items ?? []) as MockProfessional[];
+  const summary = data?.data?.summary ?? EMPTY_SUMMARY;
+
   const [search, setSearch] = React.useState("");
   const [categoryFilter, setCategoryFilter] = React.useState("all");
   const [statusFilter, setStatusFilter] = React.useState("all");
@@ -26,7 +38,7 @@ export function useAdminProfessionalsPage() {
 
   const filtered = React.useMemo(() => {
     const q = search.toLowerCase().trim();
-    return mockProfessionals.filter((professional) =>
+    return professionals.filter((professional) =>
       (!q || professional.brandName.toLowerCase().includes(q) || professional.email.toLowerCase().includes(q) || professional.phone.includes(q) || professional.id.toLowerCase().includes(q)) &&
       (categoryFilter === "all" || professional.primaryCategory === categoryFilter) &&
       (statusFilter === "all" || (statusFilter === "active" ? isActiveAccount(professional.accountStatus) : !isActiveAccount(professional.accountStatus))) &&
@@ -34,7 +46,7 @@ export function useAdminProfessionalsPage() {
       (!regDateFrom || professional.registrationDate >= regDateFrom) &&
       (!regDateTo || professional.registrationDate <= regDateTo),
     );
-  }, [search, categoryFilter, statusFilter, verificationFilter, regDateFrom, regDateTo]);
+  }, [professionals, search, categoryFilter, statusFilter, verificationFilter, regDateFrom, regDateTo]);
 
   React.useEffect(() => {
     setPage(1);
@@ -90,7 +102,8 @@ export function useAdminProfessionalsPage() {
   };
 
   return {
-    ...professionalManagementSummary, search, setSearch, categoryFilter, setCategoryFilter, statusFilter, setStatusFilter,
+    ...summary,
+    search, setSearch, categoryFilter, setCategoryFilter, statusFilter, setStatusFilter,
     verificationFilter, setVerificationFilter, regDateFrom, setRegDateFrom, regDateTo, setRegDateTo, selected, page,
     setPage, pageSize, setPageSize, bulkMenuAnchor, setBulkMenuAnchor, exportMenuAnchor, setExportMenuAnchor,
     rowMenuAnchor, setRowMenuAnchor, exportNotice, highlightedIds, filtered, pageCount, displayed,
@@ -99,5 +112,6 @@ export function useAdminProfessionalsPage() {
     allPageSelected: displayed.length > 0 && displayed.every((row) => selected.has(row.id)),
     somePageSelected: displayed.some((row) => selected.has(row.id)) && !displayed.every((row) => selected.has(row.id)),
     toggleSelect, toggleSelectAll, resetFilters, highlightExportedRows, handleExportExcel, handleExportPdf,
+    isLoading, isError, refetch,
   };
 }

@@ -20,9 +20,11 @@ type BookingPriceBreakdownProps = {
   bookingTotalDiscount?: ManualEntryDiscount | null;
   lateCancellationFeeAmount?: number;
   lateRescheduleFeeAmount?: number;
+  noShowFeeAmount?: number;
   prepaidPercent?: number;
   prepaidAmount?: number;
   remainingAmount?: number;
+  prepaymentPaid?: boolean;
   prepaidAction?: ReactNode;
   extraRows?: readonly BookingPriceBreakdownRow[];
   /** Rows only — no nested card. Use inside a parent booking card. */
@@ -98,9 +100,11 @@ export default function BookingPriceBreakdown({
   bookingTotalDiscount = null,
   lateCancellationFeeAmount = 0,
   lateRescheduleFeeAmount = 0,
+  noShowFeeAmount = 0,
   prepaidPercent = 0,
   prepaidAmount = 0,
   remainingAmount,
+  prepaymentPaid = false,
   prepaidAction,
   extraRows = [],
   variant = "card",
@@ -120,7 +124,8 @@ export default function BookingPriceBreakdown({
     lineDiscountAmount > 0 ||
     bookingDiscountAmount > 0 ||
     lateCancellationFeeAmount > 0 ||
-    lateRescheduleFeeAmount > 0;
+    lateRescheduleFeeAmount > 0 ||
+    noShowFeeAmount > 0;
   const showStrike =
     originalPrice != null &&
     Math.round((originalPrice + Number.EPSILON) * 100) / 100 !==
@@ -244,6 +249,20 @@ export default function BookingPriceBreakdown({
                     +{formatFinanceEuro(lateRescheduleFeeAmount)} Late fee
                   </BodyText>
                 ) : null}
+                {noShowFeeAmount > 0 ? (
+                  <BodyText
+                    component="span"
+                    sx={{
+                      m: 0,
+                      fontSize: 12,
+                      fontWeight: 800,
+                      color: alpha(m.navy, 0.55),
+                      lineHeight: 1,
+                    }}
+                  >
+                    +{formatFinanceEuro(noShowFeeAmount)} No-show fee
+                  </BodyText>
+                ) : null}
               </Stack>
             </Stack>
           ) : (
@@ -255,7 +274,7 @@ export default function BookingPriceBreakdown({
       {showPrepay ? (
         <Stack spacing={1} sx={{ mt: 1.25 }}>
           <FinanceRow
-            label={prepaidBreakdownLabel(prepaidPercent)}
+            label={prepaidBreakdownLabel(prepaidPercent, prepaymentPaid)}
             value={formatFinanceEuro(prepaidAmount)}
             action={prepaidAction}
           />

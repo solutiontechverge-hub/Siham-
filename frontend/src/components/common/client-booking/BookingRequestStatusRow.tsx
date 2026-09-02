@@ -1,7 +1,7 @@
 "use client";
 
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
-import { Box, Chip, Stack, Typography } from "@mui/material";
+import { Box, Chip, Stack, Tooltip } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import type {
   BookingRequestDirection,
@@ -40,46 +40,56 @@ type Props = {
   rowMode?: BookingRequestRowMode;
   /** Post-accept edit from the other party — show next to Confirmed status. */
   showUpdated?: boolean;
+  updatedSignpostTitle?: string;
+  onUpdatedClick?: () => void;
   /** Confirmed booking was edited after ER/EBR accept. */
   showEditScenario?: boolean;
+  ebrSignpostTitle?: string;
+  onEbrClick?: () => void;
+  erSignpostTitle?: string;
+  onErClick?: () => void;
 };
 
 function ScenarioPill({
   label,
   children,
+  title,
+  onClick,
 }: {
   label: string;
   children?: ReactNode;
+  title?: string;
+  onClick?: () => void;
 }) {
   const m = useTheme().palette.mollure;
-  return (
-    <Box
+  const chip = (
+    <Chip
+      size="small"
+      label={
+        <Stack direction="row" alignItems="center" spacing={0.35}>
+          <span>{label}</span>
+          {children}
+        </Stack>
+      }
+      onClick={onClick}
       sx={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 0.5,
-        height: 24,
-        px: 1,
-        borderRadius: "8px",
-        bgcolor: alpha(m.navy, 0.04),
-        border: `1px solid ${alpha(m.navy, 0.08)}`,
+        height: 18,
+        fontWeight: 800,
+        fontSize: 9,
+        borderRadius: "6px",
+        bgcolor: alpha(m.navy, 0.06),
+        color: alpha(m.navy, 0.62),
+        border: `1px solid ${alpha(m.navy, 0.14)}`,
+        cursor: onClick ? "pointer" : "default",
+        "& .MuiChip-label": { px: 0.7, py: 0, lineHeight: 1.2 },
       }}
-      title={label}
-      aria-label={label}
-    >
-      <Typography
-        sx={{
-          fontWeight: 900,
-          fontSize: 11,
-          color: alpha(m.navy, 0.55),
-          letterSpacing: "0.02em",
-          lineHeight: 1,
-        }}
-      >
-        {label}
-      </Typography>
-      {children}
-    </Box>
+    />
+  );
+  if (!title) return chip;
+  return (
+    <Tooltip title={title} placement="top">
+      {chip}
+    </Tooltip>
   );
 }
 
@@ -95,7 +105,13 @@ export default function BookingRequestStatusRow({
   bookingRequestDirection = "outgoing",
   rowMode = "default",
   showUpdated = false,
+  updatedSignpostTitle,
+  onUpdatedClick,
   showEditScenario = false,
+  ebrSignpostTitle,
+  onEbrClick,
+  erSignpostTitle,
+  onErClick,
 }: Props) {
   const m = useTheme().palette.mollure;
   const isEbrIncoming = rowMode === "professional_suggested";
@@ -173,20 +189,24 @@ export default function BookingRequestStatusRow({
       />
 
       {showUpdated && !isEbrIncoming && !showErPill ? (
-        <Chip
-          label="Updated"
-          size="small"
-          sx={{
-            height: 18,
-            fontWeight: 800,
-            fontSize: 9,
-            borderRadius: "6px",
-            bgcolor: alpha(m.teal, 0.12),
-            color: m.teal,
-            border: `1px solid ${alpha(m.teal, 0.4)}`,
-            "& .MuiChip-label": { px: 0.7, py: 0, lineHeight: 1.2 },
-          }}
-        />
+        <Tooltip title={updatedSignpostTitle || "Updated"} placement="top">
+          <Chip
+            label="Updated"
+            size="small"
+            onClick={onUpdatedClick}
+            sx={{
+              height: 18,
+              fontWeight: 800,
+              fontSize: 9,
+              borderRadius: "6px",
+              bgcolor: alpha(m.teal, 0.12),
+              color: m.teal,
+              border: `1px solid ${alpha(m.teal, 0.4)}`,
+              cursor: onUpdatedClick ? "pointer" : "default",
+              "& .MuiChip-label": { px: 0.7, py: 0, lineHeight: 1.2 },
+            }}
+          />
+        </Tooltip>
       ) : null}
 
       {showEditScenario &&
@@ -199,7 +219,11 @@ export default function BookingRequestStatusRow({
       ) : null}
 
       {isEbrIncoming ? (
-        <ScenarioPill label="EBR">
+        <ScenarioPill
+          label="EBR"
+          title={ebrSignpostTitle}
+          onClick={onEbrClick}
+        >
           <Box sx={{ display: "grid", placeItems: "center", lineHeight: 0 }}>
             <BookingRequestReceivedIcon size={11} />
           </Box>
@@ -207,7 +231,7 @@ export default function BookingRequestStatusRow({
       ) : null}
 
       {showErPill ? (
-        <ScenarioPill label="ER">
+        <ScenarioPill label="ER" title={erSignpostTitle} onClick={onErClick}>
           {rowMode === "professional_rejected" ? (
             <EditRequestIndicatorIcon variant="rejected" />
           ) : bookingRequestDirection === "incoming" ? (

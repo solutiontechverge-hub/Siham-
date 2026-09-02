@@ -1,6 +1,7 @@
 "use client";
 
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import { Box, IconButton, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../../ui/typography";
@@ -43,6 +44,8 @@ type BookingDrawerSelectedItemsSectionProps = {
   onRemoveProduct?: (productId: string) => void;
   onRemoveUniqueItem?: (itemId: string) => void;
   onServiceClick?: (service: BookingServiceLineItem) => void;
+  /** Hover edit icon → Edit Service screen (client + guest). */
+  onEditService?: (service: BookingServiceLineItem) => void;
 };
 
 export default function BookingDrawerSelectedItemsSection({
@@ -59,6 +62,7 @@ export default function BookingDrawerSelectedItemsSection({
   onRemoveProduct,
   onRemoveUniqueItem,
   onServiceClick,
+  onEditService,
 }: BookingDrawerSelectedItemsSectionProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -95,6 +99,10 @@ export default function BookingDrawerSelectedItemsSection({
                 sx={{
                   ...cardSx,
                   cursor: onServiceClick ? "pointer" : "default",
+                  "&:hover .booking-service-edit-btn": {
+                    opacity: 1,
+                    pointerEvents: "auto",
+                  },
                 }}
               >
                 <Stack
@@ -144,6 +152,29 @@ export default function BookingDrawerSelectedItemsSection({
                       }
                       discountLabel={formatLineDiscountLabel(service.discount)}
                     />
+                    {onEditService ? (
+                      <IconButton
+                        className="booking-service-edit-btn"
+                        size="small"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onEditService(service);
+                        }}
+                        sx={{
+                          color: alpha(m.navy, 0.42),
+                          opacity: 0,
+                          pointerEvents: "none",
+                          transition: "opacity 0.15s, color 0.15s, background-color 0.15s",
+                          "&:hover": {
+                            color: m.teal,
+                            bgcolor: alpha(m.teal, 0.08),
+                          },
+                        }}
+                        aria-label={`Edit ${service.name}`}
+                      >
+                        <EditRoundedIcon sx={{ fontSize: 17 }} />
+                      </IconButton>
+                    ) : null}
                     {showRemoveButtons ? (
                       <IconButton
                         size="small"

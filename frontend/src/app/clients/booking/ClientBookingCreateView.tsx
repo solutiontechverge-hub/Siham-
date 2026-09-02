@@ -1490,7 +1490,7 @@ export default function ClientBookingCreateView() {
                           const closedNote = closed
                             ? getDayClosedNote(d.date)
                             : noSlots
-                              ? "No public hours available for this day."
+                              ? "No schedule availability for this day."
                               : null;
                           const disabled = past || closed || noSlots;
                           const blocked = closed || noSlots;
@@ -1775,7 +1775,7 @@ export default function ClientBookingCreateView() {
                           }}
                         >
                           {selectedDayClosedNote ||
-                            "No public hours available for this day."}
+                            "No schedule availability for this day."}
                         </Typography>
                       )}
 

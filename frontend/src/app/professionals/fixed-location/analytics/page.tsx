@@ -2,14 +2,17 @@
 
 import { Suspense } from "react";
 import ProfessionalFixedLocationAnalytics from "../../../../components/common/ProfessionalFixedLocationAnalytics";
-import { professionalFixedLocationAnalyticsData } from "./analytics.data";
+import { useFixedLocationAnalyticsPage } from "./useFixedLocationAnalyticsPage";
+
+function AnalyticsContent() {
+  const { data } = useFixedLocationAnalyticsPage();
+  return <ProfessionalFixedLocationAnalytics data={data} />;
+}
 
 export default function FixedLocationAnalyticsPage() {
   return (
     <Suspense>
-      <ProfessionalFixedLocationAnalytics
-        data={professionalFixedLocationAnalyticsData}
-      />
+      <AnalyticsContent />
     </Suspense>
   );
 }

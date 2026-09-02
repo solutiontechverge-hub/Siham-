@@ -69,9 +69,10 @@ export function formatFinanceMethodLabel(method?: string | null): string {
   return "Online Direct";
 }
 
-export function prepaidBreakdownLabel(percent: number): string {
+export function prepaidBreakdownLabel(percent: number, paid = false): string {
+  const word = paid ? "Prepaid" : "Prepayment";
   const label = formatFinancePercent(percent);
-  return label ? `Prepayment (${label}%)` : "Prepayment";
+  return label ? `${word} (${label}%)` : word;
 }
 
 export function formatOfflinePrepaymentVisitNote(

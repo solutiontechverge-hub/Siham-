@@ -4,37 +4,19 @@ import * as React from "react";
 import { useTheme } from "@mui/material/styles";
 import { favouritesPageData } from "./favourites.data";
 import { useListingCards } from "../listing/use-listing-cards";
+import { useClientFavorites } from "../../../hooks/useClientFavorites";
 
 export function useFavouritesTokens() {
   return useTheme().palette.mollure;
 }
 
-function readFavorites(): Record<string, boolean> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem("mollure:favorites");
-    return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
-  } catch {
-    return {};
-  }
-}
-
 export function useClientFavouritesPage() {
   const tokens = useFavouritesTokens();
-  const [favorites, setFavorites] = React.useState<Record<string, boolean>>(
-    () => readFavorites(),
-  );
+  const { favorites, toggleFavorite, isLoading: favoritesLoading } =
+    useClientFavorites();
   const [page, setPage] = React.useState(1);
 
-  React.useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === "mollure:favorites") setFavorites(readFavorites());
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
-
-  const { cards: listingCards, isLoading } = useListingCards();
+  const { cards: listingCards, isLoading: cardsLoading } = useListingCards();
   const allItems = listingCards.filter((c) => Boolean(favorites[c.id]));
 
   const pageSize = favouritesPageData.pagination.pageSize;
@@ -48,18 +30,6 @@ export function useClientFavouritesPage() {
     const start = (page - 1) * pageSize;
     return allItems.slice(start, start + pageSize);
   }, [allItems, page, pageSize]);
-
-  const toggleFavorite = React.useCallback((id: string) => {
-    setFavorites((prev) => {
-      const next = { ...prev, [id]: !prev[id] };
-      try {
-        window.localStorage.setItem("mollure:favorites", JSON.stringify(next));
-      } catch {
-        // ignore
-      }
-      return next;
-    });
-  }, []);
 
   const rangeLabel =
     allItems.length === 0
@@ -76,6 +46,6 @@ export function useClientFavouritesPage() {
     totalPages,
     totalCount: allItems.length,
     rangeLabel,
-    isLoading,
+    isLoading: cardsLoading || favoritesLoading,
   };
 }
