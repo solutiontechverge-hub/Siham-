@@ -5,40 +5,20 @@ import {
   intersectIntervals,
   mergeIntervals,
   minutesSinceMidnight,
-  parseIsoDate,
   subtractIntervals,
+  weekdayNameFromIso,
 } from "./calendar.utils";
-import type { BlockTimeDraft } from "./calendar.utils";
 import type { ScheduleAvailabilityRow, ScheduleDateOverride } from "./calendar-settings.types";
-
-const dayNameToDow: Record<BlockTimeDraft["dayFrom"], number> = {
-  Sunday: 0,
-  Monday: 1,
-  Tuesday: 2,
-  Wednesday: 3,
-  Thursday: 4,
-  Friday: 5,
-  Saturday: 6,
-};
-
-const isDayInRange = (dow: number, dayFrom: BlockTimeDraft["dayFrom"], dayTo: BlockTimeDraft["dayTo"]) => {
-  const fromDow = dayNameToDow[dayFrom];
-  const toDow = dayNameToDow[dayTo];
-  if (fromDow <= toDow) return dow >= fromDow && dow <= toDow;
-  return dow >= fromDow || dow <= toDow;
-};
 
 export function makeScheduleRowId() {
   return `sch-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 }
 
+/** Match by date span only — dayFrom/dayTo are display-only. */
 export function rowMatchesDate(row: ScheduleAvailabilityRow, iso: string) {
   if (row.archived) return false;
   if (row.excludedDates?.includes(iso)) return false;
-  if (iso < row.dateFrom || iso > row.dateTo) return false;
-  const dow = parseIsoDate(iso).getUTCDay();
-  const singleDay = row.dateFrom === row.dateTo;
-  return singleDay || isDayInRange(dow, row.dayFrom, row.dayTo);
+  return iso >= row.dateFrom && iso <= row.dateTo;
 }
 
 export function getScheduleRowsForDate(
@@ -199,11 +179,9 @@ export function expandRowDates(row: ScheduleAvailabilityRow): string[] {
   const dates: string[] = [];
   let cursor = row.dateFrom;
   const end = row.dateTo;
-  const singleDay = row.dateFrom === end;
 
   while (cursor <= end) {
-    const dow = parseIsoDate(cursor).getUTCDay();
-    if (!row.excludedDates?.includes(cursor) && (singleDay || isDayInRange(dow, row.dayFrom, row.dayTo))) {
+    if (!row.excludedDates?.includes(cursor)) {
       dates.push(cursor);
     }
     cursor = addDaysIso(cursor, 1);
@@ -227,8 +205,8 @@ export function splitScheduleRowForDate(
     locations: next.locations,
     dateFrom: iso,
     dateTo: iso,
-    dayFrom: "Monday",
-    dayTo: "Sunday",
+    dayFrom: weekdayNameFromIso(iso),
+    dayTo: weekdayNameFromIso(iso),
     shifts: next.shifts,
     excludedDates: [],
   };

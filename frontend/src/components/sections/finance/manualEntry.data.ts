@@ -1,8 +1,6 @@
-import {
-  mockClientRecords,
-  mockMollureDirectory,
-  type ClientRecord,
-  type MollureDirectoryRow,
+import type {
+  ClientRecord,
+  MollureDirectoryRow,
 } from "../../../app/professionals/fixed-location/client/data/clientList";
 
 export type ManualEntryClientMode = "list" | "platform" | "guest";
@@ -11,20 +9,6 @@ export type ManualEntryClientSelection =
   | { type: "guest"; name?: string }
   | { type: "list"; client: ClientRecord }
   | { type: "platform"; client: MollureDirectoryRow };
-
-export { mockClientRecords, mockMollureDirectory };
-
-export function filterClientsByName(query: string): ClientRecord[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return mockClientRecords.slice(0, 5);
-  return mockClientRecords.filter((c) => c.name.toLowerCase().includes(q)).slice(0, 8);
-}
-
-export function filterMollureByEmail(query: string): MollureDirectoryRow[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return mockMollureDirectory;
-  return mockMollureDirectory.filter((r) => `${r.email} ${r.name}`.toLowerCase().includes(q));
-}
 
 export function selectionLabel(selection: ManualEntryClientSelection | null): string {
   if (!selection) return "";

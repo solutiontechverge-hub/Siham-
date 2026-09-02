@@ -2,16 +2,19 @@
 
 import * as React from "react";
 import {
-  mockReportRows,
-  type ReportRow,
-  type ReportStatus,
-} from "../../reportsData";
+  useGetAdminReportsQuery,
+  useUpdateAdminReportMutation,
+} from "../../../../store/services/adminApi";
+import type { ReportRow, ReportStatus } from "../../reportsData";
 import { exportReportsToExcel } from "../../exportReportsExcel";
 import { exportReportsToPdf } from "../../exportReportsPdf";
 import { PAGE_SIZE_OPTIONS } from "./reports.data";
 
 export function useAdminReportsPage() {
-  const [reports, setReports] = React.useState(mockReportRows);
+  const { data, isLoading } = useGetAdminReportsQuery();
+  const [updateAdminReport] = useUpdateAdminReportMutation();
+  const reports = (data?.data?.items ?? []) as ReportRow[];
+
   const [drawerReportId, setDrawerReportId] = React.useState<string | null>(
     null,
   );
@@ -84,11 +87,38 @@ export function useAdminReportsPage() {
   };
 
   const toggleSelectAll = () => {
-    if (selectedRows.size === pagedReports.length) {
-      setSelectedRows(new Set());
-      return;
-    }
-    setSelectedRows(new Set(pagedReports.map((report) => report.id)));
+    const ids = pagedReports.map((row) => row.id);
+    const allSelected = ids.every((id) => selectedRows.has(id));
+    setSelectedRows((previous) => {
+      const next = new Set(previous);
+      ids.forEach((id) => (allSelected ? next.delete(id) : next.add(id)));
+      return next;
+    });
+  };
+
+  const updateReportStatus = async (id: string, status: ReportStatus) => {
+    await updateAdminReport({ id, status });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    await updateAdminReport({ id: deleteTarget.id, delete: true });
+    setDeleteTarget(null);
+  };
+
+  const handleExportExcel = () => {
+    exportReportsToExcel(exportRows);
+    setExportMenuAnchor(null);
+  };
+
+  const handleExportPdf = async () => {
+    await exportReportsToPdf(exportRows);
+    setExportMenuAnchor(null);
+  };
+
+  const handleDateRangeChange = (start: string, end: string) => {
+    setDateFrom(start);
+    setDateTo(end);
   };
 
   const resetFilters = () => {
@@ -100,75 +130,50 @@ export function useAdminReportsPage() {
     setPage(1);
   };
 
-  const handleDateRangeChange = (start: string, end: string) => {
-    setDateFrom(start);
-    setDateTo(end);
-  };
-
-  const handleExportExcel = () => {
-    exportReportsToExcel(exportRows, "reports");
-    setExportMenuAnchor(null);
-  };
-
-  const handleExportPdf = async () => {
-    await exportReportsToPdf(exportRows, "reports");
-    setExportMenuAnchor(null);
-  };
-
-  const deleteReport = (id: string) => {
-    setReports((previous) => previous.filter((report) => report.id !== id));
-    setSelectedRows((previous) => {
-      const next = new Set(previous);
-      next.delete(id);
-      return next;
-    });
-  };
-
-  const confirmDelete = () => {
-    if (!deleteTarget) return;
-    deleteReport(deleteTarget.id);
-    if (drawerReportId === deleteTarget.id) setDrawerReportId(null);
-    setDeleteTarget(null);
-  };
-
-  const updateReportStatus = (id: string, status: ReportStatus) => {
-    setReports((previous) =>
-      previous.map((report) =>
-        report.id === id ? { ...report, status } : report,
-      ),
-    );
+  const setDrawerReportIdWithView = (id: string | null) => {
+    setDrawerReportId(id);
+    if (id) {
+      const report = reports.find((row) => row.id === id);
+      if (report?.status === "new") {
+        void updateReportStatus(id, "viewed");
+      }
+    }
   };
 
   return {
-    drawerReport,
+    confirmDelete,
+    dateFrom,
+    dateTo,
     deleteTarget,
+    drawerReport,
+    drawerReportId,
     exportMenuAnchor,
     filteredReports,
+    handleDateRangeChange,
+    handleExportExcel,
+    handleExportPdf,
+    isLoading,
     page,
     pageSize,
     pagedReports,
-    selectedRows,
+    resetFilters,
     search,
-    statusFilter,
-    totalPages,
-    typeFilter,
-    dateFrom,
-    dateTo,
+    selectedRows,
+    setDateFrom,
+    setDateTo,
     setDeleteTarget,
-    setDrawerReportId,
+    setDrawerReportId: setDrawerReportIdWithView,
     setExportMenuAnchor,
     setPage,
     setPageSize,
     setSearch,
     setStatusFilter,
     setTypeFilter,
+    statusFilter,
     toggleSelect,
     toggleSelectAll,
-    resetFilters,
-    handleDateRangeChange,
-    handleExportExcel,
-    handleExportPdf,
-    confirmDelete,
+    totalPages,
+    typeFilter,
     updateReportStatus,
   };
 }

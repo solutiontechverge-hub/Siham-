@@ -18,7 +18,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 import { AppButton } from "../common";
 import AdminSectionCard from "./AdminSectionCard";
 import { AdminSectionLink } from "./AdminDashboardHeader";
-import { rankingFactors } from "./adminMockData";
+import { useGetAdminListingRankingQuery } from "../../store/services/adminApi";
 import {
   platformContactMessages,
   platformFlaggedReviews,
@@ -82,6 +82,8 @@ function InfoBox({ children }: { children: React.ReactNode }) {
 
 export function RankingWeightSummaryWidget() {
   const tokens = useTheme().palette.mollure;
+  const { data } = useGetAdminListingRankingQuery();
+  const rankingFactors = data?.data?.factors ?? [];
 
   return (
     <AdminSectionCard

@@ -23,6 +23,7 @@ type BookingPriceBreakdownProps = {
   prepaidPercent?: number;
   prepaidAmount?: number;
   remainingAmount?: number;
+  prepaymentPaid?: boolean;
   prepaidAction?: ReactNode;
   extraRows?: readonly BookingPriceBreakdownRow[];
   /** Rows only — no nested card. Use inside a parent booking card. */
@@ -101,6 +102,7 @@ export default function BookingPriceBreakdown({
   prepaidPercent = 0,
   prepaidAmount = 0,
   remainingAmount,
+  prepaymentPaid = false,
   prepaidAction,
   extraRows = [],
   variant = "card",
@@ -255,7 +257,7 @@ export default function BookingPriceBreakdown({
       {showPrepay ? (
         <Stack spacing={1} sx={{ mt: 1.25 }}>
           <FinanceRow
-            label={prepaidBreakdownLabel(prepaidPercent)}
+            label={prepaidBreakdownLabel(prepaidPercent, prepaymentPaid)}
             value={formatFinanceEuro(prepaidAmount)}
             action={prepaidAction}
           />

@@ -2,7 +2,11 @@
 
 import * as React from "react";
 import { useSearchParams } from "next/navigation";
-import { mockMessages } from "../../adminMockData";
+import {
+  useDeleteAdminMessageMutation,
+  useGetAdminMessagingQuery,
+  useReplyAdminMessageMutation,
+} from "../../../../store/services/adminApi";
 import type { MessagingRecipient } from "./messaging.types";
 
 function parseRecipients(searchParams: URLSearchParams): MessagingRecipient[] {
@@ -27,13 +31,21 @@ export function useAdminMessagingPage() {
     [searchParams],
   );
 
-  const [messages, setMessages] = React.useState(mockMessages);
-  const [selectedId, setSelectedId] = React.useState<string | null>(
-    messages[0]?.id ?? null,
-  );
+  const { data } = useGetAdminMessagingQuery();
+  const [replyAdminMessage] = useReplyAdminMessageMutation();
+  const [deleteAdminMessage] = useDeleteAdminMessageMutation();
+  const messages = data?.data?.items ?? [];
+
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [reply, setReply] = React.useState("");
   const [outgoingSubject, setOutgoingSubject] = React.useState("");
   const [outgoingBody, setOutgoingBody] = React.useState("");
+
+  React.useEffect(() => {
+    if (!selectedId && messages[0]?.id) {
+      setSelectedId(messages[0].id);
+    }
+  }, [messages, selectedId]);
 
   React.useEffect(() => {
     if (prefilledRecipients.length > 0) {
@@ -43,18 +55,14 @@ export function useAdminMessagingPage() {
 
   const selected = messages.find((m) => m.id === selectedId);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!selected || !reply.trim()) return;
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === selected.id ? { ...m, status: "replied" as const } : m,
-      ),
-    );
+    await replyAdminMessage({ id: selected.id, reply: reply.trim() });
     setReply("");
   };
 
-  const handleDelete = (id: string) => {
-    setMessages((prev) => prev.filter((m) => m.id !== id));
+  const handleDelete = async (id: string) => {
+    await deleteAdminMessage(id);
     if (selectedId === id) setSelectedId(null);
   };
 

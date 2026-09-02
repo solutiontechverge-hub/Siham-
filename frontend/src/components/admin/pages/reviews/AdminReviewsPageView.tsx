@@ -55,9 +55,8 @@ import {
   type FlaggedReviewRow,
   type ReviewTabId,
 } from "../../reviewsData";
-import { ratingCategoryDefaults } from "../../adminMockData";
 import { PAGE_SIZE_OPTIONS, formatDisplayDate } from "./reviews.data";
-import type { AdminReviewsPageProps } from "./reviews.types";
+import type { AdminReviewsPageProps, RatingRanges } from "./reviews.types";
 import { useAdminReviewsPage } from "./useAdminReviewsPage";
 
 function StarRating({ value }: { value: number }) {
@@ -143,10 +142,10 @@ function ReviewsSidebar({
   newKeyword: string;
   onNewKeywordChange: (v: string) => void;
   onAddKeyword: () => void;
-  ranges: typeof ratingCategoryDefaults;
-  onRangesChange: React.Dispatch<
-    React.SetStateAction<typeof ratingCategoryDefaults>
-  >;
+  ranges: RatingRanges;
+  onRangesChange: (
+    next: RatingRanges | ((prev: RatingRanges) => RatingRanges),
+  ) => void;
   onTabChange: (tab: ReviewTabId) => void;
 }) {
   const tokens = useTheme().palette.mollure;

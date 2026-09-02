@@ -42,6 +42,7 @@ import {
   isBlockTimeRangeFullyPast,
   siblingCalendarBlocks,
   toIsoLocalDate,
+  weekdayNameFromIso,
   type BlockTimeDraft,
 } from "./calendar.utils";
 import type { ScheduleAvailabilityRow } from "./calendar-settings.types";
@@ -109,15 +110,18 @@ const defaultAvailabilityDraft = (
   resources: readonly CalendarResource[],
   locations: readonly CalendarBookingLocation[],
   dateIso: string,
-): AvailabilityDraft => ({
-  teamIds: resources.map((resource) => resource.id),
-  locations: [...locations],
-  dateFrom: dateIso,
-  dateTo: dateIso,
-  dayFrom: "Monday",
-  dayTo: "Friday",
-  shifts: [{ start: "09:00", end: "17:00" }],
-});
+): AvailabilityDraft => {
+  const day = weekdayNameFromIso(dateIso);
+  return {
+    teamIds: resources.map((resource) => resource.id),
+    locations: [...locations],
+    dateFrom: dateIso,
+    dateTo: dateIso,
+    dayFrom: day,
+    dayTo: day,
+    shifts: [{ start: "09:00", end: "17:00" }],
+  };
+};
 
 const defaultBlockDraft = (
   resources: readonly CalendarResource[],
@@ -415,6 +419,7 @@ export default function CalendarSchedulePanel({
       !availabilityDraft.locations.length
     )
       return;
+    const dateTo = availabilityDraft.dateTo || availabilityDraft.dateFrom;
     const nextRow: ScheduleAvailabilityRow = {
       id: editingRowId ?? makeScheduleRowId(),
       resourceIds: availabilityDraft.teamIds,
@@ -422,9 +427,9 @@ export default function CalendarSchedulePanel({
         availableLocations.includes(location),
       ),
       dateFrom: availabilityDraft.dateFrom,
-      dateTo: availabilityDraft.dateTo || availabilityDraft.dateFrom,
-      dayFrom: availabilityDraft.dayFrom,
-      dayTo: availabilityDraft.dayTo,
+      dateTo,
+      dayFrom: weekdayNameFromIso(availabilityDraft.dateFrom),
+      dayTo: weekdayNameFromIso(dateTo),
       shifts: availabilityDraft.shifts,
       archived: false,
     };

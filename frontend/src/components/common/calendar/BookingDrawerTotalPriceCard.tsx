@@ -13,6 +13,7 @@ type BookingDrawerTotalPriceCardProps = {
   lateRescheduleFeeAmount?: number;
   prepaidApplied?: number;
   showPrepayment?: boolean;
+  prepaymentPaid?: boolean;
   prepaymentPercent?: number;
   prepaymentAmount?: number;
   remainingAmount?: number;
@@ -27,6 +28,7 @@ export default function BookingDrawerTotalPriceCard({
   lateCancellationFeeAmount = 0,
   lateRescheduleFeeAmount = 0,
   showPrepayment = false,
+  prepaymentPaid = false,
   prepaymentPercent = 0,
   prepaymentAmount = 0,
   remainingAmount,
@@ -43,6 +45,7 @@ export default function BookingDrawerTotalPriceCard({
       prepaidPercent={showPrepayment ? prepaymentPercent : 0}
       prepaidAmount={showPrepayment ? prepaymentAmount : 0}
       remainingAmount={showPrepayment ? remainingAmount : undefined}
+      prepaymentPaid={prepaymentPaid}
     />
   );
 }

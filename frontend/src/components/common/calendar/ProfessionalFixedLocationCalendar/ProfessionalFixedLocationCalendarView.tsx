@@ -775,9 +775,6 @@ export default function ProfessionalFixedLocationCalendar({
       emptyBookingServiceEditDraft(),
     );
   const [serviceEditAttempted, setServiceEditAttempted] = React.useState(false);
-  /** When true, client already assigned staff — hide assign UI on Edit Service. */
-  const [editServiceStaffLocked, setEditServiceStaffLocked] =
-    React.useState(false);
   const [selectedProducts, setSelectedProducts] = React.useState<
     BookingProductLineItem[]
   >([]);
@@ -1359,6 +1356,9 @@ export default function ProfessionalFixedLocationCalendar({
   const isDrawerPrepaymentPaid =
     viewingBookingEvent != null &&
     resolveCalendarPrepaymentStatus(viewingBookingEvent) === "confirmed";
+  const prepaymentSectionTitle = isDrawerPrepaymentPaid
+    ? "Prepaid"
+    : "Prepayment";
   const drawerPriceDisplay = resolveBookingPriceDisplay({
     breakdown: {
       ...bookingPrice,
@@ -3707,6 +3707,59 @@ export default function ProfessionalFixedLocationCalendar({
     [getAvailabilityFor, getBusyFor],
   );
 
+  /**
+   * Client-like “most available” pick: lowest day occupancy, free at the slot.
+   * Falls back to lowest occupancy when nobody is free (still assign someone).
+   */
+  const pickMostAvailableTeamMemberId = React.useCallback(
+    (
+      dateIso: string,
+      startMin: number,
+      durationMins: number,
+      extraBusyByMember?: ReadonlyMap<string, readonly Interval[]>,
+    ): string => {
+      const candidates = [...data.resources].sort((a, b) => {
+        const diff =
+          getDailyBookingRatio(a.id, dateIso) -
+          getDailyBookingRatio(b.id, dateIso);
+        if (diff !== 0) return diff;
+        return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+      });
+      if (!candidates.length) return "";
+
+      const endMin = startMin + Math.max(1, durationMins || 0);
+      const free = candidates.find((resource) => {
+        const locationWindows = slotLocation
+          ? getLocationAvailability(resource.id, dateIso, slotLocation)
+          : [];
+        const working = locationWindows.length
+          ? locationWindows
+          : getAvailabilityFor(resource.id, dateIso);
+        if (!working.length) return false;
+        const withinWorking = working.some(
+          (window) => startMin >= window.startMin && endMin <= window.endMin,
+        );
+        if (!withinWorking) return false;
+        const busy = [
+          ...getBusyFor(resource.id, dateIso),
+          ...(extraBusyByMember?.get(resource.id) ?? []),
+        ];
+        return !busy.some((interval) =>
+          intervalsOverlap({ startMin, endMin }, interval),
+        );
+      });
+      return free?.id ?? candidates[0]?.id ?? "";
+    },
+    [
+      data.resources,
+      getAvailabilityFor,
+      getBusyFor,
+      getDailyBookingRatio,
+      getLocationAvailability,
+      slotLocation,
+    ],
+  );
+
   const teamNavMemberCount = teamNavResources.length;
   const teamNavNeedsScroll = teamNavMemberCount > TEAM_NAV_VISIBLE_SLOTS;
   const teamNavScrollContentWidth = teamNavNeedsScroll
@@ -5269,19 +5322,28 @@ export default function ProfessionalFixedLocationCalendar({
   }, [addMenuTarget]);
 
   const openEditService = React.useCallback(
-    (service: BookingCatalogService) => {
-      const override = serviceOverridesDraft[service.id];
+    (
+      service: BookingCatalogService,
+      lineItemOverride?: Partial<BookingServiceLineItem>,
+      target: string = selectionTarget,
+    ) => {
+      if (target !== selectionTarget) {
+        setSelectionTarget(target);
+      }
+      const override = {
+        ...serviceOverridesDraft[service.id],
+        ...lineItemOverride,
+      };
       const existingOnBooking =
-        selectionTarget === "client"
+        target === "client"
           ? selectedServices.find((item) => item.id === service.id)
           : bookingGuests
-              .find((guest) => guest.id === selectionTarget)
+              .find((guest) => guest.id === target)
               ?.services.find((item) => item.id === service.id);
       const assignedStaff =
         override?.staffResourceId?.trim() ||
         existingOnBooking?.staffResourceId?.trim() ||
         "";
-      setEditServiceStaffLocked(Boolean(assignedStaff));
       setServiceEditDraft(
         buildServiceEditDraftFromCatalog(service, {
           override: {
@@ -5305,6 +5367,30 @@ export default function ProfessionalFixedLocationCalendar({
       selectionTarget,
       serviceOverridesDraft,
     ],
+  );
+
+  const openEditServiceFromLineItem = React.useCallback(
+    (service: BookingServiceLineItem, target: string = selectionTarget) => {
+      const catalogService =
+        selectableServiceCatalog.find((item) => item.id === service.id) ??
+        selectableServiceCatalog.find((item) => item.name === service.name);
+      if (!catalogService) return;
+      openEditService(
+        catalogService,
+        {
+          staffResourceId: service.staffResourceId,
+          startTime: service.startTime,
+          endTime: service.endTime,
+          durationMins: service.durationMins,
+          name: service.name,
+          price: service.price,
+          priceType: service.priceType,
+          discount: service.discount,
+        },
+        target,
+      );
+    },
+    [openEditService, selectableServiceCatalog, selectionTarget],
   );
 
   const applyServiceEdit = React.useCallback(() => {
@@ -5422,6 +5508,7 @@ export default function ProfessionalFixedLocationCalendar({
               buildServiceEditDraftFromCatalog(catalogService, { override }),
             );
           }
+          const existing = currentById.get(id);
           return {
             id: catalogService.id,
             name: catalogService.name,
@@ -5429,13 +5516,89 @@ export default function ProfessionalFixedLocationCalendar({
             durationMins: catalogService.durationMins,
             startTime: selectedSlot?.start,
             endTime: selectedSlot?.end,
-            // Do not auto-assign calendar column as client-selected staff.
-            staffResourceId: undefined,
+            // Keep prior assignment if service was already on the booking.
+            staffResourceId: existing?.staffResourceId,
           } satisfies BookingServiceLineItem;
         }
         return currentById.get(id) ?? null;
       })
       .filter((service): service is BookingServiceLineItem => Boolean(service));
+
+    // Auto-assign most-available team member (client-like):
+    // Desired Location → one shared member; Fixed → per service.
+    const dateIso = selectedSlot?.date;
+    if (dateIso && data.resources.length > 0) {
+      const assignOneForAll = slotLocation === "DL";
+      const virtualBusy = new Map<string, Interval[]>();
+
+      if (assignOneForAll) {
+        const existingShared =
+          currentServices.find((service) => service.staffResourceId)
+            ?.staffResourceId ||
+          pickedServices.find((service) => service.staffResourceId)
+            ?.staffResourceId;
+        const totalDuration = Math.max(
+          1,
+          pickedServices.reduce(
+            (sum, service) => sum + (service.durationMins || 0),
+            0,
+          ),
+        );
+        const startMin = minutesSinceMidnight(
+          pickedServices.find((service) => service.startTime)?.startTime ??
+            selectedSlot?.start ??
+            "00:00",
+        );
+        const sharedId =
+          existingShared ||
+          pickMostAvailableTeamMemberId(dateIso, startMin, totalDuration);
+        for (let i = 0; i < pickedServices.length; i += 1) {
+          if (!pickedServices[i].staffResourceId) {
+            pickedServices[i] = {
+              ...pickedServices[i],
+              staffResourceId: sharedId || undefined,
+            };
+          }
+        }
+      } else {
+        let cursor = minutesSinceMidnight(
+          pickedServices.find((service) => service.startTime)?.startTime ??
+            selectedSlot?.start ??
+            "00:00",
+        );
+        for (let i = 0; i < pickedServices.length; i += 1) {
+          const service = pickedServices[i];
+          const duration = Math.max(1, service.durationMins || 0);
+          const startMin = service.startTime
+            ? minutesSinceMidnight(service.startTime)
+            : cursor;
+          if (service.staffResourceId) {
+            const memberId = service.staffResourceId;
+            const busy = virtualBusy.get(memberId) ?? [];
+            busy.push({ startMin, endMin: startMin + duration });
+            virtualBusy.set(memberId, busy);
+            cursor = startMin + duration;
+            continue;
+          }
+          const memberId = pickMostAvailableTeamMemberId(
+            dateIso,
+            startMin,
+            duration,
+            virtualBusy,
+          );
+          if (memberId) {
+            const busy = virtualBusy.get(memberId) ?? [];
+            busy.push({ startMin, endMin: startMin + duration });
+            virtualBusy.set(memberId, busy);
+          }
+          pickedServices[i] = {
+            ...service,
+            staffResourceId: memberId || undefined,
+          };
+          cursor = startMin + duration;
+        }
+      }
+    }
 
     // Always keep already-added services; only append newly selected ones.
     const mergedById = new Map<string, BookingServiceLineItem>();
@@ -5492,14 +5655,18 @@ export default function ProfessionalFixedLocationCalendar({
     setSlotSaveAttempted(false);
   }, [
     bookingGuests,
+    data.resources.length,
     originalServicesSnapshot,
+    pickMostAvailableTeamMemberId,
     selectedServices,
+    selectedSlot?.date,
     selectedSlot?.end,
     selectedSlot?.start,
     selectionTarget,
     selectableServiceCatalog,
     serviceOverridesDraft,
     serviceSelectionDraft,
+    slotLocation,
   ]);
 
   const openSelectProducts = React.useCallback(() => {
@@ -9004,7 +9171,7 @@ export default function ProfessionalFixedLocationCalendar({
                         ? editServiceStartTimeSlots
                         : undefined
                     }
-                    showStaffAssign={!editServiceStaffLocked}
+                    showStaffAssign={!isViewingExisting || incomingRequestEditMode}
                   />
                 ) : slotBookingScreen === "select-products" ? (
                   <BookingSelectProductsScreen
@@ -11365,18 +11532,22 @@ export default function ProfessionalFixedLocationCalendar({
                                   prev.filter((item) => item.id !== itemId),
                                 );
                               }}
+                              onEditService={
+                                !isViewingExisting || incomingRequestEditMode
+                                  ? (service) =>
+                                      openEditServiceFromLineItem(
+                                        service,
+                                        "client",
+                                      )
+                                  : undefined
+                              }
                               onServiceClick={
                                 incomingRequestEditMode
                                   ? (service) => {
-                                      const catalogService =
-                                        selectableServiceCatalog.find(
-                                          (item) => item.id === service.id,
-                                        ) ??
-                                        selectableServiceCatalog.find(
-                                          (item) => item.name === service.name,
-                                        );
-                                      if (catalogService)
-                                        openEditService(catalogService);
+                                      openEditServiceFromLineItem(
+                                        service,
+                                        "client",
+                                      );
                                     }
                                   : undefined
                               }
@@ -11917,6 +12088,11 @@ export default function ProfessionalFixedLocationCalendar({
                                     (service) => service.guestId === guest.id,
                                   )}
                                   showRemoveButtons={showLineItemRemoveButton}
+                                  resolveStaffName={(staffResourceId) =>
+                                    staffResourceId
+                                      ? resourceNameById.get(staffResourceId)
+                                      : undefined
+                                  }
                                   resolveServiceEditTag={resolveServiceEditTag}
                                   resolveProductEditTag={resolveProductEditTag}
                                   onRemoveService={(serviceId) => {
@@ -11947,6 +12123,16 @@ export default function ProfessionalFixedLocationCalendar({
                                       ),
                                     );
                                   }}
+                                  onEditService={
+                                    !isViewingExisting ||
+                                    incomingRequestEditMode
+                                      ? (service) =>
+                                          openEditServiceFromLineItem(
+                                            service,
+                                            guest.id,
+                                          )
+                                      : undefined
+                                  }
                                 />
 
                                 <ButtonBase
@@ -12780,7 +12966,7 @@ export default function ProfessionalFixedLocationCalendar({
                                     color: alpha(m.navy, 0.82),
                                   }}
                                 >
-                                  Prepayment
+                                  {prepaymentSectionTitle}
                                 </BodyText>
                                 <IconButton
                                   size="small"
@@ -12806,7 +12992,7 @@ export default function ProfessionalFixedLocationCalendar({
                                     color: alpha(m.navy, 0.62),
                                   }}
                                 >
-                                  Prepayment:
+                                  {prepaymentSectionTitle}:
                                 </BodyText>
                                 <AppTextField
                                   placeholder="%"
@@ -12844,7 +13030,9 @@ export default function ProfessionalFixedLocationCalendar({
                                     color: alpha(m.navy, 0.55),
                                   }}
                                 >
-                                  Remaining after prepayment
+                                  {isDrawerPrepaymentPaid
+                                    ? "Remaining after prepaid"
+                                    : "Remaining after prepayment"}
                                 </BodyText>
                                 <BodyText
                                   sx={{
@@ -13115,6 +13303,7 @@ export default function ProfessionalFixedLocationCalendar({
                               isDrawerPrepaymentPaid ? prepaymentAmount : 0
                             }
                             showPrepayment={showPrepayment}
+                            prepaymentPaid={isDrawerPrepaymentPaid}
                             prepaymentPercent={Number(prepaymentPercent) || 0}
                             prepaymentAmount={prepaymentAmount}
                             remainingAmount={remainingAfterPrepayment}

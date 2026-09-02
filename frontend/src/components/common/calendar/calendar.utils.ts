@@ -97,6 +97,7 @@ export function createEmptyBlockTimeDraft(
   locations: readonly CalendarBookingLocation[],
   dateIso: string,
 ): BlockTimeDraft {
+  const day = weekdayNameFromIso(dateIso);
   return {
     title: "",
     customTitle: "",
@@ -104,8 +105,8 @@ export function createEmptyBlockTimeDraft(
     locations: [...locations],
     dateFrom: dateIso,
     dateTo: dateIso,
-    dayFrom: "Monday",
-    dayTo: "Friday",
+    dayFrom: day,
+    dayTo: day,
     startTime: "09:00",
     endTime: "17:00",
   };
@@ -202,6 +203,13 @@ const ISO_DOW_TO_DAY_NAME = [
   "Friday",
   "Saturday",
 ] as const;
+
+/** Weekday label for an ISO date (UTC), e.g. "2026-09-02" → "Wednesday". */
+export function weekdayNameFromIso(
+  iso: string,
+): BlockTimeDraft["dayFrom"] {
+  return ISO_DOW_TO_DAY_NAME[parseIsoDate(iso).getUTCDay()];
+}
 
 export type PublicBusinessHoursLike = {
   location?: string;
@@ -576,46 +584,26 @@ export function sumIntervalsMins(intervals: readonly Interval[]) {
   return intervals.reduce((acc, it) => acc + Math.max(0, it.endMin - it.startMin), 0);
 }
 
-const blockDayNameToDow: Record<BlockTimeDraft["dayFrom"], number> = {
-  Sunday: 0,
-  Monday: 1,
-  Tuesday: 2,
-  Wednesday: 3,
-  Thursday: 4,
-  Friday: 5,
-  Saturday: 6,
-};
-
-const isBlockDayAllowed = (dow: number, dayFrom: BlockTimeDraft["dayFrom"], dayTo: BlockTimeDraft["dayTo"]) => {
-  const fromDow = blockDayNameToDow[dayFrom];
-  const toDow = blockDayNameToDow[dayTo];
-  if (fromDow <= toDow) return dow >= fromDow && dow <= toDow;
-  return dow >= fromDow || dow <= toDow;
-};
-
 export const blockTitleFromDraft = (draft: BlockTimeDraft) =>
   draft.title === "Custom" ? draft.customTitle?.trim() || "Custom" : draft.title;
 
+/** Every calendar day in [dateFrom, dateTo] — dayFrom/dayTo are display-only. */
 export function buildBlocksFromDraft(draft: BlockTimeDraft, teamIds: readonly string[]): CalendarBlock[] {
   const endDate = draft.dateTo || draft.dateFrom;
-  const singleDay = draft.dateFrom === endDate;
   const blocks: CalendarBlock[] = [];
   let cursor = draft.dateFrom;
 
   while (cursor <= endDate) {
-    const dow = parseIsoDate(cursor).getUTCDay();
-    if (singleDay || isBlockDayAllowed(dow, draft.dayFrom, draft.dayTo)) {
-      for (const teamId of teamIds) {
-        blocks.push({
-          id: `blk-local-${teamId}-${cursor}-${draft.startTime}-${draft.endTime}-${blocks.length}`,
-          resourceId: teamId,
-          date: cursor,
-          start: draft.startTime,
-          end: draft.endTime,
-          title: blockTitleFromDraft(draft),
-          kind: "unavailable",
-        });
-      }
+    for (const teamId of teamIds) {
+      blocks.push({
+        id: `blk-local-${teamId}-${cursor}-${draft.startTime}-${draft.endTime}-${blocks.length}`,
+        resourceId: teamId,
+        date: cursor,
+        start: draft.startTime,
+        end: draft.endTime,
+        title: blockTitleFromDraft(draft),
+        kind: "unavailable",
+      });
     }
     cursor = addDaysIso(cursor, 1);
   }

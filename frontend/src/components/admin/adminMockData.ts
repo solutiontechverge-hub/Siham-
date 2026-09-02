@@ -775,7 +775,8 @@ export const mockActivityLog = [
 ];
 
 export const ratingCategoryDefaults = {
-  bad: { min: 1.0, max: 2.9 },
-  good: { min: 3.0, max: 4.4 },
-  excellent: { min: 4.5, max: 5.0 },
+  excellent: { label: "Excellent", min: 4.5, max: 5.0 },
+  good: { label: "Good", min: 3.5, max: 4.4 },
+  average: { label: "Average", min: 2.5, max: 3.4 },
+  poor: { label: "Poor", min: 1.0, max: 2.4 },
 };
