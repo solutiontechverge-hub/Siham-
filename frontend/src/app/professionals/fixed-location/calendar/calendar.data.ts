@@ -12,7 +12,7 @@ export type CalendarBookingStatus =
 
 export type CalendarBookingLocation = "FL" | "DL";
 
-export type CalendarBookingType = "Online" | "Offline" | "Project" | "Requests";
+export type CalendarBookingType = "Online" | "Offline" | "Project";
 
 export type CalendarBookingScenario = "BR" | "EBR" | "ER" | "E";
 
@@ -98,6 +98,8 @@ export type CalendarBookingClientSnapshot = {
 
 export type CalendarBookingDetails = {
   clientEmail?: string;
+  /** Booking customer user id — used to match Mollure clients in Client List. */
+  customerId?: string | null;
   services?: CalendarBookingServiceItem[];
   products?: CalendarBookingProductItem[];
   guests?: CalendarBookingGuestItem[];
@@ -330,7 +332,7 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       title: "Hot stone full body massage",
       status: "Confirmed",
       location: "FL",
-      bookingType: "Requests",
+      bookingType: "Online",
       bookingScenario: "BR",
       showClientName: "Mia R",
       details: {
@@ -353,12 +355,32 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       title: "Hot stone full body massage",
       status: "Invalid",
       location: "FL",
-      bookingType: "Requests",
+      bookingType: "Online",
       bookingScenario: "BR",
       showClientName: "Sara Johnson",
       details: {
         clientEmail: "sarajohnson@gmail.com",
         requestDirection: "incoming",
+        services: [{ id: "svc-hot-stone", name: "Hot stone full body massage", durationMins: 30, price: 165 }],
+        phoneCode: "+31",
+        phoneNumber: "612345679",
+      },
+    },
+    {
+      id: "b-61201-br-rejected",
+      bookingCode: "34013",
+      resourceId: "r-1",
+      date: "2026-06-12",
+      start: "12:00",
+      end: "12:30",
+      title: "Hot stone full body massage",
+      status: "Invalid",
+      location: "FL",
+      bookingType: "Online",
+      showClientName: "Sara Johnson",
+      details: {
+        clientEmail: "sarajohnson@gmail.com",
+        requestDirection: "outgoing",
         services: [{ id: "svc-hot-stone", name: "Hot stone full body massage", durationMins: 30, price: 165 }],
         phoneCode: "+31",
         phoneNumber: "612345679",
@@ -374,7 +396,7 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       title: "Hot stone full body massage",
       status: "Requested",
       location: "FL",
-      bookingType: "Requests",
+      bookingType: "Online",
       bookingScenario: "BR",
       showClientName: "Lissa J",
       details: {
@@ -464,6 +486,34 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       showClientName: "Lissa J",
     },
     {
+      id: "b-61201-project-requested",
+      resourceId: "r-1",
+      date: "2026-06-12",
+      start: "13:00",
+      end: "13:45",
+      title: "On-site styling project",
+      status: "Requested",
+      location: "DL",
+      bookingType: "Project",
+      bookingScenario: "BR",
+      showClientName: "Lissa J",
+      details: {
+        requestDirection: "incoming",
+      },
+    },
+    {
+      id: "b-61201-offline-requested",
+      resourceId: "r-1",
+      date: "2026-06-12",
+      start: "14:00",
+      end: "14:30",
+      title: "Walk-in hair cut",
+      status: "Requested",
+      location: "FL",
+      bookingType: "Offline",
+      showClientName: "Walk-in",
+    },
+    {
       id: "b-61201-e",
       resourceId: "r-1",
       date: "2026-06-12",
@@ -528,7 +578,7 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       title: "Brow shaping",
       status: "Requested",
       location: "DL",
-      bookingType: "Requests",
+      bookingType: "Online",
       bookingScenario: "EBR",
       showClientName: "Noah P",
       details: {
@@ -640,7 +690,7 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       title: "Deep tissue massage",
       status: "Requested",
       location: "DL",
-      bookingType: "Requests",
+      bookingType: "Online",
       showClientName: "Liam R",
     },
     {
@@ -676,7 +726,7 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       title: "Hot stone full body massage",
       status: "Requested",
       location: "FL",
-      bookingType: "Requests",
+      bookingType: "Online",
       bookingScenario: "BR",
       showClientName: "Lissa J",
     },
@@ -689,7 +739,7 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       title: "Hot stone full body massage",
       status: "Requested",
       location: "FL",
-      bookingType: "Requests",
+      bookingType: "Online",
       bookingScenario: "BR",
       showClientName: "Lissa J",
     },
@@ -762,7 +812,7 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       title: "Brows",
       status: "Requested",
       location: "DL",
-      bookingType: "Requests",
+      bookingType: "Online",
       showClientName: "Noah P",
     },
     {

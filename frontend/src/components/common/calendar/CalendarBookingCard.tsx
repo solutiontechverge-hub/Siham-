@@ -26,6 +26,7 @@ import {
 import { useBookingPaymentDueMeta } from "./resolveBookingPaymentDueMeta";
 import { hasUnseenBookingUpdate } from "./bookingUpdateSeen";
 import { sanitizeInternalNoteText } from "./bookingEventDetails";
+import BookingIdTooltipLabel from "./BookingIdTooltipLabel";
 
 export type CalendarBookingCardProps = {
   event: CalendarEvent;
@@ -42,7 +43,7 @@ export type CalendarBookingCardProps = {
   onOpen: () => void;
   onOpenCalendar: () => void;
   onOpenNotes: () => void;
-  onOpenClient: () => void;
+  onOpenClient: (anchorEl: HTMLElement) => void;
   onOpenMessages: () => void;
 };
 
@@ -182,7 +183,7 @@ export default function CalendarBookingCard({
       ]}
     >
       <BookingTimelineCard
-        idLabel={`ID: ${event.bookingCode ?? extractBookingId(event.id)}`}
+        idLabel={<BookingIdTooltipLabel bookingId={bookingRef} />}
         title={event.title}
         titleBold={emphasizeRequest}
         timeLabel={dense ? "" : `(${event.start} to ${event.end})`}
@@ -305,7 +306,7 @@ export default function CalendarBookingCard({
           show: true,
           name: event.showClientName ?? "Client",
           tooltip: `Open profile: ${event.showClientName ?? "Client"}`,
-          onClick: onOpenClient,
+          onClick: (e) => onOpenClient(e.currentTarget as HTMLElement),
         }}
         messageAction={{
           show: true,

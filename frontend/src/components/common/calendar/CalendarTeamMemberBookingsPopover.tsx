@@ -25,6 +25,7 @@ export type CalendarTeamMemberBookingsPopoverProps = {
   memberName: string;
   bookings: readonly CalendarEvent[];
   showDate?: boolean;
+  showEditAvailability?: boolean;
   editAvailabilityDisabled?: boolean;
   splitScreenEnabled?: boolean;
   splitScreenActive?: boolean;
@@ -43,6 +44,7 @@ export default function CalendarTeamMemberBookingsPopover({
   memberName,
   bookings,
   showDate = false,
+  showEditAvailability = false,
   editAvailabilityDisabled = false,
   splitScreenEnabled = false,
   splitScreenActive = false,
@@ -206,24 +208,26 @@ export default function CalendarTeamMemberBookingsPopover({
           View profile
         </BodyText>
       </ButtonBase>
-      <ButtonBase
-        disabled={editAvailabilityDisabled}
-        onClick={onEditAvailability}
-        sx={{
-          width: "100%",
-          px: 1,
-          py: 0.75,
-          justifyContent: "flex-start",
-          borderRadius: "8px",
-          opacity: editAvailabilityDisabled ? 0.5 : 1,
-        }}
-      >
-        <BodyText
-          sx={{ fontWeight: 700, fontSize: 11.5, color: alpha(m.navy, 0.78) }}
+      {showEditAvailability ? (
+        <ButtonBase
+          disabled={editAvailabilityDisabled}
+          onClick={onEditAvailability}
+          sx={{
+            width: "100%",
+            px: 1,
+            py: 0.75,
+            justifyContent: "flex-start",
+            borderRadius: "8px",
+            opacity: editAvailabilityDisabled ? 0.5 : 1,
+          }}
         >
-          Edit availability
-        </BodyText>
-      </ButtonBase>
+          <BodyText
+            sx={{ fontWeight: 700, fontSize: 11.5, color: alpha(m.navy, 0.78) }}
+          >
+            Edit availability
+          </BodyText>
+        </ButtonBase>
+      ) : null}
 
       {showSplitActions ? (
         <>

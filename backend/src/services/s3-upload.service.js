@@ -161,6 +161,20 @@ export async function uploadTeamMemberPhotoFileToS3(userId, file) {
   });
 }
 
+export async function uploadTeamMemberDocumentFileToS3(userId, file) {
+  if (!file?.buffer?.length) {
+    throw new Error("No document file provided.");
+  }
+
+  return uploadUserProfileAsset({
+    userId,
+    assetKind: "team_member_document",
+    buffer: file.buffer,
+    contentType: file.mimetype,
+    originalName: file.originalname,
+  });
+}
+
 export async function uploadBusinessMediaFilesToS3(userId, files = []) {
   const urls = [];
 

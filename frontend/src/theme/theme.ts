@@ -134,6 +134,9 @@ const theme = createTheme({
       /** Calendar blocked-time slot */
       blockedTimeBg: "#FEE4E2",
       blockedTimeFg: "#F04438",
+      /** Block Time band (distinct from unavailable slot gray) */
+      blockTimeBandBg: "#E4E7EC",
+      blockTimeBandFg: "#475467",
       /** Calendar day/week timeline — solid line at each full hour (dark grey) */
       timelineGridHourLine: "#71819A",
       /** Calendar day/week timeline — dotted line at each half hour (light grey) */

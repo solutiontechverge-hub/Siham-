@@ -515,6 +515,7 @@ export function useFixedLocationCalendarPage() {
     serviceCatalog,
     serviceOrderDefaults,
     clientOptions,
+    professionalClients: professionalClientsData?.data ?? [],
     fixedLocationAddress,
     lateRescheduleFeePercentDefault,
     prepaymentPercentDefault,

@@ -23,7 +23,7 @@ export type CalendarBookingTicketStackProps = {
   onOpen: (event: CalendarEvent) => void;
   onOpenCalendar: (event: CalendarEvent) => void;
   onOpenNotes: (event: CalendarEvent) => void;
-  onOpenClient: (event: CalendarEvent) => void;
+  onOpenClient: (event: CalendarEvent, anchorEl: HTMLElement) => void;
   onOpenMessages: (event: CalendarEvent) => void;
 };
 
@@ -109,7 +109,7 @@ export default function CalendarBookingTicketStack({
               onOpen={() => onOpen(event)}
               onOpenCalendar={() => onOpenCalendar(event)}
               onOpenNotes={() => onOpenNotes(event)}
-              onOpenClient={() => onOpenClient(event)}
+              onOpenClient={(anchorEl) => onOpenClient(event, anchorEl)}
               onOpenMessages={() => onOpenMessages(event)}
             />
           </Box>

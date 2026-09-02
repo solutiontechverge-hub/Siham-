@@ -36,7 +36,11 @@ import CalendarBlockTimeModal from "./CalendarBlockTimeModal";
 import CalendarScheduleAddMenu from "./CalendarScheduleAddMenu";
 import CalendarScheduleDeleteDialog from "./CalendarScheduleDeleteDialog";
 import type { BlockTimeDraft } from "./calendar.utils";
-import { formatLongDateUtc, formatMdyDate } from "./calendar.utils";
+import {
+  createEmptyBlockTimeDraft,
+  formatLongDateUtc,
+  formatMdyDate,
+} from "./calendar.utils";
 import {
   availabilityEntryToDraft,
   blockedEntryToDraft,
@@ -331,15 +335,7 @@ export default function CalendarTeamMemberSchedule({
   const [blockDraft, setBlockDraft] = React.useState<
     BlockTimeDraft & { activity?: string }
   >({
-    title: "Custom",
-    teamIds: [],
-    locations: [...supportedLocations],
-    dateFrom: activeDateIso,
-    dateTo: activeDateIso,
-    dayFrom: "Monday",
-    dayTo: "Friday",
-    startTime: "09:00",
-    endTime: "17:00",
+    ...createEmptyBlockTimeDraft([], supportedLocations, activeDateIso),
     activity: "",
   });
   const [editingBlocked, setEditingBlocked] =
@@ -428,15 +424,11 @@ export default function CalendarTeamMemberSchedule({
     setBlockMode("add");
     setEditingBlocked(null);
     setBlockDraft({
-      title: "Custom",
-      teamIds: resources[0]?.id ? [resources[0].id] : [],
-      locations: [...supportedLocations],
-      dateFrom: activeDateIso,
-      dateTo: activeDateIso,
-      dayFrom: "Monday",
-      dayTo: "Friday",
-      startTime: "09:00",
-      endTime: "17:00",
+      ...createEmptyBlockTimeDraft(
+        resources[0]?.id ? [resources[0].id] : [],
+        supportedLocations,
+        activeDateIso,
+      ),
       activity: "",
     });
     setBlockModalOpen(true);
@@ -450,7 +442,7 @@ export default function CalendarTeamMemberSchedule({
   };
 
   const applyBlocked = () => {
-    if (!blockDraft.teamIds.length) return;
+    if (!blockDraft.title || !blockDraft.teamIds.length) return;
     if (
       blockDraft.title === "Custom" &&
       !blockDraft.customTitle?.trim() &&

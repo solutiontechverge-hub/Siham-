@@ -35,8 +35,12 @@ import type {
   CalendarResource,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import {
+  createEmptyBlockTimeDraft,
+  dedupeCalendarBlocks,
   formatLongDateUtc,
   formatMdyDate,
+  isBlockTimeRangeFullyPast,
+  siblingCalendarBlocks,
   toIsoLocalDate,
   type BlockTimeDraft,
 } from "./calendar.utils";
@@ -120,15 +124,11 @@ const defaultBlockDraft = (
   locations: readonly CalendarBookingLocation[],
   dateIso: string,
 ): BlockTimeDraft & { activity?: string } => ({
-  title: "Custom",
-  teamIds: resources[0]?.id ? [resources[0].id] : [],
-  locations: [...locations],
-  dateFrom: dateIso,
-  dateTo: dateIso,
-  dayFrom: "Monday",
-  dayTo: "Friday",
-  startTime: "09:00",
-  endTime: "17:00",
+  ...createEmptyBlockTimeDraft(
+    resources[0]?.id ? [resources[0].id] : [],
+    locations,
+    dateIso,
+  ),
   activity: "",
 });
 
@@ -294,7 +294,6 @@ export default function CalendarSchedulePanel({
   selectedResourceIds,
   onSelectedResourceIdsChange,
   activeBookings = [],
-  onCancelBookingsInSlot,
 }: CalendarSchedulePanelProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -478,33 +477,45 @@ export default function CalendarSchedulePanel({
   };
 
   const applyBlocked = async () => {
-    if (!blockDraft.teamIds.length) return;
-    const overlappingBlock = blocks.some((block) => {
-      if (!blockDraft.teamIds.includes(block.resourceId)) return false;
-      if (block.date < blockDraft.dateFrom || block.date > (blockDraft.dateTo || blockDraft.dateFrom)) {
-        return false;
+    if (!blockDraft.title || !blockDraft.teamIds.length) return;
+    const todayIso = toIsoLocalDate(new Date());
+    const rangeEnd = blockDraft.dateTo || blockDraft.dateFrom;
+    const fullyPast = isBlockTimeRangeFullyPast(
+      blockDraft.dateFrom,
+      rangeEnd,
+      todayIso,
+    );
+
+    if (!fullyPast) {
+      const overlappingBlock = blocks.some((block) => {
+        if (block.date < todayIso) return false;
+        if (!blockDraft.teamIds.includes(block.resourceId)) return false;
+        if (block.date < blockDraft.dateFrom || block.date > rangeEnd) {
+          return false;
+        }
+        const startMin = Number(block.start.replace(":", ""));
+        const endMin = Number(block.end.replace(":", ""));
+        const draftStart = Number(blockDraft.startTime.replace(":", ""));
+        const draftEnd = Number(blockDraft.endTime.replace(":", ""));
+        return startMin < draftEnd && draftStart < endMin;
+      });
+      if (overlappingBlock) {
+        setConflictKind("timeslot_blocked");
+        return;
       }
-      const startMin = Number(block.start.replace(":", ""));
-      const endMin = Number(block.end.replace(":", ""));
-      const draftStart = Number(blockDraft.startTime.replace(":", ""));
-      const draftEnd = Number(blockDraft.endTime.replace(":", ""));
-      return startMin < draftEnd && draftStart < endMin;
-    });
-    if (overlappingBlock) {
-      setConflictKind("timeslot_blocked");
-      return;
     }
+
     const colliding = findBookingsInTimeslot(
       activeBookings,
       blockDraft.teamIds,
       blockDraft.dateFrom,
-      blockDraft.dateTo || blockDraft.dateFrom,
+      rangeEnd,
       blockDraft.startTime,
       blockDraft.endTime,
     );
     if (colliding.length) {
       pendingBlockRef.current = blockDraft;
-      setConflictKind("cancel_bookings");
+      setConflictKind("overlap_booking");
       return;
     }
     await commitBlocked(blockDraft);
@@ -528,8 +539,15 @@ export default function CalendarSchedulePanel({
         scheduleRows.filter((row) => row.id !== deleteTarget.id),
       );
     } else if (onDeleteBlockedEntry) {
-      const rawId = deleteTarget.id.replace(/^blk-/, "");
-      await onDeleteBlockedEntry(rawId);
+      const target =
+        blocks.find((block) => block.id === deleteTarget.id) ?? null;
+      const twins = target
+        ? siblingCalendarBlocks(blocks, target)
+        : [{ id: deleteTarget.id } as CalendarBlock];
+      for (const twin of twins) {
+        const rawId = twin.id.replace(/^blk-/, "");
+        await onDeleteBlockedEntry(rawId);
+      }
     }
     setDeleteTarget(null);
   };
@@ -692,8 +710,10 @@ export default function CalendarSchedulePanel({
                 const memberRows = filteredRows.filter((row) =>
                   row.resourceIds.includes(resource.id),
                 );
-                const memberBlocks = filteredBlocks.filter(
-                  (block) => block.resourceId === resource.id,
+                const memberBlocks = dedupeCalendarBlocks(
+                  filteredBlocks.filter(
+                    (block) => block.resourceId === resource.id,
+                  ),
                 );
 
                 return (
@@ -881,20 +901,7 @@ export default function CalendarSchedulePanel({
           const draft = pendingBlockRef.current;
           pendingBlockRef.current = null;
           if (!draft) return;
-          const colliding = findBookingsInTimeslot(
-            activeBookings,
-            draft.teamIds,
-            draft.dateFrom,
-            draft.dateTo || draft.dateFrom,
-            draft.startTime,
-            draft.endTime,
-          );
-          void (async () => {
-            if (colliding.length && onCancelBookingsInSlot) {
-              await onCancelBookingsInSlot(colliding.map((booking) => booking.id));
-            }
-            await commitBlocked(draft);
-          })();
+          void commitBlocked(draft);
         }}
       />
     </>

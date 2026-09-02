@@ -3,6 +3,7 @@ import {
   isS3UploadConfigured,
   uploadBusinessMediaFilesToS3,
   uploadTeamMemberPhotoFileToS3,
+  uploadTeamMemberDocumentFileToS3,
 } from "../services/s3-upload.service.js";
 import {
   buildServiceDetailsFromCategories,
@@ -476,6 +477,14 @@ const getBusinessSetupDetailById = async (
        profile_photo,
        assigned_services,
        display_order,
+       first_name,
+       last_name,
+       contact_number,
+       email,
+       emergency_contact_name,
+       emergency_contact_number,
+       personal_note,
+       personal_documents,
        created_at,
        updated_at
      FROM business_team_members
@@ -487,6 +496,7 @@ const getBusinessSetupDetailById = async (
   const teamMembers = teamMembersResult.rows.map((member) => ({
     ...member,
     assigned_services: parseJsonArray(member.assigned_services),
+    personal_documents: parseJsonArray(member.personal_documents),
   }));
 
   const serviceCategories = parseJsonArray(businessSetup.service_categories);
@@ -3454,6 +3464,172 @@ export const createBookingNotification = async (req, res) => {
       data: {
         error: error.message,
       },
+    });
+  }
+};
+
+const mapTeamMemberDetail = (row) => ({
+  id: row.id,
+  business_setup_id: row.business_setup_id,
+  full_name: row.full_name,
+  role: row.role,
+  profile_photo: row.profile_photo,
+  assigned_services: parseJsonArray(row.assigned_services),
+  display_order: row.display_order,
+  first_name: row.first_name,
+  last_name: row.last_name,
+  contact_number: row.contact_number,
+  email: row.email,
+  emergency_contact_name: row.emergency_contact_name,
+  emergency_contact_number: row.emergency_contact_number,
+  personal_note: row.personal_note,
+  personal_documents: parseJsonArray(row.personal_documents),
+  created_at: row.created_at,
+  updated_at: row.updated_at,
+});
+
+export const updateTeamMember = async (req, res) => {
+  try {
+    if (req.user.user_type !== "professional") {
+      return res.status(403).json({
+        success: false,
+        message: "Only professionals can update team members.",
+        data: null,
+      });
+    }
+
+    const memberId = parseUuid(req.params.id, "team member id");
+    const professionalProfile = await getProfessionalProfile(req.user.id);
+    if (!professionalProfile) {
+      return res.status(404).json({
+        success: false,
+        message: "Professional profile not found.",
+        data: null,
+      });
+    }
+
+    const existingResult = await query(
+      `SELECT tm.*
+       FROM business_team_members tm
+       INNER JOIN business_setups bs ON bs.id = tm.business_setup_id
+       WHERE tm.id = $1 AND bs.professional_profile_id = $2`,
+      [memberId, professionalProfile.id],
+    );
+
+    if (!existingResult.rowCount) {
+      return res.status(404).json({
+        success: false,
+        message: "Team member not found.",
+        data: null,
+      });
+    }
+
+    const existing = existingResult.rows[0];
+    const body = req.body ?? {};
+
+    let fullName =
+      body.full_name !== undefined
+        ? String(body.full_name ?? "").trim()
+        : existing.full_name;
+    if (!fullName) {
+      return res.status(400).json({
+        success: false,
+        message: "Team member name is required.",
+        data: null,
+      });
+    }
+
+    let assignedServices = parseJsonArray(existing.assigned_services);
+    if (body.assigned_services !== undefined) {
+      assignedServices = parseJsonArray(body.assigned_services)
+        .map((service) => {
+          if (!service || typeof service !== "object") return null;
+          const serviceId = parseUuid(service.service_id);
+          if (!serviceId) return null;
+          return {
+            service_id: serviceId,
+            title: service.title ? String(service.title).trim() : null,
+          };
+        })
+        .filter(Boolean);
+    }
+
+    let profilePhoto = existing.profile_photo;
+    const photoFile = req.files?.profile_photo?.[0];
+    if (photoFile?.buffer?.length) {
+      profilePhoto = await uploadTeamMemberPhotoFileToS3(req.user.id, photoFile);
+    } else if (body.profile_photo === null || body.profile_photo === "") {
+      profilePhoto = null;
+    } else if (typeof body.profile_photo === "string" && body.profile_photo.trim()) {
+      profilePhoto = body.profile_photo.trim();
+    }
+
+    let personalDocuments = parseJsonArray(existing.personal_documents);
+    const documentFile = req.files?.personal_document?.[0];
+    if (documentFile?.buffer?.length) {
+      const url = await uploadTeamMemberDocumentFileToS3(req.user.id, documentFile);
+      personalDocuments = [
+        ...personalDocuments,
+        {
+          url,
+          filename: documentFile.originalname || "document",
+          uploaded_at: new Date().toISOString(),
+        },
+      ];
+    }
+    if (body.personal_documents !== undefined) {
+      personalDocuments = parseJsonArray(body.personal_documents);
+    }
+
+    const nullableText = (value, fallback) => {
+      if (value === undefined) return fallback;
+      const trimmed = String(value ?? "").trim();
+      return trimmed || null;
+    };
+
+    const updatedResult = await query(
+      `UPDATE business_team_members
+       SET
+         full_name = $2,
+         profile_photo = $3,
+         assigned_services = $4::jsonb,
+         first_name = $5,
+         last_name = $6,
+         contact_number = $7,
+         email = $8,
+         emergency_contact_name = $9,
+         emergency_contact_number = $10,
+         personal_note = $11,
+         personal_documents = $12::jsonb,
+         updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [
+        memberId,
+        fullName,
+        profilePhoto,
+        JSON.stringify(assignedServices),
+        nullableText(body.first_name, existing.first_name),
+        nullableText(body.last_name, existing.last_name),
+        nullableText(body.contact_number, existing.contact_number),
+        nullableText(body.email, existing.email),
+        nullableText(body.emergency_contact_name, existing.emergency_contact_name),
+        nullableText(body.emergency_contact_number, existing.emergency_contact_number),
+        nullableText(body.personal_note, existing.personal_note),
+        JSON.stringify(personalDocuments),
+      ],
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Team member updated.",
+      data: mapTeamMemberDetail(updatedResult.rows[0]),
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update team member.",
+      data: { error: error.message },
     });
   }
 };

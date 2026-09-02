@@ -37,10 +37,10 @@ const EBR_COPY: Record<
     confirmLabel: "Suggest Change",
   },
   reject: {
-    title: "Reject EBR",
-    body: "Confirm to reject these changes. They will not be applied to your booking.",
-    confirmLabel: "Reject",
-    snackbarMessage: "Edited booking request rejected.",
+    title: "Decline edited request",
+    body: "These edited changes will not be applied. Your booking stays confirmed.",
+    confirmLabel: "Decline",
+    snackbarMessage: "Edit request rejected. Booking stays confirmed.",
     showWarning: true,
   },
 };

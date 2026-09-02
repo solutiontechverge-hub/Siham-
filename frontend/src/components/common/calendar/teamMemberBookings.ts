@@ -12,6 +12,37 @@ function knownTeamId(
   return knownIds.has(id) ? id : null;
 }
 
+export function eventHasKnownTeamAssignment(
+  event: Pick<CalendarEvent, "resourceId" | "details">,
+  knownTeamIds: ReadonlySet<string>,
+): boolean {
+  if (event.resourceId && knownTeamIds.has(String(event.resourceId))) {
+    return true;
+  }
+
+  if (
+    event.details?.services?.some(
+      (service) =>
+        service.teamMemberId &&
+        knownTeamIds.has(String(service.teamMemberId)),
+    )
+  ) {
+    return true;
+  }
+
+  const guests = event.details?.guests ?? [];
+  return guests.some(
+    (guest) =>
+      (guest.bufferTeamMemberId &&
+        knownTeamIds.has(String(guest.bufferTeamMemberId))) ||
+      (guest.services ?? []).some(
+        (service) =>
+          service.teamMemberId &&
+          knownTeamIds.has(String(service.teamMemberId)),
+      ),
+  );
+}
+
 export function eventBelongsToTeamMember(
   event: Pick<CalendarEvent, "resourceId" | "details">,
   teamMemberId: string,
@@ -57,6 +88,57 @@ export function resolveEventTeamMemberId(
   }
 
   return String(resources[0]?.id ?? "");
+}
+
+export function countTeamMemberBookingsOnDate(
+  events: readonly CalendarEvent[],
+  teamMemberId: string,
+  iso: string,
+  options?: {
+    fallbackTeamMemberId?: string;
+    knownTeamIds?: ReadonlySet<string>;
+  },
+): number {
+  const knownTeamIds = options?.knownTeamIds ?? new Set<string>();
+  const fallbackTeamMemberId = options?.fallbackTeamMemberId ?? "";
+
+  return events.reduce((count, event) => {
+    if (event.date !== iso) return count;
+    if (event.status === "Cancelled") return count;
+
+    if (eventBelongsToTeamMember(event, teamMemberId)) {
+      return count + 1;
+    }
+
+    if (
+      fallbackTeamMemberId &&
+      teamMemberId === fallbackTeamMemberId &&
+      !eventHasKnownTeamAssignment(event, knownTeamIds)
+    ) {
+      return count + 1;
+    }
+
+    return count;
+  }, 0);
+}
+
+/** Day view: most bookings first; ties and empty days fall back to alphabetical. */
+export function rankResourcesForCalendarDay(
+  resources: readonly CalendarResource[],
+  events: readonly CalendarEvent[],
+  iso: string,
+  options?: {
+    fallbackTeamMemberId?: string;
+    knownTeamIds?: ReadonlySet<string>;
+  },
+): CalendarResource[] {
+  return [...resources].sort((a, b) => {
+    const countDiff =
+      countTeamMemberBookingsOnDate(events, b.id, iso, options) -
+      countTeamMemberBookingsOnDate(events, a.id, iso, options);
+    if (countDiff !== 0) return countDiff;
+    return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+  });
 }
 
 export function getTeamMemberBookings(

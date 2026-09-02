@@ -56,18 +56,22 @@ function copyFor(
     };
   }
   return {
-    title: isEr ? "Reject edit request" : isFirstBr ? "Reject booking request" : "Reject edited request",
+    title: isEr
+      ? "Reject edit request"
+      : isFirstBr
+        ? "Reject booking request"
+        : "Decline edited request",
     body: isFirstBr
       ? "By rejecting, this booking request will be marked Invalid."
       : isEr
         ? "By rejecting, the requested changes will not be applied. The booking stays confirmed."
-        : "By rejecting, this edited booking request will be marked Invalid.",
-    confirmLabel: "Reject",
+        : "These edited changes will not be applied. The booking stays confirmed.",
+    confirmLabel: isFirstBr || isEr ? "Reject" : "Decline",
     snackbarMessage: isEr
       ? "Edit request rejected. Booking stays confirmed."
       : isFirstBr
         ? "Booking request rejected."
-        : "Edited booking request rejected.",
+        : "Edit request rejected. Booking stays confirmed.",
     showWarning: true,
   };
 }
