@@ -11,7 +11,11 @@ import type {
   CalendarBookingType,
   CalendarResource,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
-import type { CalendarFilters } from "./calendar.utils";
+import {
+  EMPTY_CALENDAR_BOOKING_TYPES,
+  EMPTY_CALENDAR_STATUSES,
+  type CalendarFilters,
+} from "./calendar.utils";
 
 type CalendarFiltersDrawerProps = {
   appliedFilters: CalendarFilters;
@@ -267,24 +271,12 @@ export default function CalendarFiltersDrawer({
                     ...p,
                     bookingAll: checked,
                     booking: checked
-                      ? {
-                          Online: false,
-                          Offline: false,
-                          Project: false,
-                          Requests: false,
-                        }
+                      ? { ...EMPTY_CALENDAR_BOOKING_TYPES }
                       : p.booking,
                     statusAll: checked ? true : p.statusAll,
+                    brRejectedOnly: checked ? false : p.brRejectedOnly,
                     statuses: checked
-                      ? {
-                          Confirmed: false,
-                          Completed: false,
-                          Cancelled: false,
-                          Invalid: false,
-                          "No Show": false,
-                          Requested: false,
-                          "In Progress": false,
-                        }
+                      ? { ...EMPTY_CALENDAR_STATUSES }
                       : p.statuses,
                   }))
                 }
@@ -306,12 +298,7 @@ export default function CalendarFiltersDrawer({
                         return {
                           ...p,
                           bookingAll: true,
-                          booking: {
-                            Online: false,
-                            Offline: false,
-                            Project: false,
-                            Requests: false,
-                          },
+                          booking: { ...EMPTY_CALENDAR_BOOKING_TYPES },
                         };
                       }
                       return { ...p, bookingAll: false, booking };
@@ -332,53 +319,76 @@ export default function CalendarFiltersDrawer({
                   setDraftFilters((p) => ({
                     ...p,
                     statusAll: checked,
+                    brRejectedOnly: checked ? false : p.brRejectedOnly,
                     statuses: checked
-                      ? {
-                          Confirmed: false,
-                          Completed: false,
-                          Cancelled: false,
-                          Invalid: false,
-                          "No Show": false,
-                          Requested: false,
-                          "In Progress": false,
-                        }
+                      ? { ...EMPTY_CALENDAR_STATUSES }
                       : p.statuses,
                   }))
                 }
               />
               {bookingStatuses.map((st) => (
-                <FilterRow
-                  key={st}
-                  label={st}
-                  checked={
-                    draftFilters.statusAll === false &&
-                    Boolean(draftFilters.statuses?.[st])
-                  }
-                  onChange={(checked) =>
-                    setDraftFilters((p) => {
-                      const statuses = { ...p.statuses, [st]: checked };
-                      const selectedCount = bookingStatuses.filter(
-                        (status) => statuses[status],
-                      ).length;
-                      if (selectedCount === bookingStatuses.length) {
+                <React.Fragment key={st}>
+                  <FilterRow
+                    label={st}
+                    checked={
+                      draftFilters.statusAll === false &&
+                      Boolean(draftFilters.statuses?.[st])
+                    }
+                    onChange={(checked) =>
+                      setDraftFilters((p) => {
+                        const statuses = { ...p.statuses, [st]: checked };
+                        const selectedCount = bookingStatuses.filter(
+                          (status) => statuses[status],
+                        ).length;
+                        if (selectedCount === bookingStatuses.length) {
+                          return {
+                            ...p,
+                            statusAll: true,
+                            brRejectedOnly: false,
+                            statuses: { ...EMPTY_CALENDAR_STATUSES },
+                          };
+                        }
                         return {
                           ...p,
-                          statusAll: true,
-                          statuses: {
-                            Confirmed: false,
-                            Completed: false,
-                            Cancelled: false,
-                            Invalid: false,
-                            "No Show": false,
-                            Requested: false,
-                            "In Progress": false,
-                          },
+                          statusAll: false,
+                          statuses,
                         };
+                      })
+                    }
+                  />
+                  {st === "Invalid" ? (
+                    <FilterRow
+                      label="BR Rejected"
+                      checked={
+                        draftFilters.statusAll === false &&
+                        Boolean(draftFilters.brRejectedOnly)
                       }
-                      return { ...p, statusAll: false, statuses };
-                    })
-                  }
-                />
+                      onChange={(checked) =>
+                        setDraftFilters((p) => {
+                          const next = {
+                            ...p,
+                            statusAll: false,
+                            brRejectedOnly: checked,
+                          };
+                          const selectedCount = bookingStatuses.filter(
+                            (status) => next.statuses[status],
+                          ).length;
+                          if (
+                            !checked &&
+                            selectedCount === 0
+                          ) {
+                            return {
+                              ...next,
+                              statusAll: true,
+                              brRejectedOnly: false,
+                            };
+                          }
+                          return next;
+                        })
+                      }
+                    />
+                  ) : null}
+                </React.Fragment>
               ))}
             </Stack>
           </Box>

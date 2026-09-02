@@ -22,7 +22,7 @@ export function isClientOriginatedBooking(
   if (event.details?.requestDirection === "outgoing") return false;
   if (event.details?.requestDirection === "incoming") return true;
   if (event.bookingScenario === "BR" || event.bookingScenario === "EBR") return true;
-  if (event.bookingType === "Online" || event.bookingType === "Requests") return true;
+  if (event.bookingType === "Online") return true;
   return false;
 }
 

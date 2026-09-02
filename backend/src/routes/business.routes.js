@@ -22,6 +22,7 @@ import {
   listCalendarEntries,
   listCategories,
   upsertBusinessSetup,
+  updateTeamMember,
 } from "../controllers/business.controller.js";
 import {
   createProfessionalClient,
@@ -137,6 +138,41 @@ router.post(
   requireProfessional,
   upload.array("business_media", 10),
   uploadBusinessMedia,
+);
+
+router.patch(
+  "/team-members/:id",
+  requireProfessional,
+  messagingUpload.fields([
+    { name: "profile_photo", maxCount: 1 },
+    { name: "personal_document", maxCount: 1 },
+  ]),
+  (req, res, next) => {
+    if (typeof req.body?.assigned_services === "string" && req.body.assigned_services.trim()) {
+      try {
+        req.body.assigned_services = JSON.parse(req.body.assigned_services);
+      } catch {
+        return res.status(400).json({
+          success: false,
+          message: "assigned_services must be valid JSON.",
+          data: null,
+        });
+      }
+    }
+    if (typeof req.body?.personal_documents === "string" && req.body.personal_documents.trim()) {
+      try {
+        req.body.personal_documents = JSON.parse(req.body.personal_documents);
+      } catch {
+        return res.status(400).json({
+          success: false,
+          message: "personal_documents must be valid JSON.",
+          data: null,
+        });
+      }
+    }
+    return next();
+  },
+  updateTeamMember,
 );
 
 const parseBusinessSetupBody = (req, res, next) => {

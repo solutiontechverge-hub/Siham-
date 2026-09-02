@@ -87,6 +87,10 @@ declare module "@mui/material/styles" {
     blockedTimeBg: string;
     /** Calendar blocked-time label / accent */
     blockedTimeFg: string;
+    /** Block Time band fill (distinct from unavailable gray) */
+    blockTimeBandBg: string;
+    /** Block Time band title / time text */
+    blockTimeBandFg: string;
     /** Calendar day/week timeline — solid line at each full hour (dark grey) */
     timelineGridHourLine: string;
     /** Calendar day/week timeline — dotted line at each half hour (light grey) */

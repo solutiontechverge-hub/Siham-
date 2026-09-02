@@ -12,6 +12,7 @@ import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import StickyNote2OutlinedIcon from "@mui/icons-material/StickyNote2Outlined";
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
 import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
@@ -56,11 +57,27 @@ import CalendarCancelBookingModal from "../CalendarCancelBookingModal";
 import CalendarBookingActionConfirmDialog, {
   type CalendarBookingAction,
 } from "../CalendarBookingActionConfirmDialog";
+import CalendarScheduleConflictDialog from "../CalendarScheduleConflictDialog";
 import CalendarBookingCard from "../CalendarBookingCard";
 import CalendarTimelineHoverIndicator from "../CalendarTimelineHoverIndicator";
 import CalendarTeamMemberBadge from "../CalendarTeamMemberBadge";
 import CalendarTeamMemberBookingsPopover from "../CalendarTeamMemberBookingsPopover";
-import { eventBelongsToTeamMember, getTeamMemberBookings } from "../teamMemberBookings";
+import CalendarTeamMemberProfileDrawer from "../CalendarTeamMemberProfileDrawer";
+import CalendarClientNotInListHint from "../CalendarClientNotInListHint";
+import ClientDetailsViewPanel from "../../../../app/professionals/fixed-location/client/ClientDetailsViewPanel";
+import { useCalendarClientProfile } from "../useCalendarClientProfile";
+import {
+  canAddIdentityToClientList,
+  getAddToClientListDisabledReason,
+  identityFromCalendarEvent,
+  type CalendarClientIdentity,
+} from "../calendarClientProfile";
+import {
+  eventBelongsToTeamMember,
+  eventHasKnownTeamAssignment,
+  getTeamMemberBookings,
+  rankResourcesForCalendarDay,
+} from "../teamMemberBookings";
 import BookingEditedTag from "../BookingEditedTag";
 import CalendarBookingTicketStack from "../CalendarBookingTicketStack";
 import {
@@ -207,6 +224,7 @@ import {
   type BookingUniqueItemLine,
 } from "../../../../data/bookingUniqueItem.data";
 import {
+  findBookingsInTimeslot,
   getCombinedAvailabilityIntervals,
   getLocationAvailabilityBands,
   getLocationAvailabilityIntervals,
@@ -231,7 +249,6 @@ import {
   fmtMinToTime,
   fmtTimeLabel,
   getDefaultCalendarResourceId,
-  slotOverlapsBlock,
   timelineGridSlotBg,
   type TimelineGridSlotColors,
   timelineHoverFromPointerY,
@@ -240,6 +257,10 @@ import {
   formatMonthYearUtc,
   blockTitleFromDraft,
   buildBlocksFromDraft,
+  createEmptyBlockTimeDraft,
+  dedupeCalendarBlocks,
+  bookingOverlapsAnyBlock,
+  calendarBlockOverlapsBooking,
   getCalendarQueryDateRange,
   type CalendarQueryDateRange,
   type BlockTimeDraft,
@@ -255,6 +276,8 @@ import {
   sumIntervalsMins,
   toMonthIso,
   toIsoLocalDate,
+  eventMatchesBookingTypeFilter,
+  eventMatchesStatusFilter,
 } from "../calendar.utils";
 import {
   BOOKING_SCENARIO_LABELS,
@@ -365,6 +388,7 @@ export type ProfessionalFixedLocationCalendarProps = {
     countryCode?: string | null;
     clientKind?: "individual" | "company";
   }[];
+  professionalClients?: import("../../../../store/services/businessApi").ApiProfessionalClient[];
   isSaving?: boolean;
   onCreateCalendarEntry?: (
     payload: CreateCalendarEntryRequest,
@@ -471,6 +495,7 @@ export default function ProfessionalFixedLocationCalendar({
   cancellationBeforeMinutes,
   desiredLocationSetup = null,
   clientOptions = [],
+  professionalClients = [],
   isSaving = false,
   onCreateCalendarEntry,
   onUpdateCalendarEntry,
@@ -680,7 +705,7 @@ export default function ProfessionalFixedLocationCalendar({
   const [slotLocation, setSlotLocation] =
     React.useState<CalendarBookingLocation>(data.supportedLocations[0] ?? "FL");
   const [slotBookingType, setSlotBookingType] =
-    React.useState<CalendarBookingType>("Requests");
+    React.useState<CalendarBookingType>("Online");
   const [slotStatus, setSlotStatus] = React.useState<
     | "Confirmed"
     | "Requested"
@@ -933,6 +958,23 @@ export default function ProfessionalFixedLocationCalendar({
   }, [slotBookingScreen]);
 
   const clientList = clientOptions;
+
+  const {
+    viewClient,
+    closeClientDetailsDrawer,
+    handleClientNameClick,
+    notInListPopover,
+    closeNotInListPopover,
+    bookingDrawerNotListedIdentity,
+    clearBookingDrawerNotListedHint,
+    addIdentityToClientList,
+    isAddingClient,
+    saveClientTechnicalNote,
+  } = useCalendarClientProfile(professionalClients);
+
+  const [teamProfileMemberId, setTeamProfileMemberId] = React.useState<
+    string | null
+  >(null);
 
   const platformEmailQuery = platformEmailInput.trim().toLowerCase();
   const platformEmailComplete = /^\S+@\S+\.\S+$/.test(platformEmailQuery);
@@ -1192,6 +1234,78 @@ export default function ProfessionalFixedLocationCalendar({
     setDraftFilters,
   } = useCalendarFilters(data.resources, data.supportedLocations);
 
+  const knownTeamMemberIds = React.useMemo(
+    () => new Set(data.resources.map((resource) => String(resource.id))),
+    [data.resources],
+  );
+  const fallbackTeamMemberId = String(data.resources[0]?.id ?? "");
+  const alphabeticalResources = React.useMemo(
+    () =>
+      [...filteredResources].sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+      ),
+    [filteredResources],
+  );
+  const dayRankedResources = React.useMemo(
+    () =>
+      rankResourcesForCalendarDay(
+        filteredResources,
+        events,
+        activeDateIso,
+        {
+          fallbackTeamMemberId,
+          knownTeamIds: knownTeamMemberIds,
+        },
+      ),
+    [
+      activeDateIso,
+      events,
+      fallbackTeamMemberId,
+      filteredResources,
+      knownTeamMemberIds,
+    ],
+  );
+  const teamNavResources =
+    viewMode === "day" ? dayRankedResources : alphabeticalResources;
+  const defaultDaySelectedResourceId =
+    getDefaultCalendarResourceId(dayRankedResources);
+  const defaultWeekSelectedResourceId =
+    getDefaultCalendarResourceId(alphabeticalResources);
+
+  React.useLayoutEffect(() => {
+    if (viewMode !== "day") return;
+    userPickedTeamMemberRef.current = false;
+  }, [activeDateIso, viewMode]);
+
+  React.useLayoutEffect(() => {
+    if (filteredResources.length === 0) {
+      setSelectedResourceId("");
+      return;
+    }
+    const defaultResourceId =
+      viewMode === "day"
+        ? defaultDaySelectedResourceId
+        : defaultWeekSelectedResourceId;
+    setSelectedResourceId((current) => {
+      const stillValid =
+        Boolean(current) &&
+        filteredResources.some((resource) => resource.id === current);
+      if (!stillValid) {
+        userPickedTeamMemberRef.current = false;
+        return defaultResourceId;
+      }
+      if (!userPickedTeamMemberRef.current && viewMode === "day") {
+        return defaultDaySelectedResourceId;
+      }
+      return current;
+    });
+  }, [
+    defaultDaySelectedResourceId,
+    defaultWeekSelectedResourceId,
+    filteredResources,
+    viewMode,
+  ]);
+
   React.useEffect(() => {
     if (!data.supportedLocations.includes(slotLocation)) {
       setSlotLocation(data.supportedLocations[0] ?? "FL");
@@ -1224,6 +1338,14 @@ export default function ProfessionalFixedLocationCalendar({
         ? (events.find((event) => event.id === editingEventId) ?? null)
         : null,
     [editingEventId, events],
+  );
+
+  const viewingBookingOverlapsBlockTime = React.useMemo(
+    () =>
+      viewingBookingEvent
+        ? bookingOverlapsAnyBlock(viewingBookingEvent, blocks)
+        : false,
+    [blocks, viewingBookingEvent],
   );
 
   const viewingBookingChatRef =
@@ -1820,17 +1942,81 @@ export default function ProfessionalFixedLocationCalendar({
     return [datePart, timePart].filter(Boolean).join(" · ");
   }, [clientEbrSuggestion]);
 
-  const [blockDraft, setBlockDraft] = React.useState<BlockTimeDraft>(() => ({
-    title: "Meeting",
-    teamIds: data.resources.map((r) => r.id),
-    locations: [...data.supportedLocations],
-    dateFrom: "2025-04-06",
-    dateTo: "2025-04-06",
-    dayFrom: "Monday",
-    dayTo: "Friday",
-    startTime: "16:30",
-    endTime: "17:30",
-  }));
+  const [blockDraft, setBlockDraft] = React.useState<BlockTimeDraft>(() =>
+    createEmptyBlockTimeDraft(
+      data.resources.map((r) => r.id),
+      data.supportedLocations,
+      "2025-04-06",
+    ),
+  );
+  const pendingOverviewBlockRef = React.useRef<BlockTimeDraft | null>(null);
+  const [blockOverlapOpen, setBlockOverlapOpen] = React.useState(false);
+
+  const persistOverviewBlockedTime = async (draft: BlockTimeDraft) => {
+    const nextBlocks = buildBlocksFromDraft(draft, draft.teamIds);
+    if (!nextBlocks.length) {
+      showSnackbar({
+        severity: "warning",
+        message:
+          "No dates matched your selection. Check the date range and day filters.",
+      });
+      return;
+    }
+
+    setBlocks((prev) => {
+      const seen = new Set(
+        prev.map(
+          (block) =>
+            `${block.resourceId}-${block.date}-${block.start}-${block.end}`,
+        ),
+      );
+      const unique = nextBlocks.filter((block) => {
+        const key = `${block.resourceId}-${block.date}-${block.start}-${block.end}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      return [...prev, ...unique];
+    });
+    setActiveDateIso(draft.dateFrom);
+    if (draft.teamIds.length === 1) {
+      setSelectedResourceId(draft.teamIds[0]);
+    }
+    setBlockTimeOpen(false);
+    showSnackbar({ severity: "success", message: "Blocked time added." });
+
+    if (!onCreateCalendarEntry) return;
+
+    try {
+      for (const teamId of draft.teamIds) {
+        const teamMemberId = String(teamId).trim() || null;
+        for (const location of draft.locations) {
+          await onCreateCalendarEntry({
+            team_member_id: teamMemberId,
+            status: "blocked",
+            title: blockTitleFromDraft(draft) || "Blocked time",
+            blocked_time_start: toDateTimeInput(draft.dateFrom, draft.startTime),
+            blocked_time_end: toDateTimeInput(
+              draft.dateTo || draft.dateFrom,
+              draft.endTime,
+            ),
+            start_date: draft.dateFrom,
+            end_date: draft.dateTo || draft.dateFrom,
+            location_type: locationToApi(location),
+            notes:
+              `${draft.dayFrom || ""}${draft.dayTo ? ` - ${draft.dayTo}` : ""}`.trim() ||
+              null,
+          });
+        }
+      }
+    } catch {
+      showSnackbar({
+        severity: "warning",
+        message:
+          "Blocked time shown on calendar, but it could not be saved to the server.",
+      });
+    }
+  };
 
   const [publicBusinessHoursDraft, setPublicBusinessHoursDraft] =
     React.useState<PublicBusinessHoursDraft>(() => ({
@@ -2507,7 +2693,7 @@ export default function ProfessionalFixedLocationCalendar({
     [dateOverrides, scheduleRows],
   );
 
-  /** Grid height follows each team member's Schedule for visible days. */
+  /** Grid height follows schedule, bookings, and blocks on visible days. */
   const { startMin, endMin } = React.useMemo(() => {
     const step = grid.stepMinutes;
     let start = Number.POSITIVE_INFINITY;
@@ -2522,6 +2708,16 @@ export default function ProfessionalFixedLocationCalendar({
           end = Math.max(end, hours.endMin);
         }
       }
+      for (const event of events) {
+        if (event.date !== iso || event.status === "Cancelled") continue;
+        start = Math.min(start, minutesSinceMidnight(event.start));
+        end = Math.max(end, minutesSinceMidnight(event.end));
+      }
+      for (const block of blocks) {
+        if (block.date !== iso) continue;
+        start = Math.min(start, minutesSinceMidnight(block.start));
+        end = Math.max(end, minutesSinceMidnight(block.end));
+      }
     }
     if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
       return {
@@ -2534,7 +2730,9 @@ export default function ProfessionalFixedLocationCalendar({
       endMin: Math.ceil(end / step) * step,
     };
   }, [
+    blocks,
     data.resources,
+    events,
     filteredResources,
     getAvailabilityFor,
     grid.endHour,
@@ -2566,6 +2764,10 @@ export default function ProfessionalFixedLocationCalendar({
 
     const selectedMember =
       filteredResources.find((resource) => resource.id === selectedResourceId) ??
+      filteredResources.find(
+        (resource) => resource.id === defaultDaySelectedResourceId,
+      ) ??
+      dayRankedResources[0] ??
       filteredResources[0];
     if (selectedMember) return [selectedMember];
 
@@ -2581,15 +2783,16 @@ export default function ProfessionalFixedLocationCalendar({
     return [] as typeof filteredResources;
   }, [
     data.resources.length,
+    dayRankedResources,
+    defaultDaySelectedResourceId,
     filteredResources,
     selectedResourceId,
     splitScreen,
     viewMode,
   ]);
-  const dayViewColumnCount = dayViewMemberColumnSource.length;
-  const dayViewGridTemplateColumns =
-    dayViewColumnCount > 0
-      ? `repeat(${dayViewColumnCount}, minmax(0, 1fr))`
+  const dayViewBodyGridTemplateColumns =
+    splitScreen && dayViewMemberColumnSource.length > 1
+      ? `repeat(${dayViewMemberColumnSource.length}, minmax(0, 1fr))`
       : "1fr";
   // Week always needs the date header row; day only needs a header when staff exist.
   const timelineHeaderRows =
@@ -2614,8 +2817,22 @@ export default function ProfessionalFixedLocationCalendar({
   const activeResource = React.useMemo(
     () =>
       filteredResources.find((r) => r.id === selectedResourceId) ??
+      filteredResources.find((r) =>
+        viewMode === "day"
+          ? r.id === defaultDaySelectedResourceId
+          : r.id === defaultWeekSelectedResourceId,
+      ) ??
+      (viewMode === "day" ? dayRankedResources[0] : alphabeticalResources[0]) ??
       filteredResources[0],
-    [filteredResources, selectedResourceId],
+    [
+      alphabeticalResources,
+      dayRankedResources,
+      defaultDaySelectedResourceId,
+      defaultWeekSelectedResourceId,
+      filteredResources,
+      selectedResourceId,
+      viewMode,
+    ],
   );
 
   const closeTeamMenu = React.useCallback(() => {
@@ -2748,7 +2965,7 @@ export default function ProfessionalFixedLocationCalendar({
       if (activeResource) return [activeResource];
       return data.resources.length === 0 ? [emptyLane] : [];
     }
-    // Day view: one outer lane; team members render as parallel columns inside.
+    // Day view: one outer lane; selected member full width (split screen = two columns).
     if (viewMode === "day") {
       if (dayViewMemberColumnSource.length === 0) return [];
       return [
@@ -2808,21 +3025,15 @@ export default function ProfessionalFixedLocationCalendar({
     const byLocation = appliedFilters.locationAll
       ? byTeam
       : byTeam.filter((e) => appliedFilters.locations[e.location]);
-    const byBooking = appliedFilters.bookingAll
-      ? byLocation
-      : byLocation.filter((e) => {
-          const bt = (e.bookingType ??
-            (e.status === "Requested"
-              ? "Requests"
-              : "Online")) as CalendarBookingType;
-          return appliedFilters.booking[bt];
-        });
-    if (appliedFilters.statusAll !== false) return byBooking;
-    return byBooking.filter((e) => Boolean(appliedFilters.statuses?.[e.status]));
+    const byBooking = byLocation.filter((e) =>
+      eventMatchesBookingTypeFilter(e, appliedFilters),
+    );
+    return byBooking.filter((e) => eventMatchesStatusFilter(e, appliedFilters));
   }, [
     activeResource?.id,
     appliedFilters.booking,
     appliedFilters.bookingAll,
+    appliedFilters.brRejectedOnly,
     appliedFilters.statusAll,
     appliedFilters.statuses,
     appliedFilters.locationAll,
@@ -2919,22 +3130,16 @@ export default function ProfessionalFixedLocationCalendar({
     const byLocation = appliedFilters.locationAll
       ? byTeam
       : byTeam.filter((e) => appliedFilters.locations[e.location]);
-    const byBooking = appliedFilters.bookingAll
-      ? byLocation
-      : byLocation.filter((e) => {
-          const bt = (e.bookingType ??
-            (e.status === "Requested"
-              ? "Requests"
-              : "Online")) as CalendarBookingType;
-          return appliedFilters.booking[bt];
-        });
-    if (appliedFilters.statusAll !== false) return byBooking;
-    return byBooking.filter((e) => Boolean(appliedFilters.statuses?.[e.status]));
+    const byBooking = byLocation.filter((e) =>
+      eventMatchesBookingTypeFilter(e, appliedFilters),
+    );
+    return byBooking.filter((e) => eventMatchesStatusFilter(e, appliedFilters));
   }, [
     activeMonthIso,
     activeResource?.id,
     appliedFilters.booking,
     appliedFilters.bookingAll,
+    appliedFilters.brRejectedOnly,
     appliedFilters.statusAll,
     appliedFilters.statuses,
     appliedFilters.locationAll,
@@ -3299,16 +3504,11 @@ export default function ProfessionalFixedLocationCalendar({
         if (e.date !== iso) continue;
         // Cancelled slots stay visually shown but are free to rebook.
         if (e.status === "Cancelled") continue;
-        const assignedKnown =
-          Boolean(e.resourceId) && knownResourceIds.has(String(e.resourceId));
-        if (assignedKnown) {
-          if (e.resourceId !== resourceId) continue;
-        } else if (
-          resourceId !== activeResource?.id &&
-          resourceId !== "unassigned"
-        ) {
-          continue;
-        }
+        const belongs =
+          eventBelongsToTeamMember(e, resourceId) ||
+          (resourceId === fallbackTeamMemberId &&
+            !eventHasKnownTeamAssignment(e, knownTeamMemberIds));
+        if (!belongs) continue;
         busy.push({
           startMin: minutesSinceMidnight(e.start),
           endMin: minutesSinceMidnight(e.end),
@@ -3501,59 +3701,17 @@ export default function ProfessionalFixedLocationCalendar({
 
   const getDailyBookingRatio = React.useCallback(
     (resourceId: string, iso: string) => {
-      const availability = getAvailabilityFor(resourceId, iso);
-      const availableMins = sumIntervalsMins(availability);
-      if (availableMins <= 0) return 0;
       const busy = getBusyFor(resourceId, iso);
       const bookedMins = sumIntervalsMins(mergeIntervals(busy));
+      const availability = getAvailabilityFor(resourceId, iso);
+      const availableMins = sumIntervalsMins(availability);
+      if (availableMins <= 0) {
+        return bookedMins > 0 ? 1 : 0;
+      }
       return Math.max(0, Math.min(1, bookedMins / availableMins));
     },
     [getAvailabilityFor, getBusyFor],
   );
-
-  const alphabeticalResources = React.useMemo(
-    () =>
-      [...filteredResources].sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
-      ),
-    [filteredResources],
-  );
-  const dayRankedResources = React.useMemo(
-    () =>
-      [...filteredResources].sort((a, b) => {
-        const busyDiff =
-          getDailyBookingRatio(b.id, activeDateIso) -
-          getDailyBookingRatio(a.id, activeDateIso);
-        if (busyDiff !== 0) return busyDiff;
-        return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
-      }),
-    [activeDateIso, filteredResources, getDailyBookingRatio],
-  );
-  const teamNavResources =
-    viewMode === "day" ? dayRankedResources : alphabeticalResources;
-  const defaultSelectedResourceId = getDefaultCalendarResourceId(
-    teamNavResources,
-  );
-
-  React.useLayoutEffect(() => {
-    if (filteredResources.length === 0) {
-      setSelectedResourceId("");
-      return;
-    }
-    setSelectedResourceId((current) => {
-      const stillValid =
-        Boolean(current) &&
-        filteredResources.some((resource) => resource.id === current);
-      if (!stillValid) {
-        userPickedTeamMemberRef.current = false;
-        return defaultSelectedResourceId;
-      }
-      if (!userPickedTeamMemberRef.current && viewMode === "day") {
-        return defaultSelectedResourceId;
-      }
-      return current;
-    });
-  }, [defaultSelectedResourceId, filteredResources, viewMode]);
 
   const teamNavMemberCount = teamNavResources.length;
   const teamNavNeedsScroll = teamNavMemberCount > TEAM_NAV_VISIBLE_SLOTS;
@@ -4074,7 +4232,7 @@ export default function ProfessionalFixedLocationCalendar({
       setSlotDrawerTab("booking");
       setSlotBookingScreen("new-booking");
       setSlotLocation(data.supportedLocations[0] ?? "FL");
-      setSlotBookingType("Requests");
+      setSlotBookingType("Online");
       setSlotStatus("Requested");
       setSlotClientAdded(false);
       setAllowDrawerTimeSelection(allowTimeSelection);
@@ -4173,6 +4331,7 @@ export default function ProfessionalFixedLocationCalendar({
   }, []);
 
   const openExistingBooking = React.useCallback((ev: CalendarEvent) => {
+    clearBookingDrawerNotListedHint();
     const hydration = hydrateBookingDrawerFromEvent(ev);
 
     setSelectedSlot({
@@ -4186,7 +4345,7 @@ export default function ProfessionalFixedLocationCalendar({
     setSlotDrawerTab("booking");
     setSlotBookingScreen("new-booking");
     setSlotLocation(ev.location);
-    setSlotBookingType(ev.bookingType ?? "Requests");
+    setSlotBookingType(ev.bookingType ?? "Online");
     setSlotClientAdded(true);
     setAllowDrawerTimeSelection(false);
     setSlotCalendarOpen(false);
@@ -4194,6 +4353,7 @@ export default function ProfessionalFixedLocationCalendar({
     setSelectedClient({
       name: ev.showClientName ?? "Client",
       email: hydration.clientEmail,
+      mollureUserId: ev.details?.customerId ?? null,
       clientKind: ev.clientKind ?? ev.details?.clientKind,
     });
     setSelectedServices(hydration.services);
@@ -4316,7 +4476,7 @@ export default function ProfessionalFixedLocationCalendar({
       ev.bookingCode ?? extractBookingId(ev.id),
       ev.updatedAt,
     );
-  }, [bookingEventLiveKey]);
+  }, [bookingEventLiveKey, clearBookingDrawerNotListedHint]);
 
   React.useEffect(() => {
     if (!slotDrawerOpen) {
@@ -6486,7 +6646,7 @@ export default function ProfessionalFixedLocationCalendar({
             ? "Project"
             : isOfflineManualBooking
               ? "Offline"
-              : "Requests"
+              : "Online"
           : slotBookingType);
 
       const buildLocalEvent = (
@@ -6932,7 +7092,12 @@ export default function ProfessionalFixedLocationCalendar({
                       key={v}
                       onClick={() => {
                         setViewMode(v);
-                        if (v === "day") resetToDefaultTeamMember();
+                        if (v === "day") {
+                          resetToDefaultTeamMember();
+                        } else {
+                          userPickedTeamMemberRef.current = false;
+                          setSelectedResourceId("");
+                        }
                       }}
                       sx={{
                         borderRadius: 0,
@@ -6983,14 +7148,15 @@ export default function ProfessionalFixedLocationCalendar({
                 anchorEl={addAnchor}
                 bookingDisabled={isAddMenuBookingDisabled}
                 onBlockedTime={() => {
-                  setBlockDraft((prev) => ({
-                    ...prev,
-                    dateFrom: activeDateIso,
-                    dateTo: activeDateIso,
-                    teamIds: activeResource
-                      ? [activeResource.id]
-                      : prev.teamIds,
-                  }));
+                  setBlockDraft(
+                    createEmptyBlockTimeDraft(
+                      activeResource
+                        ? [activeResource.id]
+                        : data.resources.map((r) => r.id),
+                      data.supportedLocations,
+                      activeDateIso,
+                    ),
+                  );
                   setBlockTimeOpen(true);
                 }}
                 onBooking={() => {
@@ -7367,6 +7533,8 @@ export default function ProfessionalFixedLocationCalendar({
                       <Box
                         sx={{
                           position: "absolute",
+                          gridColumn: "1 / -1",
+                          gridRow: 1,
                           left: 36,
                           top: timelineHeaderPx + nowLineTop - 4,
                           width: 8,
@@ -7374,27 +7542,33 @@ export default function ProfessionalFixedLocationCalendar({
                           borderRadius: "999px",
                           bgcolor: "#FF2F64",
                           border: "1px solid #fff",
-                          zIndex: 6,
+                          zIndex: 20,
                           pointerEvents: "none",
                         }}
                       />
                       <Box
                         sx={{
                           position: "absolute",
+                          gridColumn: "1 / -1",
+                          gridRow: 1,
                           left: 48,
                           right: 0,
                           top: timelineHeaderPx + nowLineTop,
                           height: 2,
                           bgcolor: "#FF2F64",
-                          zIndex: 5,
+                          zIndex: 19,
                           pointerEvents: "none",
                         }}
                       />
                     </>
                   ) : null}
-                  {/* Time column */}
+                  {/* Time column — stays above booking cards so labels never get covered */}
                   <Box
                     sx={{
+                      gridColumn: 1,
+                      gridRow: 1,
+                      position: "relative",
+                      zIndex: 12,
                       bgcolor: "#fff",
                       borderRight: `1px solid ${alpha(m.navy, 0.08)}`,
                     }}
@@ -7445,7 +7619,10 @@ export default function ProfessionalFixedLocationCalendar({
                   {/* Events canvas */}
                   <Box
                     sx={{
+                      gridColumn: 2,
+                      gridRow: 1,
                       position: "relative",
+                      zIndex: 1,
                       bgcolor: m.fxSurface,
                       display: "flex",
                       flexDirection: "column",
@@ -7683,7 +7860,7 @@ export default function ProfessionalFixedLocationCalendar({
                               display: "grid",
                               gridTemplateColumns:
                                 viewMode === "day"
-                                  ? dayViewGridTemplateColumns
+                                  ? dayViewBodyGridTemplateColumns
                                   : "1fr",
                               width: "100%",
                               bgcolor: "#fff",
@@ -7872,14 +8049,8 @@ export default function ProfessionalFixedLocationCalendar({
                                     />
                                     </Tooltip>
 
-                                    {/* Per-slot row backgrounds (:00 dark, :30 light, :15/:45 normal, blocked → red) */}
-                                    {slotLines.map((t) => {
-                                          const isBlocked = slotOverlapsBlock(
-                                            t,
-                                            grid.stepMinutes,
-                                            laneBlocks,
-                                          );
-                                          return (
+                                    {/* Per-slot row backgrounds (:00 dark, :30 light, :15/:45 normal) */}
+                                    {slotLines.map((t) => (
                                             <Box
                                               key={`slot-bg-${resource.id}-${date}-${t}`}
                                               sx={{
@@ -7894,17 +8065,12 @@ export default function ProfessionalFixedLocationCalendar({
                                                 bgcolor: timelineGridSlotBg(
                                                   t,
                                                   timelineGridSlotColors,
-                                                  {
-                                                    blocked: isBlocked,
-                                                    blockedBg: m.blockedTimeBg,
-                                                  },
                                                 ),
                                                 pointerEvents: "none",
                                                 zIndex: 0,
                                               }}
                                             />
-                                          );
-                                        })}
+                                          ))}
 
                                     {/* Unavailable = dark gray (outside this member's Schedule) */}
                                     {unavailableIntervals.map((interval, idx) => {
@@ -7969,8 +8135,8 @@ export default function ProfessionalFixedLocationCalendar({
                                       );
                                     })}
 
-                                    {/* Blocks — label overlay; row color from slot backgrounds above */}
-                                    {laneBlocks.map((b) => {
+                                    {/* Block Time — gray band below bookings; labels omitted on booking overlap */}
+                                    {dedupeCalendarBlocks(laneBlocks).map((b) => {
                                       const top =
                                         ((minutesSinceMidnight(b.start) -
                                           startMin) /
@@ -7982,6 +8148,10 @@ export default function ProfessionalFixedLocationCalendar({
                                           minutesSinceMidnight(b.start)) /
                                           grid.stepMinutes) *
                                           rowPx,
+                                      );
+                                      const overlapsBooking = laneEvents.some(
+                                        (event) =>
+                                          calendarBlockOverlapsBooking(b, event),
                                       );
 
                                       return (
@@ -7995,18 +8165,18 @@ export default function ProfessionalFixedLocationCalendar({
                                             top,
                                             height,
                                             pointerEvents: "none",
-                                            zIndex: 3,
-                                            bgcolor: "transparent",
+                                            zIndex: 2,
+                                            bgcolor: m.blockTimeBandBg,
                                             boxSizing: "border-box",
                                             overflow: "hidden",
                                           }}
                                         >
-                                          {height >= 28 ? (
+                                          {overlapsBooking ? null : (
                                             <Box
                                               sx={{
                                                 position: "absolute",
                                                 left: 8,
-                                                top: 6,
+                                                top: 4,
                                                 right: 6,
                                                 pointerEvents: "none",
                                               }}
@@ -8015,26 +8185,30 @@ export default function ProfessionalFixedLocationCalendar({
                                                 sx={{
                                                   fontWeight: 900,
                                                   fontSize: 10,
-                                                  color: m.blockedTimeFg,
+                                                  color: m.blockTimeBandFg,
                                                   lineHeight: 1.1,
+                                                  whiteSpace: "nowrap",
+                                                  overflow: "hidden",
+                                                  textOverflow: "ellipsis",
                                                 }}
                                               >
                                                 {b.start} to {b.end}
                                               </BodyText>
-                                              {height >= 40 ? (
-                                                <BodyText
-                                                  sx={{
-                                                    fontSize: 10.5,
-                                                    fontWeight: 800,
-                                                    color: m.blockedTimeFg,
-                                                    lineHeight: 1.1,
-                                                  }}
-                                                >
-                                                  {b.title}
-                                                </BodyText>
-                                              ) : null}
+                                              <BodyText
+                                                sx={{
+                                                  fontSize: 10.5,
+                                                  fontWeight: 800,
+                                                  color: m.blockTimeBandFg,
+                                                  lineHeight: 1.1,
+                                                  whiteSpace: "nowrap",
+                                                  overflow: "hidden",
+                                                  textOverflow: "ellipsis",
+                                                }}
+                                              >
+                                                {b.title}
+                                              </BodyText>
                                             </Box>
-                                          ) : null}
+                                          )}
                                         </Box>
                                       );
                                     })}
@@ -8079,11 +8253,13 @@ export default function ProfessionalFixedLocationCalendar({
                                           ) => openExistingBooking(ev),
                                           onOpenClient: (
                                             ev: (typeof cluster)[number],
+                                            anchorEl: HTMLElement,
                                           ) =>
-                                            showSnackbar({
-                                              severity: "info",
-                                              message: `Client drawer: ${ev.showClientName ?? "Client"}`,
-                                            }),
+                                            handleClientNameClick(
+                                              ev,
+                                              anchorEl,
+                                              "overview",
+                                            ),
                                           onOpenMessages: openBookingMessages,
                                         };
 
@@ -8115,8 +8291,8 @@ export default function ProfessionalFixedLocationCalendar({
                                             event={ev}
                                             top={top}
                                             height={height}
-                                            left={0}
-                                            right={0}
+                                            left={6}
+                                            right={6}
                                             serviceColor={resolveServiceColor(
                                               ev,
                                             )}
@@ -8130,8 +8306,11 @@ export default function ProfessionalFixedLocationCalendar({
                                             onOpenNotes={() =>
                                               eventHandlers.onOpenNotes(ev)
                                             }
-                                            onOpenClient={() =>
-                                              eventHandlers.onOpenClient(ev)
+                                            onOpenClient={(anchorEl) =>
+                                              eventHandlers.onOpenClient(
+                                                ev,
+                                                anchorEl,
+                                              )
                                             }
                                             onOpenMessages={() =>
                                               eventHandlers.onOpenMessages(ev)
@@ -8196,7 +8375,19 @@ export default function ProfessionalFixedLocationCalendar({
               message: "Blocked time added.",
             });
           }}
-          onDeleteBlockedEntry={onDeleteCalendarEntry}
+          onDeleteBlockedEntry={
+            onDeleteCalendarEntry
+              ? async (entryId) => {
+                  await onDeleteCalendarEntry(entryId);
+                  setBlocks((prev) =>
+                    prev.filter((block) => {
+                      const raw = block.id.replace(/^blk-/, "");
+                      return raw !== entryId && block.id !== entryId;
+                    }),
+                  );
+                }
+              : undefined
+          }
           onSaveScheduleRows={async (rows) => {
             setScheduleRows(rows);
             await persistAvailabilitySettings({ scheduleAvailability: rows });
@@ -10063,6 +10254,40 @@ export default function ProfessionalFixedLocationCalendar({
                         </Stack>
 
                         <Stack spacing={1.25} sx={{ mt: 1.25 }}>
+                          {viewingBookingOverlapsBlockTime ? (
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "flex-start",
+                                gap: 1,
+                                px: 1.25,
+                                py: 1.15,
+                                borderRadius: "10px",
+                                bgcolor: m.statusOrangeBg,
+                                border: `1px solid ${alpha(m.statusOrangeFg, 0.28)}`,
+                              }}
+                            >
+                              <WarningAmberRoundedIcon
+                                sx={{
+                                  fontSize: 18,
+                                  color: m.statusOrangeFg,
+                                  mt: "1px",
+                                  flexShrink: 0,
+                                }}
+                              />
+                              <BodyText
+                                sx={{
+                                  fontSize: 12.5,
+                                  fontWeight: 700,
+                                  color: alpha(m.navy, 0.82),
+                                  lineHeight: 1.45,
+                                }}
+                              >
+                                This booking overlaps Block Time. Reschedule or
+                                cancel and notify the client.
+                              </BodyText>
+                            </Box>
+                          ) : null}
                           <Box>
                             <BodyText
                               sx={{
@@ -11031,16 +11256,43 @@ export default function ProfessionalFixedLocationCalendar({
                                   spacing={0.75}
                                   sx={{ minWidth: 0 }}
                                 >
-                                  <BodyText
+                                  <ButtonBase
+                                    onClick={(e) => {
+                                      const identity = viewingBookingEvent
+                                        ? identityFromCalendarEvent(viewingBookingEvent)
+                                        : {
+                                            name: selectedClient?.name,
+                                            email: selectedClient?.email,
+                                            customerId: selectedClient?.mollureUserId,
+                                            clientKind: selectedClient?.clientKind,
+                                          };
+                                      handleClientNameClick(
+                                        identity,
+                                        e.currentTarget,
+                                        "booking-drawer",
+                                      );
+                                    }}
                                     sx={{
-                                      fontSize: 12.5,
-                                      fontWeight: 900,
-                                      color: alpha(m.navy, 0.78),
-                                      lineHeight: 1.2,
+                                      textAlign: "left",
+                                      borderRadius: "6px",
+                                      px: 0.25,
+                                      py: 0.15,
+                                      "&:hover": {
+                                        bgcolor: alpha(m.navy, 0.05),
+                                      },
                                     }}
                                   >
-                                    {selectedClient?.name ?? "Client"}
-                                  </BodyText>
+                                    <BodyText
+                                      sx={{
+                                        fontSize: 12.5,
+                                        fontWeight: 900,
+                                        color: alpha(m.navy, 0.78),
+                                        lineHeight: 1.2,
+                                      }}
+                                    >
+                                      {selectedClient?.name ?? "Client"}
+                                    </BodyText>
+                                  </ButtonBase>
                                   {isSelectedCompanyClient ? (
                                     <CompanyClientTag variant="dot" />
                                   ) : null}
@@ -11112,6 +11364,25 @@ export default function ProfessionalFixedLocationCalendar({
                                 </IconButton>
                               ) : null}
                             </Stack>
+
+                            {bookingDrawerNotListedIdentity ? (
+                              <CalendarClientNotInListHint
+                                adding={isAddingClient}
+                                addDisabled={
+                                  !canAddIdentityToClientList(
+                                    bookingDrawerNotListedIdentity,
+                                  ).ok
+                                }
+                                addDisabledReason={getAddToClientListDisabledReason(
+                                  bookingDrawerNotListedIdentity,
+                                )}
+                                onAdd={() =>
+                                  void addIdentityToClientList(
+                                    bookingDrawerNotListedIdentity,
+                                  )
+                                }
+                              />
+                            ) : null}
 
                             <BookingDrawerSelectedItemsSection
                               nested
@@ -13015,7 +13286,8 @@ export default function ProfessionalFixedLocationCalendar({
         memberName={teamMenuResource?.name ?? ""}
         bookings={teamMenuBookings}
         showDate={viewMode !== "day"}
-        editAvailabilityDisabled={viewMode !== "day" || !teamMenuResource}
+        showEditAvailability={viewMode === "day"}
+        editAvailabilityDisabled={!teamMenuResource}
         splitScreenEnabled={viewMode === "day"}
         splitScreenActive={Boolean(splitScreen)}
         splitScreenCandidates={splitScreenCandidates}
@@ -13025,11 +13297,11 @@ export default function ProfessionalFixedLocationCalendar({
           openExistingBooking(booking);
         }}
         onViewProfile={() => {
+          const memberId = teamMenuResource?.id;
           closeTeamMenu();
-          showSnackbar({
-            severity: "info",
-            message: "Client profile panel opened.",
-          });
+          if (memberId) {
+            setTeamProfileMemberId(String(memberId));
+          }
         }}
         onEditAvailability={openTeamMemberAvailabilityEditor}
         onSplitScreenWith={openSplitScreenWith}
@@ -13058,6 +13330,13 @@ export default function ProfessionalFixedLocationCalendar({
         availableLocations={data.supportedLocations}
         draft={blockDraft}
         onApply={async () => {
+          if (!blockDraft.title) {
+            showSnackbar({
+              severity: "warning",
+              message: "Select a title.",
+            });
+            return;
+          }
           if (!blockDraft.teamIds.length || !blockDraft.locations.length) {
             showSnackbar({
               severity: "warning",
@@ -13077,69 +13356,48 @@ export default function ProfessionalFixedLocationCalendar({
             });
             return;
           }
-
-          setBlocks((prev) => {
-            const seen = new Set(
-              prev.map(
-                (block) =>
-                  `${block.resourceId}-${block.date}-${block.start}-${block.end}`,
-              ),
-            );
-            const unique = nextBlocks.filter((block) => {
-              const key = `${block.resourceId}-${block.date}-${block.start}-${block.end}`;
-              if (seen.has(key)) return false;
-              seen.add(key);
-              return true;
-            });
-            return [...prev, ...unique];
-          });
-          setActiveDateIso(blockDraft.dateFrom);
-          if (blockDraft.teamIds.length === 1) {
-            setSelectedResourceId(blockDraft.teamIds[0]);
+          const colliding = findBookingsInTimeslot(
+            events.map((event) => ({
+              id: event.id,
+              resourceId: event.resourceId,
+              date: event.date,
+              start: event.start,
+              end: event.end,
+              status: event.status,
+            })),
+            blockDraft.teamIds,
+            blockDraft.dateFrom,
+            blockDraft.dateTo || blockDraft.dateFrom,
+            blockDraft.startTime,
+            blockDraft.endTime,
+          );
+          if (colliding.length) {
+            pendingOverviewBlockRef.current = blockDraft;
+            setBlockOverlapOpen(true);
+            return;
           }
-          setBlockTimeOpen(false);
-          showSnackbar({ severity: "success", message: "Blocked time added." });
-
-          if (!onCreateCalendarEntry) return;
-
-          try {
-            for (const teamId of blockDraft.teamIds) {
-              const teamMemberId = String(teamId).trim() || null;
-              for (const location of blockDraft.locations) {
-                await onCreateCalendarEntry({
-                  team_member_id: teamMemberId,
-                  status: "blocked",
-                  title: blockTitleFromDraft(blockDraft) || "Blocked time",
-                  blocked_time_start: toDateTimeInput(
-                    blockDraft.dateFrom,
-                    blockDraft.startTime,
-                  ),
-                  blocked_time_end: toDateTimeInput(
-                    blockDraft.dateTo || blockDraft.dateFrom,
-                    blockDraft.endTime,
-                  ),
-                  start_date: blockDraft.dateFrom,
-                  end_date: blockDraft.dateTo || blockDraft.dateFrom,
-                  location_type: locationToApi(location),
-                  notes:
-                    `${blockDraft.dayFrom || ""}${blockDraft.dayTo ? ` - ${blockDraft.dayTo}` : ""}`.trim() ||
-                    null,
-                });
-              }
-            }
-          } catch {
-            showSnackbar({
-              severity: "warning",
-              message:
-                "Blocked time shown on calendar, but it could not be saved to the server.",
-            });
-          }
+          await persistOverviewBlockedTime(blockDraft);
         }}
         onClose={() => setBlockTimeOpen(false)}
         open={blockTimeOpen}
         resources={data.resources}
         setDraft={setBlockDraft}
         teamLabelById={teamLabelById}
+      />
+      <CalendarScheduleConflictDialog
+        open={blockOverlapOpen}
+        kind={blockOverlapOpen ? "overlap_booking" : null}
+        onClose={() => {
+          setBlockOverlapOpen(false);
+          pendingOverviewBlockRef.current = null;
+        }}
+        onConfirm={() => {
+          const draft = pendingOverviewBlockRef.current;
+          pendingOverviewBlockRef.current = null;
+          setBlockOverlapOpen(false);
+          if (!draft) return;
+          void persistOverviewBlockedTime(draft);
+        }}
       />
       <CalendarPublicBusinessHoursModal
         open={publicBusinessHoursOpen}
@@ -13437,6 +13695,60 @@ export default function ProfessionalFixedLocationCalendar({
             : drawerInvoiceRow
         }
         professionalBusinessOverride={professionalBusinessOverride}
+      />
+      <Popover
+        open={Boolean(notInListPopover)}
+        anchorEl={notInListPopover?.anchorEl ?? null}
+        onClose={closeNotInListPopover}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+        transformOrigin={{ vertical: "top", horizontal: "left" }}
+        slotProps={{
+          paper: {
+            sx: {
+              p: 1.5,
+              borderRadius: "10px",
+              maxWidth: 280,
+              boxShadow: "0 12px 32px rgba(16,35,63,0.14)",
+            },
+          },
+        }}
+      >
+        {notInListPopover ? (
+          <CalendarClientNotInListHint
+            adding={isAddingClient}
+            addDisabled={
+              !canAddIdentityToClientList(notInListPopover.identity).ok
+            }
+            addDisabledReason={getAddToClientListDisabledReason(
+              notInListPopover.identity,
+            )}
+            onAdd={() =>
+              void addIdentityToClientList(notInListPopover.identity)
+            }
+          />
+        ) : null}
+      </Popover>
+      <AppDrawer
+        anchor="right"
+        open={Boolean(viewClient)}
+        onClose={closeClientDetailsDrawer}
+        title="Client Details"
+        contentSx={{
+          bgcolor: alpha(m.navy, 0.03),
+          p: 0,
+        }}
+      >
+        {viewClient ? (
+          <ClientDetailsViewPanel
+            client={viewClient}
+            onSaveTechnicalNote={saveClientTechnicalNote}
+          />
+        ) : null}
+      </AppDrawer>
+      <CalendarTeamMemberProfileDrawer
+        open={Boolean(teamProfileMemberId)}
+        memberId={teamProfileMemberId}
+        onClose={() => setTeamProfileMemberId(null)}
       />
     </Stack>
   );

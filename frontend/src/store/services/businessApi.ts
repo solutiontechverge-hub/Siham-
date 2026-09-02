@@ -74,6 +74,39 @@ export type BusinessTeamMember = {
   display_order: number;
   created_at?: string;
   updated_at?: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  contact_number?: string | null;
+  email?: string | null;
+  emergency_contact_name?: string | null;
+  emergency_contact_number?: string | null;
+  personal_note?: string | null;
+  personal_documents?: Array<{
+    url: string;
+    filename: string;
+    uploaded_at: string;
+  }>;
+};
+
+export type UpdateTeamMemberRequest = {
+  id: string;
+  full_name?: string;
+  profile_photo?: string | null;
+  assigned_services?: Array<{ service_id: string; title?: string | null }>;
+  first_name?: string | null;
+  last_name?: string | null;
+  contact_number?: string | null;
+  email?: string | null;
+  emergency_contact_name?: string | null;
+  emergency_contact_number?: string | null;
+  personal_note?: string | null;
+  personal_documents?: Array<{
+    url: string;
+    filename: string;
+    uploaded_at: string;
+  }>;
+  profilePhotoFile?: File | null;
+  personalDocumentFile?: File | null;
 };
 
 export type BusinessBookServiceCombination = {
@@ -1627,6 +1660,73 @@ export const businessApi = baseApi.injectEndpoints({
       },
       invalidatesTags: ["ProfessionalClients"],
     }),
+    updateTeamMember: builder.mutation<
+      ApiEnvelope<BusinessTeamMember>,
+      UpdateTeamMemberRequest
+    >({
+      async queryFn(
+        {
+          id,
+          profilePhotoFile,
+          personalDocumentFile,
+          assigned_services,
+          personal_documents,
+          ...fields
+        },
+        _api,
+        _extraOptions,
+        fetchWithBQ,
+      ) {
+        const hasFiles = Boolean(profilePhotoFile || personalDocumentFile);
+        let body: FormData | Record<string, unknown>;
+
+        if (hasFiles) {
+          const formData = new FormData();
+          Object.entries(fields).forEach(([key, value]) => {
+            if (value !== undefined && value !== null) {
+              formData.append(key, String(value));
+            }
+          });
+          if (assigned_services !== undefined) {
+            formData.append("assigned_services", JSON.stringify(assigned_services));
+          }
+          if (personal_documents !== undefined) {
+            formData.append("personal_documents", JSON.stringify(personal_documents));
+          }
+          if (profilePhotoFile) {
+            formData.append("profile_photo", profilePhotoFile);
+          }
+          if (personalDocumentFile) {
+            formData.append("personal_document", personalDocumentFile);
+          }
+          body = formData;
+        } else {
+          body = {
+            ...fields,
+            ...(assigned_services !== undefined ? { assigned_services } : {}),
+            ...(personal_documents !== undefined ? { personal_documents } : {}),
+          };
+        }
+
+        const response = await fetchWithBQ({
+          url: `/api/business/team-members/${id}`,
+          method: "PATCH",
+          body,
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<BusinessTeamMember>;
+        if (!data.success || !data.data) {
+          return { error: customError(data.message || "Unable to update team member.") };
+        }
+
+        return { data };
+      },
+      invalidatesTags: ["BusinessSetup", "BusinessSetupsListing"],
+    }),
   }),
   overrideExisting: false,
 });
@@ -1662,4 +1762,5 @@ export const {
   useUpdateProfessionalClientTechnicalNoteMutation,
   useSetProfessionalClientBlockedMutation,
   useDeleteProfessionalClientMutation,
+  useUpdateTeamMemberMutation,
 } = businessApi;

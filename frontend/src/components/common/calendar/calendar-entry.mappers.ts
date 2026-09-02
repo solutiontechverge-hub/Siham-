@@ -36,14 +36,13 @@ const bookingTypeToApi: Record<CalendarBookingType, NonNullable<CreateCalendarEn
   Online: "online",
   Offline: "offline",
   Project: "project",
-  Requests: "request",
 };
 
 const bookingTypeFromApi: Record<string, CalendarBookingType> = {
   online: "Online",
   offline: "Offline",
   project: "Project",
-  request: "Requests",
+  request: "Online",
 };
 
 const locationToApi = (location: CalendarBookingLocation) => (location === "DL" ? "desired" : "fixed");
@@ -120,9 +119,7 @@ export function mapCalendarEntryToEvent(entry: CalendarEntry, fallbackResourceId
     location: entry.location_type ? (locationFromApi[entry.location_type] ?? "FL") : "FL",
     bookingType: entry.booking_type
       ? (bookingTypeFromApi[entry.booking_type] ?? "Offline")
-      : statusFromApi[entry.status] === "Requested"
-        ? "Requests"
-        : "Offline",
+      : "Offline",
     bookingScenario: statusFromApi[entry.status] === "Requested" ? "BR" : undefined,
     showClientName: entry.client_name ?? undefined,
     details: parseCalendarEntryNotes(entry.notes),

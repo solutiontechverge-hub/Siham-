@@ -9,7 +9,7 @@ import AppModal from "../AppModal";
 export type CalendarScheduleConflictKind =
   | "availability_set"
   | "timeslot_blocked"
-  | "cancel_bookings";
+  | "overlap_booking";
 
 type CalendarScheduleConflictDialogProps = {
   open: boolean;
@@ -34,12 +34,12 @@ const COPY: Record<
     confirmLabel: "OK",
     confirmTone: "primary",
   },
-  cancel_bookings: {
-    title: "Cancel active bookings?",
+  overlap_booking: {
+    title: "Block Time overlaps a booking",
     message:
-      "Cancel active bookings in this timeslot? Prepaid bookings become Cancelled with a refund icon.",
-    confirmLabel: "Yes",
-    confirmTone: "danger",
+      "This timeslot already has a booking. You can still add Block Time. Reschedule or cancel the booking and notify the client.",
+    confirmLabel: "Continue",
+    confirmTone: "primary",
   },
 };
 
@@ -52,7 +52,7 @@ export default function CalendarScheduleConflictDialog({
   const m = useTheme().palette.mollure;
   if (!kind) return null;
   const copy = COPY[kind];
-  const ackOnly = kind !== "cancel_bookings";
+  const ackOnly = kind !== "overlap_booking";
 
   return (
     <AppModal
@@ -80,10 +80,10 @@ export default function CalendarScheduleConflictDialog({
                   onClick={onClose}
                   sx={{ height: 40, minWidth: 120 }}
                 >
-                  No
+                  Cancel
                 </AppButton>
                 <AppButton
-                  tone="danger"
+                  tone="primary"
                   onClick={() => {
                     onConfirm();
                     onClose();
@@ -100,7 +100,7 @@ export default function CalendarScheduleConflictDialog({
     >
       <Box sx={{ py: 3, px: 2.5, textAlign: "center" }}>
         <WarningAmberRoundedIcon
-          sx={{ fontSize: 56, color: "#E85D5D", mb: 1.75 }}
+          sx={{ fontSize: 56, color: m.statusOrangeFg, mb: 1.75 }}
         />
         <Typography
           sx={{

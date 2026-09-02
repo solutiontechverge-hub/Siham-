@@ -3,7 +3,12 @@ import type {
   CalendarBookingLocation,
   CalendarBookingStatus,
   CalendarBookingType,
+  CalendarEvent,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
+import {
+  isOutgoingPlainBookingRequestRejected,
+  statusChipSx as bookingStatusChipSx,
+} from "./bookingStatus";
 
 export type Interval = { startMin: number; endMin: number };
 
@@ -25,10 +30,57 @@ export type CalendarFilters = {
   booking: Record<CalendarBookingType, boolean>;
   statusAll: boolean;
   statuses: Record<CalendarBookingStatus, boolean>;
+  /** When true and Invalid is not selected, only outgoing plain-BR rejects. */
+  brRejectedOnly: boolean;
 };
 
+export const EMPTY_CALENDAR_BOOKING_TYPES: Record<CalendarBookingType, boolean> = {
+  Online: false,
+  Offline: false,
+  Project: false,
+};
+
+export const EMPTY_CALENDAR_STATUSES: Record<CalendarBookingStatus, boolean> = {
+  Confirmed: false,
+  Completed: false,
+  Cancelled: false,
+  Invalid: false,
+  "No Show": false,
+  Requested: false,
+  "In Progress": false,
+};
+
+export function calendarBookingChannel(
+  bookingType?: CalendarBookingType,
+): CalendarBookingType {
+  if (bookingType === "Offline" || bookingType === "Project") return bookingType;
+  return "Online";
+}
+
+export function eventMatchesBookingTypeFilter(
+  event: Pick<CalendarEvent, "bookingType">,
+  filters: Pick<CalendarFilters, "bookingAll" | "booking">,
+) {
+  if (filters.bookingAll) return true;
+  return Boolean(filters.booking[calendarBookingChannel(event.bookingType)]);
+}
+
+export function eventMatchesStatusFilter(
+  event: Pick<CalendarEvent, "status" | "bookingScenario" | "details" | "notes">,
+  filters: Pick<CalendarFilters, "statusAll" | "statuses" | "brRejectedOnly">,
+) {
+  if (filters.statusAll !== false) return true;
+  const invalidSelected = Boolean(filters.statuses?.Invalid);
+  if (filters.brRejectedOnly && !invalidSelected) {
+    return isOutgoingPlainBookingRequestRejected(event);
+  }
+  return Boolean(filters.statuses?.[event.status]);
+}
+
+export type BlockTimeTitle = "" | "Meeting" | "Training" | "Holiday" | "Custom";
+
 export type BlockTimeDraft = {
-  title: "Meeting" | "Training" | "Holiday" | "Custom";
+  title: BlockTimeTitle;
   customTitle?: string;
   teamIds: string[];
   locations: CalendarBookingLocation[];
@@ -40,7 +92,90 @@ export type BlockTimeDraft = {
   endTime: string;
 };
 
-import { statusChipSx as bookingStatusChipSx } from "./bookingStatus";
+export function createEmptyBlockTimeDraft(
+  teamIds: string[],
+  locations: readonly CalendarBookingLocation[],
+  dateIso: string,
+): BlockTimeDraft {
+  return {
+    title: "",
+    customTitle: "",
+    teamIds,
+    locations: [...locations],
+    dateFrom: dateIso,
+    dateTo: dateIso,
+    dayFrom: "Monday",
+    dayTo: "Friday",
+    startTime: "09:00",
+    endTime: "17:00",
+  };
+}
+
+export function calendarBlockLogicalKey(
+  block: Pick<CalendarBlock, "resourceId" | "date" | "start" | "end" | "title">,
+) {
+  return `${block.resourceId}|${block.date}|${block.start}|${block.end}|${block.title}`;
+}
+
+export function dedupeCalendarBlocks<T extends CalendarBlock>(
+  blocks: readonly T[],
+): T[] {
+  const seen = new Set<string>();
+  const unique: T[] = [];
+  for (const block of blocks) {
+    const key = calendarBlockLogicalKey(block);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(block);
+  }
+  return unique;
+}
+
+export function siblingCalendarBlocks<T extends CalendarBlock>(
+  blocks: readonly T[],
+  target: Pick<CalendarBlock, "resourceId" | "date" | "start" | "end" | "title">,
+): T[] {
+  const key = calendarBlockLogicalKey(target);
+  return blocks.filter((block) => calendarBlockLogicalKey(block) === key);
+}
+
+export function calendarBlockOverlapsBooking(
+  block: Pick<CalendarBlock, "resourceId" | "date" | "start" | "end">,
+  booking: {
+    resourceId: string;
+    date: string;
+    start: string;
+    end: string;
+    status?: string;
+  },
+) {
+  if (booking.status === "Cancelled" || booking.status === "Invalid") {
+    return false;
+  }
+  if (block.resourceId !== booking.resourceId) return false;
+  if (block.date !== booking.date) return false;
+  const blockStart = minutesSinceMidnight(block.start);
+  const blockEnd = minutesSinceMidnight(block.end);
+  const bookingStart = minutesSinceMidnight(booking.start);
+  const bookingEnd = minutesSinceMidnight(booking.end);
+  return blockStart < bookingEnd && bookingStart < blockEnd;
+}
+
+export function bookingOverlapsAnyBlock(
+  booking: {
+    resourceId: string;
+    date: string;
+    start: string;
+    end: string;
+    status?: string;
+  },
+  blocks: readonly Pick<
+    CalendarBlock,
+    "resourceId" | "date" | "start" | "end"
+  >[],
+) {
+  return blocks.some((block) => calendarBlockOverlapsBooking(block, booking));
+}
 
 export function statusChipSx(status: CalendarBookingStatus, _m?: { navy: string }) {
   return bookingStatusChipSx(status);
@@ -282,6 +417,16 @@ export function parseIsoDate(iso: string) {
 
 export function toIsoLocalDate(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** True when the whole Date (from)–Date (to) range is before local today. */
+export function isBlockTimeRangeFullyPast(
+  dateFrom: string,
+  dateTo: string,
+  todayIso = toIsoLocalDate(new Date()),
+) {
+  const end = dateTo || dateFrom;
+  return Boolean(end) && end < todayIso;
 }
 
 /** Extract YYYY-MM-DD without UTC timezone shifts (for API timestamps). */
