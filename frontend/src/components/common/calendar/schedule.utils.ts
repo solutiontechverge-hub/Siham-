@@ -4,7 +4,7 @@ import type {
   TeamScheduleBlockedEntry,
   TeamScheduleTimeRange,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
-import { blockTitleFromDraft, type BlockTimeDraft } from "./calendar.utils";
+import { blockTitleFromDraft, weekdayNameFromIso, type BlockTimeDraft } from "./calendar.utils";
 
 const KNOWN_BLOCK_TITLES = ["Meeting", "Training", "Holiday"] as const;
 
@@ -62,23 +62,26 @@ export const toDayAbbr = (day: BlockTimeDraft["dayFrom"] | string) =>
 export const toDayFull = (day: string): BlockTimeDraft["dayFrom"] =>
   DAY_ABBR_TO_FULL[day] ?? (day as BlockTimeDraft["dayFrom"]);
 
-export const emptyAvailabilityDraft = (dateIso: string): AvailabilityDraft => ({
-  teamIds: [],
-  locations: [],
-  dateFrom: dateIso,
-  dateTo: dateIso,
-  dayFrom: "Monday",
-  dayTo: "Friday",
-  shifts: [{ start: "09:00", end: "17:00" }],
-});
+export const emptyAvailabilityDraft = (dateIso: string): AvailabilityDraft => {
+  const day = weekdayNameFromIso(dateIso);
+  return {
+    teamIds: [],
+    locations: [],
+    dateFrom: dateIso,
+    dateTo: dateIso,
+    dayFrom: day,
+    dayTo: day,
+    shifts: [{ start: "09:00", end: "17:00" }],
+  };
+};
 
 export const availabilityEntryToDraft = (entry: TeamScheduleAvailabilityEntry): AvailabilityDraft => ({
   teamIds: [entry.resourceId],
   locations: [entry.location],
   dateFrom: entry.dateFrom,
   dateTo: entry.dateTo,
-  dayFrom: toDayFull(entry.dayFrom),
-  dayTo: toDayFull(entry.dayTo),
+  dayFrom: weekdayNameFromIso(entry.dateFrom),
+  dayTo: weekdayNameFromIso(entry.dateTo),
   shifts: [...entry.times],
 });
 
@@ -93,8 +96,8 @@ export const blockedEntryToDraft = (
     locations: [...supportedLocations],
     dateFrom: entry.dateFrom,
     dateTo: entry.dateTo,
-    dayFrom: toDayFull(entry.dayFrom),
-    dayTo: toDayFull(entry.dayTo),
+    dayFrom: weekdayNameFromIso(entry.dateFrom),
+    dayTo: weekdayNameFromIso(entry.dateTo),
     startTime: entry.times[0]?.start ?? "09:00",
     endTime: entry.times[0]?.end ?? "17:00",
     activity: entry.activity,
@@ -105,8 +108,8 @@ export const buildAvailabilityEntriesFromDraft = (
   draft: AvailabilityDraft,
   editingEntry?: TeamScheduleAvailabilityEntry,
 ): TeamScheduleAvailabilityEntry[] => {
-  const dayFrom = toDayAbbr(draft.dayFrom);
-  const dayTo = toDayAbbr(draft.dayTo);
+  const dayFrom = toDayAbbr(weekdayNameFromIso(draft.dateFrom));
+  const dayTo = toDayAbbr(weekdayNameFromIso(draft.dateTo));
   const shifts = draft.shifts.filter((shift) => shift.start && shift.end);
 
   if (editingEntry) {
@@ -152,8 +155,8 @@ export const buildBlockedEntryFromDraft = (
   activity: blockTitleFromDraft(draft),
   dateFrom: draft.dateFrom,
   dateTo: draft.dateTo,
-  dayFrom: toDayAbbr(draft.dayFrom),
-  dayTo: toDayAbbr(draft.dayTo),
+  dayFrom: toDayAbbr(weekdayNameFromIso(draft.dateFrom)),
+  dayTo: toDayAbbr(weekdayNameFromIso(draft.dateTo)),
   times: [{ start: draft.startTime, end: draft.endTime }],
   archived: editingEntry?.archived,
 });

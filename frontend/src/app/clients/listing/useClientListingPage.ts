@@ -11,6 +11,7 @@ import { cardMatchesListingFilters } from "./listing.filters";
 import { presentListingCards } from "./listing.cardPresentation";
 import { hasListingSearchParams } from "./listingSearchParams";
 import type { ListingCardData } from "./listing.data";
+import { useClientFavorites } from "../../../hooks/useClientFavorites";
 
 export type ListingSortValue =
   "recommended" | "alpha_asc" | "alpha_desc" | "rating_desc";
@@ -58,17 +59,7 @@ export function useClientListingState(
     React.useState<ListingDrawerFilters>(defaultListingDrawerFilters);
   const [sort, setSort] = React.useState<ListingSortValue>("recommended");
   const [page, setPage] = React.useState(1);
-  const [favorites, setFavorites] = React.useState<Record<string, boolean>>(
-    () => {
-      if (typeof window === "undefined") return {};
-      try {
-        const raw = window.localStorage.getItem("mollure:favorites");
-        return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
-      } catch {
-        return {};
-      }
-    },
-  );
+  const { favorites, toggleFavorite } = useClientFavorites();
 
   const pageSize = 6;
 
@@ -80,21 +71,6 @@ export function useClientListingState(
     setAppliedFilters(merged);
     setPage(1);
   }, [searchKey, urlFilters]);
-
-  const toggleFavorite = React.useCallback((id: string) => {
-    setFavorites((prev) => ({ ...prev, [id]: !prev[id] }));
-  }, []);
-
-  React.useEffect(() => {
-    try {
-      window.localStorage.setItem(
-        "mollure:favorites",
-        JSON.stringify(favorites),
-      );
-    } catch {
-      // ignore (storage disabled)
-    }
-  }, [favorites]);
 
   const filtered = React.useMemo(() => {
     return cards.filter((card) =>

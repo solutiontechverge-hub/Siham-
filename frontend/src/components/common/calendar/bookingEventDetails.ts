@@ -78,8 +78,15 @@ type StoredBookingNoteMeta = Partial<
     | "clientNote"
     | "showLateRescheduling"
     | "lateRescheduleFeePercent"
+    | "lateRescheduleFeePercentCeiling"
     | "showLateCancellation"
     | "lateCancellationFeePercent"
+    | "lateCancellationFeePercentCeiling"
+    | "showNoShowFee"
+    | "noShowFeePercent"
+    | "noShowFeePercentCeiling"
+    | "cancellationFeeAt"
+    | "exceededCancellationWindow"
     | "showPrepayment"
     | "prepaymentPercent"
     | "prepaymentStatus"
@@ -112,6 +119,7 @@ type StoredBookingNoteMeta = Partial<
     | "addedServiceIds"
     | "cancelledServiceIds"
     | "silentUpdated"
+    | "silentUpdateSnapshot"
     | "scheduleEdited"
     | "refunded"
     | "waitingForPayment"
@@ -153,8 +161,28 @@ export function serializeCalendarEntryNotes(
     ...(details?.clientNote?.trim() ? { clientNote: details.clientNote.trim() } : {}),
     showLateRescheduling: details?.showLateRescheduling,
     lateRescheduleFeePercent: details?.lateRescheduleFeePercent,
+    ...(details?.lateRescheduleFeePercentCeiling
+      ? { lateRescheduleFeePercentCeiling: details.lateRescheduleFeePercentCeiling }
+      : {}),
     showLateCancellation: details?.showLateCancellation,
     lateCancellationFeePercent: details?.lateCancellationFeePercent,
+    ...(details?.lateCancellationFeePercentCeiling
+      ? {
+          lateCancellationFeePercentCeiling:
+            details.lateCancellationFeePercentCeiling,
+        }
+      : {}),
+    showNoShowFee: details?.showNoShowFee,
+    noShowFeePercent: details?.noShowFeePercent,
+    ...(details?.noShowFeePercentCeiling
+      ? { noShowFeePercentCeiling: details.noShowFeePercentCeiling }
+      : {}),
+    ...(details?.cancellationFeeAt
+      ? { cancellationFeeAt: details.cancellationFeeAt }
+      : {}),
+    ...(typeof details?.exceededCancellationWindow === "boolean"
+      ? { exceededCancellationWindow: details.exceededCancellationWindow }
+      : {}),
     showPrepayment: details?.showPrepayment,
     prepaymentPercent: details?.prepaymentPercent,
     prepaymentStatus: details?.prepaymentStatus,
@@ -189,6 +217,9 @@ export function serializeCalendarEntryNotes(
       ? { cancelledServiceIds: details.cancelledServiceIds }
       : {}),
     ...(details?.silentUpdated ? { silentUpdated: true } : {}),
+    ...(details?.silentUpdateSnapshot
+      ? { silentUpdateSnapshot: details.silentUpdateSnapshot }
+      : {}),
     ...(details?.scheduleEdited ? { scheduleEdited: true } : {}),
     ...(details?.refunded ? { refunded: true } : {}),
     ...(details?.waitingForPayment ? { waitingForPayment: true } : {}),
@@ -262,8 +293,15 @@ export function markClientEbrRejectedInNotes(notes?: string | null): string | nu
       showInternalNote: Boolean(internalNote) || Boolean(details?.showInternalNote),
       showLateRescheduling: details?.showLateRescheduling,
       lateRescheduleFeePercent: details?.lateRescheduleFeePercent,
+      lateRescheduleFeePercentCeiling: details?.lateRescheduleFeePercentCeiling,
       showLateCancellation: details?.showLateCancellation,
       lateCancellationFeePercent: details?.lateCancellationFeePercent,
+      lateCancellationFeePercentCeiling: details?.lateCancellationFeePercentCeiling,
+      showNoShowFee: details?.showNoShowFee,
+      noShowFeePercent: details?.noShowFeePercent,
+      noShowFeePercentCeiling: details?.noShowFeePercentCeiling,
+      cancellationFeeAt: details?.cancellationFeeAt,
+      exceededCancellationWindow: details?.exceededCancellationWindow,
       showPrepayment: details?.showPrepayment,
       prepaymentPercent: details?.prepaymentPercent,
       paymentMethod: details?.paymentMethod,
@@ -305,8 +343,15 @@ export function markClientEbrAcceptedInNotes(
       showInternalNote: Boolean(internalNote) || Boolean(details?.showInternalNote),
       showLateRescheduling: details?.showLateRescheduling,
       lateRescheduleFeePercent: details?.lateRescheduleFeePercent,
+      lateRescheduleFeePercentCeiling: details?.lateRescheduleFeePercentCeiling,
       showLateCancellation: details?.showLateCancellation,
       lateCancellationFeePercent: details?.lateCancellationFeePercent,
+      lateCancellationFeePercentCeiling: details?.lateCancellationFeePercentCeiling,
+      showNoShowFee: details?.showNoShowFee,
+      noShowFeePercent: details?.noShowFeePercent,
+      noShowFeePercentCeiling: details?.noShowFeePercentCeiling,
+      cancellationFeeAt: details?.cancellationFeeAt,
+      exceededCancellationWindow: details?.exceededCancellationWindow,
       showPrepayment: details?.showPrepayment,
       prepaymentPercent: details?.prepaymentPercent,
       paymentMethod: details?.paymentMethod,
@@ -424,8 +469,30 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
       ...(clientNote ? { clientNote } : {}),
       showLateRescheduling: Boolean(meta.showLateRescheduling),
       lateRescheduleFeePercent: meta.lateRescheduleFeePercent ?? "",
+      ...(meta.lateRescheduleFeePercentCeiling
+        ? {
+            lateRescheduleFeePercentCeiling: meta.lateRescheduleFeePercentCeiling,
+          }
+        : {}),
       showLateCancellation: Boolean(meta.showLateCancellation),
       lateCancellationFeePercent: meta.lateCancellationFeePercent ?? "",
+      ...(meta.lateCancellationFeePercentCeiling
+        ? {
+            lateCancellationFeePercentCeiling:
+              meta.lateCancellationFeePercentCeiling,
+          }
+        : {}),
+      showNoShowFee: Boolean(meta.showNoShowFee),
+      noShowFeePercent: meta.noShowFeePercent ?? "",
+      ...(meta.noShowFeePercentCeiling
+        ? { noShowFeePercentCeiling: meta.noShowFeePercentCeiling }
+        : {}),
+      ...(meta.cancellationFeeAt
+        ? { cancellationFeeAt: meta.cancellationFeeAt }
+        : {}),
+      ...(typeof meta.exceededCancellationWindow === "boolean"
+        ? { exceededCancellationWindow: meta.exceededCancellationWindow }
+        : {}),
       showPrepayment: Boolean(meta.showPrepayment),
       prepaymentPercent: meta.prepaymentPercent ?? "",
       ...(meta.prepaymentStatus
@@ -490,6 +557,10 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
         ? { cancelledServiceIds: meta.cancelledServiceIds }
         : {}),
       ...(meta.silentUpdated ? { silentUpdated: true } : {}),
+      ...(meta.silentUpdateSnapshot
+        ? { silentUpdateSnapshot: meta.silentUpdateSnapshot }
+        : {}),
+      ...(meta.scheduleEdited ? { scheduleEdited: true } : {}),
       ...(meta.refunded ? { refunded: true } : {}),
       ...(meta.waitingForPayment ? { waitingForPayment: true } : {}),
       ...(meta.invoiceDueDate ? { invoiceDueDate: meta.invoiceDueDate } : {}),
@@ -538,8 +609,13 @@ export type BookingDrawerHydration = {
   paymentMethod: "online" | "offline";
   showLateCancellation: boolean;
   lateCancellationFeePercent: string;
+  lateCancellationFeePercentCeiling: string;
   showLateRescheduling: boolean;
   lateRescheduleFeePercent: string;
+  lateRescheduleFeePercentCeiling: string;
+  showNoShowFee: boolean;
+  noShowFeePercent: string;
+  noShowFeePercentCeiling: string;
   showInternalNote: boolean;
   internalNote: string;
   totalDiscount: ManualEntryDiscount | null;
@@ -591,11 +667,55 @@ export function hydrateBookingDrawerFromEvent(ev: CalendarEvent): BookingDrawerH
     details.phoneCode,
   );
 
+  const snapshotPeople = details.clientSnapshot?.people ?? [];
+  const snapshotServices = details.clientSnapshot?.services ?? [];
+  const guestsFromNotes = details.guests ?? [];
+  const guests =
+    guestsFromNotes.length > 0
+      ? guestsFromNotes.map((guest) => {
+          const person = snapshotPeople.find((p) => p.id === guest.id);
+          return {
+            ...guest,
+            email: guest.email || person?.email || "",
+            phoneCode: guest.phoneCode || person?.phoneCode || "",
+            phoneNumber: guest.phoneNumber || person?.phoneNumber || "",
+          };
+        })
+      : snapshotPeople
+          .filter(
+            (person) =>
+              !person.isRequester &&
+              person.participantType !== "notes" &&
+              person.name?.trim().toLowerCase() !== "notes",
+          )
+          .map((person) => ({
+            id: person.id,
+            name: person.name,
+            email: person.email,
+            phoneCode: person.phoneCode,
+            phoneNumber: person.phoneNumber,
+            services: snapshotServices
+              .filter((service) => service.guestId === person.id)
+              .map((service) => ({
+                id: service.id,
+                name: service.name,
+                price: service.price,
+                durationMins: service.durationMins,
+                staffResourceId: service.teamMemberId ?? undefined,
+              })),
+            products: [],
+            participantType: person.participantType ?? ("guest" as const),
+            planningActivity: person.planningActivity,
+            planningDuration: person.planningDuration,
+            bufferTeamMemberId: person.bufferTeamMemberId,
+            bufferEndTime: person.bufferEndTime,
+          }));
+
   return {
     clientEmail: details.clientEmail ?? "",
     services,
     products: details.products ?? [],
-    guests: details.guests ?? [],
+    guests,
     phoneCode: splitPhone.countryCode,
     phoneNumber: splitPhone.phone,
     desiredLocation: details.desiredLocation ?? emptyDesiredLocation(),
@@ -604,8 +724,20 @@ export function hydrateBookingDrawerFromEvent(ev: CalendarEvent): BookingDrawerH
     paymentMethod: details.paymentMethod ?? "online",
     showLateCancellation: Boolean(details.showLateCancellation),
     lateCancellationFeePercent: details.lateCancellationFeePercent ?? "",
+    lateCancellationFeePercentCeiling:
+      details.lateCancellationFeePercentCeiling ??
+      details.lateCancellationFeePercent ??
+      "",
     showLateRescheduling: Boolean(details.showLateRescheduling),
     lateRescheduleFeePercent: details.lateRescheduleFeePercent ?? "",
+    lateRescheduleFeePercentCeiling:
+      details.lateRescheduleFeePercentCeiling ??
+      details.lateRescheduleFeePercent ??
+      "",
+    showNoShowFee: Boolean(details.showNoShowFee),
+    noShowFeePercent: details.noShowFeePercent ?? "",
+    noShowFeePercentCeiling:
+      details.noShowFeePercentCeiling ?? details.noShowFeePercent ?? "",
     showInternalNote: Boolean(sanitizeInternalNoteText(details.internalNote)),
     internalNote: sanitizeInternalNoteText(details.internalNote),
     totalDiscount: details.totalDiscount ?? null,
@@ -619,6 +751,7 @@ export function buildBookingDetailsSnapshot(input: {
     name: string;
     email: string;
     clientKind?: "individual" | "company";
+    mollureUserId?: string | null;
   } | null;
   selectedServices: BookingDrawerHydration["services"];
   selectedProducts: BookingDrawerHydration["products"];
@@ -630,8 +763,15 @@ export function buildBookingDetailsSnapshot(input: {
   paymentMethod: "online" | "offline";
   showLateCancellation: boolean;
   lateCancellationFeePercent: string;
+  lateCancellationFeePercentCeiling?: string;
   showLateRescheduling: boolean;
   lateRescheduleFeePercent: string;
+  lateRescheduleFeePercentCeiling?: string;
+  showNoShowFee?: boolean;
+  noShowFeePercent?: string;
+  noShowFeePercentCeiling?: string;
+  cancellationFeeAt?: string;
+  exceededCancellationWindow?: boolean;
   showInternalNote: boolean;
   bookingInternalNote: string;
   bookingTotalDiscount: ManualEntryDiscount | null;
@@ -644,8 +784,12 @@ export function buildBookingDetailsSnapshot(input: {
   lastEditedBy?: CalendarBookingDetails["lastEditedBy"];
   clientNote?: string;
 }): CalendarBookingDetails {
+  const mollureId = String(input.selectedClient?.mollureUserId ?? "").trim();
+  const customerId =
+    mollureId && mollureId !== "platform" ? mollureId : undefined;
   return {
     clientEmail: input.selectedClient?.email ?? "",
+    ...(customerId ? { customerId } : {}),
     ...(input.selectedClient?.clientKind
       ? { clientKind: input.selectedClient.clientKind }
       : {}),
@@ -660,8 +804,30 @@ export function buildBookingDetailsSnapshot(input: {
     paymentMethod: input.paymentMethod,
     showLateCancellation: input.showLateCancellation,
     lateCancellationFeePercent: input.lateCancellationFeePercent,
+    ...(input.lateCancellationFeePercentCeiling
+      ? {
+          lateCancellationFeePercentCeiling:
+            input.lateCancellationFeePercentCeiling,
+        }
+      : {}),
     showLateRescheduling: input.showLateRescheduling,
     lateRescheduleFeePercent: input.lateRescheduleFeePercent,
+    ...(input.lateRescheduleFeePercentCeiling
+      ? {
+          lateRescheduleFeePercentCeiling: input.lateRescheduleFeePercentCeiling,
+        }
+      : {}),
+    showNoShowFee: Boolean(input.showNoShowFee),
+    noShowFeePercent: input.noShowFeePercent ?? "",
+    ...(input.noShowFeePercentCeiling
+      ? { noShowFeePercentCeiling: input.noShowFeePercentCeiling }
+      : {}),
+    ...(input.cancellationFeeAt
+      ? { cancellationFeeAt: input.cancellationFeeAt }
+      : {}),
+    ...(typeof input.exceededCancellationWindow === "boolean"
+      ? { exceededCancellationWindow: input.exceededCancellationWindow }
+      : {}),
     showInternalNote: input.showInternalNote || Boolean(input.bookingInternalNote.trim()),
     internalNote: input.bookingInternalNote,
     ...(input.clientNote?.trim() ? { clientNote: input.clientNote.trim() } : {}),

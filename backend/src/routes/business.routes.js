@@ -10,6 +10,7 @@ import {
   updateBookingStatus,
   updateMyBooking,
   manageBookingEditRequest,
+  getBookingActivity,
   getCalendarOverview,
   upsertCalendarSettings,
   createCategory,
@@ -455,6 +456,8 @@ router.patch(
   validateRequest,
   updateBookingStatus,
 );
+
+router.get("/bookings/:id/activity", getBookingActivity);
 
 router.post("/bookings/:id/notifications", createBookingNotification);
 

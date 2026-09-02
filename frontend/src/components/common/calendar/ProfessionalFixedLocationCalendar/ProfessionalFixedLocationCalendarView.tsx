@@ -47,11 +47,15 @@ import AppPillTabs from "../../AppPillTabs";
 import AppDrawer from "../../AppDrawer";
 import AppDatePicker from "../../AppDatePicker";
 import { AppCalendarPanel } from "../../AppDatePicker";
+import { AppTimePanel } from "../../AppTimePicker";
 import AppTextField from "../../AppTextField";
 import AppCountryPhoneFields from "../../AppCountryPhoneFields";
 import AppDropdown from "../../AppDropdown";
 import AppSearchField from "../../AppSearchField";
 import CalendarAddMenu from "../CalendarAddMenu";
+import CalendarSlotAddMenu, {
+  type CalendarSlotAddAction,
+} from "../CalendarSlotAddMenu";
 import CalendarNoShowModal from "../CalendarNoShowModal";
 import CalendarCancelBookingModal from "../CalendarCancelBookingModal";
 import CalendarBookingActionConfirmDialog, {
@@ -81,9 +85,14 @@ import {
 import BookingEditedTag from "../BookingEditedTag";
 import CalendarBookingTicketStack from "../CalendarBookingTicketStack";
 import {
+  buildMultiServiceBookingTitle,
   clusterSameStartTimeEvents,
+  findExternalStaffBookingOverlaps,
+  findInternalStaffServiceOverlaps,
   getClusterTimeBounds,
+  type StaffServiceInterval,
 } from "../calendar-overlap.utils";
+import type { CalendarScheduleConflictKind } from "../CalendarScheduleConflictDialog";
 import { useMessagingWidget } from "../../messaging/MessagingWidgetContext";
 import { useOpenMessagingForBookingMutation } from "../../../../store/services/messagingApi";
 import { useProfessionalMessagingUnread } from "../../messaging/useProfessionalMessagingUnread";
@@ -134,7 +143,9 @@ import CalendarDesignModal, {
   type CalendarDesignDraft,
 } from "../CalendarDesignModal";
 import CalendarPublicBusinessHoursModal, {
-  expandPublicBusinessHoursDraft,
+  createEmptyPublicBusinessHoursDraft,
+  draftFromPublicBusinessHoursEntries,
+  replacePublicBusinessHoursForLocations,
   type PublicBusinessHoursDraft,
   type PublicBusinessHoursEntry,
 } from "../CalendarPublicBusinessHoursModal";
@@ -144,7 +155,6 @@ import CalendarHoursRulesPanel from "../CalendarHoursRulesPanel";
 import CalendarEditAvailabilityModal, {
   type EditAvailabilityDraft,
 } from "../CalendarEditAvailabilityModal";
-import CalendarServiceOrderModal from "../CalendarServiceOrderModal";
 import ManualEntryDiscountModal from "../../../sections/finance/ManualEntryDiscountModal";
 import {
   parseFinancePrice,
@@ -156,6 +166,16 @@ import {
   partitionBookingProducts,
   resolveBookingPriceDisplay,
 } from "../bookingTotal";
+import {
+  canAddLateCancellation,
+  canAddLateRescheduling,
+  canAddNoShowFee,
+  canAddPrepayment,
+  canCheckoutProtectiveFee,
+  clampProtectiveFeePercent,
+  parsePolicyPercentCeiling,
+} from "../bookingGroupAddOns";
+import { isLateCancellation } from "../../client-booking/settleCancellationFee";
 import {
   removeFinanceProduct,
   removeFinanceUniqueItem,
@@ -172,9 +192,15 @@ import BookingRequestResponseActions from "../BookingRequestResponseActions";
 import InlineTimedSnackbar from "../../InlineTimedSnackbar";
 import BookingDrawerSelectedItemsSection from "../BookingDrawerSelectedItemsSection";
 import BookingDrawerClientSnapshotSection from "../BookingDrawerClientSnapshotSection";
-import CompanyClientTag from "../CompanyClientTag";
+import BookingClientTags, {
+  bookingClientOptionLabel,
+} from "../BookingClientTags";
 import BookingActivityOverview from "../BookingActivityOverview";
 import { buildBookingActivityTimeline } from "../buildBookingActivityTimeline";
+import {
+  ACTIVITY_COMPARISON_SIGNPOST,
+  findActivityComparisonItem,
+} from "../buildActivityComparison";
 import type { BookingActivityItem } from "../bookingActivity.types";
 import SalesOverview from "../SalesOverview";
 import CatalogItemDeleteDialog from "../CatalogItemDeleteDialog";
@@ -186,13 +212,11 @@ import { useCalendarFilters } from "../useCalendarFilters";
 import type { BookingCatalogService } from "../../../../data/bookingServiceCatalog.data";
 import { buildOrderedBookingServiceCategories } from "../../../../data/bookingServiceCatalog.data";
 import {
-  BUSINESS_SERVICE_CATEGORY_CATALOG,
-  resolveServiceCategorySliderIconId,
-} from "../../../../data/businessServiceCategorySlider.data";
-import {
   resolveDesiredVisitAddressOptions,
   type BusinessPublicProfileDesiredLocation,
 } from "../../../../data/businessPublicProfile.data";
+import { isConfiguredColor } from "../../../../lib/calendarDesign.utils";
+import type { TemplateCategoryRow } from "../../../../lib/businessTemplateCatalog";
 import {
   addMinutesToTime,
   buildBookingServiceLineItem,
@@ -224,6 +248,7 @@ import {
   type BookingUniqueItemLine,
 } from "../../../../data/bookingUniqueItem.data";
 import {
+  archiveFullyPastScheduleRows,
   findBookingsInTimeslot,
   getCombinedAvailabilityIntervals,
   getLocationAvailabilityBands,
@@ -231,17 +256,22 @@ import {
   locationAvailabilityKindAtMinute,
   locationAvailabilityTooltip,
   makeScheduleRowId,
+  resourceHasScheduleOrBlockOnAnyDate,
   type LocationAvailabilityKind,
 } from "../calendar-schedule.utils";
 import {
   defaultBookingRules,
   normalizeServiceOrderSettings,
+  withClampedDesiredLocationInterval,
   type BookingRules,
   type ParsedCalendarSettings,
   type ScheduleAvailabilityRow,
   type ServiceOrderSettings,
 } from "../calendar-settings.types";
-import { dedupeServiceOrderSettings } from "../serviceOrder.utils";
+import {
+  dedupeServiceOrderSettings,
+  shouldPreferTemplateServiceOrderDefaults,
+} from "../serviceOrder.utils";
 import {
   addDaysIso,
   addMonthsIso,
@@ -284,12 +314,12 @@ import {
   calendarBookingStatusLabel,
   canDiscardBookingRequest,
   getBookingScenarioIndicators,
+  isAllowedStatusForBookingType,
   isBookingRequestAccepted,
   scenarioIndicatorDisplayLabel,
   statusAccentColor,
 } from "../bookingStatus";
 import {
-  isRefundApplicable,
   resolveProfessionalBookingActions,
   showProfessionalActionMenu,
 } from "../bookingStatusActions";
@@ -345,12 +375,14 @@ import {
 } from "../calendar-entry.mappers";
 import type {
   BookingNotificationEvent,
+  CalendarBooking,
   CreateCalendarEntryRequest,
   CalendarEntry,
   UpsertCalendarSettingsRequest,
 } from "../../../../store/services/businessApi";
 import {
   useGetMyBookingsQuery,
+  useGetBookingActivityQuery,
   useLazyLookupMollureClientByEmailQuery,
   useUploadBookingAttachmentsMutation,
   useManageBookingEditRequestMutation,
@@ -373,10 +405,16 @@ export type ProfessionalFixedLocationCalendarProps = {
   calendarSettings?: ParsedCalendarSettings | null;
   serviceOptions?: string[];
   categoryOptions?: readonly { key: string; label: string }[];
+  /** Business Template category rows (categories that have ≥1 service). */
+  templateCategoryRows?: readonly TemplateCategoryRow[];
+  /** Exact service title → template category key for appearance colouring. */
+  serviceNameToCategoryKey?: Readonly<Record<string, string>>;
   serviceCatalog?: readonly BookingCatalogService[];
   serviceOrderDefaults?: ServiceOrderSettings;
   fixedLocationAddress?: string;
   lateRescheduleFeePercentDefault?: string;
+  lateCancellationFeePercentDefault?: string;
+  noShowFeePercentDefault?: string;
   prepaymentPercentDefault?: string;
   cancellationBeforeHours?: number | null;
   cancellationBeforeMinutes?: number | null;
@@ -388,6 +426,7 @@ export type ProfessionalFixedLocationCalendarProps = {
     phone?: string | null;
     countryCode?: string | null;
     clientKind?: "individual" | "company";
+    isMollure?: boolean;
   }[];
   professionalClients?: import("../../../../store/services/businessApi").ApiProfessionalClient[];
   isSaving?: boolean;
@@ -488,10 +527,14 @@ export default function ProfessionalFixedLocationCalendar({
   calendarSettings,
   serviceOptions = [],
   categoryOptions = [],
+  templateCategoryRows = [],
+  serviceNameToCategoryKey = {},
   serviceCatalog = [],
   serviceOrderDefaults,
   fixedLocationAddress,
   lateRescheduleFeePercentDefault,
+  lateCancellationFeePercentDefault,
+  noShowFeePercentDefault,
   prepaymentPercentDefault,
   cancellationBeforeHours,
   cancellationBeforeMinutes,
@@ -775,9 +818,9 @@ export default function ProfessionalFixedLocationCalendar({
       emptyBookingServiceEditDraft(),
     );
   const [serviceEditAttempted, setServiceEditAttempted] = React.useState(false);
-  /** When true, client already assigned staff — hide assign UI on Edit Service. */
-  const [editServiceStaffLocked, setEditServiceStaffLocked] =
-    React.useState(false);
+  const [serviceEditOrigin, setServiceEditOrigin] = React.useState<
+    "select-services" | "new-booking"
+  >("select-services");
   const [selectedProducts, setSelectedProducts] = React.useState<
     BookingProductLineItem[]
   >([]);
@@ -808,7 +851,13 @@ export default function ProfessionalFixedLocationCalendar({
   const [inlineGuestDraft, setInlineGuestDraft] = React.useState({
     firstName: "",
     lastName: "",
+    email: "",
+    phoneCode: "",
+    phoneNumber: "",
   });
+  const [editingInlineGuestId, setEditingInlineGuestId] = React.useState<
+    string | null
+  >(null);
   const [inlineGuestParticipantType, setInlineGuestParticipantType] =
     React.useState<"guest" | "model">("guest");
   const [bookingProjectEnabled, setBookingProjectEnabled] =
@@ -837,6 +886,9 @@ export default function ProfessionalFixedLocationCalendar({
     Array<{
       id: string;
       name: string;
+      email?: string;
+      phoneCode?: string;
+      phoneNumber?: string;
       services: BookingServiceLineItem[];
       products: BookingProductLineItem[];
       participantType?: "model" | "planning" | "guest" | "buffer" | "notes";
@@ -876,9 +928,22 @@ export default function ProfessionalFixedLocationCalendar({
   const [showLateCancellation, setShowLateCancellation] = React.useState(false);
   const [lateCancellationFeePercent, setLateCancellationFeePercent] =
     React.useState("");
+  const [lateCancellationFeePercentCeiling, setLateCancellationFeePercentCeiling] =
+    React.useState("");
   const [showLateRescheduling, setShowLateRescheduling] = React.useState(false);
   const [lateRescheduleFeePercent, setLateRescheduleFeePercent] =
     React.useState("");
+  const [lateRescheduleFeePercentCeiling, setLateRescheduleFeePercentCeiling] =
+    React.useState("");
+  const [showNoShowFee, setShowNoShowFee] = React.useState(false);
+  const [noShowFeePercent, setNoShowFeePercent] = React.useState("");
+  const [noShowFeePercentCeiling, setNoShowFeePercentCeiling] =
+    React.useState("");
+  const [cancellationFeeAt, setCancellationFeeAt] = React.useState<
+    string | undefined
+  >(undefined);
+  const [exceededCancellationWindow, setExceededCancellationWindow] =
+    React.useState<boolean | undefined>(undefined);
   const [showInternalNote, setShowInternalNote] = React.useState(false);
   const [bookingInternalNote, setBookingInternalNote] = React.useState("");
   const [paymentMethod, setPaymentMethod] = React.useState<
@@ -972,6 +1037,7 @@ export default function ProfessionalFixedLocationCalendar({
     addIdentityToClientList,
     isAddingClient,
     saveClientTechnicalNote,
+    findListedClient,
   } = useCalendarClientProfile(professionalClients);
 
   const [teamProfileMemberId, setTeamProfileMemberId] = React.useState<
@@ -1114,6 +1180,8 @@ export default function ProfessionalFixedLocationCalendar({
         lateCancellationFeePercent,
         showLateRescheduling,
         lateRescheduleFeePercent,
+        showNoShowFee,
+        noShowFeePercent,
         showPrepayment,
         prepaymentPercent,
         prepaymentPaid: false,
@@ -1124,10 +1192,12 @@ export default function ProfessionalFixedLocationCalendar({
       kilometerAllowanceAmount,
       lateCancellationFeePercent,
       lateRescheduleFeePercent,
+      noShowFeePercent,
       paymentMethod,
       prepaymentPercent,
       showLateCancellation,
       showLateRescheduling,
+      showNoShowFee,
       showPrepayment,
       subtotalPrice,
     ],
@@ -1135,6 +1205,7 @@ export default function ProfessionalFixedLocationCalendar({
   const bookingDiscountAmount = bookingPrice.discountAmount;
   const lateCancellationFeeAmount = bookingPrice.lateCancellationFeeAmount;
   const lateRescheduleFeeAmount = bookingPrice.lateRescheduleFeeAmount;
+  const noShowFeeAmount = bookingPrice.noShowFeeAmount;
   const prepaymentAmount = bookingPrice.prepaymentAmount;
   const remainingAfterPrepayment = bookingPrice.remainingAfterPrepayment;
   /** Amount due in the drawer (discount + fees + prepaid applied). */
@@ -1152,6 +1223,7 @@ export default function ProfessionalFixedLocationCalendar({
         discountAmount: bookingDiscountAmount,
         lateCancellationFeeAmount,
         lateRescheduleFeeAmount,
+        noShowFeeAmount,
       }),
     [
       bookingDiscountAmount,
@@ -1159,6 +1231,7 @@ export default function ProfessionalFixedLocationCalendar({
       kilometerAllowanceAmount,
       lateCancellationFeeAmount,
       lateRescheduleFeeAmount,
+      noShowFeeAmount,
       productsTotal,
       servicesTotal,
       uniqueItemsTotal,
@@ -1230,7 +1303,7 @@ export default function ProfessionalFixedLocationCalendar({
     bookingTypes,
     bookingStatuses,
     draftFilters,
-    filteredResources,
+    filteredResources: filterDrawerResources,
     initialFilters,
     locations,
     setDraftFilters,
@@ -1241,72 +1314,6 @@ export default function ProfessionalFixedLocationCalendar({
     [data.resources],
   );
   const fallbackTeamMemberId = String(data.resources[0]?.id ?? "");
-  const alphabeticalResources = React.useMemo(
-    () =>
-      [...filteredResources].sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
-      ),
-    [filteredResources],
-  );
-  const dayRankedResources = React.useMemo(
-    () =>
-      rankResourcesForCalendarDay(
-        filteredResources,
-        events,
-        activeDateIso,
-        {
-          fallbackTeamMemberId,
-          knownTeamIds: knownTeamMemberIds,
-        },
-      ),
-    [
-      activeDateIso,
-      events,
-      fallbackTeamMemberId,
-      filteredResources,
-      knownTeamMemberIds,
-    ],
-  );
-  const teamNavResources =
-    viewMode === "day" ? dayRankedResources : alphabeticalResources;
-  const defaultDaySelectedResourceId =
-    getDefaultCalendarResourceId(dayRankedResources);
-  const defaultWeekSelectedResourceId =
-    getDefaultCalendarResourceId(alphabeticalResources);
-
-  React.useLayoutEffect(() => {
-    if (viewMode !== "day") return;
-    userPickedTeamMemberRef.current = false;
-  }, [activeDateIso, viewMode]);
-
-  React.useLayoutEffect(() => {
-    if (filteredResources.length === 0) {
-      setSelectedResourceId("");
-      return;
-    }
-    const defaultResourceId =
-      viewMode === "day"
-        ? defaultDaySelectedResourceId
-        : defaultWeekSelectedResourceId;
-    setSelectedResourceId((current) => {
-      const stillValid =
-        Boolean(current) &&
-        filteredResources.some((resource) => resource.id === current);
-      if (!stillValid) {
-        userPickedTeamMemberRef.current = false;
-        return defaultResourceId;
-      }
-      if (!userPickedTeamMemberRef.current && viewMode === "day") {
-        return defaultDaySelectedResourceId;
-      }
-      return current;
-    });
-  }, [
-    defaultDaySelectedResourceId,
-    defaultWeekSelectedResourceId,
-    filteredResources,
-    viewMode,
-  ]);
 
   React.useEffect(() => {
     if (!data.supportedLocations.includes(slotLocation)) {
@@ -1314,6 +1321,12 @@ export default function ProfessionalFixedLocationCalendar({
     }
   }, [data.supportedLocations, slotLocation]);
   const [blockTimeOpen, setBlockTimeOpen] = React.useState(false);
+  const [slotAddAnchor, setSlotAddAnchor] = React.useState<{
+    top: number;
+    left: number;
+  } | null>(null);
+  const [pendingSlotPayload, setPendingSlotPayload] =
+    React.useState<SelectedSlot | null>(null);
   const [publicBusinessHoursOpen, setPublicBusinessHoursOpen] =
     React.useState(false);
   const [designOpen, setDesignOpen] = React.useState(false);
@@ -1359,6 +1372,9 @@ export default function ProfessionalFixedLocationCalendar({
   const isDrawerPrepaymentPaid =
     viewingBookingEvent != null &&
     resolveCalendarPrepaymentStatus(viewingBookingEvent) === "confirmed";
+  const prepaymentSectionTitle = isDrawerPrepaymentPaid
+    ? "Prepaid"
+    : "Prepayment";
   const drawerPriceDisplay = resolveBookingPriceDisplay({
     breakdown: {
       ...bookingPrice,
@@ -1372,7 +1388,47 @@ export default function ProfessionalFixedLocationCalendar({
 
   const drawerPaymentMethod =
     viewingBookingEvent?.details?.paymentMethod ?? paymentMethod;
-  const drawerPaymentIsOffline = isOfflinePaymentMethod(drawerPaymentMethod);
+  // Paid-like unlocks (accept bypass / receipt) only after Offline is persisted — not on draft select.
+  const persistedPaymentIsOffline = isOfflinePaymentMethod(
+    viewingBookingEvent?.details?.paymentMethod,
+  );
+  const drawerPaymentIsOffline = persistedPaymentIsOffline;
+
+  const isMollureClientPath =
+    addClientSource === "mollure-platform" ||
+    Boolean(selectedClient?.mollureUserId) ||
+    Boolean(viewingBookingEvent?.details?.customerId);
+  const isGuestClientPath =
+    addClientSource === "guest" ||
+    (viewingBookingEvent != null &&
+      viewingBookingEvent.bookingType === "Offline" &&
+      !String(
+        selectedClient?.email ?? viewingBookingEvent.details?.clientEmail ?? "",
+      ).trim());
+  const paymentMethodPolicy: "online-only" | "offline-only" | "either" =
+    viewingBookingEvent
+      ? viewingBookingEvent.bookingType === "Offline"
+        ? isGuestClientPath
+          ? "offline-only"
+          : "either"
+        : "online-only"
+      : isGuestClientPath
+        ? "offline-only"
+        : isMollureClientPath
+          ? "online-only"
+          : "either";
+
+  React.useEffect(() => {
+    if (viewingBookingEvent) return;
+    if (paymentMethodPolicy === "online-only" && paymentMethod !== "online") {
+      setPaymentMethod("online");
+    } else if (
+      paymentMethodPolicy === "offline-only" &&
+      paymentMethod !== "offline"
+    ) {
+      setPaymentMethod("offline");
+    }
+  }, [paymentMethod, paymentMethodPolicy, viewingBookingEvent]);
 
   const drawerDocumentDraft = React.useMemo(() => {
     if (!selectedServices.length) return null;
@@ -1494,8 +1550,15 @@ export default function ProfessionalFixedLocationCalendar({
         paymentMethod,
         showLateCancellation,
         lateCancellationFeePercent,
+        lateCancellationFeePercentCeiling,
         showLateRescheduling,
         lateRescheduleFeePercent,
+        lateRescheduleFeePercentCeiling,
+        showNoShowFee,
+        noShowFeePercent,
+        noShowFeePercentCeiling,
+        cancellationFeeAt,
+        exceededCancellationWindow,
         showInternalNote,
         bookingInternalNote,
         bookingTotalDiscount,
@@ -1526,8 +1589,15 @@ export default function ProfessionalFixedLocationCalendar({
     paymentMethod,
     showLateCancellation,
     lateCancellationFeePercent,
+    lateCancellationFeePercentCeiling,
     showLateRescheduling,
     lateRescheduleFeePercent,
+    lateRescheduleFeePercentCeiling,
+    showNoShowFee,
+    noShowFeePercent,
+    noShowFeePercentCeiling,
+    cancellationFeeAt,
+    exceededCancellationWindow,
     showInternalNote,
     bookingInternalNote,
     bookingTotalDiscount,
@@ -1570,7 +1640,7 @@ export default function ProfessionalFixedLocationCalendar({
       ? (parseApiCalendarEventId(drawerSalesActivityContext.id)?.id ?? null)
       : null;
     const currentCode = drawerSalesActivityContext?.bookingCode ?? null;
-    return all.filter((booking) => {
+    const matched = all.filter((booking) => {
       if (currentId && String(booking.id) === String(currentId)) return true;
       if (
         currentCode &&
@@ -1578,22 +1648,91 @@ export default function ProfessionalFixedLocationCalendar({
         booking.unique_code === currentCode
       )
         return true;
-      const email = clientActivityIdentity.email.toLowerCase();
-      const name = clientActivityIdentity.name.toLowerCase();
-      const bookingEmail = (booking.customer_email ?? "").trim().toLowerCase();
-      const bookingName = (booking.customer_name || booking.client_name || "")
-        .trim()
-        .toLowerCase();
-      if (email && bookingEmail && email === bookingEmail) return true;
-      if (name && bookingName && name === bookingName) return true;
       return false;
     });
-  }, [
-    clientActivityIdentity.email,
-    clientActivityIdentity.name,
-    drawerSalesActivityContext,
-    myBookingsResponse?.data,
-  ]);
+
+    // Offline calendar entries often have no bookings row — synthesize one for fallback.
+    if (
+      matched.length === 0 &&
+      drawerSalesActivityContext &&
+      (currentId || currentCode)
+    ) {
+      const ev = drawerSalesActivityContext;
+      let totalPrice: number | null = null;
+      const details = ev.details;
+      if (details) {
+        let total = 0;
+        for (const service of details.services ?? []) {
+          total += Number(service.price) || 0;
+        }
+        for (const product of details.products ?? []) {
+          total += Number(product.price) || 0;
+        }
+        for (const guest of details.guests ?? []) {
+          for (const service of guest.services ?? []) {
+            total += Number(service.price) || 0;
+          }
+          for (const product of guest.products ?? []) {
+            total += Number(product.price) || 0;
+          }
+        }
+        if (total > 0) totalPrice = total;
+      }
+      const bookingType = ev.bookingType?.toLowerCase();
+      const synthetic: CalendarBooking = {
+        id: String(currentId || currentCode || ev.id),
+        unique_code: currentCode,
+        status: String(ev.status || "confirmed")
+          .toLowerCase()
+          .replace(/\s+/g, "_"),
+        prepayment_status:
+          ev.details?.prepaymentStatus === "confirmed"
+            ? "paid"
+            : ev.details?.prepaymentStatus || null,
+        total_price: totalPrice,
+        booking_type:
+          bookingType === "online" ||
+          bookingType === "offline" ||
+          bookingType === "project" ||
+          bookingType === "request"
+            ? bookingType
+            : null,
+        customer_name: ev.showClientName || null,
+        customer_email: ev.details?.clientEmail || null,
+        client_name: ev.showClientName || null,
+        service_title: ev.title || null,
+        notes: ev.notes || null,
+        created_at: ev.start || null,
+        updated_at: ev.start || null,
+        booking_date: ev.date || ev.start?.slice(0, 10) || "",
+        start_time: ev.start || null,
+        end_time: ev.end || null,
+        business_setup_id: "",
+        customer_id: ev.details?.customerId || "",
+        service_id: null,
+        team_member_id: ev.resourceId || null,
+        location_type: ev.location === "DL" ? "desired" : "fixed",
+      };
+      return [synthetic];
+    }
+
+    return matched;
+  }, [drawerSalesActivityContext, myBookingsResponse?.data]);
+
+  const activityBookingId = drawerSalesActivityContext
+    ? (parseApiCalendarEventId(drawerSalesActivityContext.id)?.id ?? null)
+    : null;
+  const activityBookingCode = drawerSalesActivityContext?.bookingCode ?? null;
+
+  const { data: bookingActivityResponse } = useGetBookingActivityQuery(
+    {
+      bookingId: activityBookingId,
+      bookingCode: activityBookingCode,
+    },
+    {
+      skip: !activityBookingId && !activityBookingCode,
+    },
+  );
 
   const activityTimelineItems = React.useMemo(
     () =>
@@ -1601,10 +1740,8 @@ export default function ProfessionalFixedLocationCalendar({
         bookings: clientBookingsForActivity,
         clientEmail: clientActivityIdentity.email,
         clientName: clientActivityIdentity.name,
-        currentBookingId: drawerSalesActivityContext
-          ? (parseApiCalendarEventId(drawerSalesActivityContext.id)?.id ?? null)
-          : null,
-        currentBookingCode: drawerSalesActivityContext?.bookingCode ?? null,
+        currentBookingId: activityBookingId,
+        currentBookingCode: activityBookingCode,
         currentScenario: drawerSalesActivityContext?.bookingScenario ?? null,
         currentStatus: drawerSalesActivityContext?.status ?? null,
         currentCancellationReason:
@@ -1613,15 +1750,41 @@ export default function ProfessionalFixedLocationCalendar({
           data.resources.find(
             (r) => r.id === drawerSalesActivityContext?.resourceId,
           )?.name ?? null,
+        currentBookingType: drawerSalesActivityContext?.bookingType ?? null,
+        currentDetails: drawerSalesActivityContext?.details ?? null,
+        currentDateISO: drawerSalesActivityContext?.date ?? null,
+        currentStart: drawerSalesActivityContext?.start ?? null,
+        apiEvents: bookingActivityResponse?.data ?? null,
         mode: "activity",
       }),
     [
+      activityBookingCode,
+      activityBookingId,
+      bookingActivityResponse?.data,
       clientActivityIdentity.email,
       clientActivityIdentity.name,
       clientBookingsForActivity,
       data.resources,
       drawerSalesActivityContext,
     ],
+  );
+
+  const openActivityComparison = React.useCallback(
+    (mode?: "ebr" | "er" | "silent_updated") => {
+      const bookingRef =
+        drawerSalesActivityContext?.bookingCode ||
+        (drawerSalesActivityContext
+          ? parseApiCalendarEventId(drawerSalesActivityContext.id)?.id
+          : null) ||
+        null;
+      const target = findActivityComparisonItem(activityTimelineItems, {
+        bookingRef,
+        mode,
+      });
+      setSlotDrawerTab("activity");
+      setActivityDetailItem(target);
+    },
+    [activityTimelineItems, drawerSalesActivityContext],
   );
 
   const isCompletedBooking = viewingBookingEvent?.status === "Completed";
@@ -1796,8 +1959,15 @@ export default function ProfessionalFixedLocationCalendar({
         paymentMethod,
         showLateCancellation,
         lateCancellationFeePercent,
+        lateCancellationFeePercentCeiling,
         showLateRescheduling,
         lateRescheduleFeePercent,
+        lateRescheduleFeePercentCeiling,
+        showNoShowFee,
+        noShowFeePercent,
+        noShowFeePercentCeiling,
+        cancellationFeeAt,
+        exceededCancellationWindow,
         showInternalNote,
         internalNote: bookingInternalNote,
         totalDiscount: bookingTotalDiscount,
@@ -1826,8 +1996,15 @@ export default function ProfessionalFixedLocationCalendar({
       paymentMethod,
       showLateCancellation,
       lateCancellationFeePercent,
+      lateCancellationFeePercentCeiling,
       showLateRescheduling,
       lateRescheduleFeePercent,
+      lateRescheduleFeePercentCeiling,
+      showNoShowFee,
+      noShowFeePercent,
+      noShowFeePercentCeiling,
+      cancellationFeeAt,
+      exceededCancellationWindow,
       showInternalNote,
       bookingInternalNote,
       bookingTotalDiscount,
@@ -1953,6 +2130,30 @@ export default function ProfessionalFixedLocationCalendar({
   );
   const pendingOverviewBlockRef = React.useRef<BlockTimeDraft | null>(null);
   const [blockOverlapOpen, setBlockOverlapOpen] = React.useState(false);
+  const [staffConflictOpen, setStaffConflictOpen] = React.useState(false);
+  const [staffConflictMessage, setStaffConflictMessage] = React.useState<
+    string | null
+  >(null);
+  const staffConflictAckRef = React.useRef(false);
+  const inlineGuestFormRef = React.useRef<HTMLDivElement | null>(null);
+  const emptyInlineGuestDraft = React.useMemo(
+    () => ({
+      firstName: "",
+      lastName: "",
+      email: "",
+      phoneCode: "",
+      phoneNumber: "",
+    }),
+    [],
+  );
+
+  React.useEffect(() => {
+    if (!showInlineGuestField) return;
+    inlineGuestFormRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    });
+  }, [showInlineGuestField, editingInlineGuestId]);
 
   const persistOverviewBlockedTime = async (draft: BlockTimeDraft) => {
     const nextBlocks = buildBlocksFromDraft(draft, draft.teamIds);
@@ -2021,17 +2222,9 @@ export default function ProfessionalFixedLocationCalendar({
   };
 
   const [publicBusinessHoursDraft, setPublicBusinessHoursDraft] =
-    React.useState<PublicBusinessHoursDraft>(() => ({
-      locations: [],
-      schedule: "",
-      day: "",
-      dateFrom: "",
-      dateTo: "",
-      startTime: "08:00",
-      endTime: "18:00",
-      notAvailable: false,
-      note: "",
-    }));
+    React.useState<PublicBusinessHoursDraft>(() =>
+      createEmptyPublicBusinessHoursDraft(),
+    );
 
   const [designDraft, setDesignDraft] = React.useState<CalendarDesignDraft>(
     () => ({
@@ -2057,6 +2250,7 @@ export default function ProfessionalFixedLocationCalendar({
   const [scheduleRows, setScheduleRows] = React.useState<
     ScheduleAvailabilityRow[]
   >([]);
+  const autoArchivePersistedRef = React.useRef<string | null>(null);
   const [dateOverrides, setDateOverrides] = React.useState<
     ParsedCalendarSettings["availability"]["dateOverrides"]
   >([]);
@@ -2079,7 +2273,6 @@ export default function ProfessionalFixedLocationCalendar({
       serviceOrderDraft,
     );
   }, [selectableServiceCatalog, serviceOrderDraft]);
-  const [serviceOrderOpen, setServiceOrderOpen] = React.useState(false);
   const [scheduleResourceFilter, setScheduleResourceFilter] = React.useState<
     string[]
   >([]);
@@ -2097,11 +2290,18 @@ export default function ProfessionalFixedLocationCalendar({
     setBookingRules(
       calendarSettings.availability.bookingRules ?? defaultBookingRules(),
     );
-    setScheduleRows(calendarSettings.availability.scheduleAvailability ?? []);
+    const rawSchedule =
+      calendarSettings.availability.scheduleAvailability ?? [];
+    setScheduleRows(archiveFullyPastScheduleRows(rawSchedule));
     setDateOverrides(calendarSettings.availability.dateOverrides ?? []);
     setAppliedDesign(calendarSettings.design);
     setDesignDraft(calendarSettings.design);
-    if (calendarSettings.availability.serviceOrder) {
+    if (
+      calendarSettings.availability.serviceOrder &&
+      !shouldPreferTemplateServiceOrderDefaults(
+        calendarSettings.availability.serviceOrder,
+      )
+    ) {
       setServiceOrderDraft(
         dedupeServiceOrderSettings(
           normalizeServiceOrderSettings(
@@ -2152,32 +2352,48 @@ export default function ProfessionalFixedLocationCalendar({
     ],
   );
 
-  const resolveEventCategoryKey = React.useCallback((event: CalendarEvent) => {
-    const candidates = [
-      event.title,
-      ...(event.details?.services?.map((service) => service.name) ?? []),
-    ].filter(Boolean);
+  React.useEffect(() => {
+    if (!calendarSettings || !onSaveCalendarSettings) return;
+    const raw = calendarSettings.availability.scheduleAvailability ?? [];
+    const next = archiveFullyPastScheduleRows(raw);
+    if (next === raw) return;
+    const fingerprint = next
+      .map((row) => `${row.id}:${row.archived ? 1 : 0}`)
+      .join("|");
+    if (autoArchivePersistedRef.current === fingerprint) return;
+    autoArchivePersistedRef.current = fingerprint;
+    void persistAvailabilitySettings({ scheduleAvailability: next });
+  }, [calendarSettings, onSaveCalendarSettings, persistAvailabilitySettings]);
 
-    for (const text of candidates) {
-      const iconId = resolveServiceCategorySliderIconId(String(text));
-      if (iconId !== "generic" && iconId !== "all") return iconId;
-    }
-    return null;
-  }, []);
+  const resolveEventCategoryKey = React.useCallback(
+    (event: CalendarEvent) => {
+      const candidates = [
+        ...(event.details?.services?.map((service) => service.name) ?? []),
+        event.title,
+      ]
+        .map((text) => String(text ?? "").trim())
+        .filter(Boolean);
+
+      for (const name of candidates) {
+        const direct = serviceNameToCategoryKey[name];
+        if (direct) return direct;
+        const lower = name.toLowerCase();
+        const matched = Object.entries(serviceNameToCategoryKey).find(
+          ([serviceTitle]) => serviceTitle.toLowerCase() === lower,
+        );
+        if (matched) return matched[1];
+      }
+      return null;
+    },
+    [serviceNameToCategoryKey],
+  );
 
   const lookupCategoryColor = React.useCallback(
     (categoryKey: string | null | undefined) => {
       if (!categoryKey) return undefined;
       const colors = appliedDesign.colorsByCategory ?? {};
-      if (colors[categoryKey]) return colors[categoryKey];
-
-      const entry = BUSINESS_SERVICE_CATEGORY_CATALOG.find(
-        (item) => item.key === categoryKey,
-      );
-      if (!entry) return undefined;
-      if (colors[entry.label]) return colors[entry.label];
-      if (entry.key === "hair" && colors.Haar) return colors.Haar;
-      return undefined;
+      const color = colors[categoryKey];
+      return isConfiguredColor(color) ? color : undefined;
     },
     [appliedDesign.colorsByCategory],
   );
@@ -2187,12 +2403,12 @@ export default function ProfessionalFixedLocationCalendar({
       const categoryKey = resolveEventCategoryKey(event);
       const categoryColor = lookupCategoryColor(categoryKey);
       const serviceNames = [
-        event.title,
         ...(event.details?.services?.map((service) => service.name) ?? []),
+        event.title,
       ].filter(Boolean);
       const namedServiceColor = serviceNames
         .map((name) => appliedDesign.colorsByService?.[String(name)])
-        .find(Boolean);
+        .find((color) => isConfiguredColor(color));
 
       const cardColor =
         appliedDesign.scope === "Services"
@@ -2222,6 +2438,18 @@ export default function ProfessionalFixedLocationCalendar({
         end_time?: string | null;
       },
     ) => {
+      const current =
+        events.find((event) => event.id === eventId) ?? viewingBookingEvent;
+      if (
+        current &&
+        !isAllowedStatusForBookingType(status, current.bookingType)
+      ) {
+        showSnackbar({
+          severity: "warning",
+          message: "This status is not allowed for offline bookings.",
+        });
+        return;
+      }
       const parsed = parseApiCalendarEventId(eventId);
       if (!parsed) return;
       const apiStatus =
@@ -2248,7 +2476,13 @@ export default function ProfessionalFixedLocationCalendar({
         await onUpdateCalendarEntryStatus(parsed.id, apiStatus);
       }
     },
-    [onUpdateBookingStatus, onUpdateCalendarEntryStatus],
+    [
+      events,
+      onUpdateBookingStatus,
+      onUpdateCalendarEntryStatus,
+      showSnackbar,
+      viewingBookingEvent,
+    ],
   );
 
   const dispatchBookingEventIfApi = React.useCallback(
@@ -2275,7 +2509,6 @@ export default function ProfessionalFixedLocationCalendar({
         | "checkout"
         | "delete"
         | "rebook"
-        | "refund"
         | "ok",
     ) => {
       setBookingActionAnchor(null);
@@ -2340,6 +2573,99 @@ export default function ProfessionalFixedLocationCalendar({
         const current =
           viewingBookingEvent ??
           events.find((event) => event.id === editingEventId);
+        const status = current?.status;
+        const feeCheckout = canCheckoutProtectiveFee({
+          status,
+          showLateCancellation,
+          lateCancellationFeeAmount,
+          showNoShowFee,
+          noShowFeeAmount,
+        });
+
+        // Cancelled / No Show: invoice protective fee only — keep status, open Sales.
+        if (
+          feeCheckout &&
+          (status === "Cancelled" || status === "No Show")
+        ) {
+          const feeAmount =
+            status === "Cancelled"
+              ? lateCancellationFeeAmount
+              : noShowFeeAmount;
+          const nextDetails = {
+            ...(current?.details ?? {}),
+            showLateCancellation:
+              status === "Cancelled"
+                ? showLateCancellation
+                : current?.details?.showLateCancellation,
+            lateCancellationFeePercent:
+              status === "Cancelled"
+                ? lateCancellationFeePercent
+                : current?.details?.lateCancellationFeePercent,
+            lateCancellationFeePercentCeiling:
+              status === "Cancelled"
+                ? lateCancellationFeePercentCeiling
+                : current?.details?.lateCancellationFeePercentCeiling,
+            showNoShowFee:
+              status === "No Show"
+                ? showNoShowFee
+                : current?.details?.showNoShowFee,
+            noShowFeePercent:
+              status === "No Show"
+                ? noShowFeePercent
+                : current?.details?.noShowFeePercent,
+            noShowFeePercentCeiling:
+              status === "No Show"
+                ? noShowFeePercentCeiling
+                : current?.details?.noShowFeePercentCeiling,
+            cancellationFeeAt:
+              cancellationFeeAt ?? new Date().toISOString(),
+            ...(typeof exceededCancellationWindow === "boolean"
+              ? { exceededCancellationWindow }
+              : {}),
+            waitingForPayment: feeAmount > 0,
+            invoiceDueDate: new Date().toISOString().slice(0, 10),
+          };
+          const nextNotes = serializeCalendarEntryNotes(
+            nextDetails.internalNote ?? "",
+            nextDetails,
+            parseStoredEbrFromNotes(current?.notes),
+            parseStoredErFromNotes(current?.notes),
+          );
+          try {
+            await persistEventStatus(editingEventId, status, {
+              notes: nextNotes,
+              total_price: feeAmount,
+            });
+            setEvents((prev) =>
+              prev.map((event) =>
+                event.id === editingEventId
+                  ? {
+                      ...event,
+                      notes: nextNotes,
+                      details: nextDetails,
+                    }
+                  : event,
+              ),
+            );
+            setCancellationFeeAt(nextDetails.cancellationFeeAt);
+          } catch {
+            showSnackbar({
+              severity: "error",
+              message: "Unable to send fee checkout.",
+            });
+            return;
+          }
+          setSlotDrawerTab("sales");
+          showSnackbar({
+            severity: "success",
+            message:
+              status === "Cancelled"
+                ? "Cancellation fee checkout opened in Sales."
+                : "No-show fee checkout opened in Sales.",
+          });
+          return;
+        }
+
         const remaining = remainingAfterPrepayment;
         const waiting = remaining > 0;
         const nextDetails = {
@@ -2476,50 +2802,9 @@ export default function ProfessionalFixedLocationCalendar({
         return;
       }
 
-      if (action === "refund") {
-        const current =
-          viewingBookingEvent ??
-          events.find((event) => event.id === editingEventId);
-        const nextDetails = {
-          ...(current?.details ?? {}),
-          refunded: true,
-          waitingForPayment: false,
-        };
-        const nextNotes = serializeCalendarEntryNotes(
-          nextDetails.internalNote ?? "",
-          nextDetails,
-          parseStoredEbrFromNotes(current?.notes),
-          parseStoredErFromNotes(current?.notes),
-        );
-        try {
-          await persistEventStatus(editingEventId, current?.status ?? "Completed", {
-            notes: nextNotes,
-          });
-          setEvents((prev) =>
-            prev.map((event) =>
-              event.id === editingEventId
-                ? { ...event, notes: nextNotes, details: nextDetails }
-                : event,
-            ),
-          );
-        } catch {
-          showSnackbar({
-            severity: "error",
-            message: "Unable to mark refund.",
-          });
-          return;
-        }
-        setSlotDrawerTab("sales");
-        showSnackbar({
-          severity: "success",
-          message: "Refund recorded. Finish the payment in Sales if needed.",
-        });
-        return;
-      }
-
       setPendingBookingAction(action);
     },
-    [editingEventId, events, persistEventStatus, remainingAfterPrepayment, showSnackbar, viewingBookingEvent],
+    [editingEventId, events, persistEventStatus, remainingAfterPrepayment, showSnackbar, viewingBookingEvent, showLateCancellation, lateCancellationFeeAmount, showNoShowFee, noShowFeeAmount, lateCancellationFeePercent, lateCancellationFeePercentCeiling, noShowFeePercent, noShowFeePercentCeiling, cancellationFeeAt, exceededCancellationWindow],
   );
 
   const handleConfirmCancel = React.useCallback(async () => {
@@ -2644,6 +2929,82 @@ export default function ProfessionalFixedLocationCalendar({
     // month: we still keep a single active date; month grid computed separately in UI.
     return [activeDateIso];
   }, [activeDateIso, viewMode]);
+
+  // Overview calendar: hide members with neither availability nor block on visible dates.
+  const filteredResources = React.useMemo(
+    () =>
+      filterDrawerResources.filter((resource) =>
+        resourceHasScheduleOrBlockOnAnyDate(
+          resource.id,
+          visibleDates,
+          scheduleRows,
+          blocks,
+        ),
+      ),
+    [blocks, filterDrawerResources, scheduleRows, visibleDates],
+  );
+
+  const alphabeticalResources = React.useMemo(
+    () =>
+      [...filteredResources].sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+      ),
+    [filteredResources],
+  );
+  const dayRankedResources = React.useMemo(
+    () =>
+      rankResourcesForCalendarDay(filteredResources, events, activeDateIso, {
+        fallbackTeamMemberId,
+        knownTeamIds: knownTeamMemberIds,
+      }),
+    [
+      activeDateIso,
+      events,
+      fallbackTeamMemberId,
+      filteredResources,
+      knownTeamMemberIds,
+    ],
+  );
+  const teamNavResources =
+    viewMode === "day" ? dayRankedResources : alphabeticalResources;
+  const defaultDaySelectedResourceId =
+    getDefaultCalendarResourceId(dayRankedResources);
+  const defaultWeekSelectedResourceId =
+    getDefaultCalendarResourceId(alphabeticalResources);
+
+  React.useLayoutEffect(() => {
+    if (viewMode !== "day") return;
+    userPickedTeamMemberRef.current = false;
+  }, [activeDateIso, viewMode]);
+
+  React.useLayoutEffect(() => {
+    if (filteredResources.length === 0) {
+      setSelectedResourceId("");
+      return;
+    }
+    const defaultResourceId =
+      viewMode === "day"
+        ? defaultDaySelectedResourceId
+        : defaultWeekSelectedResourceId;
+    setSelectedResourceId((current) => {
+      const stillValid =
+        Boolean(current) &&
+        filteredResources.some((resource) => resource.id === current);
+      if (!stillValid) {
+        userPickedTeamMemberRef.current = false;
+        return defaultResourceId;
+      }
+      if (!userPickedTeamMemberRef.current && viewMode === "day") {
+        return defaultDaySelectedResourceId;
+      }
+      return current;
+    });
+  }, [
+    defaultDaySelectedResourceId,
+    defaultWeekSelectedResourceId,
+    filteredResources,
+    viewMode,
+  ]);
 
   const getAvailabilityFor = React.useCallback(
     (resourceId: string, iso: string): Interval[] => {
@@ -3190,6 +3551,8 @@ export default function ProfessionalFixedLocationCalendar({
         | "guestLastName"
         | "guestPhoneCode"
         | "guestPhoneNumber"
+        | "guestEmail"
+        | "bookingClientEmail"
         | "nonMollureFirstName"
         | "nonMollureLastName"
         | "nonMollureGender"
@@ -3285,13 +3648,10 @@ export default function ProfessionalFixedLocationCalendar({
         isValid = false;
         errors.guestFirstName = "First name is required.";
       }
-      if (isBlank(guestDraft.lastName)) {
-        isValid = false;
-        errors.guestLastName = "Last name is required.";
-      }
-      const guestPhoneErrors = getOptionalPhoneValidationErrors(
+      const guestPhoneErrors = getPhoneValidationErrors(
         guestDraft.phoneCode,
         guestDraft.phoneNumber,
+        { required: true },
       );
       if (guestPhoneErrors.countryCode) {
         isValid = false;
@@ -3419,10 +3779,18 @@ export default function ProfessionalFixedLocationCalendar({
       errors.bookingClient =
         errors.bookingClient ?? "Select at least one item/service or product.";
     }
-    const bookingPhoneErrors = getOptionalPhoneValidationErrors(
-      bookingPhoneDraft.phoneCode,
-      bookingPhoneDraft.phoneNumber,
-    );
+    // Primary guest path keeps phone mandatory after attach; other clients stay optional.
+    const bookingPhoneErrors =
+      addClientSource === "guest"
+        ? getPhoneValidationErrors(
+            bookingPhoneDraft.phoneCode,
+            bookingPhoneDraft.phoneNumber,
+            { required: true },
+          )
+        : getOptionalPhoneValidationErrors(
+            bookingPhoneDraft.phoneCode,
+            bookingPhoneDraft.phoneNumber,
+          );
     if (bookingPhoneErrors.countryCode) {
       isValid = false;
       errors.bookingPhoneCode = bookingPhoneErrors.countryCode;
@@ -3431,16 +3799,26 @@ export default function ProfessionalFixedLocationCalendar({
       isValid = false;
       errors.bookingPhoneNumber = bookingPhoneErrors.phone;
     }
+    if (
+      paymentMethod === "online" &&
+      isBlank(selectedClient?.email ?? "")
+    ) {
+      isValid = false;
+      errors.bookingClientEmail =
+        "Email is required for online payment.";
+    }
     return { isValid, errors };
   }, [
+    addClientSource,
     bookingPhoneDraft.phoneCode,
     bookingPhoneDraft.phoneNumber,
     guestDraft.firstName,
-    guestDraft.lastName,
     guestDraft.phoneCode,
     guestDraft.phoneNumber,
     nonMollureClientType,
     nonMollureDraft,
+    paymentMethod,
+    selectedClient?.email,
     selectedProducts.length,
     selectedServices.length,
     bookingUniqueItems.length,
@@ -3600,6 +3978,14 @@ export default function ProfessionalFixedLocationCalendar({
     todayIso,
   ]);
 
+  const drawerSelectableTimes = React.useMemo(
+    () =>
+      drawerAvailableTimeSlots
+        .filter((slot) => !slot.disabled)
+        .map((slot) => slot.time),
+    [drawerAvailableTimeSlots],
+  );
+
   /** Edit Service Start Time list: Available + Occupied (manual booking only). */
   const editServiceStartTimeSlots = React.useMemo(() => {
     if (!selectedSlot?.date) {
@@ -3705,6 +4091,59 @@ export default function ProfessionalFixedLocationCalendar({
       return Math.max(0, Math.min(1, bookedMins / availableMins));
     },
     [getAvailabilityFor, getBusyFor],
+  );
+
+  /**
+   * Client-like “most available” pick: lowest day occupancy, free at the slot.
+   * Falls back to lowest occupancy when nobody is free (still assign someone).
+   */
+  const pickMostAvailableTeamMemberId = React.useCallback(
+    (
+      dateIso: string,
+      startMin: number,
+      durationMins: number,
+      extraBusyByMember?: ReadonlyMap<string, readonly Interval[]>,
+    ): string => {
+      const candidates = [...data.resources].sort((a, b) => {
+        const diff =
+          getDailyBookingRatio(a.id, dateIso) -
+          getDailyBookingRatio(b.id, dateIso);
+        if (diff !== 0) return diff;
+        return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+      });
+      if (!candidates.length) return "";
+
+      const endMin = startMin + Math.max(1, durationMins || 0);
+      const free = candidates.find((resource) => {
+        const locationWindows = slotLocation
+          ? getLocationAvailability(resource.id, dateIso, slotLocation)
+          : [];
+        const working = locationWindows.length
+          ? locationWindows
+          : getAvailabilityFor(resource.id, dateIso);
+        if (!working.length) return false;
+        const withinWorking = working.some(
+          (window) => startMin >= window.startMin && endMin <= window.endMin,
+        );
+        if (!withinWorking) return false;
+        const busy = [
+          ...getBusyFor(resource.id, dateIso),
+          ...(extraBusyByMember?.get(resource.id) ?? []),
+        ];
+        return !busy.some((interval) =>
+          intervalsOverlap({ startMin, endMin }, interval),
+        );
+      });
+      return free?.id ?? candidates[0]?.id ?? "";
+    },
+    [
+      data.resources,
+      getAvailabilityFor,
+      getBusyFor,
+      getDailyBookingRatio,
+      getLocationAvailability,
+      slotLocation,
+    ],
   );
 
   const teamNavMemberCount = teamNavResources.length;
@@ -4248,7 +4687,10 @@ export default function ProfessionalFixedLocationCalendar({
       setIsEditingExisting(false);
       setBookingGuests([]);
       setShowInlineGuestField(false);
+      setEditingInlineGuestId(null);
+      setInlineGuestDraft(emptyInlineGuestDraft);
       setInlineGuestParticipantType("guest");
+      staffConflictAckRef.current = false;
       setBookingProjectEnabled(false);
       setBookingProjectDescription("");
       setBookingProjectUploads([]);
@@ -4256,8 +4698,15 @@ export default function ProfessionalFixedLocationCalendar({
       setBookingDiscountModalOpen(false);
       setShowLateCancellation(false);
       setLateCancellationFeePercent("");
+      setLateCancellationFeePercentCeiling("");
       setShowLateRescheduling(false);
       setLateRescheduleFeePercent(lateRescheduleFeePercentDefault ?? "");
+      setLateRescheduleFeePercentCeiling("");
+      setShowNoShowFee(false);
+      setNoShowFeePercent("");
+      setNoShowFeePercentCeiling("");
+      setCancellationFeeAt(undefined);
+      setExceededCancellationWindow(undefined);
       setShowInternalNote(false);
       setBookingInternalNote("");
       setShowPrepayment(false);
@@ -4266,7 +4715,7 @@ export default function ProfessionalFixedLocationCalendar({
       setShowKilometerAllowance(false);
       setKilometerAllowanceDraft({ eurPerKm: "", totalKilometer: "" });
       setDesiredLocationDraft(emptyDesiredLocation());
-      setInlineGuestDraft({ firstName: "", lastName: "" });
+      setInlineGuestDraft(emptyInlineGuestDraft);
       setAddMenuTarget("client");
       setSelectionTarget("client");
       setSlotAddMenuAnchor(null);
@@ -4350,6 +4799,15 @@ export default function ProfessionalFixedLocationCalendar({
       mollureUserId: ev.details?.customerId ?? null,
       clientKind: ev.clientKind ?? ev.details?.clientKind,
     });
+    if (ev.details?.customerId) {
+      setAddClientSource("client-list");
+    } else if (ev.bookingType === "Offline" && !String(hydration.clientEmail ?? "").trim()) {
+      setAddClientSource("guest");
+    } else if (ev.bookingType === "Offline") {
+      setAddClientSource("non-mollure");
+    } else {
+      setAddClientSource("client-list");
+    }
     setSelectedServices(hydration.services);
     setSelectedProducts(
       hydration.products.filter(
@@ -4413,6 +4871,9 @@ export default function ProfessionalFixedLocationCalendar({
               .map((person) => ({
                 id: person.id,
                 name: person.name,
+                email: person.email,
+                phoneCode: person.phoneCode,
+                phoneNumber: person.phoneNumber,
                 services: (snap.services ?? [])
                   .filter((service) => service.guestId === person.id)
                   .map((service) => ({
@@ -4442,8 +4903,19 @@ export default function ProfessionalFixedLocationCalendar({
     setPaymentMethod(hydration.paymentMethod);
     setShowLateCancellation(hydration.showLateCancellation);
     setLateCancellationFeePercent(hydration.lateCancellationFeePercent);
+    setLateCancellationFeePercentCeiling(
+      hydration.lateCancellationFeePercentCeiling,
+    );
     setShowLateRescheduling(hydration.showLateRescheduling);
     setLateRescheduleFeePercent(hydration.lateRescheduleFeePercent);
+    setLateRescheduleFeePercentCeiling(
+      hydration.lateRescheduleFeePercentCeiling,
+    );
+    setShowNoShowFee(hydration.showNoShowFee);
+    setNoShowFeePercent(hydration.noShowFeePercent);
+    setNoShowFeePercentCeiling(hydration.noShowFeePercentCeiling);
+    setCancellationFeeAt(ev.details?.cancellationFeeAt);
+    setExceededCancellationWindow(ev.details?.exceededCancellationWindow);
     setShowInternalNote(hydration.showInternalNote);
     setBookingInternalNote(hydration.internalNote);
     setBookingTotalDiscount(hydration.totalDiscount);
@@ -5269,19 +5741,29 @@ export default function ProfessionalFixedLocationCalendar({
   }, [addMenuTarget]);
 
   const openEditService = React.useCallback(
-    (service: BookingCatalogService) => {
-      const override = serviceOverridesDraft[service.id];
+    (
+      service: BookingCatalogService,
+      lineItemOverride?: Partial<BookingServiceLineItem>,
+      target: string = selectionTarget,
+      origin: "select-services" | "new-booking" = "select-services",
+    ) => {
+      if (target !== selectionTarget) {
+        setSelectionTarget(target);
+      }
+      const override = {
+        ...serviceOverridesDraft[service.id],
+        ...lineItemOverride,
+      };
       const existingOnBooking =
-        selectionTarget === "client"
+        target === "client"
           ? selectedServices.find((item) => item.id === service.id)
           : bookingGuests
-              .find((guest) => guest.id === selectionTarget)
+              .find((guest) => guest.id === target)
               ?.services.find((item) => item.id === service.id);
       const assignedStaff =
         override?.staffResourceId?.trim() ||
         existingOnBooking?.staffResourceId?.trim() ||
         "";
-      setEditServiceStaffLocked(Boolean(assignedStaff));
       setServiceEditDraft(
         buildServiceEditDraftFromCatalog(service, {
           override: {
@@ -5296,6 +5778,7 @@ export default function ProfessionalFixedLocationCalendar({
         }),
       );
       setServiceEditAttempted(false);
+      setServiceEditOrigin(origin);
       setSlotBookingScreen("edit-service");
     },
     [
@@ -5305,6 +5788,31 @@ export default function ProfessionalFixedLocationCalendar({
       selectionTarget,
       serviceOverridesDraft,
     ],
+  );
+
+  const openEditServiceFromLineItem = React.useCallback(
+    (service: BookingServiceLineItem, target: string = selectionTarget) => {
+      const catalogService =
+        selectableServiceCatalog.find((item) => item.id === service.id) ??
+        selectableServiceCatalog.find((item) => item.name === service.name);
+      if (!catalogService) return;
+      openEditService(
+        catalogService,
+        {
+          staffResourceId: service.staffResourceId,
+          startTime: service.startTime,
+          endTime: service.endTime,
+          durationMins: service.durationMins,
+          name: service.name,
+          price: service.price,
+          priceType: service.priceType,
+          discount: service.discount,
+        },
+        target,
+        "new-booking",
+      );
+    },
+    [openEditService, selectableServiceCatalog, selectionTarget],
   );
 
   const applyServiceEdit = React.useCallback(() => {
@@ -5374,7 +5882,7 @@ export default function ProfessionalFixedLocationCalendar({
     }
 
     setServiceEditAttempted(false);
-    setSlotBookingScreen("select-services");
+    setSlotBookingScreen(serviceEditOrigin);
     void dispatchBookingEventIfApi(editingEventId, "service_edited", {
       initiated_by: "professional",
     });
@@ -5384,6 +5892,7 @@ export default function ProfessionalFixedLocationCalendar({
     editingEventId,
     selectableServiceCatalog,
     serviceEditDraft,
+    serviceEditOrigin,
   ]);
 
   const toggleServiceSelectionDraft = React.useCallback(
@@ -5422,6 +5931,7 @@ export default function ProfessionalFixedLocationCalendar({
               buildServiceEditDraftFromCatalog(catalogService, { override }),
             );
           }
+          const existing = currentById.get(id);
           return {
             id: catalogService.id,
             name: catalogService.name,
@@ -5429,13 +5939,89 @@ export default function ProfessionalFixedLocationCalendar({
             durationMins: catalogService.durationMins,
             startTime: selectedSlot?.start,
             endTime: selectedSlot?.end,
-            // Do not auto-assign calendar column as client-selected staff.
-            staffResourceId: undefined,
+            // Keep prior assignment if service was already on the booking.
+            staffResourceId: existing?.staffResourceId,
           } satisfies BookingServiceLineItem;
         }
         return currentById.get(id) ?? null;
       })
       .filter((service): service is BookingServiceLineItem => Boolean(service));
+
+    // Auto-assign most-available team member (client-like):
+    // Desired Location → one shared member; Fixed → per service.
+    const dateIso = selectedSlot?.date;
+    if (dateIso && data.resources.length > 0) {
+      const assignOneForAll = slotLocation === "DL";
+      const virtualBusy = new Map<string, Interval[]>();
+
+      if (assignOneForAll) {
+        const existingShared =
+          currentServices.find((service) => service.staffResourceId)
+            ?.staffResourceId ||
+          pickedServices.find((service) => service.staffResourceId)
+            ?.staffResourceId;
+        const totalDuration = Math.max(
+          1,
+          pickedServices.reduce(
+            (sum, service) => sum + (service.durationMins || 0),
+            0,
+          ),
+        );
+        const startMin = minutesSinceMidnight(
+          pickedServices.find((service) => service.startTime)?.startTime ??
+            selectedSlot?.start ??
+            "00:00",
+        );
+        const sharedId =
+          existingShared ||
+          pickMostAvailableTeamMemberId(dateIso, startMin, totalDuration);
+        for (let i = 0; i < pickedServices.length; i += 1) {
+          if (!pickedServices[i].staffResourceId) {
+            pickedServices[i] = {
+              ...pickedServices[i],
+              staffResourceId: sharedId || undefined,
+            };
+          }
+        }
+      } else {
+        let cursor = minutesSinceMidnight(
+          pickedServices.find((service) => service.startTime)?.startTime ??
+            selectedSlot?.start ??
+            "00:00",
+        );
+        for (let i = 0; i < pickedServices.length; i += 1) {
+          const service = pickedServices[i];
+          const duration = Math.max(1, service.durationMins || 0);
+          const startMin = service.startTime
+            ? minutesSinceMidnight(service.startTime)
+            : cursor;
+          if (service.staffResourceId) {
+            const memberId = service.staffResourceId;
+            const busy = virtualBusy.get(memberId) ?? [];
+            busy.push({ startMin, endMin: startMin + duration });
+            virtualBusy.set(memberId, busy);
+            cursor = startMin + duration;
+            continue;
+          }
+          const memberId = pickMostAvailableTeamMemberId(
+            dateIso,
+            startMin,
+            duration,
+            virtualBusy,
+          );
+          if (memberId) {
+            const busy = virtualBusy.get(memberId) ?? [];
+            busy.push({ startMin, endMin: startMin + duration });
+            virtualBusy.set(memberId, busy);
+          }
+          pickedServices[i] = {
+            ...service,
+            staffResourceId: memberId || undefined,
+          };
+          cursor = startMin + duration;
+        }
+      }
+    }
 
     // Always keep already-added services; only append newly selected ones.
     const mergedById = new Map<string, BookingServiceLineItem>();
@@ -5492,14 +6078,18 @@ export default function ProfessionalFixedLocationCalendar({
     setSlotSaveAttempted(false);
   }, [
     bookingGuests,
+    data.resources.length,
     originalServicesSnapshot,
+    pickMostAvailableTeamMemberId,
     selectedServices,
+    selectedSlot?.date,
     selectedSlot?.end,
     selectedSlot?.start,
     selectionTarget,
     selectableServiceCatalog,
     serviceOverridesDraft,
     serviceSelectionDraft,
+    slotLocation,
   ]);
 
   const openSelectProducts = React.useCallback(() => {
@@ -5865,41 +6455,106 @@ export default function ProfessionalFixedLocationCalendar({
   const addInlineGuest = React.useCallback(() => {
     const guestName =
       `${inlineGuestDraft.firstName.trim()} ${inlineGuestDraft.lastName.trim()}`.trim();
-    if (!guestName) {
+    const email = inlineGuestDraft.email.trim();
+    const phoneCode = inlineGuestDraft.phoneCode;
+    const phoneNumber = inlineGuestDraft.phoneNumber.trim();
+    const phoneErrors = getOptionalPhoneValidationErrors(phoneCode, phoneNumber);
+    if (phoneErrors.countryCode || phoneErrors.phone) {
       showSnackbar({
         severity: "warning",
-        message:
-          inlineGuestParticipantType === "model"
-            ? "Model name is required."
-            : "Guest name is required.",
+        message: phoneErrors.phone || phoneErrors.countryCode || "Invalid phone.",
       });
       return;
     }
+
+    if (editingInlineGuestId) {
+      setBookingGuests((prev) =>
+        prev.map((guest) => {
+          if (guest.id !== editingInlineGuestId) return guest;
+          const fallback =
+            guest.participantType === "model" ? "Model" : "Guest";
+          return {
+            ...guest,
+            name: guestName || guest.name || fallback,
+            email,
+            phoneCode,
+            phoneNumber,
+          };
+        }),
+      );
+      setInlineGuestDraft(emptyInlineGuestDraft);
+      setEditingInlineGuestId(null);
+      setInlineGuestParticipantType("guest");
+      setShowInlineGuestField(false);
+      return;
+    }
+
     const modelCount =
       bookingGuests.filter((g) => g.participantType === "model").length + 1;
+    const guestCount =
+      bookingGuests.filter((g) => (g.participantType ?? "guest") === "guest")
+        .length + 1;
+    const fallbackName =
+      inlineGuestParticipantType === "model"
+        ? `Model ${modelCount}`
+        : `Guest ${guestCount}`;
     setBookingGuests((prev) => [
       ...prev,
       {
         id: `guest-${Date.now()}`,
-        name:
-          inlineGuestParticipantType === "model" && !guestName
-            ? `Model ${modelCount}`
-            : guestName,
+        name: guestName || fallbackName,
+        email,
+        phoneCode,
+        phoneNumber,
         services: [],
         products: [],
         participantType: inlineGuestParticipantType,
       },
     ]);
-    setInlineGuestDraft({ firstName: "", lastName: "" });
+    setInlineGuestDraft(emptyInlineGuestDraft);
+    setEditingInlineGuestId(null);
     setInlineGuestParticipantType("guest");
     setShowInlineGuestField(false);
   }, [
     bookingGuests,
+    editingInlineGuestId,
+    emptyInlineGuestDraft,
+    inlineGuestDraft.email,
     inlineGuestDraft.firstName,
     inlineGuestDraft.lastName,
+    inlineGuestDraft.phoneCode,
+    inlineGuestDraft.phoneNumber,
     inlineGuestParticipantType,
     showSnackbar,
   ]);
+
+  const beginEditInlineGuest = React.useCallback(
+    (guest: {
+      id: string;
+      name: string;
+      email?: string;
+      phoneCode?: string;
+      phoneNumber?: string;
+      participantType?: string;
+    }) => {
+      const parts = guest.name.trim().split(/\s+/);
+      const firstName = parts[0] || "";
+      const lastName = parts.slice(1).join(" ");
+      setInlineGuestDraft({
+        firstName,
+        lastName,
+        email: guest.email ?? "",
+        phoneCode: guest.phoneCode ?? "",
+        phoneNumber: guest.phoneNumber ?? "",
+      });
+      setEditingInlineGuestId(guest.id);
+      setInlineGuestParticipantType(
+        guest.participantType === "model" ? "model" : "guest",
+      );
+      setShowInlineGuestField(true);
+    },
+    [],
+  );
 
   const addDlParticipant = React.useCallback(
     (kind: "planning" | "buffer") => {
@@ -5990,7 +6645,12 @@ export default function ProfessionalFixedLocationCalendar({
   );
 
   const onEmptyClick = React.useCallback(
-    (resourceId: string, iso: string, minutes: number) => {
+    (
+      resourceId: string,
+      iso: string,
+      minutes: number,
+      anchor: { top: number; left: number },
+    ) => {
       if (iso < todayIso) {
         showSnackbar({
           severity: "info",
@@ -6028,7 +6688,7 @@ export default function ProfessionalFixedLocationCalendar({
       );
       const end = Math.min(segment.endMin, start + grid.stepMinutes);
 
-      const payload = {
+      const payload: SelectedSlot = {
         resourceId,
         date: iso,
         start: fmtMinToTime(start),
@@ -6036,17 +6696,44 @@ export default function ProfessionalFixedLocationCalendar({
         freeStart: fmtMinToTime(segment.startMin),
         freeEnd: fmtMinToTime(segment.endMin),
       };
-      // Timeline slot click: copy that 15-min start, hide Select time.
-      openBookingDrawer(payload, { allowTimeSelection: false });
+      // Timeline slot click: show Booking / Blocked time on-screen menu.
+      setPendingSlotPayload(payload);
+      setSlotAddAnchor(anchor);
     },
     [
       getAvailabilityFor,
       getBusyFor,
       grid.stepMinutes,
-      openBookingDrawer,
       showSnackbar,
       todayIso,
     ],
+  );
+
+  const handleSlotAddContinue = React.useCallback(
+    (action: CalendarSlotAddAction) => {
+      const payload = pendingSlotPayload;
+      setSlotAddAnchor(null);
+      setPendingSlotPayload(null);
+      if (!payload) return;
+
+      if (action === "booking") {
+        openBookingDrawer(payload, { allowTimeSelection: false });
+        return;
+      }
+
+      const draft = createEmptyBlockTimeDraft(
+        [payload.resourceId],
+        data.supportedLocations,
+        payload.date,
+      );
+      setBlockDraft({
+        ...draft,
+        startTime: payload.start.slice(0, 5),
+        endTime: payload.end.slice(0, 5),
+      });
+      setBlockTimeOpen(true);
+    },
+    [data.supportedLocations, openBookingDrawer, pendingSlotPayload],
   );
 
   const persistBookingFromDrawer =
@@ -6076,8 +6763,15 @@ export default function ProfessionalFixedLocationCalendar({
           paymentMethod,
           showLateCancellation,
           lateCancellationFeePercent,
+          lateCancellationFeePercentCeiling,
           showLateRescheduling,
           lateRescheduleFeePercent,
+          lateRescheduleFeePercentCeiling,
+          showNoShowFee,
+          noShowFeePercent,
+          noShowFeePercentCeiling,
+          cancellationFeeAt,
+          exceededCancellationWindow,
           showInternalNote,
           bookingInternalNote,
           bookingTotalDiscount,
@@ -6260,11 +6954,72 @@ export default function ProfessionalFixedLocationCalendar({
         return true;
       }
 
-      const title =
-        selectedServices[0]?.name ??
-        selectedProducts[0]?.name ??
-        bookingUniqueItems[0]?.name ??
-        "Booking";
+      const title = buildMultiServiceBookingTitle(
+        [
+          ...selectedServices.map((service) => service.name),
+          ...bookingGuests.flatMap((guest) =>
+            guest.services.map((service) => service.name),
+          ),
+        ],
+        "Booking",
+      );
+
+      if (!staffConflictAckRef.current) {
+        const slotStart = selectedSlot.start.slice(0, 5);
+        const slotEnd = selectedSlot.end.slice(0, 5);
+        const staffIntervals: StaffServiceInterval[] = [
+          ...selectedServices.map((service) => ({
+            id: service.id,
+            name: service.name,
+            staffId: service.staffResourceId || selectedSlot.resourceId,
+            start: (service.startTime || slotStart).slice(0, 5),
+            end: (service.endTime || slotEnd).slice(0, 5),
+          })),
+          ...bookingGuests.flatMap((guest) =>
+            guest.services.map((service) => ({
+              id: `${guest.id}-${service.id}`,
+              name: service.name,
+              staffId: service.staffResourceId || selectedSlot.resourceId,
+              start: (service.startTime || slotStart).slice(0, 5),
+              end: (service.endTime || slotEnd).slice(0, 5),
+            })),
+          ),
+        ];
+        const internalOverlaps =
+          findInternalStaffServiceOverlaps(staffIntervals);
+        const externalOverlaps = findExternalStaffBookingOverlaps({
+          bookingId: editingEventId,
+          date: selectedSlot.date,
+          services: staffIntervals,
+          events,
+        });
+        if (internalOverlaps.length || externalOverlaps.length) {
+          const parts: string[] = [];
+          if (internalOverlaps.length) {
+            parts.push(
+              `Same team member has overlapping services (${internalOverlaps
+                .map(({ a, b }) => `${a.name} & ${b.name}`)
+                .join(", ")})`,
+            );
+          }
+          if (externalOverlaps.length) {
+            parts.push(
+              `Overlaps another booking (${externalOverlaps
+                .map(({ service, event }) => `${service.name} / ${event.title}`)
+                .slice(0, 3)
+                .join(", ")})`,
+            );
+          }
+          setStaffConflictMessage(
+            `${parts.join(". ")}. You can still save this booking.`,
+          );
+          setStaffConflictOpen(true);
+          return false;
+        }
+      } else {
+        staffConflictAckRef.current = false;
+      }
+
       const clientName =
         selectedClient?.name?.trim() ||
         `${guestDraft.firstName} ${guestDraft.lastName}`.trim() ||
@@ -6314,8 +7069,15 @@ export default function ProfessionalFixedLocationCalendar({
           paymentMethod,
           showLateCancellation,
           lateCancellationFeePercent,
+          lateCancellationFeePercentCeiling,
           showLateRescheduling,
           lateRescheduleFeePercent,
+          lateRescheduleFeePercentCeiling,
+          showNoShowFee,
+          noShowFeePercent,
+          noShowFeePercentCeiling,
+          cancellationFeeAt,
+          exceededCancellationWindow,
           showInternalNote,
           bookingInternalNote,
           bookingTotalDiscount,
@@ -6348,8 +7110,10 @@ export default function ProfessionalFixedLocationCalendar({
         ...(showPrepayment
           ? {
               prepaymentStatus:
-                existingEvent?.details?.prepaymentStatus ??
-                ("pending" as const),
+                paymentMethod === "offline"
+                  ? ("confirmed" as const)
+                  : (existingEvent?.details?.prepaymentStatus ??
+                    ("pending" as const)),
             }
           : {}),
       };
@@ -6495,6 +7259,9 @@ export default function ProfessionalFixedLocationCalendar({
               return {
                 id: guest.id,
                 name: guest.name,
+                email: guest.email,
+                phoneCode: guest.phoneCode,
+                phoneNumber: guest.phoneNumber,
                 isRequester: false as const,
                 participantType:
                   guest.participantType ??
@@ -6614,6 +7381,12 @@ export default function ProfessionalFixedLocationCalendar({
         ) {
           details.silentUpdated = true;
           details.lastEditedBy = "professional";
+          details.silentUpdateSnapshot = {
+            phoneCode: existingEvent.details?.phoneCode,
+            phoneNumber: existingEvent.details?.phoneNumber,
+            guests: existingEvent.details?.guests,
+            desiredLocation: existingEvent.details?.desiredLocation,
+          };
         } else if (existingEvent.status === "Confirmed") {
           details.lastEditedBy = "professional";
         } else if (editedIds.length || editedProductIds.length) {
@@ -6847,6 +7620,26 @@ export default function ProfessionalFixedLocationCalendar({
           setEditingEventId(nextEvent.id);
           setSlotStatus(nextEvent.status);
           setIsEditingExisting(false);
+
+          if (
+            addClientSource === "mollure-platform" ||
+            addClientSource === "non-mollure"
+          ) {
+            const identity = {
+              name: selectedClient?.name,
+              email: selectedClient?.email,
+              customerId: selectedClient?.mollureUserId,
+              clientKind: selectedClient?.clientKind,
+              phone: [bookingPhoneDraft.phoneCode, bookingPhoneDraft.phoneNumber]
+                .map((part) => String(part ?? "").trim())
+                .filter(Boolean)
+                .join(" "),
+            };
+            if (!findListedClient(identity)) {
+              void addIdentityToClientList(identity, { silent: true });
+            }
+          }
+
           showSnackbar({
             severity: "success",
             message: isOfflineManualBooking
@@ -6905,6 +7698,7 @@ export default function ProfessionalFixedLocationCalendar({
       incomingRequestEditMode,
       kilometerAllowanceDraft,
       lateCancellationFeePercent,
+      lateCancellationFeePercentCeiling,
       nonMollureDraft.firstName,
       nonMollureDraft.lastName,
       onCreateCalendarEntry,
@@ -6928,6 +7722,12 @@ export default function ProfessionalFixedLocationCalendar({
       showLateCancellation,
       showLateRescheduling,
       lateRescheduleFeePercent,
+      lateRescheduleFeePercentCeiling,
+      showNoShowFee,
+      noShowFeePercent,
+      noShowFeePercentCeiling,
+      cancellationFeeAt,
+      exceededCancellationWindow,
       showPrepayment,
       showSnackbar,
       slotBookingType,
@@ -6935,6 +7735,10 @@ export default function ProfessionalFixedLocationCalendar({
       slotStatus,
       canUseBookingProject,
       resourceNameById,
+      addIdentityToClientList,
+      findListedClient,
+      bookingPhoneDraft.phoneCode,
+      bookingPhoneDraft.phoneNumber,
     ]);
 
   return (
@@ -7196,7 +8000,12 @@ export default function ProfessionalFixedLocationCalendar({
                     { allowTimeSelection: true },
                   );
                 }}
-                onPublicBusinessHours={() => setPublicBusinessHoursOpen(true)}
+                onPublicBusinessHours={() => {
+                  setPublicBusinessHoursDraft(
+                    createEmptyPublicBusinessHoursDraft("FL"),
+                  );
+                  setPublicBusinessHoursOpen(true);
+                }}
                 onDesign={() => {
                   setDesignDraft(appliedDesign);
                   setDesignOpen(true);
@@ -8011,6 +8820,7 @@ export default function ProfessionalFixedLocationCalendar({
                                           resource.id,
                                           date,
                                           minutes,
+                                          { top: e.clientY, left: e.clientX },
                                         );
                                       }}
                                       onMouseMove={(e) => {
@@ -8449,6 +9259,7 @@ export default function ProfessionalFixedLocationCalendar({
           serviceOrder={serviceOrderDraft}
           appliedDesign={appliedDesign}
           categoryOptions={categoryOptions}
+          templateCategoryRows={templateCategoryRows}
           isSaving={isSaving}
           onBookingRulesChange={setBookingRules}
           onServiceOrderChange={setServiceOrderDraft}
@@ -8457,18 +9268,26 @@ export default function ProfessionalFixedLocationCalendar({
             setDesignOpen(true);
           }}
           onOpenPublicHours={(location) => {
-            if (location) {
-              setPublicBusinessHoursDraft((prev) => ({
-                ...prev,
-                locations: [location],
-                schedule: location === "FL" ? "fixed" : "variable",
-              }));
+            const existing = Array.isArray(
+              calendarSettings?.availability.publicBusinessHours,
+            )
+              ? calendarSettings.availability.publicBusinessHours
+              : [];
+            if (location === "FL" || location === "DL") {
+              setPublicBusinessHoursDraft(
+                draftFromPublicBusinessHoursEntries(existing, location),
+              );
+            } else {
+              setPublicBusinessHoursDraft(createEmptyPublicBusinessHoursDraft());
             }
             setPublicBusinessHoursOpen(true);
           }}
-          onOpenServiceOrder={() => setServiceOrderOpen(true)}
-          onSaveBookingRules={async () => {
-            await persistAvailabilitySettings({ bookingRules });
+          onSaveBookingRules={async (next) => {
+            const rules = withClampedDesiredLocationInterval(
+              next ?? bookingRules,
+            );
+            setBookingRules(rules);
+            await persistAvailabilitySettings({ bookingRules: rules });
             showSnackbar({
               severity: "success",
               message: "Booking rules saved.",
@@ -8498,7 +9317,10 @@ export default function ProfessionalFixedLocationCalendar({
           activityDetailItem
             ? activityDetailItem.detailType === "cancellation"
               ? "Activity Details"
-              : "Edit request details"
+              : activityDetailItem.detailType === "comparison" ||
+                  activityDetailItem.comparison
+                ? "Comparison"
+                : "Edit request details"
             : slotBookingScreen === "select-services"
               ? "Select Service"
               : slotBookingScreen === "edit-service"
@@ -8539,18 +9361,113 @@ export default function ProfessionalFixedLocationCalendar({
                         ? "new-booking"
                         : "select-products"
                       : slotBookingScreen === "edit-service"
-                        ? "select-services"
+                        ? serviceEditOrigin
                         : "new-booking",
                   )
               : undefined
         }
         footer={
           selectedSlot && slotDrawerTab === "booking" && !activityDetailItem ? (
-            <Box sx={{ px: 2.5, py: 2 }}>
+            <Box
+              sx={{
+                px: 2.5,
+                pt: 1.25,
+                pb: 2,
+                borderTop: `1px solid ${alpha(m.navy, 0.08)}`,
+                bgcolor: "#fff",
+              }}
+            >
+              {slotBookingScreen === "new-booking" && slotClientAdded ? (
+                <Box sx={{ mb: 1.25 }}>
+                  {(() => {
+                    if (!selectedSlot || isViewingExisting) return null;
+                    const slotStart = selectedSlot.start.slice(0, 5);
+                    const slotEnd = selectedSlot.end.slice(0, 5);
+                    const staffIntervals: StaffServiceInterval[] = [
+                      ...selectedServices.map((service) => ({
+                        id: service.id,
+                        name: service.name,
+                        staffId:
+                          service.staffResourceId || selectedSlot.resourceId,
+                        start: (service.startTime || slotStart).slice(0, 5),
+                        end: (service.endTime || slotEnd).slice(0, 5),
+                      })),
+                      ...bookingGuests.flatMap((guest) =>
+                        guest.services.map((service) => ({
+                          id: `${guest.id}-${service.id}`,
+                          name: service.name,
+                          staffId:
+                            service.staffResourceId || selectedSlot.resourceId,
+                          start: (service.startTime || slotStart).slice(0, 5),
+                          end: (service.endTime || slotEnd).slice(0, 5),
+                        })),
+                      ),
+                    ];
+                    const hasInternal =
+                      findInternalStaffServiceOverlaps(staffIntervals).length >
+                      0;
+                    const hasExternal =
+                      findExternalStaffBookingOverlaps({
+                        bookingId: editingEventId,
+                        date: selectedSlot.date,
+                        services: staffIntervals,
+                        events,
+                      }).length > 0;
+                    if (!hasInternal && !hasExternal) return null;
+                    return (
+                      <Box
+                        sx={{
+                          mb: 1,
+                          px: 1.25,
+                          py: 1,
+                          borderRadius: "10px",
+                          bgcolor: alpha(m.statusOrangeFg, 0.1),
+                          border: `1px solid ${alpha(m.statusOrangeFg, 0.28)}`,
+                        }}
+                      >
+                        <BodyText
+                          sx={{
+                            fontSize: 12,
+                            fontWeight: 800,
+                            color: m.statusOrangeFg,
+                            lineHeight: 1.35,
+                          }}
+                        >
+                          Overlapping staff time detected. You can still save —
+                          you will be asked to confirm.
+                        </BodyText>
+                      </Box>
+                    );
+                  })()}
+                  <BookingDrawerParticipantActions
+                    kinds={drawerParticipantKinds}
+                    nameFieldOpen={
+                      showInlineGuestField && !editingInlineGuestId
+                    }
+                    onAddGuest={() => {
+                      setInlineGuestParticipantType("guest");
+                      setEditingInlineGuestId(null);
+                      setInlineGuestDraft(emptyInlineGuestDraft);
+                      setShowInlineGuestField(true);
+                    }}
+                    onAddModel={() => {
+                      setInlineGuestParticipantType("model");
+                      setEditingInlineGuestId(null);
+                      setInlineGuestDraft(emptyInlineGuestDraft);
+                      setShowInlineGuestField(true);
+                    }}
+                    onAddPlanning={() => {
+                      addDlParticipant("planning");
+                    }}
+                    onAddBuffer={() => {
+                      addDlParticipant("buffer");
+                    }}
+                  />
+                </Box>
+              ) : null}
               <Stack direction="row" alignItems="center" spacing={1.25}>
-                {slotBookingScreen === "new-booking" &&
-                slotClientAdded &&
-                !isViewingExisting ? (
+                {(slotBookingScreen === "new-booking" || isViewingExisting) &&
+                slotClientAdded ? (
                   <IconButton
                     size="small"
                     onClick={(e) => setBookingMoreAnchor(e.currentTarget)}
@@ -8562,6 +9479,7 @@ export default function ProfessionalFixedLocationCalendar({
                       color: alpha(m.navy, 0.68),
                       bgcolor: "#fff",
                     }}
+                    aria-label="Group add-ons"
                   >
                     <MoreVertRoundedIcon sx={{ fontSize: 18 }} />
                   </IconButton>
@@ -8583,75 +9501,155 @@ export default function ProfessionalFixedLocationCalendar({
                   }}
                 >
                   <Stack sx={{ py: 0.5 }}>
-                    {[
-                      {
-                        label: "Add Prepayment",
-                        onClick: () => {
-                          if (isViewingExisting) return;
-                          setShowPrepayment(true);
-                          setPrepaymentPercent((prev) =>
-                            prev.trim()
-                              ? prev
-                              : (prepaymentPercentDefault ?? ""),
-                          );
-                          showSnackbar({
-                            severity: "info",
-                            message: "Prepayment enabled.",
-                          });
-                        },
-                      },
-                      ...(slotLocation === "DL"
-                        ? ([
-                            {
+                    {(
+                      [
+                        canAddPrepayment({ alreadyShown: showPrepayment })
+                          ? {
+                              label: "Add Prepayment",
+                              onClick: () => {
+                                setShowPrepayment(true);
+                                setPrepaymentPercent((prev) =>
+                                  prev.trim()
+                                    ? prev
+                                    : (prepaymentPercentDefault ?? ""),
+                                );
+                                showSnackbar({
+                                  severity: "info",
+                                  message: "Prepayment enabled.",
+                                });
+                              },
+                            }
+                          : null,
+                        !isViewingExisting &&
+                        slotLocation === "DL" &&
+                        !showKilometerAllowance
+                          ? {
                               label: "Add Kilometer Allowance",
                               onClick: () => {
-                                if (isViewingExisting) return;
                                 setShowKilometerAllowance(true);
                                 showSnackbar({
                                   severity: "info",
                                   message: "Kilometer Allowance enabled.",
                                 });
                               },
-                            },
-                          ] as const)
-                        : []),
-                      {
-                        label: "Add Discount to Total",
-                        onClick: () => {
-                          if (isViewingExisting) return;
-                          setBookingDiscountModalOpen(true);
-                        },
-                      },
-                      {
-                        label: "Add Late Cancellation",
-                        onClick: () => {
-                          if (isViewingExisting) return;
-                          setShowLateCancellation(true);
-                        },
-                      },
-                      {
-                        label: "Add Late Rescheduling",
-                        onClick: () => {
-                          if (isViewingExisting) return;
-                          setShowLateRescheduling(true);
-                          if (
-                            !lateRescheduleFeePercent &&
-                            lateRescheduleFeePercentDefault
-                          ) {
-                            setLateRescheduleFeePercent(
-                              lateRescheduleFeePercentDefault,
-                            );
-                          }
-                        },
-                      },
-                      {
-                        label: "Add Note",
-                        onClick: () => {
-                          if (isViewingExisting) return;
-                          setShowInternalNote(true);
-                        },
-                      },
-                    ].map((item) => (
+                            }
+                          : null,
+                        !isViewingExisting
+                          ? {
+                              label: "Add Discount to Total",
+                              onClick: () => {
+                                setBookingDiscountModalOpen(true);
+                              },
+                            }
+                          : null,
+                        canAddLateCancellation({
+                          policyPercent: lateCancellationFeePercentDefault,
+                          status: viewingBookingEvent?.status ?? slotStatus,
+                          cancelledServiceIds:
+                            viewingBookingEvent?.details?.cancelledServiceIds ??
+                            negotiationDetails?.cancelledServiceIds,
+                          alreadyShown: showLateCancellation,
+                        })
+                          ? {
+                              label: "Add Late Cancellation",
+                              onClick: () => {
+                                const ceiling =
+                                  lateCancellationFeePercentDefault ?? "";
+                                setShowLateCancellation(true);
+                                setLateCancellationFeePercentCeiling(ceiling);
+                                setLateCancellationFeePercent((prev) =>
+                                  prev.trim() ? prev : ceiling,
+                                );
+                                const nowIso = new Date().toISOString();
+                                setCancellationFeeAt(nowIso);
+                                const startMs = viewingBookingEvent
+                                  ? Date.parse(
+                                      `${viewingBookingEvent.date}T${viewingBookingEvent.start}:00`,
+                                    )
+                                  : selectedSlot
+                                    ? Date.parse(
+                                        `${selectedSlot.date}T${selectedSlot.start}:00`,
+                                      )
+                                    : NaN;
+                                setExceededCancellationWindow(
+                                  isLateCancellation({
+                                    appointmentStartMs: startMs,
+                                    noticeHours: cancellationBeforeHours,
+                                    noticeMinutes: cancellationBeforeMinutes,
+                                  }),
+                                );
+                                showSnackbar({
+                                  severity: "info",
+                                  message: "Late cancellation fee enabled.",
+                                });
+                              },
+                            }
+                          : null,
+                        canAddLateRescheduling({
+                          policyPercent: lateRescheduleFeePercentDefault,
+                          scheduleEdited: Boolean(
+                            viewingBookingEvent?.details?.scheduleEdited,
+                          ),
+                          alreadyShown: showLateRescheduling,
+                        })
+                          ? {
+                              label: "Add Late Rescheduling",
+                              onClick: () => {
+                                const ceiling =
+                                  lateRescheduleFeePercentDefault ?? "";
+                                setShowLateRescheduling(true);
+                                setLateRescheduleFeePercentCeiling(ceiling);
+                                setLateRescheduleFeePercent((prev) =>
+                                  prev.trim() ? prev : ceiling,
+                                );
+                                showSnackbar({
+                                  severity: "info",
+                                  message: "Late rescheduling fee enabled.",
+                                });
+                              },
+                            }
+                          : null,
+                        canAddNoShowFee({
+                          policyPercent: noShowFeePercentDefault,
+                          status: viewingBookingEvent?.status ?? slotStatus,
+                          alreadyShown: showNoShowFee,
+                        })
+                          ? {
+                              label: "Add No-Show Fee",
+                              onClick: () => {
+                                const ceiling = noShowFeePercentDefault ?? "";
+                                setShowNoShowFee(true);
+                                setNoShowFeePercentCeiling(ceiling);
+                                setNoShowFeePercent((prev) =>
+                                  prev.trim() ? prev : ceiling,
+                                );
+                                showSnackbar({
+                                  severity: "info",
+                                  message: "No-show fee enabled.",
+                                });
+                              },
+                            }
+                          : null,
+                        !showInternalNote
+                          ? {
+                              label: "Add Note",
+                              onClick: () => {
+                                setShowInternalNote(true);
+                              },
+                            }
+                          : null,
+                      ] as Array<{
+                        label: string;
+                        onClick: () => void;
+                      } | null>
+                    )
+                      .filter(
+                        (
+                          item,
+                        ): item is { label: string; onClick: () => void } =>
+                          Boolean(item),
+                      )
+                      .map((item) => (
                       <Box
                         key={item.label}
                         role="button"
@@ -8696,7 +9694,7 @@ export default function ProfessionalFixedLocationCalendar({
                         return;
                       }
                       if (slotBookingScreen === "edit-service") {
-                        setSlotBookingScreen("select-services");
+                        setSlotBookingScreen(serviceEditOrigin);
                         return;
                       }
                       if (
@@ -8847,6 +9845,7 @@ export default function ProfessionalFixedLocationCalendar({
                             phoneCode: nonMollureDraft.phoneCode,
                             phoneNumber: nonMollureDraft.phoneNumber,
                           });
+                          setPaymentMethod("online");
                           setSlotClientAdded(true);
                           showSnackbar({
                             severity: "success",
@@ -8862,7 +9861,7 @@ export default function ProfessionalFixedLocationCalendar({
                             name:
                               `${guestDraft.firstName} ${guestDraft.lastName}`.trim() ||
                               "Guest",
-                            email: "",
+                            email: guestDraft.email.trim(),
                             mollureUserId: null,
                             clientKind: "individual",
                           });
@@ -8870,6 +9869,7 @@ export default function ProfessionalFixedLocationCalendar({
                             phoneCode: guestDraft.phoneCode,
                             phoneNumber: guestDraft.phoneNumber,
                           });
+                          setPaymentMethod("offline");
                           setSlotClientAdded(true);
                           showSnackbar({
                             severity: "success",
@@ -9004,7 +10004,7 @@ export default function ProfessionalFixedLocationCalendar({
                         ? editServiceStartTimeSlots
                         : undefined
                     }
-                    showStaffAssign={!editServiceStaffLocked}
+                    showStaffAssign={!isViewingExisting || incomingRequestEditMode}
                   />
                 ) : slotBookingScreen === "select-products" ? (
                   <BookingSelectProductsScreen
@@ -9256,12 +10256,17 @@ export default function ProfessionalFixedLocationCalendar({
                                   c.countryCode,
                                 ),
                               );
+                              setPaymentMethod("online");
                               setAddClientSource("client-list");
                               setSlotClientAdded(true);
                               setSlotBookingScreen("new-booking");
                             }}
                             options={clientList.map((c) => ({
-                              label: c.name,
+                              label: bookingClientOptionLabel({
+                                name: c.name,
+                                isMollure: Boolean(c.mollureUserId),
+                                clientKind: c.clientKind,
+                              }),
                               value: c.email,
                             }))}
                             fullWidth
@@ -9325,6 +10330,7 @@ export default function ProfessionalFixedLocationCalendar({
                                     );
                                   }
                                   setAddClientSource("mollure-platform");
+                                  setPaymentMethod("online");
                                   setSlotClientAdded(true);
                                   setPlatformEmailInput("");
                                   setSlotBookingScreen("new-booking");
@@ -9354,16 +10360,40 @@ export default function ProfessionalFixedLocationCalendar({
                                     .toUpperCase()}
                                 </Avatar>
                                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                                  <BodyText
-                                    sx={{
-                                      fontSize: 12.5,
-                                      fontWeight: 900,
-                                      color: alpha(m.navy, 0.78),
-                                      lineHeight: 1.2,
-                                    }}
+                                  <Stack
+                                    direction="row"
+                                    alignItems="center"
+                                    spacing={0.75}
+                                    sx={{ minWidth: 0 }}
                                   >
-                                    {platformEmailMatch.name}
-                                  </BodyText>
+                                    <BodyText
+                                      sx={{
+                                        fontSize: 12.5,
+                                        fontWeight: 900,
+                                        color: alpha(m.navy, 0.78),
+                                        lineHeight: 1.2,
+                                      }}
+                                    >
+                                      {platformEmailMatch.name}
+                                    </BodyText>
+                                    <BookingClientTags
+                                      isMollure
+                                      clientKind={
+                                        platformEmailMatch.userType ===
+                                          "company" ||
+                                        clientList.find(
+                                          (x) =>
+                                            x.email.toLowerCase() ===
+                                              platformEmailMatch.email.toLowerCase() ||
+                                            (platformEmailMatch.id &&
+                                              x.mollureUserId ===
+                                                platformEmailMatch.id),
+                                        )?.clientKind === "company"
+                                          ? "company"
+                                          : "individual"
+                                      }
+                                    />
+                                  </Stack>
                                   <BodyText
                                     sx={{
                                       fontSize: 11.5,
@@ -9900,7 +10930,7 @@ export default function ProfessionalFixedLocationCalendar({
                       />
                       <AppTextField
                         label="Last Name"
-                        placeholder="Enter last name"
+                        placeholder="Enter last name (optional)"
                         value={guestDraft.lastName}
                         onChange={(e) =>
                           setGuestDraft((p) => ({
@@ -9935,9 +10965,9 @@ export default function ProfessionalFixedLocationCalendar({
                       }
                       countryCodeError={slotErrors.guestPhoneCode}
                       phoneError={slotErrors.guestPhoneNumber}
-                      label="Contact Number (optional)"
+                      label="Contact Number"
                       phonePlaceholder="Phone number"
-                      required={false}
+                      required
                     />
 
                     <Box sx={{ flex: 1, minHeight: 200 }} />
@@ -10013,19 +11043,18 @@ export default function ProfessionalFixedLocationCalendar({
                                 }}
                               >
                                 {(() => {
-                                  const refundApplicable = isRefundApplicable({
-                                    status: viewingBookingEvent.status,
-                                    prepaid:
-                                      viewingBookingEvent.details
-                                        ?.prepaymentStatus === "confirmed",
-                                    prepaymentStatus:
-                                      viewingBookingEvent.details
-                                        ?.prepaymentStatus,
-                                  });
+                                  const protectiveFeeCheckoutApplicable =
+                                    canCheckoutProtectiveFee({
+                                      status: viewingBookingEvent.status,
+                                      showLateCancellation,
+                                      lateCancellationFeeAmount,
+                                      showNoShowFee,
+                                      noShowFeeAmount,
+                                    });
                                   const actions =
                                     resolveProfessionalBookingActions(
                                       viewingBookingEvent,
-                                      { refundApplicable },
+                                      { protectiveFeeCheckoutApplicable },
                                     );
                                   const itemSx = {
                                     fontWeight: 800,
@@ -10093,6 +11122,12 @@ export default function ProfessionalFixedLocationCalendar({
                                     );
                                   }
                                   if (actions.checkout) {
+                                    const checkoutLabel =
+                                      viewingBookingEvent.status ===
+                                        "Cancelled" ||
+                                      viewingBookingEvent.status === "No Show"
+                                        ? "Send fee checkout"
+                                        : "Checkout";
                                     items.push(
                                       <MenuItem
                                         key="checkout"
@@ -10103,7 +11138,7 @@ export default function ProfessionalFixedLocationCalendar({
                                         }
                                         sx={itemSx}
                                       >
-                                        Checkout
+                                        {checkoutLabel}
                                       </MenuItem>,
                                     );
                                   }
@@ -10119,31 +11154,6 @@ export default function ProfessionalFixedLocationCalendar({
                                         sx={itemSx}
                                       >
                                         Rebook
-                                      </MenuItem>,
-                                    );
-                                  }
-                                  if (actions.refund) {
-                                    items.push(
-                                      <MenuItem
-                                        key="refund"
-                                        onClick={() =>
-                                          void handleBookingActionSelect(
-                                            "refund",
-                                          )
-                                        }
-                                        sx={itemSx}
-                                      >
-                                        <Stack
-                                          direction="row"
-                                          alignItems="center"
-                                          spacing={0.75}
-                                        >
-                                          <BookingGuidelineIcon
-                                            variant="refund_completed"
-                                            size={14}
-                                          />
-                                          <span>Refund</span>
-                                        </Stack>
                                       </MenuItem>,
                                     );
                                   }
@@ -10309,6 +11319,37 @@ export default function ProfessionalFixedLocationCalendar({
                                   ),
                                 }}
                               />
+                              {viewingBookingEvent.details?.silentUpdated &&
+                              viewingBookingEvent.bookingScenario !== "EBR" &&
+                              viewingBookingEvent.bookingScenario !== "ER" ? (
+                                <Tooltip
+                                  title={ACTIVITY_COMPARISON_SIGNPOST}
+                                  placement="top"
+                                >
+                                  <Chip
+                                    size="small"
+                                    label="Updated"
+                                    onClick={() =>
+                                      openActivityComparison("silent_updated")
+                                    }
+                                    sx={{
+                                      height: 18,
+                                      fontSize: 9,
+                                      fontWeight: 800,
+                                      borderRadius: "6px",
+                                      border: `1px solid ${alpha(m.teal, 0.4)}`,
+                                      bgcolor: alpha(m.teal, 0.12),
+                                      color: m.teal,
+                                      cursor: "pointer",
+                                      "& .MuiChip-label": {
+                                        px: 0.7,
+                                        py: 0,
+                                        lineHeight: 1.2,
+                                      },
+                                    }}
+                                  />
+                                </Tooltip>
+                              ) : null}
                               {getBookingScenarioIndicators(
                                 viewingBookingEvent,
                               )
@@ -10333,15 +11374,31 @@ export default function ProfessionalFixedLocationCalendar({
                                           (item) => item === "overdue_response",
                                         )
                                       : [];
+                                const comparisonSignpost =
+                                  indicator === "EBR" || indicator === "ER";
 
                                 return (
                                   <Tooltip
                                     key={indicator}
-                                    title={BOOKING_SCENARIO_LABELS[indicator]}
+                                    title={
+                                      comparisonSignpost
+                                        ? ACTIVITY_COMPARISON_SIGNPOST
+                                        : BOOKING_SCENARIO_LABELS[indicator]
+                                    }
                                     placement="top"
                                   >
                                     <Chip
                                       size="small"
+                                      onClick={
+                                        comparisonSignpost
+                                          ? () =>
+                                              openActivityComparison(
+                                                indicator === "ER"
+                                                  ? "er"
+                                                  : "ebr",
+                                              )
+                                          : undefined
+                                      }
                                       label={
                                         <Stack
                                           direction="row"
@@ -10418,6 +11475,9 @@ export default function ProfessionalFixedLocationCalendar({
                                         bgcolor: alpha(m.navy, 0.06),
                                         color: alpha(m.navy, 0.62),
                                         border: `1px solid ${alpha(m.navy, 0.14)}`,
+                                        cursor: comparisonSignpost
+                                          ? "pointer"
+                                          : "default",
                                         "& .MuiChip-label": { px: 0.85 },
                                       }}
                                     />
@@ -10832,63 +11892,19 @@ export default function ProfessionalFixedLocationCalendar({
                           >
                             Select time
                           </BodyText>
-                          {drawerAvailableTimeSlots.length ? (
-                            <Box
-                              sx={{
-                                display: "grid",
-                                gridTemplateColumns:
-                                  "repeat(4, minmax(0, 1fr))",
-                                gap: 0.75,
-                                maxHeight: 168,
-                                overflowY: "auto",
-                                pr: 0.25,
-                              }}
-                            >
-                              {drawerAvailableTimeSlots.map(
-                                ({ time, disabled }) => {
-                                  const active =
-                                    !disabled &&
-                                    selectedSlot?.start?.slice(0, 5) === time;
-                                  return (
-                                    <ButtonBase
-                                      key={time}
-                                      disabled={disabled}
-                                      onClick={() => {
-                                        if (disabled) return;
-                                        applyDrawerTimeSlot(time);
-                                      }}
-                                      sx={{
-                                        height: 32,
-                                        borderRadius: "8px",
-                                        border: `1px solid ${active ? m.teal : alpha(m.navy, 0.12)}`,
-                                        bgcolor: active ? m.teal : "#fff",
-                                        color: disabled
-                                          ? alpha(m.navy, 0.32)
-                                          : active
-                                            ? "#fff"
-                                            : alpha(m.navy, 0.72),
-                                        fontSize: 11.5,
-                                        fontWeight: 800,
-                                        opacity: disabled ? 0.55 : 1,
-                                        cursor: disabled
-                                          ? "default"
-                                          : "pointer",
-                                        "&:hover": disabled
-                                          ? undefined
-                                          : {
-                                              bgcolor: active
-                                                ? m.tealDark
-                                                : alpha(m.teal, 0.08),
-                                              borderColor: m.teal,
-                                            },
-                                      }}
-                                    >
-                                      {time}
-                                    </ButtonBase>
-                                  );
-                                },
-                              )}
-                            </Box>
+                          {drawerSelectableTimes.length ? (
+                            <AppTimePanel
+                              compact
+                              hideHeader
+                              value={
+                                selectedSlot?.start?.slice(0, 5) ||
+                                drawerSelectableTimes[0] ||
+                                "09:00"
+                              }
+                              onChange={applyDrawerTimeSlot}
+                              minuteStep={grid.stepMinutes}
+                              allowedTimes={drawerSelectableTimes}
+                            />
                           ) : (
                             <BodyText
                               sx={{
@@ -11232,8 +12248,27 @@ export default function ProfessionalFixedLocationCalendar({
                                       {selectedClient?.name ?? "Client"}
                                     </BodyText>
                                   </ButtonBase>
-                                  {isSelectedCompanyClient ? (
-                                    <CompanyClientTag variant="dot" />
+                                  {isSelectedCompanyClient ||
+                                  Boolean(selectedClient?.mollureUserId) ||
+                                  addClientSource === "mollure-platform" ? (
+                                    <BookingClientTags
+                                      isMollure={
+                                        Boolean(selectedClient?.mollureUserId) ||
+                                        addClientSource === "mollure-platform"
+                                      }
+                                      clientKind={selectedClient?.clientKind}
+                                      showType={
+                                        isSelectedCompanyClient ||
+                                        selectedClient?.clientKind ===
+                                          "individual"
+                                      }
+                                    />
+                                  ) : selectedClient &&
+                                    addClientSource !== "guest" ? (
+                                    <BookingClientTags
+                                      isMollure={false}
+                                      clientKind={selectedClient.clientKind}
+                                    />
                                   ) : null}
                                 </Stack>
                                 <BodyText
@@ -11365,18 +12400,22 @@ export default function ProfessionalFixedLocationCalendar({
                                   prev.filter((item) => item.id !== itemId),
                                 );
                               }}
+                              onEditService={
+                                !isViewingExisting || incomingRequestEditMode
+                                  ? (service) =>
+                                      openEditServiceFromLineItem(
+                                        service,
+                                        "client",
+                                      )
+                                  : undefined
+                              }
                               onServiceClick={
                                 incomingRequestEditMode
                                   ? (service) => {
-                                      const catalogService =
-                                        selectableServiceCatalog.find(
-                                          (item) => item.id === service.id,
-                                        ) ??
-                                        selectableServiceCatalog.find(
-                                          (item) => item.name === service.name,
-                                        );
-                                      if (catalogService)
-                                        openEditService(catalogService);
+                                      openEditServiceFromLineItem(
+                                        service,
+                                        "client",
+                                      );
                                     }
                                   : undefined
                               }
@@ -11792,7 +12831,49 @@ export default function ProfessionalFixedLocationCalendar({
                                       </BodyText>
                                     </Stack>
                                   )}
-                                  {showClientRemoveButton ? (
+                                  {showClientRemoveButton &&
+                                  (participantKind === "guest" ||
+                                    participantKind === "model") ? (
+                                    <Stack direction="row" spacing={0.25}>
+                                      <IconButton
+                                        size="small"
+                                        onClick={() =>
+                                          beginEditInlineGuest(guest)
+                                        }
+                                        sx={{ color: alpha(m.navy, 0.45) }}
+                                        aria-label={`Edit ${guest.name}`}
+                                      >
+                                        <EditRoundedIcon sx={{ fontSize: 17 }} />
+                                      </IconButton>
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => {
+                                          setBookingGuests((prev) =>
+                                            prev.filter(
+                                              (item) => item.id !== guest.id,
+                                            ),
+                                          );
+                                          if (
+                                            editingInlineGuestId === guest.id
+                                          ) {
+                                            setEditingInlineGuestId(null);
+                                            setInlineGuestDraft(
+                                              emptyInlineGuestDraft,
+                                            );
+                                            setShowInlineGuestField(false);
+                                          }
+                                          if (addMenuTarget === guest.id)
+                                            setSlotAddMenuAnchor(null);
+                                        }}
+                                        sx={{ color: alpha(m.navy, 0.35) }}
+                                        aria-label={`Remove ${guest.name}`}
+                                      >
+                                        <CloseRoundedIcon
+                                          sx={{ fontSize: 17 }}
+                                        />
+                                      </IconButton>
+                                    </Stack>
+                                  ) : showClientRemoveButton ? (
                                     <IconButton
                                       size="small"
                                       onClick={() => {
@@ -11917,6 +12998,11 @@ export default function ProfessionalFixedLocationCalendar({
                                     (service) => service.guestId === guest.id,
                                   )}
                                   showRemoveButtons={showLineItemRemoveButton}
+                                  resolveStaffName={(staffResourceId) =>
+                                    staffResourceId
+                                      ? resourceNameById.get(staffResourceId)
+                                      : undefined
+                                  }
                                   resolveServiceEditTag={resolveServiceEditTag}
                                   resolveProductEditTag={resolveProductEditTag}
                                   onRemoveService={(serviceId) => {
@@ -11947,6 +13033,16 @@ export default function ProfessionalFixedLocationCalendar({
                                       ),
                                     );
                                   }}
+                                  onEditService={
+                                    !isViewingExisting ||
+                                    incomingRequestEditMode
+                                      ? (service) =>
+                                          openEditServiceFromLineItem(
+                                            service,
+                                            guest.id,
+                                          )
+                                      : undefined
+                                  }
                                 />
 
                                 <ButtonBase
@@ -12058,6 +13154,7 @@ export default function ProfessionalFixedLocationCalendar({
 
                         {showInlineGuestField ? (
                           <Box
+                            ref={inlineGuestFormRef}
                             sx={{
                               borderRadius: "12px",
                               bgcolor: alpha(m.navy, 0.025),
@@ -12073,9 +13170,13 @@ export default function ProfessionalFixedLocationCalendar({
                                 mb: 1.25,
                               }}
                             >
-                              {inlineGuestParticipantType === "model"
-                                ? "Model"
-                                : "Guest"}
+                              {editingInlineGuestId
+                                ? inlineGuestParticipantType === "model"
+                                  ? "Edit Model"
+                                  : "Edit Guest"
+                                : inlineGuestParticipantType === "model"
+                                  ? "Model"
+                                  : "Guest"}
                             </BodyText>
                             <Stack
                               direction="row"
@@ -12097,7 +13198,7 @@ export default function ProfessionalFixedLocationCalendar({
                               />
                               <AppTextField
                                 label="Last Name"
-                                placeholder="Enter last name"
+                                placeholder="Optional"
                                 value={inlineGuestDraft.lastName}
                                 onChange={(e) =>
                                   setInlineGuestDraft((prev) => ({
@@ -12109,17 +13210,71 @@ export default function ProfessionalFixedLocationCalendar({
                                 disabled={isViewingExisting}
                               />
                             </Stack>
-                            <AppButton
-                              tone="primary"
-                              onClick={addInlineGuest}
+                            <AppTextField
+                              label="Email"
+                              placeholder="Email (optional)"
+                              value={inlineGuestDraft.email}
+                              onChange={(e) =>
+                                setInlineGuestDraft((prev) => ({
+                                  ...prev,
+                                  email: e.target.value,
+                                }))
+                              }
+                              fullWidth
                               disabled={isViewingExisting}
-                              sx={{
-                                height: 38,
-                                minWidth: 96,
-                              }}
+                              sx={{ mb: 1.25 }}
+                            />
+                            <AppCountryPhoneFields
+                              countryCode={inlineGuestDraft.phoneCode}
+                              phone={inlineGuestDraft.phoneNumber}
+                              onCountryCodeChange={(dialCode) =>
+                                setInlineGuestDraft((prev) => ({
+                                  ...prev,
+                                  phoneCode: dialCode,
+                                }))
+                              }
+                              onPhoneChange={(phone) =>
+                                setInlineGuestDraft((prev) => ({
+                                  ...prev,
+                                  phoneNumber: phone,
+                                }))
+                              }
+                              label="Contact Number (optional)"
+                              phonePlaceholder="Phone number"
+                              required={false}
+                              disabled={isViewingExisting}
+                            />
+                            <Stack
+                              direction="row"
+                              spacing={1}
+                              sx={{ mt: 1.25 }}
                             >
-                              Add
-                            </AppButton>
+                              <AppButton
+                                tone="primary"
+                                onClick={addInlineGuest}
+                                disabled={isViewingExisting}
+                                sx={{
+                                  height: 38,
+                                  minWidth: 96,
+                                }}
+                              >
+                                {editingInlineGuestId ? "Save" : "Add"}
+                              </AppButton>
+                              {editingInlineGuestId || showInlineGuestField ? (
+                                <AppButton
+                                  tone="secondary"
+                                  onClick={() => {
+                                    setShowInlineGuestField(false);
+                                    setEditingInlineGuestId(null);
+                                    setInlineGuestDraft(emptyInlineGuestDraft);
+                                  }}
+                                  disabled={isViewingExisting}
+                                  sx={{ height: 38, minWidth: 96 }}
+                                >
+                                  Cancel
+                                </AppButton>
+                              ) : null}
+                            </Stack>
                           </Box>
                         ) : null}
 
@@ -12467,10 +13622,51 @@ export default function ProfessionalFixedLocationCalendar({
                           }
                           countryCodeError={slotErrors.bookingPhoneCode}
                           phoneError={slotErrors.bookingPhoneNumber}
+                          label={
+                            addClientSource === "guest"
+                              ? "Contact Number"
+                              : "Contact Number (optional)"
+                          }
                           phonePlaceholder="+316xxxxxxxx"
-                          required={false}
+                          required={addClientSource === "guest"}
                           disabled={isViewingExisting}
                         />
+
+                        {paymentMethod === "online" &&
+                        !isDrawerPrepaymentPaid &&
+                        !isViewingExisting ? (
+                          <AppTextField
+                            label="Email"
+                            placeholder="Email for online payment"
+                            value={selectedClient?.email ?? ""}
+                            onChange={(e) =>
+                              setSelectedClient((prev) =>
+                                prev
+                                  ? { ...prev, email: e.target.value }
+                                  : prev,
+                              )
+                            }
+                            fullWidth
+                            error={Boolean(slotErrors.bookingClientEmail)}
+                            helperText={
+                              slotErrors.bookingClientEmail ||
+                              (selectedClient?.email?.trim()
+                                ? undefined
+                                : "Required for online payment")
+                            }
+                          />
+                        ) : paymentMethod === "online" &&
+                          selectedClient?.email?.trim() ? (
+                          <BodyText
+                            sx={{
+                              fontSize: 12.5,
+                              fontWeight: 650,
+                              color: alpha(m.navy, 0.55),
+                            }}
+                          >
+                            Email: {selectedClient.email.trim()}
+                          </BodyText>
+                        ) : null}
 
                         {isViewingBooking &&
                         canDiscardBookingRequest(viewingBookingEvent) ? (
@@ -12575,13 +13771,14 @@ export default function ProfessionalFixedLocationCalendar({
                               <IconButton
                                 size="small"
                                 onClick={() => {
-                                  if (isViewingExisting) return;
                                   setShowLateCancellation(false);
                                   setLateCancellationFeePercent("");
+                                  setLateCancellationFeePercentCeiling("");
+                                  setCancellationFeeAt(undefined);
+                                  setExceededCancellationWindow(undefined);
                                 }}
                                 sx={{ color: alpha(m.navy, 0.35) }}
                                 aria-label="Remove late cancellation"
-                                disabled={isViewingExisting}
                               >
                                 <CloseRoundedIcon sx={{ fontSize: 17 }} />
                               </IconButton>
@@ -12597,6 +13794,11 @@ export default function ProfessionalFixedLocationCalendar({
                               }}
                             >
                               {lateCancelNoticeLabel}
+                              {typeof exceededCancellationWindow === "boolean"
+                                ? exceededCancellationWindow
+                                  ? " · Outside notice window"
+                                  : " · Within notice window"
+                                : null}
                             </BodyText>
 
                             <Stack
@@ -12629,11 +13831,20 @@ export default function ProfessionalFixedLocationCalendar({
                                 value={lateCancellationFeePercent}
                                 onChange={(e) =>
                                   setLateCancellationFeePercent(
-                                    sanitizeDecimalInput(e.target.value),
+                                    clampProtectiveFeePercent(
+                                      sanitizeDecimalInput(e.target.value),
+                                      lateCancellationFeePercentCeiling ||
+                                        lateCancellationFeePercentDefault,
+                                    ),
                                   )
                                 }
-                                disabled={isViewingExisting}
-                                inputProps={{ inputMode: "decimal" }}
+                                inputProps={{
+                                  inputMode: "decimal",
+                                  max: parsePolicyPercentCeiling(
+                                    lateCancellationFeePercentCeiling ||
+                                      lateCancellationFeePercentDefault,
+                                  ),
+                                }}
                                 sx={{ width: 72, flexShrink: 0 }}
                               />
                               <BodyText
@@ -12679,13 +13890,12 @@ export default function ProfessionalFixedLocationCalendar({
                               <IconButton
                                 size="small"
                                 onClick={() => {
-                                  if (isViewingExisting) return;
                                   setShowLateRescheduling(false);
                                   setLateRescheduleFeePercent("");
+                                  setLateRescheduleFeePercentCeiling("");
                                 }}
                                 sx={{ color: alpha(m.navy, 0.35) }}
                                 aria-label="Remove late rescheduling"
-                                disabled={isViewingExisting}
                               >
                                 <CloseRoundedIcon sx={{ fontSize: 17 }} />
                               </IconButton>
@@ -12734,11 +13944,20 @@ export default function ProfessionalFixedLocationCalendar({
                                 value={lateRescheduleFeePercent}
                                 onChange={(e) =>
                                   setLateRescheduleFeePercent(
-                                    sanitizeDecimalInput(e.target.value),
+                                    clampProtectiveFeePercent(
+                                      sanitizeDecimalInput(e.target.value),
+                                      lateRescheduleFeePercentCeiling ||
+                                        lateRescheduleFeePercentDefault,
+                                    ),
                                   )
                                 }
-                                disabled={isViewingExisting}
-                                inputProps={{ inputMode: "decimal" }}
+                                inputProps={{
+                                  inputMode: "decimal",
+                                  max: parsePolicyPercentCeiling(
+                                    lateRescheduleFeePercentCeiling ||
+                                      lateRescheduleFeePercentDefault,
+                                  ),
+                                }}
                                 sx={{ width: 72, flexShrink: 0 }}
                               />
                               <BodyText
@@ -12751,6 +13970,119 @@ export default function ProfessionalFixedLocationCalendar({
                                 }}
                               >
                                 €{lateRescheduleFeeAmount}
+                              </BodyText>
+                            </Stack>
+                          </Box>
+                        ) : null}
+
+                        {showNoShowFee ? (
+                          <Box
+                            sx={{
+                              borderRadius: "12px",
+                              bgcolor: "#fff",
+                              border: `1px solid ${alpha(m.navy, 0.08)}`,
+                              boxShadow: "0 10px 26px rgba(16, 35, 63, 0.08)",
+                              p: 1.5,
+                            }}
+                          >
+                            <Stack
+                              direction="row"
+                              alignItems="center"
+                              spacing={1}
+                            >
+                              <BodyText
+                                sx={{
+                                  flex: 1,
+                                  fontSize: 13,
+                                  fontWeight: 900,
+                                  color: alpha(m.navy, 0.82),
+                                }}
+                              >
+                                No-Show Fee
+                              </BodyText>
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  setShowNoShowFee(false);
+                                  setNoShowFeePercent("");
+                                  setNoShowFeePercentCeiling("");
+                                }}
+                                sx={{ color: alpha(m.navy, 0.35) }}
+                                aria-label="Remove no-show fee"
+                              >
+                                <CloseRoundedIcon sx={{ fontSize: 17 }} />
+                              </IconButton>
+                            </Stack>
+
+                            <BodyText
+                              sx={{
+                                mt: 0.5,
+                                fontSize: 11.5,
+                                fontWeight: 700,
+                                color: alpha(m.navy, 0.48),
+                                lineHeight: 1.35,
+                              }}
+                            >
+                              Fee for a guest tagged No Show. You may only
+                              decrease or remove this fee.
+                            </BodyText>
+
+                            <Stack
+                              direction="row"
+                              alignItems="center"
+                              spacing={1.25}
+                              sx={{ mt: 1.25 }}
+                            >
+                              <Stack
+                                direction="row"
+                                alignItems="center"
+                                spacing={0.5}
+                                sx={{ minWidth: 52 }}
+                              >
+                                <BodyText
+                                  sx={{
+                                    fontSize: 12.5,
+                                    fontWeight: 850,
+                                    color: alpha(m.navy, 0.62),
+                                  }}
+                                >
+                                  Fee
+                                </BodyText>
+                                <InfoOutlinedIcon
+                                  sx={{ fontSize: 15, color: m.teal }}
+                                />
+                              </Stack>
+                              <AppTextField
+                                placeholder="%"
+                                value={noShowFeePercent}
+                                onChange={(e) =>
+                                  setNoShowFeePercent(
+                                    clampProtectiveFeePercent(
+                                      sanitizeDecimalInput(e.target.value),
+                                      noShowFeePercentCeiling ||
+                                        noShowFeePercentDefault,
+                                    ),
+                                  )
+                                }
+                                inputProps={{
+                                  inputMode: "decimal",
+                                  max: parsePolicyPercentCeiling(
+                                    noShowFeePercentCeiling ||
+                                      noShowFeePercentDefault,
+                                  ),
+                                }}
+                                sx={{ width: 72, flexShrink: 0 }}
+                              />
+                              <BodyText
+                                sx={{
+                                  flex: 1,
+                                  textAlign: "right",
+                                  fontSize: 16,
+                                  fontWeight: 950,
+                                  color: alpha(m.navy, 0.85),
+                                }}
+                              >
+                                €{noShowFeeAmount}
                               </BodyText>
                             </Stack>
                           </Box>
@@ -12780,7 +14112,7 @@ export default function ProfessionalFixedLocationCalendar({
                                     color: alpha(m.navy, 0.82),
                                   }}
                                 >
-                                  Prepayment
+                                  {prepaymentSectionTitle}
                                 </BodyText>
                                 <IconButton
                                   size="small"
@@ -12806,7 +14138,7 @@ export default function ProfessionalFixedLocationCalendar({
                                     color: alpha(m.navy, 0.62),
                                   }}
                                 >
-                                  Prepayment:
+                                  {prepaymentSectionTitle}:
                                 </BodyText>
                                 <AppTextField
                                   placeholder="%"
@@ -12844,7 +14176,9 @@ export default function ProfessionalFixedLocationCalendar({
                                     color: alpha(m.navy, 0.55),
                                   }}
                                 >
-                                  Remaining after prepayment
+                                  {isDrawerPrepaymentPaid
+                                    ? "Remaining after prepaid"
+                                    : "Remaining after prepayment"}
                                 </BodyText>
                                 <BodyText
                                   sx={{
@@ -12875,66 +14209,96 @@ export default function ProfessionalFixedLocationCalendar({
                                   Payment method
                                 </BodyText>
 
-                                {[
-                                  {
-                                    key: "online" as const,
-                                    label: "Online Direct",
-                                  },
-                                  {
-                                    key: "offline" as const,
-                                    label: "Offline Direct",
-                                  },
-                                ].map((pm) => {
-                                  const active = paymentMethod === pm.key;
-                                  return (
-                                    <ButtonBase
-                                      key={pm.key}
-                                      onClick={() => setPaymentMethod(pm.key)}
-                                      sx={{
-                                        width: "100%",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "space-between",
-                                        py: 0.65,
-                                        borderRadius: "10px",
-                                        "&:hover": {
-                                          bgcolor: alpha(m.navy, 0.03),
-                                        },
-                                      }}
-                                    >
-                                      <BodyText
-                                        sx={{
-                                          fontSize: 12.75,
-                                          fontWeight: 850,
-                                          color: alpha(m.navy, 0.74),
-                                        }}
-                                      >
-                                        {pm.label}
-                                      </BodyText>
-                                      <Box
-                                        sx={{
-                                          width: 18,
-                                          height: 18,
-                                          borderRadius: "999px",
-                                          border: `2px solid ${active ? m.teal : alpha(m.navy, 0.22)}`,
-                                          display: "grid",
-                                          placeItems: "center",
-                                        }}
-                                      >
-                                        {active ? (
+                                {isDrawerPrepaymentPaid ? (
+                                  <BodyText
+                                    sx={{
+                                      fontSize: 12.75,
+                                      fontWeight: 850,
+                                      color: alpha(m.navy, 0.74),
+                                      py: 0.65,
+                                    }}
+                                  >
+                                    {persistedPaymentIsOffline ||
+                                    drawerPaymentMethod === "offline"
+                                      ? "Prepaid – Offline Direct"
+                                      : "Prepaid – Online Direct"}
+                                  </BodyText>
+                                ) : (
+                                  (
+                                    [
+                                      {
+                                        key: "online" as const,
+                                        label: "Online Direct",
+                                      },
+                                      {
+                                        key: "offline" as const,
+                                        label: "Offline Direct",
+                                      },
+                                    ] as const
+                                  )
+                                    .filter((pm) => {
+                                      if (paymentMethodPolicy === "online-only") {
+                                        return pm.key === "online";
+                                      }
+                                      if (paymentMethodPolicy === "offline-only") {
+                                        return pm.key === "offline";
+                                      }
+                                      return true;
+                                    })
+                                    .map((pm) => {
+                                      const active = paymentMethod === pm.key;
+                                      return (
+                                        <ButtonBase
+                                          key={pm.key}
+                                          onClick={() =>
+                                            setPaymentMethod(pm.key)
+                                          }
+                                          sx={{
+                                            width: "100%",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "space-between",
+                                            py: 0.65,
+                                            borderRadius: "10px",
+                                            "&:hover": {
+                                              bgcolor: alpha(m.navy, 0.03),
+                                            },
+                                          }}
+                                        >
+                                          <BodyText
+                                            sx={{
+                                              fontSize: 12.75,
+                                              fontWeight: 850,
+                                              color: alpha(m.navy, 0.74),
+                                            }}
+                                          >
+                                            {pm.label}
+                                          </BodyText>
                                           <Box
                                             sx={{
-                                              width: 8,
-                                              height: 8,
+                                              width: 18,
+                                              height: 18,
                                               borderRadius: "999px",
-                                              bgcolor: m.teal,
+                                              border: `2px solid ${active ? m.teal : alpha(m.navy, 0.22)}`,
+                                              display: "grid",
+                                              placeItems: "center",
                                             }}
-                                          />
-                                        ) : null}
-                                      </Box>
-                                    </ButtonBase>
-                                  );
-                                })}
+                                          >
+                                            {active ? (
+                                              <Box
+                                                sx={{
+                                                  width: 8,
+                                                  height: 8,
+                                                  borderRadius: "999px",
+                                                  bgcolor: m.teal,
+                                                }}
+                                              />
+                                            ) : null}
+                                          </Box>
+                                        </ButtonBase>
+                                      );
+                                    })
+                                )}
                               </Box>
                             </Box>
                           </>
@@ -13056,7 +14420,6 @@ export default function ProfessionalFixedLocationCalendar({
                               onChange={(e) =>
                                 setBookingInternalNote(e.target.value)
                               }
-                              disabled={isViewingExisting}
                               multiline
                               minRows={4}
                               fullWidth
@@ -13111,34 +14474,17 @@ export default function ProfessionalFixedLocationCalendar({
                             lateRescheduleFeeAmount={
                               bookingPrice.lateRescheduleFeeAmount
                             }
+                            noShowFeeAmount={bookingPrice.noShowFeeAmount}
                             prepaidApplied={
                               isDrawerPrepaymentPaid ? prepaymentAmount : 0
                             }
                             showPrepayment={showPrepayment}
+                            prepaymentPaid={isDrawerPrepaymentPaid}
                             prepaymentPercent={Number(prepaymentPercent) || 0}
                             prepaymentAmount={prepaymentAmount}
                             remainingAmount={remainingAfterPrepayment}
                           />
                         )}
-
-                        <BookingDrawerParticipantActions
-                          kinds={drawerParticipantKinds}
-                          nameFieldOpen={showInlineGuestField}
-                          onAddGuest={() => {
-                            setInlineGuestParticipantType("guest");
-                            setShowInlineGuestField(true);
-                          }}
-                          onAddModel={() => {
-                            setInlineGuestParticipantType("model");
-                            setShowInlineGuestField(true);
-                          }}
-                          onAddPlanning={() => {
-                            addDlParticipant("planning");
-                          }}
-                          onAddBuffer={() => {
-                            addDlParticipant("buffer");
-                          }}
-                        />
 
                         <Box sx={{ flex: 1, minHeight: 40 }} />
                       </>
@@ -13196,7 +14542,7 @@ export default function ProfessionalFixedLocationCalendar({
                       <BookingActivityOverview
                         title="Activity Overview"
                         items={activityTimelineItems}
-                        emptyMessage="No activity for this client yet."
+                        emptyMessage="No activity for this booking yet."
                         selectedDetail={activityDetailItem}
                         onSelectedDetailChange={setActivityDetailItem}
                       />
@@ -13264,6 +14610,14 @@ export default function ProfessionalFixedLocationCalendar({
           applyFilters(filters);
           setFiltersOpen(false);
         }}
+      />
+      <CalendarSlotAddMenu
+        anchorPosition={slotAddAnchor}
+        onClose={() => {
+          setSlotAddAnchor(null);
+          setPendingSlotPayload(null);
+        }}
+        onSelect={handleSlotAddContinue}
       />
       <CalendarBlockTimeModal
         availableLocations={data.supportedLocations}
@@ -13338,63 +14692,72 @@ export default function ProfessionalFixedLocationCalendar({
           void persistOverviewBlockedTime(draft);
         }}
       />
+      <CalendarScheduleConflictDialog
+        open={staffConflictOpen}
+        kind={
+          staffConflictOpen
+            ? ("staff_double_book" satisfies CalendarScheduleConflictKind)
+            : null
+        }
+        messageOverride={staffConflictMessage}
+        onClose={() => {
+          setStaffConflictOpen(false);
+          setStaffConflictMessage(null);
+          staffConflictAckRef.current = false;
+        }}
+        onConfirm={() => {
+          staffConflictAckRef.current = true;
+          setStaffConflictOpen(false);
+          setStaffConflictMessage(null);
+          void persistBookingFromDrawer().then((saved) => {
+            if (saved) closeBookingDrawer();
+          });
+        }}
+      />
       <CalendarPublicBusinessHoursModal
         open={publicBusinessHoursOpen}
         onClose={() => setPublicBusinessHoursOpen(false)}
         onApply={async () => {
           try {
-            if (
-              !publicBusinessHoursDraft.locations.length ||
-              !publicBusinessHoursDraft.dateFrom ||
-              !publicBusinessHoursDraft.dateTo ||
-              (publicBusinessHoursDraft.dateFrom ===
-                publicBusinessHoursDraft.dateTo &&
-                !publicBusinessHoursDraft.day)
-            ) {
+            const location =
+              publicBusinessHoursDraft.location ||
+              publicBusinessHoursDraft.locations[0];
+            if (!location || !publicBusinessHoursDraft.schedule) {
               showSnackbar({
                 severity: "error",
-                message:
-                  "Select location and a date (single day or full range) before applying.",
+                message: "Select location and schedule before applying.",
               });
               return;
             }
             if (
-              publicBusinessHoursDraft.notAvailable &&
-              !publicBusinessHoursDraft.note.trim()
+              !publicBusinessHoursDraft.days?.length ||
+              publicBusinessHoursDraft.days.length !== 7
             ) {
               showSnackbar({
                 severity: "error",
-                message:
-                  "Note is required when Not Availability is selected.",
+                message: "Configure hours for each weekday before applying.",
               });
               return;
             }
+            const existing = Array.isArray(
+              calendarSettings?.availability.publicBusinessHours,
+            )
+              ? calendarSettings.availability.publicBusinessHours
+              : [];
             await persistAvailabilitySettings({
-              publicBusinessHours: [
-                ...(Array.isArray(
-                  calendarSettings?.availability.publicBusinessHours,
-                )
-                  ? calendarSettings.availability.publicBusinessHours
-                  : []),
-                ...expandPublicBusinessHoursDraft(publicBusinessHoursDraft),
-              ],
+              publicBusinessHours: replacePublicBusinessHoursForLocations(
+                existing,
+                publicBusinessHoursDraft,
+              ),
             });
             showSnackbar({
               severity: "success",
-              message: "Public business hours added.",
+              message: "Public business hours saved.",
             });
             setPublicBusinessHoursOpen(false);
-            setPublicBusinessHoursDraft({
-              locations: publicBusinessHoursDraft.locations,
-              schedule: publicBusinessHoursDraft.schedule,
-              day: "",
-              dateFrom: "",
-              dateTo: "",
-              startTime: "08:00",
-              endTime: "18:00",
-              notAvailable: false,
-              note: "",
-            });
+            setPublicBusinessHoursDraft(
+              createEmptyPublicBusinessHoursDraft(location),
+            );
           } catch {
             showSnackbar({
               severity: "error",
@@ -13410,27 +14773,27 @@ export default function ProfessionalFixedLocationCalendar({
         onClose={() => setDesignOpen(false)}
         onApply={async () => {
           try {
-            // Persist only colours the professional explicitly chose (no defaults).
+            // Persist only colours the professional explicitly chose (no defaults / gray).
             const nextDesign: CalendarDesignDraft = {
               ...designDraft,
               colorsByCategory: Object.fromEntries(
                 Object.entries(designDraft.colorsByCategory ?? {}).filter(
-                  ([, color]) => Boolean(color?.trim()),
+                  ([, color]) => isConfiguredColor(color),
                 ),
               ),
               colorsByService: Object.fromEntries(
                 Object.entries(designDraft.colorsByService ?? {}).filter(
-                  ([, color]) => Boolean(color?.trim()),
+                  ([, color]) => isConfiguredColor(color),
                 ),
               ),
               colorsByStatus: Object.fromEntries(
                 Object.entries(designDraft.colorsByStatus ?? {}).filter(
-                  ([, color]) => Boolean(color?.trim()),
+                  ([, color]) => isConfiguredColor(color),
                 ),
               ) as CalendarDesignDraft["colorsByStatus"],
               colorsByTeamMember: Object.fromEntries(
                 Object.entries(designDraft.colorsByTeamMember ?? {}).filter(
-                  ([, color]) => Boolean(color?.trim()),
+                  ([, color]) => isConfiguredColor(color),
                 ),
               ),
             };
@@ -13450,29 +14813,7 @@ export default function ProfessionalFixedLocationCalendar({
         setDraft={setDesignDraft}
         serviceOptions={serviceOptions}
         categoryOptions={categoryOptions}
-      />
-      <CalendarServiceOrderModal
-        draft={serviceOrderDraft}
-        onApply={async () => {
-          try {
-            await persistAvailabilitySettings({
-              serviceOrder: serviceOrderDraft,
-            });
-            showSnackbar({
-              severity: "success",
-              message: "Service order saved.",
-            });
-            setServiceOrderOpen(false);
-          } catch {
-            showSnackbar({
-              severity: "error",
-              message: "Unable to save service order.",
-            });
-          }
-        }}
-        onClose={() => setServiceOrderOpen(false)}
-        open={serviceOrderOpen}
-        setDraft={setServiceOrderDraft}
+        templateCategoryRows={templateCategoryRows}
       />
       <CalendarEditAvailabilityModal
         availableLocations={data.supportedLocations}

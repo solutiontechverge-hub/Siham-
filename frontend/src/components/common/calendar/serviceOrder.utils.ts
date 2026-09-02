@@ -360,15 +360,55 @@ export function sortServicesByServiceOrder(
 }
 
 /**
+ * True when saved order is missing/empty, or looks like an unused platform-8 seed
+ * (categories only, no listed services, no hide rules) — prefer Business Template defaults.
+ */
+export function shouldPreferTemplateServiceOrderDefaults(
+  saved: ServiceOrderSettings | null | undefined,
+): boolean {
+  if (!saved?.categories?.length) return true;
+
+  const hasAnyListedService = Object.values(
+    saved.servicesByCategory ?? {},
+  ).some((list) => (list?.length ?? 0) > 0);
+  const hasHides =
+    (saved.hiddenCategories?.length ?? 0) > 0 ||
+    Object.values(saved.hiddenServicesByCategory ?? {}).some(
+      (list) => (list?.length ?? 0) > 0,
+    );
+  if (hasAnyListedService || hasHides) return false;
+
+  const platform = buildPlatformServiceOrderDefaults().categories;
+  if (saved.categories.length !== platform.length) return false;
+  return saved.categories.every(
+    (category, index) =>
+      category.trim().toLowerCase() === platform[index].trim().toLowerCase(),
+  );
+}
+
+/**
  * Business Setup Services Details source of truth:
  * Calendar Settings → Service Order Rules.
- * New professionals (empty/missing order) get the 8 platform categories.
+ * When calendar order is empty/missing (or an unused platform seed), prefer
+ * Business Template order, then platform defaults.
  */
 export function resolveBusinessSetupServiceOrder(
   saved: ServiceOrderSettings | null | undefined,
+  templateFallback?: ServiceOrderSettings | null,
 ): ServiceOrderSettings {
+  const template =
+    templateFallback?.categories?.length ? templateFallback : null;
+  const platform = buildPlatformServiceOrderDefaults();
+  const fallback = template ?? platform;
+
+  if (shouldPreferTemplateServiceOrderDefaults(saved)) {
+    return dedupeServiceOrderSettings(
+      normalizeServiceOrderSettings(template ?? undefined, fallback),
+    );
+  }
+
   return dedupeServiceOrderSettings(
-    normalizeServiceOrderSettings(saved, buildPlatformServiceOrderDefaults()),
+    normalizeServiceOrderSettings(saved, fallback),
   );
 }
 

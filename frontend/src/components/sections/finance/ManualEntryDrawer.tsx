@@ -11,13 +11,20 @@ import { FinanceDrawerActionsFooter } from "../../common/FinanceDrawerFooter";
 import AppSearchField from "../../common/AppSearchField";
 import MollureFormField from "../../common/MollureFormField";
 import { BodyText } from "../../ui/typography";
-import { useGetBusinessSetupQuery } from "../../../store/services/businessApi";
+import {
+  useGetBusinessSetupQuery,
+  useGetMollureClientDirectoryQuery,
+  useGetProfessionalClientsQuery,
+} from "../../../store/services/businessApi";
+import { mapApiProfessionalClientToRecord } from "../../../app/professionals/fixed-location/client/mapApiProfessionalClient";
+import type {
+  ClientRecord,
+  MollureDirectoryRow,
+} from "../../../app/professionals/fixed-location/client/data/clientList";
 import { useFinanceInvoiceSettings } from "./useFinanceInvoiceSettings";
 import {
   calculateManualEntryDiscountAmount,
   createManualEntryLineFromOption,
-  filterClientsByName,
-  filterMollureByEmail,
   formatEurAmount,
   formatManualEntryDiscountLabel,
   lineTotal,
@@ -64,14 +71,6 @@ export default function ManualEntryDrawer({
   const m = useTheme().palette.mollure;
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   const { settings, setSettings } = useFinanceInvoiceSettings();
-  const { data: businessSetupResponse } = useGetBusinessSetupQuery(
-    { includeDraft: false },
-    {
-      skip: !open,
-    },
-  );
-  const businessSetup = businessSetupResponse?.data ?? null;
-
   const [clientOpen, setClientOpen] = React.useState(false);
   const [clientMode, setClientMode] =
     React.useState<ManualEntryClientMode | null>(null);
@@ -96,6 +95,22 @@ export default function ManualEntryDrawer({
   const [productDrawerOpen, setProductDrawerOpen] = React.useState(false);
   const [itemDrawerOpen, setItemDrawerOpen] = React.useState(false);
   const [guestContactError, setGuestContactError] = React.useState(false);
+
+  const { data: businessSetupResponse } = useGetBusinessSetupQuery(
+    { includeDraft: false },
+    {
+      skip: !open,
+    },
+  );
+  const businessSetup = businessSetupResponse?.data ?? null;
+  const { data: professionalClientsResponse } = useGetProfessionalClientsQuery(
+    undefined,
+    { skip: !open },
+  );
+  const { data: mollureDirectoryResponse } = useGetMollureClientDirectoryQuery(
+    { q: clientQuery },
+    { skip: !open || clientMode !== "platform" },
+  );
 
   const hasGuestContact = Boolean(guestName.trim() || guestEmail.trim());
   const isGuestClientStepValid =
@@ -293,14 +308,32 @@ export default function ManualEntryDrawer({
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [clientOpen]);
 
-  const listResults = React.useMemo(
-    () => (clientMode === "list" ? filterClientsByName(clientQuery) : []),
-    [clientMode, clientQuery],
-  );
-  const platformResults = React.useMemo(
-    () => (clientMode === "platform" ? filterMollureByEmail(clientQuery) : []),
-    [clientMode, clientQuery],
-  );
+  const listResults = React.useMemo(() => {
+    if (clientMode !== "list") return [] as ClientRecord[];
+    const records = (professionalClientsResponse?.data ?? []).map(
+      mapApiProfessionalClientToRecord,
+    );
+    const q = clientQuery.trim().toLowerCase();
+    if (!q) return records.slice(0, 5);
+    return records
+      .filter((c) => c.name.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [clientMode, clientQuery, professionalClientsResponse?.data]);
+
+  const platformResults = React.useMemo(() => {
+    if (clientMode !== "platform") return [] as MollureDirectoryRow[];
+    return (mollureDirectoryResponse?.data ?? [])
+      .filter((row) => row.has_eligible_booking !== false)
+      .map(
+        (row): MollureDirectoryRow => ({
+          id: row.id,
+          name: row.name,
+          email: row.email,
+          hasEligibleBooking: row.has_eligible_booking,
+          tags: ["Mollure"],
+        }),
+      );
+  }, [clientMode, mollureDirectoryResponse?.data]);
 
   const displayClient = selectionLabel(clientSelection) || "Search Client";
 

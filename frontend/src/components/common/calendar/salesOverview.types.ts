@@ -139,6 +139,7 @@ export type SalesAddOnCheckoutPayload = {
   discountAmount: number;
   totalPrice: number;
   paymentMethod: ManualEntryPaymentMethod;
+  clientEmail?: string | null;
 };
 
 export type SalesEditCheckoutPayload = {
@@ -148,4 +149,5 @@ export type SalesEditCheckoutPayload = {
   totalPrice: number;
   paymentMethod: SalesCheckoutPaymentMethod;
   dueDate?: string | null;
+  clientEmail?: string | null;
 };

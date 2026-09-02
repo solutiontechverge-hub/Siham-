@@ -1,5 +1,5 @@
 import type { FlaggedReviewRow, ReviewTabId } from "../../reviewsData";
-import type { ratingCategoryDefaults } from "../../adminMockData";
+import { ratingCategoryDefaults } from "../../adminMockData";
 
 export type AdminReviewsPageProps = {
   embedded?: boolean;

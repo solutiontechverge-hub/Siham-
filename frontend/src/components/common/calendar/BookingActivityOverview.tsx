@@ -6,6 +6,7 @@ import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import { Box, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import type { ActivityComparison, ActivityComparisonRow } from "./buildActivityComparison";
 import type { BookingActivityItem } from "./bookingActivity.types";
 
 type BookingActivityOverviewProps = {
@@ -309,6 +310,172 @@ function CancellationActivityDetails({ item }: { item: BookingActivityItem }) {
   );
 }
 
+function ComparisonRowView({
+  row,
+  compact,
+}: {
+  row: ActivityComparisonRow;
+  compact?: boolean;
+}) {
+  const m = useTheme().palette.mollure;
+
+  if (compact || row.changeKind === "updated") {
+    return (
+      <Stack spacing={0.35}>
+        <Typography
+          sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.5) }}
+        >
+          {row.label}
+        </Typography>
+        <Typography
+          sx={{
+            fontSize: 12.5,
+            fontWeight: 700,
+            color: alpha(m.navy, 0.82),
+            lineHeight: 1.45,
+          }}
+        >
+          <Box
+            component="span"
+            sx={{
+              color: alpha(m.navy, 0.45),
+              textDecoration: "line-through",
+              fontWeight: 600,
+            }}
+          >
+            {row.originalValue}
+          </Box>
+          <Box component="span" sx={{ mx: 0.75, color: alpha(m.navy, 0.35) }}>
+            →
+          </Box>
+          <Box component="span" sx={{ color: m.teal, fontWeight: 800 }}>
+            {row.newValue}
+          </Box>
+        </Typography>
+      </Stack>
+    );
+  }
+
+  return (
+    <Box
+      sx={{
+        borderRadius: "10px",
+        border: `1px solid ${alpha(m.navy, 0.08)}`,
+        bgcolor: alpha(m.navy, 0.015),
+        px: 1.25,
+        py: 1.1,
+      }}
+    >
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="center"
+        sx={{ mb: 0.75 }}
+      >
+        <Typography
+          sx={{ fontSize: 11.5, fontWeight: 800, color: alpha(m.navy, 0.55) }}
+        >
+          {row.label}
+        </Typography>
+        <Typography
+          sx={{
+            fontSize: 10,
+            fontWeight: 800,
+            letterSpacing: 0.2,
+            textTransform: "uppercase",
+            color:
+              row.changeKind === "added"
+                ? m.teal
+                : row.changeKind === "removed"
+                  ? alpha("#C45C5C", 0.9)
+                  : alpha(m.navy, 0.45),
+          }}
+        >
+          {row.changeKind === "added"
+            ? "Added"
+            : row.changeKind === "removed"
+              ? "Removed"
+              : "Changed"}
+        </Typography>
+      </Stack>
+      <Stack spacing={0.65}>
+        <Typography
+          sx={{
+            fontSize: 11.5,
+            fontWeight: 600,
+            color: alpha(m.navy, 0.42),
+            textDecoration:
+              row.changeKind === "removed" || row.changeKind === "changed"
+                ? "line-through"
+                : "none",
+            lineHeight: 1.4,
+          }}
+        >
+          {row.originalValue}
+        </Typography>
+        <Typography
+          sx={{
+            fontSize: 12.5,
+            fontWeight: 800,
+            color: m.teal,
+            lineHeight: 1.4,
+          }}
+        >
+          {row.newValue}
+        </Typography>
+      </Stack>
+    </Box>
+  );
+}
+
+function ComparisonPanel({ comparison }: { comparison: ActivityComparison }) {
+  const m = useTheme().palette.mollure;
+  const isSilent = comparison.mode === "silent_updated";
+
+  return (
+    <Box
+      sx={{
+        borderRadius: "12px",
+        border: `1px solid ${alpha(m.navy, 0.08)}`,
+        bgcolor: "#fff",
+        px: 1.75,
+        py: 1.5,
+      }}
+    >
+      <Typography
+        sx={{
+          fontSize: 12,
+          fontWeight: 900,
+          color: alpha(m.navy, 0.78),
+          mb: 0.35,
+        }}
+      >
+        {comparison.headline}
+      </Typography>
+      <Typography
+        sx={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: alpha(m.navy, 0.48),
+          mb: 1.25,
+          lineHeight: 1.4,
+        }}
+      >
+        {comparison.baselineCaption}
+        <Box component="span" sx={{ mx: 0.5, color: alpha(m.navy, 0.3) }}>
+          →
+        </Box>
+        {comparison.proposedCaption}
+      </Typography>
+      <Stack spacing={isSilent ? 1.15 : 1}>
+        {comparison.rows.map((row) => (
+          <ComparisonRowView key={row.id} row={row} compact={isSilent} />
+        ))}
+      </Stack>
+    </Box>
+  );
+}
+
 function EbrActivityDetails({
   item,
   relatedItems,
@@ -317,12 +484,17 @@ function EbrActivityDetails({
   relatedItems: BookingActivityItem[];
 }) {
   const m = useTheme().palette.mollure;
+  const comparison = item.comparison;
 
   return (
     <Stack spacing={1.5}>
-      <TimelineList items={relatedItems} allowArrows={false} />
+      {!comparison || item.kind !== "booking_updated" ? (
+        <TimelineList items={relatedItems} allowArrows={false} />
+      ) : null}
 
-      {(item.detailLines?.length ?? 0) > 0 ? (
+      {comparison ? <ComparisonPanel comparison={comparison} /> : null}
+
+      {!comparison && (item.detailLines?.length ?? 0) > 0 ? (
         <Box
           sx={{
             borderRadius: "12px",

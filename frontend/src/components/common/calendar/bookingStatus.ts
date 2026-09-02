@@ -76,12 +76,12 @@ type StatusTheme = {
 
 export const BOOKING_STATUS_THEME: Record<CalendarBookingStatus, StatusTheme> = {
   Requested: {
-    accent: "#FBB500",
-    cardBg: "rgba(253, 246, 239, 0.6)",
-    cardBorder: "#FBB500",
-    chipBg: "#FBB500",
+    accent: "#F97316",
+    cardBg: "rgba(255, 247, 237, 0.75)",
+    cardBorder: "#F97316",
+    chipBg: "#F97316",
     chipColor: "#FFFFFF",
-    chipBorder: "#FBB500",
+    chipBorder: "#F97316",
   },
   Confirmed: {
     accent: "#22B573",
@@ -92,19 +92,19 @@ export const BOOKING_STATUS_THEME: Record<CalendarBookingStatus, StatusTheme> = 
     chipBorder: "#75D9A6",
   },
   "In Progress": {
-    accent: "#21B8BF",
-    cardBg: "#E9F8F9",
-    cardBorder: alpha("#21B8BF", 0.35),
-    chipBg: alpha("#21B8BF", 0.1),
-    chipColor: "#149CA7",
-    chipBorder: alpha("#21B8BF", 0.35),
+    accent: "#3B82F6",
+    cardBg: "#EFF6FF",
+    cardBorder: alpha("#3B82F6", 0.35),
+    chipBg: alpha("#3B82F6", 0.1),
+    chipColor: "#2563EB",
+    chipBorder: alpha("#3B82F6", 0.35),
   },
   Completed: {
-    accent: "#667085",
+    accent: "#98A2B3",
     cardBg: "#F9FAFB",
     cardBorder: "#D0D5DD",
     chipBg: "#F9FAFB",
-    chipColor: "#667085",
+    chipColor: "#98A2B3",
     chipBorder: "#D0D5DD",
   },
   Cancelled: {

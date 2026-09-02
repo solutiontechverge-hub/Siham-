@@ -45,7 +45,7 @@ type SalesAddOnCheckoutProps = {
   clientName: string;
   clientEmail?: string;
   onCancel: () => void;
-  onSave: (payload: SalesAddOnCheckoutPayload) => void;
+  onSave: (payload: SalesAddOnCheckoutPayload) => void | Promise<void>;
 };
 
 export default function SalesAddOnCheckout({
@@ -268,6 +268,7 @@ export default function SalesAddOnCheckout({
       return;
     }
     if (step === "payment") {
+      if (paymentMethod === "onlineDirect" && !guestEmail.trim()) return;
       setStep("summary");
       return;
     }
@@ -277,6 +278,7 @@ export default function SalesAddOnCheckout({
       discountAmount,
       totalPrice,
       paymentMethod,
+      clientEmail: guestEmail.trim() || clientEmail || null,
     });
   };
 
@@ -529,11 +531,19 @@ export default function SalesAddOnCheckout({
                         >
                           <MollureFormField
                             label="Guest email"
-                            placeholder="Email for Guest"
+                            placeholder="Email for online payment"
                             value={guestEmail}
                             onChange={(e) => setGuestEmail(e.target.value)}
                             size="small"
                             fullWidth
+                            error={!guestEmail.trim()}
+                            helperText={
+                              !guestEmail.trim()
+                                ? "Required for online payment"
+                                : clientEmail?.trim()
+                                  ? "Reused from client profile"
+                                  : undefined
+                            }
                           />
                         </Box>
                       ) : null}

@@ -10,6 +10,7 @@ import { mainDrawerServicesFromClientSnapshot, parseCalendarEntryNotes, parseSto
 import { syncEditRequestFromBookingApi } from "../client-booking/syncEditRequestFromApi";
 import { mapApiPrepaymentStatus } from "./prepaymentStatus";
 import { splitContactPhone } from "../../../lib/phone-validation";
+import { buildMultiServiceBookingTitle } from "./calendar-overlap.utils";
 
 const statusFromApi: Record<string, CalendarBookingStatus> = {
   requested: "Requested",
@@ -153,7 +154,27 @@ export function mapCalendarBookingToEvent(
       : snapshotMainServices?.length
         ? snapshotMainServices
         : null;
-  const title = ebrServices?.[0]?.name || booking.service_title || "Booking";
+  const guestOnlyNames = (parsedNotes?.guests ?? []).flatMap((guest) =>
+    (guest.services ?? []).map((service) => service.name),
+  );
+  const snapshotGuestNames = (parsedNotes?.clientSnapshot?.services ?? [])
+    .filter((service) => Boolean(service.guestId))
+    .map((service) => service.name);
+  // Flat notes.services already includes guest lines; otherwise merge main + guest names.
+  const title =
+    ebrServices?.length &&
+    (pendingEbr?.suggestedServices?.length || parsedNotes?.services?.length)
+      ? buildMultiServiceBookingTitle(
+          ebrServices.map((service) => service.name),
+          booking.service_title || "Booking",
+        )
+      : buildMultiServiceBookingTitle(
+          [
+            ...(ebrServices?.map((service) => service.name) ?? []),
+            ...(guestOnlyNames.length ? guestOnlyNames : snapshotGuestNames),
+          ],
+          booking.service_title || "Booking",
+        );
   const start =
     pendingEbr?.suggestedStart ||
     booking.start ||
@@ -406,6 +427,9 @@ export function mapCalendarBookingToEvent(
         ? { cancelledServiceIds: parsedNotes.cancelledServiceIds }
         : {}),
       ...(parsedNotes?.silentUpdated ? { silentUpdated: true } : {}),
+      ...(parsedNotes?.silentUpdateSnapshot
+        ? { silentUpdateSnapshot: parsedNotes.silentUpdateSnapshot }
+        : {}),
       ...(parsedNotes?.scheduleEdited ? { scheduleEdited: true } : {}),
       ...(parsedNotes?.refunded ? { refunded: true } : {}),
       ...(parsedNotes?.waitingForPayment ? { waitingForPayment: true } : {}),
@@ -433,8 +457,36 @@ export function mapCalendarBookingToEvent(
         ? {
             showLateRescheduling: parsedNotes.showLateRescheduling,
             lateRescheduleFeePercent: parsedNotes.lateRescheduleFeePercent,
+            ...(parsedNotes.lateRescheduleFeePercentCeiling
+              ? {
+                  lateRescheduleFeePercentCeiling:
+                    parsedNotes.lateRescheduleFeePercentCeiling,
+                }
+              : {}),
             showLateCancellation: parsedNotes.showLateCancellation,
             lateCancellationFeePercent: parsedNotes.lateCancellationFeePercent,
+            ...(parsedNotes.lateCancellationFeePercentCeiling
+              ? {
+                  lateCancellationFeePercentCeiling:
+                    parsedNotes.lateCancellationFeePercentCeiling,
+                }
+              : {}),
+            showNoShowFee: parsedNotes.showNoShowFee,
+            noShowFeePercent: parsedNotes.noShowFeePercent,
+            ...(parsedNotes.noShowFeePercentCeiling
+              ? {
+                  noShowFeePercentCeiling: parsedNotes.noShowFeePercentCeiling,
+                }
+              : {}),
+            ...(parsedNotes.cancellationFeeAt
+              ? { cancellationFeeAt: parsedNotes.cancellationFeeAt }
+              : {}),
+            ...(typeof parsedNotes.exceededCancellationWindow === "boolean"
+              ? {
+                  exceededCancellationWindow:
+                    parsedNotes.exceededCancellationWindow,
+                }
+              : {}),
             prepaymentPercent: parsedNotes.prepaymentPercent,
             ...(mappedPrepayStatus
               ? { prepaymentStatus: mappedPrepayStatus }
@@ -475,6 +527,9 @@ export function mapCalendarBookingToEvent(
                       return {
                         id: personId,
                         name: person.name,
+                        email: person.email,
+                        phoneCode: person.phoneCode,
+                        phoneNumber: person.phoneNumber,
                         participantType:
                           person.participantType === "model"
                             ? ("model" as const)
