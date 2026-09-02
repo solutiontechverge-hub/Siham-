@@ -398,7 +398,7 @@ export default function SalesOverview({
       bookingId: checkoutContext.bookingId,
       bookingCode: checkoutContext.bookingCode,
       clientName: checkoutContext.clientName,
-      clientEmail: checkoutContext.clientEmail,
+      clientEmail: payload.clientEmail || checkoutContext.clientEmail,
       lines: payload.lines,
       discount: payload.discount,
       discountAmount: payload.discountAmount,
@@ -492,7 +492,8 @@ export default function SalesOverview({
               amount: line.quantity * line.unitPrice,
             })),
             mainClientName: editingCard.clientName,
-            mainClientEmail: editingCard.clientEmail,
+            mainClientEmail:
+              payload.clientEmail || editingCard.clientEmail,
             mainClientPhone: editingCard.clientPhone,
           })
         : [];

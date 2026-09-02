@@ -619,6 +619,7 @@ export function buildBookingDetailsSnapshot(input: {
     name: string;
     email: string;
     clientKind?: "individual" | "company";
+    mollureUserId?: string | null;
   } | null;
   selectedServices: BookingDrawerHydration["services"];
   selectedProducts: BookingDrawerHydration["products"];
@@ -644,8 +645,12 @@ export function buildBookingDetailsSnapshot(input: {
   lastEditedBy?: CalendarBookingDetails["lastEditedBy"];
   clientNote?: string;
 }): CalendarBookingDetails {
+  const mollureId = String(input.selectedClient?.mollureUserId ?? "").trim();
+  const customerId =
+    mollureId && mollureId !== "platform" ? mollureId : undefined;
   return {
     clientEmail: input.selectedClient?.email ?? "",
+    ...(customerId ? { customerId } : {}),
     ...(input.selectedClient?.clientKind
       ? { clientKind: input.selectedClient.clientKind }
       : {}),

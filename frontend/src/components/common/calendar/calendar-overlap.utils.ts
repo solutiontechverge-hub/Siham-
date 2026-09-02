@@ -9,6 +9,96 @@ export function eventsOverlap(a: CalendarEvent, b: CalendarEvent): boolean {
   return aStart < bEnd && aEnd > bStart;
 }
 
+export type StaffServiceInterval = {
+  id: string;
+  name: string;
+  staffId: string;
+  start: string;
+  end: string;
+};
+
+function intervalsOverlap(
+  aStart: number,
+  aEnd: number,
+  bStart: number,
+  bEnd: number,
+): boolean {
+  return aStart < bEnd && aEnd > bStart;
+}
+
+/** Same team member + overlapping service times within one booking (soft flag). */
+export function findInternalStaffServiceOverlaps(
+  services: readonly StaffServiceInterval[],
+): Array<{ a: StaffServiceInterval; b: StaffServiceInterval }> {
+  const overlaps: Array<{ a: StaffServiceInterval; b: StaffServiceInterval }> =
+    [];
+  for (let i = 0; i < services.length; i++) {
+    for (let j = i + 1; j < services.length; j++) {
+      const a = services[i];
+      const b = services[j];
+      if (!a.staffId || a.staffId !== b.staffId) continue;
+      if (
+        intervalsOverlap(
+          minutesSinceMidnight(a.start),
+          minutesSinceMidnight(a.end),
+          minutesSinceMidnight(b.start),
+          minutesSinceMidnight(b.end),
+        )
+      ) {
+        overlaps.push({ a, b });
+      }
+    }
+  }
+  return overlaps;
+}
+
+/** Booking services overlapping other calendar events on the same staff/resource. */
+export function findExternalStaffBookingOverlaps(input: {
+  bookingId?: string | null;
+  date: string;
+  services: readonly StaffServiceInterval[];
+  events: readonly CalendarEvent[];
+}): Array<{ service: StaffServiceInterval; event: CalendarEvent }> {
+  const overlaps: Array<{
+    service: StaffServiceInterval;
+    event: CalendarEvent;
+  }> = [];
+  for (const service of input.services) {
+    if (!service.staffId) continue;
+    for (const event of input.events) {
+      if (input.bookingId && event.id === input.bookingId) continue;
+      if (event.date !== input.date) continue;
+      if (event.resourceId !== service.staffId) continue;
+      if (
+        intervalsOverlap(
+          minutesSinceMidnight(service.start),
+          minutesSinceMidnight(service.end),
+          minutesSinceMidnight(event.start),
+          minutesSinceMidnight(event.end),
+        )
+      ) {
+        overlaps.push({ service, event });
+      }
+    }
+  }
+  return overlaps;
+}
+
+/** Join all service names for calendar card title (main + guests). */
+export function buildMultiServiceBookingTitle(
+  serviceNames: readonly string[],
+  fallback = "Booking",
+): string {
+  const names = serviceNames.map((name) => name.trim()).filter(Boolean);
+  if (!names.length) return fallback;
+  // Dedupe consecutive identical names while preserving order.
+  const unique: string[] = [];
+  for (const name of names) {
+    if (unique[unique.length - 1] !== name) unique.push(name);
+  }
+  return unique.join(" · ");
+}
+
 function sameStartClusterKey(event: CalendarEvent) {
   return `${event.date}|${event.resourceId}|${minutesSinceMidnight(event.start)}`;
 }

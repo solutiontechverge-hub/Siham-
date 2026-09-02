@@ -50,6 +50,9 @@ export type CalendarBookingProductItem = {
 export type CalendarBookingGuestItem = {
   id: string;
   name: string;
+  email?: string;
+  phoneCode?: string;
+  phoneNumber?: string;
   services: CalendarBookingServiceItem[];
   products: CalendarBookingProductItem[];
   participantType?: "model" | "planning" | "guest" | "buffer" | "notes";
@@ -63,6 +66,9 @@ export type CalendarBookingClientSnapshot = {
   people?: Array<{
     id: string;
     name: string;
+    email?: string;
+    phoneCode?: string;
+    phoneNumber?: string;
     isRequester?: boolean;
     participantType?: "model" | "planning" | "guest" | "buffer" | "notes";
     planningActivity?: string;
