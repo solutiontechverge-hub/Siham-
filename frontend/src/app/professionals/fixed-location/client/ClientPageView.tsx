@@ -1163,7 +1163,7 @@ export default function ClientPageView() {
                       countryCodeError={editPhoneErrors.countryCode}
                       phoneError={editPhoneErrors.phone}
                       onClearErrors={() => setEditPhoneErrors({})}
-                      phonePlaceholder="+442xxxxxxxxxxx"
+                      phonePlaceholder="+316xxxxxxxxx"
                     />
 
                     <Typography
@@ -1471,7 +1471,7 @@ export default function ClientPageView() {
                       countryCodeError={editPhoneErrors.countryCode}
                       phoneError={editPhoneErrors.phone}
                       onClearErrors={() => setEditPhoneErrors({})}
-                      phonePlaceholder="+442xxxxxxxxxx"
+                      phonePlaceholder="+316xxxxxxxx"
                     />
                     <MollureFormField
                       placeholder="Residential Address"
@@ -1892,7 +1892,7 @@ export default function ClientPageView() {
                       phone: undefined,
                     }))
                   }
-                  phonePlaceholder="+442xxxxxxxxxx"
+                  phonePlaceholder="+316xxxxxxxx"
                 />
 
                 <MollureFormField
@@ -2096,7 +2096,7 @@ export default function ClientPageView() {
                       phone: undefined,
                     }))
                   }
-                  phonePlaceholder="+442xxxxxxxxxxx"
+                  phonePlaceholder="+316xxxxxxxxx"
                 />
 
                 <MollureFormField

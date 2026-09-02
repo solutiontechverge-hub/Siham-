@@ -5,6 +5,7 @@ import * as React from "react";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import {
   Box,
@@ -29,7 +30,13 @@ import type {
   ServiceOrderSettings,
 } from "./calendar-settings.types";
 import type { CalendarDesignDraft } from "./CalendarDesignModal";
-import { getCalendarDesignServiceLabel } from "./CalendarDesignModal";
+import { getCalendarDesignCategoryLabel } from "./CalendarDesignModal";
+import {
+  appearanceModeLabel,
+  countConfiguredAppearanceColors,
+  isAppearanceConfigured,
+  isConfiguredColor,
+} from "../../../lib/calendarDesign.utils";
 import type { PublicBusinessHoursEntry } from "./CalendarPublicBusinessHoursModal";
 import CalendarServiceOrderCard from "./CalendarServiceOrderCard";
 import {
@@ -46,6 +53,7 @@ type CalendarHoursRulesPanelProps = {
   publicBusinessHours?: readonly PublicBusinessHoursEntry[];
   serviceOrder: ServiceOrderSettings;
   appliedDesign: CalendarDesignDraft;
+  categoryOptions?: readonly { key: string; label: string }[];
   isSaving?: boolean;
   onBookingRulesChange: (next: BookingRules) => void;
   onServiceOrderChange: (next: ServiceOrderSettings) => void;
@@ -54,8 +62,6 @@ type CalendarHoursRulesPanelProps = {
   onOpenServiceOrder: () => void;
   onSaveBookingRules: () => Promise<void>;
   onSaveServiceOrder: () => Promise<void>;
-  onEditAppearanceColor: (key: string) => void;
-  onRemoveAppearanceColor: (key: string) => void;
 };
 
 function SettingsSection({
@@ -108,7 +114,6 @@ function SetButton({
   onClick: () => void;
   disabled?: boolean;
 }) {
-  const m = useTheme().palette.mollure;
   return (
     <AppButton
       tone="primary"
@@ -122,6 +127,32 @@ function SetButton({
       }}
     >
       Set
+    </AppButton>
+  );
+}
+
+function AppearanceActionButton({
+  configured,
+  onClick,
+  disabled,
+}: {
+  configured: boolean;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <AppButton
+      tone="primary"
+      disabled={disabled}
+      onClick={onClick}
+      sx={{
+        fontSize: 12.5,
+        minWidth: 58,
+        height: 30,
+        px: 1.75,
+      }}
+    >
+      {configured ? "Edit" : "Set"}
     </AppButton>
   );
 }
@@ -747,6 +778,7 @@ export default function CalendarHoursRulesPanel({
   publicBusinessHours = [],
   serviceOrder,
   appliedDesign,
+  categoryOptions = [],
   isSaving = false,
   onBookingRulesChange,
   onServiceOrderChange,
@@ -755,12 +787,11 @@ export default function CalendarHoursRulesPanel({
   onOpenServiceOrder,
   onSaveBookingRules,
   onSaveServiceOrder,
-  onEditAppearanceColor,
-  onRemoveAppearanceColor,
 }: CalendarHoursRulesPanelProps) {
   const m = useTheme().palette.mollure;
   const showFl = availableLocations.includes("FL");
   const showDl = availableLocations.includes("DL");
+  const [appearanceExpanded, setAppearanceExpanded] = React.useState(false);
 
   const [bookingRulesEditing, setBookingRulesEditing] = React.useState(false);
   const [serviceOrderEditing, setServiceOrderEditing] = React.useState(false);
@@ -808,44 +839,29 @@ export default function CalendarHoursRulesPanel({
   }, [activeCategory, serviceOrder.servicesByCategory]);
 
   const appearanceItems = React.useMemo(() => {
-    const withColor = ([, color]: [string, string | undefined]) =>
-      Boolean(color && String(color).trim() && String(color).trim() !== "#");
+    const isServices = appliedDesign.scope === "Services";
+    const entries = isServices
+      ? Object.entries(appliedDesign.colorsByService ?? {})
+      : Object.entries(appliedDesign.colorsByCategory ?? {});
 
-    if (appliedDesign.scope === "Services") {
-      return Object.entries(appliedDesign.colorsByService ?? {})
-        .filter(withColor)
-        .map(([key, color]) => ({
-          key,
-          label: key,
-          color: color as string,
-        }));
-    }
-    if (appliedDesign.scope === "Status") {
-      return Object.entries(appliedDesign.colorsByStatus ?? {})
-        .filter(withColor)
-        .map(([key, color]) => ({
-          key,
-          label: key,
-          color: color ?? "",
-        }));
-    }
-    if (appliedDesign.scope === "Team Members") {
-      return Object.entries(appliedDesign.colorsByTeamMember ?? {})
-        .filter(withColor)
-        .map(([key, color]) => ({
-          key,
-          label: key,
-          color: color as string,
-        }));
-    }
-    return Object.entries(appliedDesign.colorsByCategory ?? {})
-      .filter(withColor)
+    return entries
+      .filter(([, color]) => isConfiguredColor(color))
       .map(([key, color]) => ({
         key,
-        label: getCalendarDesignServiceLabel(key),
+        label: isServices
+          ? key
+          : getCalendarDesignCategoryLabel(key, categoryOptions),
         color: color as string,
       }));
-  }, [appliedDesign]);
+  }, [appliedDesign, categoryOptions]);
+
+  const appearanceConfigured = isAppearanceConfigured(appliedDesign);
+  const inactiveScope =
+    appliedDesign.scope === "Services" ? "Categories" : "Services";
+  const inactiveColorCount = countConfiguredAppearanceColors(
+    appliedDesign,
+    inactiveScope,
+  );
 
   const handleBookingRulesEdit = () => {
     setBookingRulesEditing(true);
@@ -1337,72 +1353,112 @@ export default function CalendarHoursRulesPanel({
 
         <SettingsSection
           title="Calendar Appearance"
-          action={<SetButton disabled={isSaving} onClick={onOpenDesign} />}
+          action={
+            <AppearanceActionButton
+              configured={appearanceConfigured}
+              disabled={isSaving}
+              onClick={onOpenDesign}
+            />
+          }
         >
-          {appearanceItems.length ? (
-            <Stack spacing={1}>
-              {appearanceItems.map((item) => (
-                <Box
-                  key={item.key}
+          {appearanceConfigured || appearanceItems.length ? (
+            <Box
+              sx={{
+                borderRadius: "8px",
+                border: `1px solid ${alpha(m.navy, 0.08)}`,
+                bgcolor: alpha(m.navy, 0.015),
+                overflow: "hidden",
+              }}
+            >
+              <Box
+                component="button"
+                type="button"
+                onClick={() => setAppearanceExpanded((prev) => !prev)}
+                sx={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 1.25,
+                  px: 1.5,
+                  py: 1.1,
+                  border: 0,
+                  bgcolor: "transparent",
+                  cursor: "pointer",
+                  textAlign: "left",
+                }}
+              >
+                <BodyText
                   sx={{
-                    display: "grid",
-                    gridTemplateColumns: "auto minmax(0, 1fr) auto auto",
-                    alignItems: "center",
-                    gap: 1.25,
-                    borderRadius: "8px",
-                    border: `1px solid ${alpha(m.navy, 0.08)}`,
-                    bgcolor: alpha(m.navy, 0.015),
-                    px: 1.5,
-                    py: 1.1,
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.72),
                   }}
                 >
-                  <Box
-                    sx={{
-                      width: 18,
-                      height: 18,
-                      borderRadius: "4px",
-                      bgcolor: item.color || alpha(m.navy, 0.12),
-                      border: `1px solid ${alpha(m.navy, 0.14)}`,
-                    }}
-                  />
+                  {appearanceModeLabel(appliedDesign.scope)}
+                  {appearanceItems.length
+                    ? ` · ${appearanceItems.length} colour${appearanceItems.length === 1 ? "" : "s"}`
+                    : ""}
+                </BodyText>
+                <ExpandMoreRoundedIcon
+                  sx={{
+                    fontSize: 20,
+                    color: alpha(m.navy, 0.45),
+                    transform: appearanceExpanded ? "rotate(180deg)" : "none",
+                    transition: "transform 0.2s ease",
+                  }}
+                />
+              </Box>
+              {appearanceExpanded ? (
+                <Stack spacing={0.75} sx={{ px: 1.5, pb: 1.25 }}>
+                  {appearanceItems.map((item) => (
+                    <Box
+                      key={item.key}
+                      sx={{
+                        display: "grid",
+                        gridTemplateColumns: "auto minmax(0, 1fr)",
+                        alignItems: "center",
+                        gap: 1.1,
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: 18,
+                          height: 18,
+                          borderRadius: "4px",
+                          bgcolor: item.color,
+                          border: `1px solid ${alpha(m.navy, 0.14)}`,
+                        }}
+                      />
+                      <BodyText
+                        sx={{
+                          fontSize: 12.5,
+                          fontWeight: 600,
+                          color: alpha(m.navy, 0.68),
+                        }}
+                      >
+                        {item.label} · {item.color.toUpperCase()}
+                      </BodyText>
+                    </Box>
+                  ))}
+                </Stack>
+              ) : null}
+              {inactiveColorCount > 0 ? (
+                <Box sx={{ px: 1.5, pb: 1.1 }}>
                   <BodyText
                     sx={{
-                      fontSize: 13,
-                      fontWeight: 700,
-                      color: alpha(m.navy, 0.72),
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      color: alpha(m.navy, 0.42),
                     }}
                   >
-                    {item.label} colour {item.color}
+                    {inactiveColorCount} colour
+                    {inactiveColorCount === 1 ? "" : "s"} saved in{" "}
+                    {appearanceModeLabel(inactiveScope)} mode
                   </BodyText>
-                  <IconButton
-                    size="small"
-                    onClick={() => onEditAppearanceColor(item.key)}
-                    sx={{
-                      width: 30,
-                      height: 30,
-                      borderRadius: "8px",
-                      border: `1px solid ${alpha(m.navy, 0.1)}`,
-                      color: alpha(m.navy, 0.55),
-                    }}
-                  >
-                    <EditOutlinedIcon sx={{ fontSize: 16 }} />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    onClick={() => onRemoveAppearanceColor(item.key)}
-                    sx={{
-                      width: 30,
-                      height: 30,
-                      borderRadius: "8px",
-                      border: `1px solid ${alpha(m.navy, 0.1)}`,
-                      color: alpha(m.navy, 0.55),
-                    }}
-                  >
-                    <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
-                  </IconButton>
                 </Box>
-              ))}
-            </Stack>
+              ) : null}
+            </Box>
           ) : (
             <Box
               sx={{

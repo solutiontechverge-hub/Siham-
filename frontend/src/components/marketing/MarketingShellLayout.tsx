@@ -11,6 +11,8 @@ import {
   professionalsMarketingFooter,
   professionalsMarketingHeader,
 } from "../../data/marketingShell.data";
+import { useAppSelector } from "../../store/hooks";
+import { getPersistedAuthSession } from "../../lib/auth-storage";
 
 export type MarketingAudience = "clients" | "professionals";
 
@@ -29,6 +31,12 @@ export function MarketingShellLayout({
   contentSx,
   hideFooter,
 }: MarketingShellLayoutProps) {
+  const accessToken = useAppSelector((state) => state.auth.accessToken);
+  const [persisted] = React.useState(() =>
+    typeof window === "undefined" ? null : getPersistedAuthSession(),
+  );
+  const isAuthed = Boolean(accessToken || persisted?.accessToken);
+
   const footerData =
     audience === "clients"
       ? marketingShellFooter
@@ -59,6 +67,7 @@ export function MarketingShellLayout({
           localeLabel={h.localeLabel}
           loginLabel={h.loginLabel}
           homeHref="/"
+          isAuthed={isAuthed}
           professionalLinkLabel={h.professionalLinkLabel}
           professionalHref={h.professionalHref}
         />
@@ -81,6 +90,7 @@ export function MarketingShellLayout({
         navItems={[...h.navItems]}
         localeLabel={h.localeLabel}
         loginLabel={h.loginLabel}
+        isAuthed={isAuthed}
         professionalLinkLabel={h.professionalLinkLabel}
         professionalHref={h.professionalHref}
         homeHref="/professionals"

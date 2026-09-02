@@ -38,8 +38,11 @@ import {
 } from "../../../../store/services/businessApi";
 import type { BookingCatalogService } from "../../../../data/bookingServiceCatalog.data";
 import { applyBusinessServiceDiscount } from "../../../../data/businessServiceModal.data";
-import { buildPlatformServiceOrderDefaults } from "../../../../data/businessServiceCategorySlider.data";
 import { buildDesiredLocationFromSetupFields } from "../../../../data/businessPublicProfile.data";
+import {
+  buildServiceOrderFromTemplate,
+  buildTemplateCategoryOptions,
+} from "../../../../lib/businessTemplateCatalog";
 import { useBookingRealtimeSync } from "../../../../hooks/useBookingRealtimeSync";
 import {
   applyServiceOrderToServiceCategories,
@@ -283,45 +286,23 @@ export function useFixedLocationCalendarPage() {
     [serviceCatalog],
   );
 
+  const categoryOptions = React.useMemo(
+    () =>
+      buildTemplateCategoryOptions(setupData?.data?.service_details).map(
+        (entry) => ({
+          key: entry.value,
+          label: entry.label,
+        }),
+      ),
+    [setupData],
+  );
+
   const serviceOrderDefaults = React.useMemo(() => {
     const setup = setupData?.data;
-    const platformDefaults = buildPlatformServiceOrderDefaults();
-    const fromSetup = Array.from(
-      new Set(
-        setup?.service_details
-          ?.map((service) => service.category_title)
-          .filter(Boolean) ?? [],
-      ),
-    );
-    const categories = [...platformDefaults.categories];
-    for (const category of fromSetup) {
-      if (
-        !categories.some(
-          (entry) => entry.toLowerCase() === category.toLowerCase(),
-        )
-      ) {
-        categories.push(category);
-      }
-    }
-    const servicesByCategory: Record<string, string[]> = {
-      ...platformDefaults.servicesByCategory,
-    };
-    for (const category of categories) {
-      const matchedSetupKey =
-        fromSetup.find(
-          (entry) => entry.toLowerCase() === category.toLowerCase(),
-        ) ?? category;
-      servicesByCategory[category] =
-        setup?.service_details
-          ?.filter((service) => service.category_title === matchedSetupKey)
-          .map((service) => service.service_title)
-          .filter(Boolean) ??
-        servicesByCategory[category] ??
-        [];
-    }
+    const fromTemplate = buildServiceOrderFromTemplate(setup?.service_details);
     return dedupeServiceOrderSettings({
-      categories,
-      servicesByCategory,
+      categories: fromTemplate.categories,
+      servicesByCategory: fromTemplate.servicesByCategory,
       hiddenCategories: [],
       hiddenServicesByCategory: {},
     });
@@ -512,6 +493,7 @@ export function useFixedLocationCalendarPage() {
     handleOverviewDateRangeChange,
     calendarSettings,
     serviceOptions,
+    categoryOptions,
     serviceCatalog,
     serviceOrderDefaults,
     clientOptions,

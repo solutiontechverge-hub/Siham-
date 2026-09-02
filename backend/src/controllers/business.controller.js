@@ -21,6 +21,7 @@ import {
   pickSectionDraft,
 } from "../utils/business-setup-draft.js";
 import { syncBookingToFinanceTransaction } from "../services/finance-sync.service.js";
+import { getTeamMemberReviewAggregates } from "../services/review.service.js";
 import { safeEnsureProfessionalClientFromBooking } from "../services/professional-clients.service.js";
 import {
   BOOKING_NOTIFICATION_EVENTS,
@@ -499,6 +500,16 @@ const getBusinessSetupDetailById = async (
     personal_documents: parseJsonArray(member.personal_documents),
   }));
 
+  const teamMemberRatingStats = await getTeamMemberReviewAggregates(setupId);
+  const teamMembersWithRatings = teamMembers.map((member) => {
+    const stats = teamMemberRatingStats.get(String(member.id));
+    return {
+      ...member,
+      rating: stats?.rating ?? 0,
+      total_reviews: stats?.totalReviews ?? 0,
+    };
+  });
+
   const serviceCategories = parseJsonArray(businessSetup.service_categories);
   const serviceDetails = await buildServiceDetailsFromCategories(
     serviceCategories,
@@ -512,7 +523,7 @@ const getBusinessSetupDetailById = async (
     service_categories: serviceCategories,
     book_service_combinations: parseJsonArray(businessSetup.book_service_combinations),
     section_sync_settings: parseJsonValue(businessSetup.section_sync_settings, {}),
-    team_members: teamMembers,
+    team_members: teamMembersWithRatings,
     service_details: serviceDetails,
   };
 
@@ -3565,8 +3576,20 @@ export const updateTeamMember = async (req, res) => {
     }
 
     let personalDocuments = parseJsonArray(existing.personal_documents);
-    const documentFile = req.files?.personal_document?.[0];
-    if (documentFile?.buffer?.length) {
+    if (body.personal_documents !== undefined) {
+      personalDocuments = parseJsonArray(body.personal_documents);
+    }
+
+    const documentFiles = Array.isArray(req.files?.personal_document)
+      ? req.files.personal_document
+      : req.files?.personal_document
+        ? [req.files.personal_document]
+        : [];
+
+    for (const documentFile of documentFiles) {
+      if (!documentFile?.buffer?.length) continue;
+      if (personalDocuments.length >= 5) break;
+
       const url = await uploadTeamMemberDocumentFileToS3(req.user.id, documentFile);
       personalDocuments = [
         ...personalDocuments,
@@ -3577,9 +3600,8 @@ export const updateTeamMember = async (req, res) => {
         },
       ];
     }
-    if (body.personal_documents !== undefined) {
-      personalDocuments = parseJsonArray(body.personal_documents);
-    }
+
+    personalDocuments = personalDocuments.slice(0, 5);
 
     const nullableText = (value, fallback) => {
       if (value === undefined) return fallback;

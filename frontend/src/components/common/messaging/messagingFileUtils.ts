@@ -1,7 +1,13 @@
 import type { MessagingAttachment } from "./messagingTypes";
 import { resolveMessagingAttachmentUrl } from "./messagingAttachmentUpload";
 
-const MAX_FILE_BYTES = 8 * 1024 * 1024;
+export const MESSAGING_ATTACHMENT_MAX_BYTES = 8 * 1024 * 1024;
+
+/** Must match backend `messagingUpload.middleware.js` and MessagingComposer. */
+export const MESSAGING_ATTACHMENT_FILE_ACCEPT =
+  ".pdf,.doc,.docx,.txt,.xls,.xlsx,.csv,image/jpeg,image/jpg,image/png,image/webp,image/gif,image/heic,image/heif";
+
+const MAX_FILE_BYTES = MESSAGING_ATTACHMENT_MAX_BYTES;
 
 const ALLOWED_EXTENSIONS = new Set([
   "pdf",
@@ -20,7 +26,7 @@ const ALLOWED_EXTENSIONS = new Set([
   "heif",
 ]);
 
-function isAllowedFile(file: File): boolean {
+export function isAllowedMessagingAttachmentFile(file: File): boolean {
   if (file.type.startsWith("image/")) return true;
   if (file.type === "application/pdf" || file.type === "text/plain" || file.type === "text/csv") {
     return true;
@@ -37,6 +43,16 @@ function isAllowedFile(file: File): boolean {
   return Boolean(ext && ALLOWED_EXTENSIONS.has(ext));
 }
 
+export function validateMessagingAttachmentFile(file: File): string | null {
+  if (!isAllowedMessagingAttachmentFile(file)) {
+    return `"${file.name}" is not a supported file type.`;
+  }
+  if (file.size > MESSAGING_ATTACHMENT_MAX_BYTES) {
+    return `"${file.name}" is too large. Maximum size is 8 MB.`;
+  }
+  return null;
+}
+
 export type FileProcessResult =
   | { ok: true; attachments: MessagingAttachment[] }
   | { ok: false; error: string };
@@ -49,7 +65,7 @@ export function filesToMessagingAttachments(files: FileList | File[]): FileProce
   const attachments: MessagingAttachment[] = [];
 
   for (const file of list) {
-    if (!isAllowedFile(file)) {
+    if (!isAllowedMessagingAttachmentFile(file)) {
       return { ok: false, error: `"${file.name}" is not a supported file type.` };
     }
     if (file.size > MAX_FILE_BYTES) {

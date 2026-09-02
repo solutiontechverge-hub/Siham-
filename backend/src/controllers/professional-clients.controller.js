@@ -3,6 +3,7 @@ import { parseUuid } from "../utils/uuid.js";
 import {
   refreshProfessionalClientSalesStats,
   syncProfessionalClientsFromConfirmedBookings,
+  syncProfessionalClientProfilesFromMollure,
 } from "../services/professional-clients.service.js";
 import {
   listResponse,
@@ -106,6 +107,12 @@ export const listProfessionalClients = async (req, res) => {
       await syncProfessionalClientsFromConfirmedBookings(profile.id);
     } catch {
       // list should still return existing rows if backfill fails
+    }
+
+    try {
+      await syncProfessionalClientProfilesFromMollure(profile.id);
+    } catch {
+      // profile enrichment is best-effort
     }
 
     try {
@@ -315,7 +322,8 @@ export const createProfessionalClient = async (req, res) => {
       const userResult = await query(
         `SELECT u.id, u.email, u.user_type,
                 ip.first_name, ip.last_name, ip.display_name, ip.phone, ip.gender, ip.date_of_birth, ip.country_code,
-                cp.legal_name, cp.contact_first_name, cp.contact_last_name, cp.phone AS company_phone
+                cp.legal_name, cp.contact_first_name, cp.contact_last_name, cp.phone AS company_phone,
+                cp.ccc_number, cp.vat_number, cp.street, cp.street_number, cp.postal_code, cp.municipality, cp.province
          FROM users u
          LEFT JOIN individual_profiles ip ON ip.user_id = u.id
          LEFT JOIN company_profiles cp ON cp.user_id = u.id
@@ -351,14 +359,26 @@ export const createProfessionalClient = async (req, res) => {
         ? user.legal_name || user.email
         : user.display_name || `${user.first_name ?? ""} ${user.last_name ?? ""}`.trim() || user.email;
       const phone = isCompany ? user.company_phone : user.phone;
+      const businessAddress = isCompany
+        ? [
+            user.street,
+            user.street_number,
+            user.postal_code,
+            user.municipality,
+            user.province,
+          ]
+            .map((part) => String(part ?? "").trim())
+            .filter(Boolean)
+            .join(", ") || null
+        : null;
 
       const insert = await query(
         `INSERT INTO professional_clients (
            professional_profile_id, mollure_user_id, client_kind, is_mollure,
            display_name, email, phone, first_name, last_name, gender, date_of_birth,
-           legal_name, contact_person_name
+           legal_name, contact_person_name, coc, vat, business_address
          )
-         VALUES ($1, $2, $3, true, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         VALUES ($1, $2, $3, true, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
          RETURNING *`,
         [
           profile.id,
@@ -373,8 +393,17 @@ export const createProfessionalClient = async (req, res) => {
           user.date_of_birth,
           isCompany ? user.legal_name : null,
           isCompany ? `${user.contact_first_name ?? ""} ${user.contact_last_name ?? ""}`.trim() : null,
+          isCompany ? user.ccc_number : null,
+          isCompany ? user.vat_number : null,
+          businessAddress,
         ],
       );
+
+      try {
+        await refreshProfessionalClientSalesStats(profile.id, insert.rows[0]?.id);
+      } catch {
+        // client row is still returned even if stats refresh fails
+      }
 
       return res.status(201).json({
         success: true,

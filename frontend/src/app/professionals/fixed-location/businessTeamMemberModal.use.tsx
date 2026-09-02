@@ -10,13 +10,16 @@ import {
   createEmptyTeamMemberFormDraft,
   groupsFromTeamService,
   groupsToTeamService,
-  removeTeamMemberServiceGroup,
+  removeTeamMemberAssignedService,
   TEAM_MEMBER_DRAFT_PREVIEW_ID,
   type TeamBusinessServiceRef,
   type TeamMemberFormDraft,
   type TeamMemberModalServiceContext,
   type TeamServiceSlots,
 } from "../../../data/businessTeamMemberModal.data";
+import { teamMemberRatingFromApi } from "../../../lib/teamMemberReviews";
+
+const EMPTY_MEMBER_REVIEWS = teamMemberRatingFromApi(0, 0);
 
 export type TeamMemberUi = {
   id: string;
@@ -110,8 +113,8 @@ export function useBusinessTeamMemberModal({
           role: "Team member",
           photoSrc: draftState.photoSrc,
           pendingPhotoFile: draftState.pendingPhotoFile ?? null,
-          rating: 4.5,
-          reviewsLabel: "(0 Reviews)",
+          rating: EMPTY_MEMBER_REVIEWS.rating,
+          reviewsLabel: EMPTY_MEMBER_REVIEWS.reviewsLabel,
           services,
         };
 
@@ -183,13 +186,10 @@ export function useBusinessTeamMemberModal({
     [],
   );
 
-  const removeServiceGroup = React.useCallback(
-    (categoryId: string) => {
+  const removeAssignedService = React.useCallback(
+    (serviceId: string) => {
       setDraft((prev) => {
-        let next = removeTeamMemberServiceGroup(prev, categoryId);
-        if (prev.categoryId === categoryId) {
-          next = { ...next, serviceId: "" };
-        }
+        const next = removeTeamMemberAssignedService(prev, serviceId);
         syncDraftToMainScreen(next);
         return next;
       });
@@ -264,8 +264,8 @@ export function useBusinessTeamMemberModal({
           role,
           photoSrc: effectiveDraft.photoSrc,
           pendingPhotoFile: effectiveDraft.pendingPhotoFile ?? null,
-          rating: 4.5,
-          reviewsLabel: "(0 Reviews)",
+          rating: EMPTY_MEMBER_REVIEWS.rating,
+          reviewsLabel: EMPTY_MEMBER_REVIEWS.reviewsLabel,
           services,
         },
         ...persistedMembers,
@@ -327,7 +327,7 @@ export function useBusinessTeamMemberModal({
     openEdit,
     updateDraft,
     pickService,
-    removeServiceGroup,
+    removeAssignedService,
     choosePhoto,
     onPhotoSelected,
     saveModal,

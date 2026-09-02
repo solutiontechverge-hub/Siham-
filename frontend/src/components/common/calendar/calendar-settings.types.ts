@@ -2,6 +2,7 @@ import type { CalendarBookingLocation } from "../../../app/professionals/fixed-l
 import { BUSINESS_SERVICE_CATEGORY_CATALOG } from "../../../data/businessServiceCategorySlider.data";
 import type { PublicBusinessHoursEntry } from "./CalendarPublicBusinessHoursModal";
 import type { CalendarDesignDraft } from "./CalendarDesignModal";
+import { normalizeCalendarDesignScope } from "../../../lib/calendarDesign.utils";
 import type { BlockTimeDraft } from "./calendar.utils";
 
 export type ScheduleShift = {
@@ -304,14 +305,7 @@ export function parseCalendarSettings(
       dateOverrides: availability.dateOverrides ?? [],
     },
     design: {
-      scope:
-        designRaw.scope === "Services"
-          ? "Services"
-          : designRaw.scope === "Status"
-            ? "Status"
-            : designRaw.scope === "Team Members"
-              ? "Team Members"
-              : "Categories",
+      scope: normalizeCalendarDesignScope(designRaw.scope),
       colorsByCategory: asColorMap(designRaw.colorsByCategory),
       colorsByService: asColorMap(designRaw.colorsByService),
       colorsByStatus: asColorMap(designRaw.colorsByStatus) as CalendarDesignDraft["colorsByStatus"],

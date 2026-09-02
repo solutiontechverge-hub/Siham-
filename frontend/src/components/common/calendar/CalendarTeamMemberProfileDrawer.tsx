@@ -4,9 +4,9 @@ import AppButton from "../AppButton";
 import * as React from "react";
 import Image from "next/image";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import InsertDriveFileRoundedIcon from "@mui/icons-material/InsertDriveFileRounded";
 import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import {
-  Avatar,
   Box,
   Divider,
   IconButton,
@@ -20,6 +20,7 @@ import AppDrawer from "../AppDrawer";
 import MollureFormField from "../MollureFormField";
 import { MollureLabeledSelect } from "../MollureLabeledFields";
 import AppPillTabs from "../AppPillTabs";
+import TeamMemberAssignedServicesPanel from "../business/TeamMemberAssignedServicesPanel";
 import { useSnackbar } from "../AppSnackbar";
 import { getApiErrorMessage } from "../../../lib/api-error";
 import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
@@ -30,20 +31,23 @@ import {
   buildTeamServiceOptionsForCategory,
   businessTeamMemberModalCopy,
   createEmptyTeamMemberFormDraft,
-  formatTeamMemberGroupLabel,
-  groupsFromTeamService,
+  groupsFromAssignedServices,
   groupsToTeamService,
-  removeTeamMemberServiceGroup,
+  removeTeamMemberAssignedService,
+  TEAM_MEMBER_MAX_PERSONAL_DOCUMENTS,
   TEAM_SERVICE_SLOT_KEYS,
   type TeamMemberFormDraft,
   type TeamMemberModalServiceContext,
-  type TeamServiceSlots,
 } from "../../../data/businessTeamMemberModal.data";
 import {
   isAllowedProfileImageFile,
   PROFILE_IMAGE_FILE_ACCEPT,
   PROFILE_IMAGE_INVALID_MESSAGE,
 } from "../../../lib/profileImageUpload";
+import {
+  MESSAGING_ATTACHMENT_FILE_ACCEPT,
+  validateMessagingAttachmentFile,
+} from "../messaging/messagingFileUtils";
 import {
   useGetBusinessCategoriesQuery,
   useGetBusinessSetupQuery,
@@ -108,9 +112,9 @@ export default function CalendarTeamMemberProfileDrawer({
   const [personalDocuments, setPersonalDocuments] = React.useState<
     NonNullable<BusinessTeamMember["personal_documents"]>
   >([]);
-  const [pendingDocumentFile, setPendingDocumentFile] = React.useState<File | null>(
-    null,
-  );
+  const [pendingDocumentFiles, setPendingDocumentFiles] = React.useState<File[]>([]);
+
+  const documentInputId = React.useId();
 
   const serviceContext = React.useMemo<TeamMemberModalServiceContext>(() => {
     const businessServices = buildTeamBusinessServiceRefs(
@@ -124,25 +128,14 @@ export default function CalendarTeamMemberProfileDrawer({
   }, [setup?.service_details]);
 
   React.useEffect(() => {
-    if (!member) return;
-    const slots = {
-      slot1: "",
-      slot2: "",
-      slot3: "",
-      slot4: "",
-      slot5: "",
-      slot6: "",
-      slot7: "",
-    } as TeamServiceSlots;
-    member.assigned_services?.forEach((service, index) => {
-      const key = `slot${index + 1}` as keyof TeamServiceSlots;
-      if (index < 7) slots[key] = String(service.service_id ?? "");
-    });
-    const resolvedGroups = groupsFromTeamService(
-      slots,
+    if (!open || !member) return;
+
+    const resolvedGroups = groupsFromAssignedServices(
+      member.assigned_services ?? [],
       businessCategories,
       serviceContext,
     );
+
     setPublicDraft({
       name: member.full_name?.trim() ?? "",
       photoSrc: resolveMediaUrl(member.profile_photo) ?? "",
@@ -160,9 +153,28 @@ export default function CalendarTeamMemberProfileDrawer({
     setEmergencyContactNumber(member.emergency_contact_number ?? "");
     setPersonalNote(member.personal_note ?? "");
     setPersonalDocuments(member.personal_documents ?? []);
-    setPendingDocumentFile(null);
+    setPendingDocumentFiles([]);
     setLocationTab("FL");
-  }, [member, businessCategories, serviceContext]);
+  }, [open, memberId, member, businessCategories, serviceContext]);
+
+  const totalDocumentCount = personalDocuments.length + pendingDocumentFiles.length;
+  const canUploadMoreDocuments = totalDocumentCount < TEAM_MEMBER_MAX_PERSONAL_DOCUMENTS;
+
+  const pendingDocumentPreviewUrls = React.useMemo(
+    () =>
+      pendingDocumentFiles.map((file) =>
+        file.type.startsWith("image/") ? URL.createObjectURL(file) : null,
+      ),
+    [pendingDocumentFiles],
+  );
+
+  React.useEffect(() => {
+    return () => {
+      pendingDocumentPreviewUrls.forEach((url) => {
+        if (url) URL.revokeObjectURL(url);
+      });
+    };
+  }, [pendingDocumentPreviewUrls]);
 
   const categoryOptions = React.useMemo(
     () => buildTeamCategoryOptions(businessCategories, serviceContext),
@@ -178,7 +190,18 @@ export default function CalendarTeamMemberProfileDrawer({
     );
   }, [businessCategories, publicDraft.categoryId, serviceContext]);
 
-  const displaySelectedGroups = publicDraft.selectedGroups;
+  const displaySelectedGroups = React.useMemo(() => {
+    if (!publicDraft.categoryId || !publicDraft.serviceId) {
+      return publicDraft.selectedGroups;
+    }
+    return addTeamMemberServiceSelection(
+      publicDraft,
+      businessCategories,
+      serviceContext,
+    ).selectedGroups;
+  }, [businessCategories, publicDraft, serviceContext]);
+
+  const drawerTitle = `${publicDraft.name.trim() || member?.full_name?.trim() || "Team Member"} Profile`;
 
   const handleSave = async () => {
     if (!member?.id) return;
@@ -215,12 +238,13 @@ export default function CalendarTeamMemberProfileDrawer({
         personal_note: personalNote.trim() || null,
         personal_documents: personalDocuments,
         profilePhotoFile: pendingPhotoFile,
-        personalDocumentFile: pendingDocumentFile,
+        personalDocumentFiles:
+          pendingDocumentFiles.length > 0 ? pendingDocumentFiles : undefined,
       }).unwrap();
 
       showSnackbar({ severity: "success", message: "Team member profile saved." });
       setPendingPhotoFile(null);
-      setPendingDocumentFile(null);
+      setPendingDocumentFiles([]);
       onClose();
     } catch (error) {
       showSnackbar({
@@ -239,7 +263,7 @@ export default function CalendarTeamMemberProfileDrawer({
       anchor="right"
       open={open && Boolean(member)}
       onClose={onClose}
-      title="Team Member Profile"
+      title={drawerTitle}
       contentSx={{ bgcolor: alpha(m.navy, 0.03), p: 0 }}
       footer={
         <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ px: 2.5, py: 2 }}>
@@ -285,43 +309,88 @@ export default function CalendarTeamMemberProfileDrawer({
             ) : null}
 
             <Stack spacing={2}>
-              <Box
-                onClick={() => photoInputRef.current?.click()}
-                sx={{
-                  position: "relative",
-                  width: 96,
-                  height: 96,
-                  borderRadius: "12px",
-                  overflow: "hidden",
-                  border: `1px solid ${alpha(m.navy, 0.12)}`,
-                  bgcolor: alpha(m.navy, 0.04),
-                  cursor: "pointer",
-                }}
-              >
-                {publicDraft.photoSrc ? (
-                  <Image
-                    src={publicDraft.photoSrc}
-                    alt={publicDraft.name || "Team member"}
-                    fill
-                    unoptimized
-                    sizes="96px"
-                    style={{ objectFit: "cover" }}
-                  />
-                ) : (
-                  <Avatar sx={{ width: 96, height: 96, fontWeight: 900 }}>
-                    {(publicDraft.name || "T").slice(0, 1).toUpperCase()}
-                  </Avatar>
-                )}
-                <Box
+              <Box>
+                <Typography
                   sx={{
-                    position: "absolute",
-                    inset: 0,
-                    display: "grid",
-                    placeItems: "center",
-                    bgcolor: alpha("#000", 0.12),
+                    fontWeight: 800,
+                    fontSize: 14,
+                    color: alpha(m.navy, 0.88),
+                    mb: 1,
                   }}
                 >
-                  <UploadFileRoundedIcon sx={{ color: "#fff" }} />
+                  {businessTeamMemberModalCopy.profilePictureLabel}
+                </Typography>
+                <Box
+                  onClick={() => photoInputRef.current?.click()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      photoInputRef.current?.click();
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  sx={{
+                    position: "relative",
+                    width: 120,
+                    height: 120,
+                    borderRadius: "12px",
+                    overflow: "hidden",
+                    border: `1px solid ${alpha(m.navy, 0.12)}`,
+                    bgcolor: alpha(m.navy, 0.04),
+                    cursor: "pointer",
+                  }}
+                >
+                  {publicDraft.photoSrc ? (
+                    <Image
+                      src={publicDraft.photoSrc}
+                      alt={publicDraft.name || "Team member"}
+                      fill
+                      unoptimized
+                      sizes="120px"
+                      style={{ objectFit: "cover" }}
+                    />
+                  ) : (
+                    <Box
+                      sx={{
+                        width: "100%",
+                        height: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 0.75,
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: "999px",
+                          bgcolor: "#fff",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          boxShadow: "0 8px 20px rgba(16,35,63,0.18)",
+                        }}
+                      >
+                        <UploadFileRoundedIcon
+                          sx={{ fontSize: 22, color: alpha(m.navy, 0.55) }}
+                        />
+                      </Box>
+                      <Typography
+                        sx={{
+                          fontSize: 11.5,
+                          fontWeight: 700,
+                          color: alpha(m.navy, 0.55),
+                          px: 1,
+                          textAlign: "center",
+                        }}
+                      >
+                        {businessTeamMemberModalCopy.uploadProfileLabel}
+                      </Typography>
+                    </Box>
+                  )}
                 </Box>
               </Box>
               <input
@@ -386,73 +455,70 @@ export default function CalendarTeamMemberProfileDrawer({
               ) : null}
 
               {publicDraft.categoryId && selectableServices.length > 0 ? (
-                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-                  {selectableServices.map((option) => (
-                    <AppButton
-                      key={option.value}
-                      variant="outlined"
-                      onClick={() =>
-                        setPublicDraft((prev) =>
-                          addTeamMemberServiceSelection(
-                            { ...prev, serviceId: option.value },
-                            businessCategories,
-                            serviceContext,
-                          ),
-                        )
-                      }
-                      sx={{ borderRadius: "10px", textTransform: "none", fontWeight: 700 }}
-                    >
-                      {option.label}
-                    </AppButton>
-                  ))}
+                <Box sx={{ width: "100%" }}>
+                  <Typography
+                    sx={{
+                      fontWeight: 800,
+                      fontSize: 14,
+                      color: alpha(m.navy, 0.88),
+                      mb: 1.25,
+                    }}
+                  >
+                    {businessTeamMemberModalCopy.selectServicesLabel}
+                  </Typography>
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                    {selectableServices.map((option) => {
+                      const isSelected =
+                        publicDraft.categoryId &&
+                        publicDraft.serviceId === option.value;
+
+                      return (
+                        <AppButton
+                          key={option.value}
+                          variant="outlined"
+                          onClick={() =>
+                            setPublicDraft((prev) =>
+                              addTeamMemberServiceSelection(
+                                { ...prev, serviceId: option.value },
+                                businessCategories,
+                                serviceContext,
+                              ),
+                            )
+                          }
+                          sx={{
+                            borderRadius: "10px",
+                            textTransform: "none",
+                            fontWeight: 700,
+                            fontSize: 13,
+                            px: 1.75,
+                            py: 0.75,
+                            borderColor: isSelected ? m.teal : alpha(m.navy, 0.14),
+                            color: isSelected ? m.teal : alpha(m.navy, 0.78),
+                            bgcolor: isSelected ? alpha(m.teal, 0.08) : "#fff",
+                            "&:hover": {
+                              borderColor: m.teal,
+                              bgcolor: alpha(m.teal, 0.06),
+                            },
+                          }}
+                        >
+                          {option.label}
+                        </AppButton>
+                      );
+                    })}
+                  </Box>
                 </Box>
               ) : null}
 
-              <Box
-                sx={{
-                  borderRadius: "10px",
-                  bgcolor: alpha(m.navy, 0.045),
-                  border: `1px solid ${alpha(m.navy, 0.08)}`,
-                  p: 1.5,
-                }}
-              >
-                <Typography sx={{ fontWeight: 800, fontSize: 13, mb: 1 }}>
-                  {businessTeamMemberModalCopy.selectedHeading}
-                </Typography>
-                {displaySelectedGroups.length === 0 ? (
-                  <Typography sx={{ fontSize: 12, color: alpha(m.navy, 0.5) }}>
-                    {businessTeamMemberModalCopy.noSelections}
-                  </Typography>
-                ) : (
-                  displaySelectedGroups.map((group) => (
-                    <Stack
-                      key={group.categoryId}
-                      direction="row"
-                      alignItems="center"
-                      spacing={1}
-                      sx={{ mb: 0.75 }}
-                    >
-                      <Typography sx={{ flex: 1, fontSize: 12.5, fontWeight: 700 }}>
-                        {formatTeamMemberGroupLabel(
-                          group,
-                          businessCategories,
-                          serviceContext,
-                        )}
-                      </Typography>
-                      <IconButton
-                        size="small"
-                        onClick={() =>
-                          setPublicDraft((prev) =>
-                            removeTeamMemberServiceGroup(prev, group.categoryId),
-                          )
-                        }
-                      >
-                        <DeleteOutlineRoundedIcon fontSize="small" />
-                      </IconButton>
-                    </Stack>
-                  ))
-                )}
-              </Box>
+              <TeamMemberAssignedServicesPanel
+                selectedGroups={displaySelectedGroups}
+                businessCategories={businessCategories}
+                serviceContext={serviceContext}
+                onRemoveService={(serviceId) =>
+                  setPublicDraft((prev) =>
+                    removeTeamMemberAssignedService(prev, serviceId),
+                  )
+                }
+              />
             </Stack>
           </Paper>
 
@@ -525,52 +591,225 @@ export default function CalendarTeamMemberProfileDrawer({
               <Divider />
               <Typography sx={{ fontWeight: 800, fontSize: 13 }}>
                 Documents
+                {totalDocumentCount > 0
+                  ? ` (${totalDocumentCount}/${TEAM_MEMBER_MAX_PERSONAL_DOCUMENTS})`
+                  : ""}
               </Typography>
-              {personalDocuments.map((doc, index) => (
-                <Stack
-                  key={`${doc.url}-${index}`}
-                  direction="row"
-                  alignItems="center"
-                  justifyContent="space-between"
-                  sx={{
-                    px: 1.25,
-                    py: 0.75,
-                    borderRadius: "8px",
-                    bgcolor: alpha(m.navy, 0.04),
-                  }}
-                >
-                  <Typography sx={{ fontSize: 12, fontWeight: 700 }}>
-                    {doc.filename}
-                  </Typography>
-                  <IconButton
-                    size="small"
-                    onClick={() =>
-                      setPersonalDocuments((prev) =>
-                        prev.filter((_, docIndex) => docIndex !== index),
-                      )
-                    }
-                  >
-                    <DeleteOutlineRoundedIcon fontSize="small" />
-                  </IconButton>
-                </Stack>
-              ))}
               <AppButton
+                component="label"
+                htmlFor={documentInputId}
                 tone="secondary"
-                onClick={() => documentInputRef.current?.click()}
+                type="button"
+                disabled={!canUploadMoreDocuments}
+                sx={{ borderRadius: "999px", py: 1.25, cursor: "pointer" }}
               >
                 Upload document
               </AppButton>
               <input
+                id={documentInputId}
                 ref={documentInputRef}
                 type="file"
+                multiple
+                accept={MESSAGING_ATTACHMENT_FILE_ACCEPT}
                 hidden
                 onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  setPendingDocumentFile(file);
+                  const files = Array.from(e.target.files ?? []);
+                  if (!files.length) return;
+
+                  const remainingSlots =
+                    TEAM_MEMBER_MAX_PERSONAL_DOCUMENTS -
+                    personalDocuments.length -
+                    pendingDocumentFiles.length;
+
+                  if (remainingSlots <= 0) {
+                    showSnackbar({
+                      severity: "warning",
+                      message: `Maximum ${TEAM_MEMBER_MAX_PERSONAL_DOCUMENTS} documents allowed.`,
+                    });
+                    e.target.value = "";
+                    return;
+                  }
+
+                  const acceptedFiles: File[] = [];
+                  for (const file of files) {
+                    if (acceptedFiles.length >= remainingSlots) break;
+                    const validationError = validateMessagingAttachmentFile(file);
+                    if (validationError) {
+                      showSnackbar({
+                        severity: "error",
+                        message: validationError,
+                      });
+                      continue;
+                    }
+                    acceptedFiles.push(file);
+                  }
+
+                  if (files.length > remainingSlots) {
+                    showSnackbar({
+                      severity: "warning",
+                      message: `Only ${remainingSlots} more document(s) can be added (max ${TEAM_MEMBER_MAX_PERSONAL_DOCUMENTS}).`,
+                    });
+                  }
+
+                  if (acceptedFiles.length > 0) {
+                    setPendingDocumentFiles((prev) => [...prev, ...acceptedFiles]);
+                  }
                   e.target.value = "";
                 }}
               />
+              {(personalDocuments.length > 0 || pendingDocumentFiles.length > 0) && (
+                <Stack spacing={1}>
+                  {personalDocuments.map((doc, index) => {
+                    const docUrl = resolveMediaUrl(doc.url);
+                    const isImage = /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(
+                      doc.filename ?? "",
+                    );
+
+                    return (
+                      <Box
+                        key={`${doc.url}-${index}`}
+                        sx={{
+                          borderRadius: "10px",
+                          border: `1px solid ${alpha(m.navy, 0.08)}`,
+                          bgcolor: alpha(m.navy, 0.03),
+                          overflow: "hidden",
+                        }}
+                      >
+                        {isImage && docUrl ? (
+                          <Box
+                            sx={{
+                              position: "relative",
+                              width: "100%",
+                              height: 140,
+                              bgcolor: alpha(m.navy, 0.04),
+                            }}
+                          >
+                            <Image
+                              src={docUrl}
+                              alt={doc.filename}
+                              fill
+                              unoptimized
+                              sizes="360px"
+                              style={{ objectFit: "cover" }}
+                            />
+                          </Box>
+                        ) : null}
+                        <Stack
+                          direction="row"
+                          alignItems="center"
+                          justifyContent="space-between"
+                          sx={{ px: 1.25, py: 0.9 }}
+                        >
+                          <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+                            {!isImage ? (
+                              <InsertDriveFileRoundedIcon
+                                sx={{ fontSize: 20, color: alpha(m.navy, 0.45) }}
+                              />
+                            ) : null}
+                            <Typography
+                              sx={{
+                                fontSize: 12,
+                                fontWeight: 700,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {doc.filename}
+                            </Typography>
+                          </Stack>
+                          <IconButton
+                            size="small"
+                            onClick={() =>
+                              setPersonalDocuments((prev) =>
+                                prev.filter((_, docIndex) => docIndex !== index),
+                              )
+                            }
+                          >
+                            <DeleteOutlineRoundedIcon fontSize="small" />
+                          </IconButton>
+                        </Stack>
+                      </Box>
+                    );
+                  })}
+                  {pendingDocumentFiles.map((file, index) => {
+                    const previewUrl = pendingDocumentPreviewUrls[index];
+
+                    return (
+                      <Box
+                        key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
+                        sx={{
+                          borderRadius: "10px",
+                          border: `1px dashed ${alpha(m.teal, 0.35)}`,
+                          bgcolor: alpha(m.teal, 0.06),
+                          overflow: "hidden",
+                        }}
+                      >
+                        {previewUrl ? (
+                          <Box
+                            sx={{
+                              position: "relative",
+                              width: "100%",
+                              height: 140,
+                              bgcolor: alpha(m.navy, 0.04),
+                            }}
+                          >
+                            <Image
+                              src={previewUrl}
+                              alt={file.name}
+                              fill
+                              unoptimized
+                              sizes="360px"
+                              style={{ objectFit: "cover" }}
+                            />
+                          </Box>
+                        ) : null}
+                        <Stack
+                          direction="row"
+                          alignItems="center"
+                          justifyContent="space-between"
+                          sx={{ px: 1.25, py: 0.9 }}
+                        >
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            alignItems="center"
+                            sx={{ minWidth: 0 }}
+                          >
+                            {!previewUrl ? (
+                              <InsertDriveFileRoundedIcon
+                                sx={{ fontSize: 20, color: m.teal }}
+                              />
+                            ) : null}
+                            <Typography
+                              sx={{
+                                fontSize: 12,
+                                fontWeight: 700,
+                                color: m.teal,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {file.name}
+                            </Typography>
+                          </Stack>
+                          <IconButton
+                            size="small"
+                            onClick={() =>
+                              setPendingDocumentFiles((prev) =>
+                                prev.filter((_, fileIndex) => fileIndex !== index),
+                              )
+                            }
+                          >
+                            <DeleteOutlineRoundedIcon fontSize="small" />
+                          </IconButton>
+                        </Stack>
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              )}
             </Stack>
           </Paper>
         </Stack>

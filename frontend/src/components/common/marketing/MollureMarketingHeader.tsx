@@ -151,7 +151,9 @@ export default function MollureMarketingHeader({
   const user = useAppSelector((state) => state.auth.user);
   const [persisted, setPersisted] = React.useState<ReturnType<
     typeof getPersistedAuthSession
-  > | null>(null);
+  > | null>(() =>
+    typeof window === "undefined" ? null : getPersistedAuthSession(),
+  );
   const pathname = usePathname() ?? "";
   const pathForActive = activePath ?? pathname;
   const isProfessionalsRoute =
@@ -247,13 +249,11 @@ export default function MollureMarketingHeader({
 
   const audienceSwitchSx = {
     ...pillOutlineSx,
-    maxWidth: { xs: 170, sm: 200, md: 240 },
-    minWidth: 0,
+    minWidth: { xs: 112, sm: 120, md: 128 },
     flexShrink: 0,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
     textAlign: "center" as const,
     textTransform: "none" as const,
+    whiteSpace: "nowrap" as const,
   };
 
   return (
@@ -530,7 +530,7 @@ export default function MollureMarketingHeader({
                   </AppButton>
                 )}
 
-                {!isAuthed && professionalLinkLabel ? (
+                {!mounted ? null : !isAuthed && professionalLinkLabel ? (
                   professionalHref ? (
                     <AppButton
                       component={Link}

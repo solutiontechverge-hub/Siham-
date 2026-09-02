@@ -1,4 +1,5 @@
 import type { ClientRecord } from "./data/clientList";
+import { DEFAULT_DIAL_CODE } from "../../../../lib/phoneDefaults";
 
 export type { ClientKind, ClientRecord } from "./data/clientList";
 export type { ClientListFilterKey } from "./data/clientListFilters";
@@ -77,7 +78,7 @@ export const emptyEditCompanyForm = (): EditCompanyFormState => ({
   contactFirst: "",
   contactLast: "",
   gender: "",
-  countryCode: "+44",
+  countryCode: DEFAULT_DIAL_CODE,
   phone: "",
   street: "",
   streetNumber: "",
@@ -93,7 +94,7 @@ export const emptyEditIndividualForm = (): EditIndividualFormState => ({
   lastName: "",
   gender: "",
   dob: "",
-  countryCode: "+44",
+  countryCode: DEFAULT_DIAL_CODE,
   phone: "",
   email: "",
   residentialAddress: "",

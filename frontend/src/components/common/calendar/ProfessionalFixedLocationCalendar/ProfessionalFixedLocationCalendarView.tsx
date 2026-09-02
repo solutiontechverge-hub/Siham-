@@ -372,6 +372,7 @@ export type ProfessionalFixedLocationCalendarProps = {
   data: ProfessionalFixedLocationCalendarData;
   calendarSettings?: ParsedCalendarSettings | null;
   serviceOptions?: string[];
+  categoryOptions?: readonly { key: string; label: string }[];
   serviceCatalog?: readonly BookingCatalogService[];
   serviceOrderDefaults?: ServiceOrderSettings;
   fixedLocationAddress?: string;
@@ -486,6 +487,7 @@ export default function ProfessionalFixedLocationCalendar({
   data,
   calendarSettings,
   serviceOptions = [],
+  categoryOptions = [],
   serviceCatalog = [],
   serviceOrderDefaults,
   fixedLocationAddress,
@@ -2191,23 +2193,15 @@ export default function ProfessionalFixedLocationCalendar({
       const namedServiceColor = serviceNames
         .map((name) => appliedDesign.colorsByService?.[String(name)])
         .find(Boolean);
-      const teamColor = appliedDesign.colorsByTeamMember?.[event.resourceId];
-      const statusColor = appliedDesign.colorsByStatus?.[event.status];
 
-      let cardColor: string | undefined;
-      if (appliedDesign.scope === "Team Members") {
-        cardColor = teamColor ?? categoryColor;
-      } else if (appliedDesign.scope === "Services") {
-        cardColor = namedServiceColor ?? categoryColor;
-      } else if (appliedDesign.scope === "Status") {
-        cardColor = statusColor ?? categoryColor;
-      } else {
-        cardColor = categoryColor;
-      }
+      const cardColor =
+        appliedDesign.scope === "Services"
+          ? namedServiceColor ?? categoryColor
+          : categoryColor;
 
       return {
         serviceColor: cardColor,
-        statusColor,
+        statusColor: undefined,
       };
     },
     [appliedDesign, lookupCategoryColor, resolveEventCategoryKey],
@@ -2628,8 +2622,8 @@ export default function ProfessionalFixedLocationCalendar({
 
   const teamLabelById = React.useMemo(() => {
     const map = new Map<string, string>();
-    data.resources.forEach((r, idx) => {
-      map.set(r.id, `Team Member ${String.fromCharCode(65 + idx)}`);
+    data.resources.forEach((r) => {
+      map.set(r.id, r.name);
     });
     return map;
   }, [data.resources]);
@@ -8454,6 +8448,7 @@ export default function ProfessionalFixedLocationCalendar({
           }
           serviceOrder={serviceOrderDraft}
           appliedDesign={appliedDesign}
+          categoryOptions={categoryOptions}
           isSaving={isSaving}
           onBookingRulesChange={setBookingRules}
           onServiceOrderChange={setServiceOrderDraft}
@@ -8488,62 +8483,6 @@ export default function ProfessionalFixedLocationCalendar({
               severity: "success",
               message: "Service order saved.",
             });
-          }}
-          onEditAppearanceColor={() => {
-            setDesignDraft(appliedDesign);
-            setDesignOpen(true);
-          }}
-          onRemoveAppearanceColor={async (key) => {
-            const nextDesign: CalendarDesignDraft =
-              appliedDesign.scope === "Services"
-                ? {
-                    ...appliedDesign,
-                    colorsByService: Object.fromEntries(
-                      Object.entries(
-                        appliedDesign.colorsByService ?? {},
-                      ).filter(([entryKey]) => entryKey !== key),
-                    ),
-                  }
-                : appliedDesign.scope === "Status"
-                  ? {
-                      ...appliedDesign,
-                      colorsByStatus: Object.fromEntries(
-                        Object.entries(
-                          appliedDesign.colorsByStatus ?? {},
-                        ).filter(([entryKey]) => entryKey !== key),
-                      ),
-                    }
-                  : appliedDesign.scope === "Team Members"
-                    ? {
-                        ...appliedDesign,
-                        colorsByTeamMember: Object.fromEntries(
-                          Object.entries(
-                            appliedDesign.colorsByTeamMember ?? {},
-                          ).filter(([entryKey]) => entryKey !== key),
-                        ),
-                      }
-                    : {
-                        ...appliedDesign,
-                        colorsByCategory: Object.fromEntries(
-                          Object.entries(
-                            appliedDesign.colorsByCategory ?? {},
-                          ).filter(([entryKey]) => entryKey !== key),
-                        ),
-                      };
-            setAppliedDesign(nextDesign);
-            setDesignDraft(nextDesign);
-            try {
-              await persistAvailabilitySettings({ design: nextDesign });
-              showSnackbar({
-                severity: "success",
-                message: "Calendar colour removed.",
-              });
-            } catch {
-              showSnackbar({
-                severity: "error",
-                message: "Unable to remove calendar colour.",
-              });
-            }
           }}
         />
       ) : null}
@@ -9612,7 +9551,7 @@ export default function ProfessionalFixedLocationCalendar({
                       }
                       countryCodeError={slotErrors.nonMollurePhoneCode}
                       phoneError={slotErrors.nonMollurePhoneNumber}
-                      phonePlaceholder="+442xxxxxxxxxx"
+                      phonePlaceholder="+316xxxxxxxx"
                     />
 
                     <AppTextField
@@ -9894,7 +9833,7 @@ export default function ProfessionalFixedLocationCalendar({
                       }
                       countryCodeError={slotErrors.nonMollurePhoneCode}
                       phoneError={slotErrors.nonMollurePhoneNumber}
-                      phonePlaceholder="+442xxxxxxxxxx"
+                      phonePlaceholder="+316xxxxxxxx"
                     />
 
                     <AppTextField
@@ -12528,7 +12467,7 @@ export default function ProfessionalFixedLocationCalendar({
                           }
                           countryCodeError={slotErrors.bookingPhoneCode}
                           phoneError={slotErrors.bookingPhoneNumber}
-                          phonePlaceholder="+442xxxxxxxxxx"
+                          phonePlaceholder="+316xxxxxxxx"
                           required={false}
                           disabled={isViewingExisting}
                         />
@@ -13510,10 +13449,7 @@ export default function ProfessionalFixedLocationCalendar({
         draft={designDraft}
         setDraft={setDesignDraft}
         serviceOptions={serviceOptions}
-        teamMemberOptions={data.resources.map((resource) => ({
-          id: resource.id,
-          name: resource.name,
-        }))}
+        categoryOptions={categoryOptions}
       />
       <CalendarServiceOrderModal
         draft={serviceOrderDraft}
