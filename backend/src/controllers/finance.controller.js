@@ -20,6 +20,10 @@ import {
   syncBookingToFinanceTransaction,
 } from "../services/finance-sync.service.js";
 import {
+  logAddonPaidActivity,
+  logRefundCompletedActivity,
+} from "../services/bookingActivity.service.js";
+import {
   DEFAULT_INVOICE_SETTINGS,
   mergeInvoiceSettings,
 } from "../helpers/financeInvoiceSettings.js";
@@ -412,6 +416,15 @@ export const createFinanceTransaction = async (req, res) => {
     const net = gross - (stripeFee ?? 0) - (mollureFee ?? 0);
     const today = new Date().toISOString().slice(0, 10);
     const entryNum = String(100 + Math.floor(Math.random() * 900));
+    const paymentPhase = body.paymentPhase === "addon" ? "addon" : null;
+    const isAddon = paymentPhase === "addon";
+    const bookingRef =
+      (typeof body.bookingRef === "string" && body.bookingRef.trim()) ||
+      (typeof body.bookingId === "string" && body.bookingId.trim()) ||
+      null;
+    const addonId =
+      (typeof body.addonId === "string" && body.addonId.trim()) ||
+      (isAddon ? `addon-${Date.now()}` : null);
 
     const lineItems = Array.isArray(body.lines)
       ? body.lines.map((line) => ({
@@ -433,6 +446,43 @@ export const createFinanceTransaction = async (req, res) => {
       });
     }
 
+    let bookingUuid = null;
+    if (bookingRef) {
+      const bookingLookup = await query(
+        `SELECT b.id, b.unique_code
+         FROM bookings b
+         INNER JOIN business_setups bs ON bs.id = b.business_setup_id
+         WHERE bs.professional_profile_id = $1
+           AND (b.id::text = $2 OR b.unique_code = $2)
+         LIMIT 1`,
+        [profile.id, bookingRef],
+      );
+      if (bookingLookup.rows[0]) {
+        bookingUuid = bookingLookup.rows[0].id;
+        if (!body.bookingRef) {
+          body.bookingRef = bookingLookup.rows[0].unique_code;
+        }
+      }
+    }
+
+    const entryType = bookingRef
+      ? body.entryType === "offlineBooking"
+        ? "offlineBooking"
+        : "onlineBooking"
+      : "manualEntry";
+    const entryLabel = isAddon
+      ? "Add-ons"
+      : bookingRef
+        ? body.entryLabel || "Booking"
+        : "Manual entry";
+    const status = isAddon
+      ? isOnline
+        ? "Pending"
+        : "Paid"
+      : isOnline
+        ? "Pending"
+        : "Paid";
+
     const document = {
       documentNumber: `INV-G${entryNum}`,
       receiptNumber: isOnline ? undefined : `RCP-G${entryNum}`,
@@ -445,6 +495,8 @@ export const createFinanceTransaction = async (req, res) => {
       },
       lineItems,
       totalPrice: formatEuro(gross),
+      ...(paymentPhase ? { paymentPhase } : {}),
+      ...(addonId ? { addonId, payerKey: addonId } : {}),
     };
 
     const result = await query(
@@ -452,17 +504,19 @@ export const createFinanceTransaction = async (req, res) => {
         professional_profile_id, entry_type, entry_id, transaction_date, entry_label,
         client_name, client_email, client_type,
         gross_amount, stripe_fee, mollure_fee, net_amount,
-        method_title, method_detail, status, status_detail, document
+        method_title, method_detail, status, status_detail, booking_id, document
       ) VALUES (
-        $1, 'manualEntry', $2, $3::date, 'Manual entry',
-        $4, $5, $6,
-        $7, $8, $9, $10,
-        $11, $12, $13, $14, $15::jsonb
+        $1, $2, $3, $4::date, $5,
+        $6, $7, $8,
+        $9, $10, $11, $12,
+        $13, $14, $15, $16, $17, $18::jsonb
       ) RETURNING *`,
       [
         profile.id,
+        entryType,
         entryNum,
         today,
+        entryLabel,
         body.clientName ?? "Guest",
         body.clientEmail ?? "",
         body.clientType ?? "guest",
@@ -472,15 +526,26 @@ export const createFinanceTransaction = async (req, res) => {
         net,
         isOnline ? "Online – direct" : "Offline – direct",
         isOnline ? "iDeal" : "",
-        isOnline ? "Pending" : "Paid",
+        status,
         isOnline ? "Pay within 15 min" : null,
+        body.bookingRef || bookingRef,
         JSON.stringify(document),
       ],
     );
 
+    if (isAddon && (bookingUuid || bookingRef)) {
+      void logAddonPaidActivity({
+        bookingId: bookingUuid,
+        bookingCode: body.bookingRef || bookingRef,
+        amount: gross,
+        actorLabel: body.clientName || "Client",
+        addonId,
+      });
+    }
+
     return res.status(201).json({
       success: true,
-      message: "Transaction created.",
+      message: isAddon ? "Add-on sale created." : "Transaction created.",
       data: mapTransactionRow(result.rows[0]),
     });
   } catch (error) {
@@ -612,6 +677,13 @@ export const bulkFinanceTransactionAction = async (req, res) => {
            WHERE id = $1 AND professional_profile_id = $2`,
           [row.id, profile.id, JSON.stringify(creditDocument)],
         );
+
+        if (row.booking_id) {
+          void logRefundCompletedActivity({
+            bookingCode: row.booking_id,
+            actorLabel: "Professional",
+          });
+        }
       }
 
       return res.status(200).json({

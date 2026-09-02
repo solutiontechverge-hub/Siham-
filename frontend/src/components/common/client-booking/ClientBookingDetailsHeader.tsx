@@ -72,8 +72,14 @@ type Props = {
   apiEditGrantActive?: boolean;
   /** Show Updated next to Confirmed after post-accept edits. */
   showUpdated?: boolean;
+  updatedSignpostTitle?: string;
+  onUpdatedClick?: () => void;
   /** Confirmed booking was edited after ER/EBR accept. */
   showEditScenario?: boolean;
+  ebrSignpostTitle?: string;
+  onEbrClick?: () => void;
+  erSignpostTitle?: string;
+  onErClick?: () => void;
   /** BR/EBR/ER response window elapsed. */
   responseOverdue?: boolean;
   messagingHref?: string;
@@ -103,7 +109,13 @@ export default function ClientBookingDetailsHeader({
   onSendConfirmedEditRequest,
   apiEditGrantActive = false,
   showUpdated = false,
+  updatedSignpostTitle,
+  onUpdatedClick,
   showEditScenario = false,
+  ebrSignpostTitle,
+  onEbrClick,
+  erSignpostTitle,
+  onErClick,
   responseOverdue = false,
   messagingHref,
 }: Props) {
@@ -458,7 +470,13 @@ export default function ClientBookingDetailsHeader({
               }
               rowMode={requestRowMode}
               showUpdated={showUpdated}
+              updatedSignpostTitle={updatedSignpostTitle}
+              onUpdatedClick={onUpdatedClick}
               showEditScenario={showEditScenario}
+              ebrSignpostTitle={ebrSignpostTitle}
+              onEbrClick={onEbrClick}
+              erSignpostTitle={erSignpostTitle}
+              onErClick={onErClick}
               responseOverdue={responseOverdue}
             />
           </Stack>

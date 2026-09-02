@@ -47,6 +47,10 @@ import { settleCancellationFee } from "./settleCancellationFee";
 import ClientBookingDetailsHeader from "./ClientBookingDetailsHeader";
 import BookingActivityOverview from "../calendar/BookingActivityOverview";
 import { buildBookingActivityTimeline } from "../calendar/buildBookingActivityTimeline";
+import {
+  ACTIVITY_COMPARISON_SIGNPOST,
+  findActivityComparisonItem,
+} from "../calendar/buildActivityComparison";
 import type { BookingActivityItem } from "../calendar/bookingActivity.types";
 import ClientBookingInfoBar from "./ClientBookingInfoBar";
 import ClientBookingPaymentDetailsCard from "./ClientBookingPaymentDetailsCard";
@@ -106,6 +110,7 @@ import {
   useCreateBookingMutation,
   useDispatchBookingNotificationMutation,
   useGetAllBusinessSetupsQuery,
+  useGetBookingActivityQuery,
   useManageBookingEditRequestMutation,
   useUpdateMyBookingMutation,
 } from "../../../store/services/businessApi";
@@ -229,35 +234,17 @@ export default function ClientBookingDetailsView({
       : ("none" as const);
   const apiBookingId = activeBooking?.apiBookingId ?? activeBooking?.id ?? null;
 
-  const activityTimelineItems = React.useMemo(
-    () =>
-      buildBookingActivityTimeline({
-        bookings: apiBookings,
-        clientEmail: user?.email ?? null,
-        clientName: requesterName,
-        currentBookingId: apiBookingId,
-        currentBookingCode: bookingRef,
-        currentScenario: activeBooking?.incomingEditRequest
-          ? "EBR"
-          : bookingStatus === "requested"
-            ? "BR"
-            : null,
-        currentStatus: bookingStatus,
-        currentProfessionalName: resolvePrimaryProfessional(draft).name,
-        mode: "activity",
-      }),
-    [
-      activeBooking?.incomingEditRequest,
-      apiBookingId,
-      apiBookings,
-      bookingRef,
-      bookingStatus,
-      draft,
-      requesterName,
-      user?.email,
-    ],
+  const { data: bookingActivityResponse } = useGetBookingActivityQuery(
+    {
+      bookingId: apiBookingId,
+      bookingCode: bookingRef,
+    },
+    {
+      skip: !apiBookingId && !bookingRef,
+    },
   );
 
+  // Activity timeline is built after bookingNotesMeta / displayDraft below.
   const [cancelDialogOpen, setCancelDialogOpen] = React.useState(false);
   const [cancelFeeDialogOpen, setCancelFeeDialogOpen] = React.useState(false);
   const [cancelFeeStripeOpen, setCancelFeeStripeOpen] = React.useState(false);
@@ -2238,6 +2225,77 @@ export default function ClientBookingDetailsView({
     () => parseCalendarEntryNotes(activeBooking?.notes),
     [activeBooking?.notes],
   );
+
+  const activityTimelineItems = React.useMemo(() => {
+    const scopedBookings = (apiBookings ?? []).filter((booking) => {
+      if (apiBookingId && String(booking.id) === String(apiBookingId)) return true;
+      if (bookingRef && booking.unique_code === bookingRef) return true;
+      return false;
+    });
+
+    return buildBookingActivityTimeline({
+      bookings: scopedBookings,
+      clientEmail: user?.email ?? null,
+      clientName: requesterName,
+      currentBookingId: apiBookingId,
+      currentBookingCode: bookingRef,
+      currentScenario: activeBooking?.incomingEditRequest
+        ? "EBR"
+        : editRequest.isPending
+          ? "ER"
+          : bookingStatus === "requested"
+            ? "BR"
+            : null,
+      currentStatus: bookingStatus,
+      currentProfessionalName: resolvePrimaryProfessional(draft).name,
+      currentBookingType: null,
+      currentDetails: {
+        originalServices: bookingNotesMeta?.originalServices,
+        services: displayDraft?.services,
+        products: displayDraft?.products,
+        editedServiceIds: bookingNotesMeta?.editedServiceIds,
+        editedProductIds: bookingNotesMeta?.editedProductIds,
+        addedServiceIds: bookingNotesMeta?.addedServiceIds,
+        cancelledServiceIds: bookingNotesMeta?.cancelledServiceIds,
+        phoneCode: bookingNotesMeta?.phoneCode,
+        phoneNumber: bookingNotesMeta?.phoneNumber,
+        guests: bookingNotesMeta?.guests,
+        desiredLocation: bookingNotesMeta?.desiredLocation,
+        silentUpdated: bookingNotesMeta?.silentUpdated,
+        silentUpdateSnapshot: bookingNotesMeta?.silentUpdateSnapshot,
+        lastEditedBy: bookingNotesMeta?.lastEditedBy,
+      },
+      apiEvents: bookingActivityResponse?.data ?? null,
+      mode: "activity",
+    });
+  }, [
+    activeBooking?.incomingEditRequest,
+    apiBookingId,
+    apiBookings,
+    bookingActivityResponse?.data,
+    bookingNotesMeta,
+    bookingRef,
+    bookingStatus,
+    displayDraft?.products,
+    displayDraft?.services,
+    draft,
+    editRequest.isPending,
+    requesterName,
+    user?.email,
+  ]);
+
+  const openActivityComparison = React.useCallback(
+    (mode?: "ebr" | "er" | "silent_updated") => {
+      const target = findActivityComparisonItem(activityTimelineItems, {
+        bookingRef,
+        mode,
+      });
+      setActivityOpen(true);
+      setActivityDetailItem(target);
+    },
+    [activityTimelineItems, bookingRef],
+  );
+
   /**
    * Line-change tags after EBR accept (client or professional).
    */
@@ -2492,6 +2550,8 @@ export default function ClientBookingDetailsView({
                 "professional"
             }
             showUpdated={showStatusUpdated}
+            updatedSignpostTitle={ACTIVITY_COMPARISON_SIGNPOST}
+            onUpdatedClick={() => openActivityComparison("silent_updated")}
             showEditScenario={
               bookingStatus === "confirmed" &&
               !editRequest.isPending &&
@@ -2501,6 +2561,10 @@ export default function ClientBookingDetailsView({
                 Boolean(activeBooking?.editedProductIds?.length) ||
                 isClientChangeAccepted)
             }
+            ebrSignpostTitle={ACTIVITY_COMPARISON_SIGNPOST}
+            onEbrClick={() => openActivityComparison("ebr")}
+            erSignpostTitle={ACTIVITY_COMPARISON_SIGNPOST}
+            onErClick={() => openActivityComparison("er")}
             responseOverdue={isResponseWindowOverdue({
               responseStatus: bookingNotesMeta?.responseStatus,
               responseStartedAt: bookingNotesMeta?.responseStartedAt,
@@ -2733,7 +2797,19 @@ export default function ClientBookingDetailsView({
           setActivityOpen(false);
           setActivityDetailItem(null);
         }}
-        title="Activity"
+        title={
+          activityDetailItem
+            ? activityDetailItem.detailType === "cancellation"
+              ? "Activity Details"
+              : activityDetailItem.detailType === "comparison" ||
+                  activityDetailItem.comparison
+                ? "Comparison"
+                : "Edit request details"
+            : "Activity"
+        }
+        onBack={
+          activityDetailItem ? () => setActivityDetailItem(null) : undefined
+        }
         panelWidth={420}
       >
         <Box sx={{ px: 2, pb: 2 }}>

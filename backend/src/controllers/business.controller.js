@@ -21,6 +21,11 @@ import {
   pickSectionDraft,
 } from "../utils/business-setup-draft.js";
 import { syncBookingToFinanceTransaction } from "../services/finance-sync.service.js";
+import {
+  listBookingActivityEvents,
+  logBookingCreatedActivity,
+  logBookingStatusActivity,
+} from "../services/bookingActivity.service.js";
 import { getTeamMemberReviewAggregates } from "../services/review.service.js";
 import { safeEnsureProfessionalClientFromBooking } from "../services/professional-clients.service.js";
 import {
@@ -74,27 +79,27 @@ const parseJsonValue = (value, fallback) => {
   }
 };
 
-/** Default Service Order Rules for new professionals (Business Setup Services Details). */
-const PLATFORM_DEFAULT_SERVICE_CATEGORY_LABELS = [
-  "Hair",
-  "Make-Up",
-  "Lashes",
-  "Eyebrows",
-  "Facial treatment",
-  "Nails",
-  "Body treatment",
-  "Hair Removal",
-];
-
-const buildPlatformDefaultServiceOrder = () => ({
-  categories: [...PLATFORM_DEFAULT_SERVICE_CATEGORY_LABELS],
-  servicesByCategory: Object.fromEntries(
-    PLATFORM_DEFAULT_SERVICE_CATEGORY_LABELS.map((label) => [label, []]),
-  ),
-  hiddenCategories: [],
-  hiddenServicesByCategory: {},
+const normalizeSavedServiceOrder = (saved) => ({
+  categories: Array.isArray(saved.categories) ? saved.categories.map(String) : [],
+  servicesByCategory:
+    saved.servicesByCategory && typeof saved.servicesByCategory === "object"
+      ? saved.servicesByCategory
+      : {},
+  hiddenCategories: Array.isArray(saved.hiddenCategories)
+    ? saved.hiddenCategories.map(String)
+    : [],
+  hiddenServicesByCategory:
+    saved.hiddenServicesByCategory &&
+    typeof saved.hiddenServicesByCategory === "object"
+      ? saved.hiddenServicesByCategory
+      : {},
 });
 
+/**
+ * Preserve a saved Service Order when present.
+ * Do not invent the platform-8 category list — the client seeds defaults from the
+ * Business Template (service_details) so Edit is always available from day one.
+ */
 const ensureAvailabilityServiceOrder = (availability) => {
   const base =
     availability && typeof availability === "object" && !Array.isArray(availability)
@@ -110,28 +115,20 @@ const ensureAvailabilityServiceOrder = (availability) => {
   if (hasCategories) {
     return {
       ...base,
-      serviceOrder: {
-        categories: saved.categories.map(String),
-        servicesByCategory:
-          saved.servicesByCategory && typeof saved.servicesByCategory === "object"
-            ? saved.servicesByCategory
-            : {},
-        hiddenCategories: Array.isArray(saved.hiddenCategories)
-          ? saved.hiddenCategories.map(String)
-          : [],
-        hiddenServicesByCategory:
-          saved.hiddenServicesByCategory &&
-          typeof saved.hiddenServicesByCategory === "object"
-            ? saved.hiddenServicesByCategory
-            : {},
-      },
+      serviceOrder: normalizeSavedServiceOrder(saved),
     };
   }
 
-  return {
-    ...base,
-    serviceOrder: buildPlatformDefaultServiceOrder(),
-  };
+  if (saved && typeof saved === "object") {
+    return {
+      ...base,
+      serviceOrder: normalizeSavedServiceOrder(saved),
+    };
+  }
+
+  const next = { ...base };
+  delete next.serviceOrder;
+  return next;
 };
 
 const parseTextArray = (value) => {
@@ -1605,6 +1602,26 @@ export const createCalendarEntry = async (req, res) => {
       }
     }
 
+    // Offline / confirmed calendar bookings: register Activity with real timestamps.
+    // Requested BRs are logged when mirrored into `bookings` (avoid duplicates).
+    if (entry && normalizedStatus !== "blocked" && normalizedStatus !== "requested") {
+      void logBookingCreatedActivity(
+        {
+          id: null,
+          unique_code: entry.unique_code,
+          status: entry.status,
+          booking_type: entry.booking_type,
+          prepayment_status: null,
+          total_price: null,
+          created_at: entry.created_at,
+        },
+        {
+          actor: "professional",
+          actorLabel: "Professional",
+        },
+      );
+    }
+
     emitBusinessChangedForProfile(professionalProfile.id, {
       action: "updated",
       scope: "calendar",
@@ -2061,6 +2078,10 @@ const mirrorCalendarRequestToBooking = async ({
     } catch {
       // Socket emit is best-effort.
     }
+    void logBookingCreatedActivity(booking, {
+      actor: "professional",
+      actorLabel: "Professional",
+    });
   }
   return booking;
 };
@@ -2487,6 +2508,8 @@ export const createBooking = async (req, res) => {
       await safeEnsureProfessionalClientFromBooking(booking.id);
     }
 
+    void logBookingCreatedActivity(booking);
+
     void dispatchBookingCreatedNotifications(booking).catch((error) => {
       console.error("[booking-notification] create dispatch failed:", error.message || error);
     });
@@ -2547,7 +2570,8 @@ export const updateCalendarEntryStatus = async (req, res) => {
     }
 
     const existingForGuard = await query(
-      `SELECT booking_type FROM calendar_entries
+      `SELECT booking_type, status, unique_code, client_name
+       FROM calendar_entries
        WHERE id = $1 AND professional_profile_id = $2
        LIMIT 1`,
       [entryId, professionalProfile.id],
@@ -2559,8 +2583,9 @@ export const updateCalendarEntryStatus = async (req, res) => {
         data: null,
       });
     }
+    const previousEntry = existingForGuard.rows[0];
     const offlineStatusError = assertOfflineAllowsStatus(
-      existingForGuard.rows[0].booking_type,
+      previousEntry.booking_type,
       status,
     );
     if (offlineStatusError) {
@@ -2589,6 +2614,22 @@ export const updateCalendarEntryStatus = async (req, res) => {
       });
     }
 
+    const entry = result.rows[0];
+    void logBookingStatusActivity(
+      {
+        id: null,
+        unique_code: entry.unique_code,
+        status: entry.status,
+        booking_type: entry.booking_type,
+        prepayment_status: null,
+        total_price: null,
+      },
+      {
+        previousStatus: previousEntry.status,
+        actorLabel: "Professional",
+      },
+    );
+
     emitBusinessChangedForProfile(professionalProfile.id, {
       action: "updated",
       scope: "calendar",
@@ -2597,7 +2638,7 @@ export const updateCalendarEntryStatus = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Calendar entry status updated successfully.",
-      data: result.rows[0],
+      data: entry,
     });
   } catch (error) {
     return res.status(500).json({
@@ -3026,6 +3067,11 @@ export const updateMyBooking = async (req, res) => {
           req.body.notify_incoming_er === true || req.body.email_scenario === "incoming_er",
       });
     }
+    void logBookingStatusActivity(booking, {
+      previousStatus,
+      previousPrepayment: existing.prepayment_status,
+      actorLabel: "Client",
+    });
     emitBookingChanged(booking, "updated");
 
     return res.status(200).json({
@@ -3078,7 +3124,8 @@ export const updateBookingStatus = async (req, res) => {
     // calendar overview lists bookings across setups; Accept/Reject must match that.
     const existingResult = await query(
       `SELECT b.status, b.notes, b.total_price, b.booking_date, b.start_time, b.end_time,
-              b.business_setup_id, b.customer_id, b.edit_request
+              b.business_setup_id, b.customer_id, b.edit_request, b.prepayment_status,
+              b.booking_type, b.unique_code
        FROM bookings b
        INNER JOIN business_setups bs ON bs.id = b.business_setup_id
        WHERE b.id = $1
@@ -3283,6 +3330,12 @@ export const updateBookingStatus = async (req, res) => {
       initiatedBy: req.body.initiated_by === "client" ? "client" : "professional",
     });
 
+    void logBookingStatusActivity(booking, {
+      previousStatus,
+      previousPrepayment: existingBooking.prepayment_status,
+      actorLabel: "Professional",
+    });
+
     emitBookingChanged(booking, "updated");
 
     return res.status(200).json({
@@ -3474,6 +3527,127 @@ export const manageBookingEditRequest = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to update edit request.",
+      data: {
+        error: error.message,
+      },
+    });
+  }
+};
+
+export const getBookingActivity = async (req, res) => {
+  try {
+    const rawId = typeof req.params.id === "string" ? req.params.id.trim() : "";
+    const bookingIdParam = parseUuid(rawId);
+    const bookingCode =
+      (typeof req.query.code === "string" && req.query.code.trim()) ||
+      (!bookingIdParam && rawId ? rawId : null);
+
+    if (!bookingIdParam && !bookingCode) {
+      return res.status(400).json({
+        success: false,
+        message: "Booking id or code is required.",
+        data: null,
+      });
+    }
+
+    let authorizedBookingId = null;
+    let authorizedCode = bookingCode;
+
+    if (bookingIdParam) {
+      const access = await query(
+        `SELECT
+           b.id,
+           b.unique_code,
+           b.customer_id,
+           pp.user_id AS professional_user_id
+         FROM bookings b
+         INNER JOIN business_setups bs ON bs.id = b.business_setup_id
+         INNER JOIN professional_profiles pp ON pp.id = bs.professional_profile_id
+         WHERE b.id = $1
+         LIMIT 1`,
+        [bookingIdParam],
+      );
+      const row = access.rows[0];
+      if (!row) {
+        return res.status(404).json({
+          success: false,
+          message: "Booking not found.",
+          data: null,
+        });
+      }
+      const allowed =
+        row.customer_id === req.user.id || row.professional_user_id === req.user.id;
+      if (!allowed) {
+        return res.status(403).json({
+          success: false,
+          message: "Not authorized to view this booking activity.",
+          data: null,
+        });
+      }
+      authorizedBookingId = row.id;
+      authorizedCode = row.unique_code || bookingCode;
+    } else if (bookingCode) {
+      // Calendar-only offline bookings: authorize via calendar_entries ownership or bookings.
+      const byBooking = await query(
+        `SELECT
+           b.id,
+           b.unique_code,
+           b.customer_id,
+           pp.user_id AS professional_user_id
+         FROM bookings b
+         INNER JOIN business_setups bs ON bs.id = b.business_setup_id
+         INNER JOIN professional_profiles pp ON pp.id = bs.professional_profile_id
+         WHERE b.unique_code = $1
+         LIMIT 1`,
+        [bookingCode],
+      );
+      if (byBooking.rows[0]) {
+        const row = byBooking.rows[0];
+        const allowed =
+          row.customer_id === req.user.id || row.professional_user_id === req.user.id;
+        if (!allowed) {
+          return res.status(403).json({
+            success: false,
+            message: "Not authorized to view this booking activity.",
+            data: null,
+          });
+        }
+        authorizedBookingId = row.id;
+        authorizedCode = row.unique_code;
+      } else {
+        const byEntry = await query(
+          `SELECT ce.unique_code, pp.user_id AS professional_user_id
+           FROM calendar_entries ce
+           INNER JOIN professional_profiles pp ON pp.id = ce.professional_profile_id
+           WHERE ce.unique_code = $1
+           LIMIT 1`,
+          [bookingCode],
+        );
+        if (!byEntry.rows[0] || byEntry.rows[0].professional_user_id !== req.user.id) {
+          return res.status(403).json({
+            success: false,
+            message: "Not authorized to view this booking activity.",
+            data: null,
+          });
+        }
+        authorizedCode = byEntry.rows[0].unique_code;
+      }
+    }
+
+    const events = await listBookingActivityEvents({
+      bookingId: authorizedBookingId,
+      bookingCode: authorizedCode,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Booking activity loaded.",
+      data: events,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load booking activity.",
       data: {
         error: error.message,
       },

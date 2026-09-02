@@ -72,6 +72,7 @@ import {
   sortServicesByServiceOrder,
   serviceOrderLabelsMatch,
 } from "../calendar/serviceOrder.utils";
+import { buildServiceOrderFromTemplate } from "../../../lib/businessTemplateCatalog";
 import { toIsoLocalDate } from "../calendar/calendar.utils";
 import { useSnackbar } from "../AppSnackbar";
 import AppMultiSelect from "../AppMultiSelect";
@@ -626,8 +627,16 @@ export default function ProfessionalFixedLocationSetup({
       ? parseCalendarSettings(settings.availability, settings.design).availability
           .serviceOrder
       : null;
-    return resolveBusinessSetupServiceOrder(saved);
-  }, [calendarOverviewData]);
+    const fromTemplate = buildServiceOrderFromTemplate(
+      businessSetupData?.service_details,
+    );
+    return resolveBusinessSetupServiceOrder(saved, {
+      categories: fromTemplate.categories,
+      servicesByCategory: fromTemplate.servicesByCategory,
+      hiddenCategories: [],
+      hiddenServicesByCategory: {},
+    });
+  }, [businessSetupData?.service_details, calendarOverviewData]);
 
   const isBusinessProfileActive = businessSetupData?.is_active !== false;
   type ProfileValidationField =

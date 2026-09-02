@@ -1,18 +1,22 @@
 export type BookingActivityActor = "client" | "professional" | "guest" | "system";
 
 export type BookingActivityKind =
+  | "booking_created"
   | "booking_request_sent"
   | "booking_accepted"
+  | "booking_confirmed"
   | "booking_prepaid"
   | "edit_request_sent"
   | "edit_request_suggest"
   | "edit_request_accepted"
   | "booking_cancelled"
+  | "booking_updated"
   | "post_booking_paid"
   | "fee_paid"
-  | "addon_paid";
+  | "addon_paid"
+  | "refund_completed";
 
-export type BookingActivityDetailType = "cancellation" | "ebr";
+export type BookingActivityDetailType = "cancellation" | "ebr" | "comparison";
 
 export type BookingActivityDetailLine = {
   label: string;
@@ -32,15 +36,30 @@ export type BookingActivityItem = {
   dateLabel: string;
   timeLabel: string;
   /**
-   * Arrow for Edit Request sent, or cancelled bookings that include a client reason.
+   * Arrow for Edit Request sent, silent Updated, or cancelled bookings that include a client reason.
    * Simple cancels (no reason) have no arrow.
    */
   hasDetailArrow: boolean;
   detailType?: BookingActivityDetailType;
   detailLines?: BookingActivityDetailLine[];
+  /** Before/after field comparison for EBR, ER, or silent Updated. */
+  comparison?: import("./buildActivityComparison").ActivityComparison | null;
   /** Cancellation reason when client provided one */
   cancellationReason?: string;
   professionalName?: string;
+};
+
+export type BookingActivityApiEvent = {
+  id: string;
+  bookingId?: string | null;
+  bookingCode?: string | null;
+  kind: string;
+  title: string;
+  actor?: string;
+  actorLabel?: string | null;
+  subtitle?: string | null;
+  payload?: Record<string, unknown> | null;
+  occurredAt: string;
 };
 
 export type BookingActivityBuildInput = {
@@ -72,5 +91,67 @@ export type BookingActivityBuildInput = {
   currentStatus?: string | null;
   currentCancellationReason?: string | null;
   currentProfessionalName?: string | null;
+  currentBookingType?: string | null;
+  /** Freshest details from the open drawer (preferred over notes alone). */
+  currentDetails?: {
+    originalServices?: Array<{
+      id: string;
+      name: string;
+      price: number;
+      durationMins?: number;
+      startTime?: string;
+      endTime?: string;
+      teamMemberName?: string;
+      staffResourceId?: string | null;
+    }> | null;
+    services?: Array<{
+      id: string;
+      name: string;
+      price: number;
+      durationMins?: number;
+      startTime?: string;
+      endTime?: string;
+      teamMemberName?: string;
+      staffResourceId?: string | null;
+    }> | null;
+    products?: Array<{
+      id: string;
+      name: string;
+      price: number;
+      quantity?: number;
+    }> | null;
+    editedServiceIds?: string[] | null;
+    editedProductIds?: string[] | null;
+    addedServiceIds?: string[] | null;
+    cancelledServiceIds?: string[] | null;
+    phoneCode?: string | null;
+    phoneNumber?: string | null;
+    guests?: Array<{ name?: string | null }> | null;
+    desiredLocation?: string | {
+      street?: string;
+      number?: string;
+      postalCode?: string;
+      province?: string;
+      municipality?: string;
+    } | null;
+    silentUpdated?: boolean;
+    silentUpdateSnapshot?: {
+      phoneCode?: string | null;
+      phoneNumber?: string | null;
+      guests?: Array<{ name?: string | null }> | null;
+      desiredLocation?: string | {
+        street?: string;
+        number?: string;
+        postalCode?: string;
+        province?: string;
+        municipality?: string;
+      } | null;
+    } | null;
+    lastEditedBy?: "professional" | "client" | null;
+  } | null;
+  currentDateISO?: string | null;
+  currentStart?: string | null;
+  /** Persisted API events — preferred over synthesis when present */
+  apiEvents?: BookingActivityApiEvent[] | null;
   mode: "activity" | "sales";
 };

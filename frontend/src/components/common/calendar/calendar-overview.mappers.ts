@@ -427,6 +427,9 @@ export function mapCalendarBookingToEvent(
         ? { cancelledServiceIds: parsedNotes.cancelledServiceIds }
         : {}),
       ...(parsedNotes?.silentUpdated ? { silentUpdated: true } : {}),
+      ...(parsedNotes?.silentUpdateSnapshot
+        ? { silentUpdateSnapshot: parsedNotes.silentUpdateSnapshot }
+        : {}),
       ...(parsedNotes?.scheduleEdited ? { scheduleEdited: true } : {}),
       ...(parsedNotes?.refunded ? { refunded: true } : {}),
       ...(parsedNotes?.waitingForPayment ? { waitingForPayment: true } : {}),
@@ -454,8 +457,36 @@ export function mapCalendarBookingToEvent(
         ? {
             showLateRescheduling: parsedNotes.showLateRescheduling,
             lateRescheduleFeePercent: parsedNotes.lateRescheduleFeePercent,
+            ...(parsedNotes.lateRescheduleFeePercentCeiling
+              ? {
+                  lateRescheduleFeePercentCeiling:
+                    parsedNotes.lateRescheduleFeePercentCeiling,
+                }
+              : {}),
             showLateCancellation: parsedNotes.showLateCancellation,
             lateCancellationFeePercent: parsedNotes.lateCancellationFeePercent,
+            ...(parsedNotes.lateCancellationFeePercentCeiling
+              ? {
+                  lateCancellationFeePercentCeiling:
+                    parsedNotes.lateCancellationFeePercentCeiling,
+                }
+              : {}),
+            showNoShowFee: parsedNotes.showNoShowFee,
+            noShowFeePercent: parsedNotes.noShowFeePercent,
+            ...(parsedNotes.noShowFeePercentCeiling
+              ? {
+                  noShowFeePercentCeiling: parsedNotes.noShowFeePercentCeiling,
+                }
+              : {}),
+            ...(parsedNotes.cancellationFeeAt
+              ? { cancellationFeeAt: parsedNotes.cancellationFeeAt }
+              : {}),
+            ...(typeof parsedNotes.exceededCancellationWindow === "boolean"
+              ? {
+                  exceededCancellationWindow:
+                    parsedNotes.exceededCancellationWindow,
+                }
+              : {}),
             prepaymentPercent: parsedNotes.prepaymentPercent,
             ...(mappedPrepayStatus
               ? { prepaymentStatus: mappedPrepayStatus }

@@ -239,12 +239,52 @@ export type ParsedCalendarSettings = {
 
 export const defaultBookingRules = (): BookingRules => ({
   flIntervalHours: "0",
-  flIntervalMinutes: "15",
+  flIntervalMinutes: "0",
   dlIntervalHours: "0",
-  dlIntervalMinutes: "15",
-  dlMinTimeslotHours: "2",
-  dlMinTimeslotMinutes: "0",
+  dlIntervalMinutes: "5",
+  dlMinTimeslotHours: "",
+  dlMinTimeslotMinutes: "",
 });
+
+/** Desired Location interval floor: at least 5 minutes (travel buffer). */
+export const DL_INTERVAL_MIN_MINUTES = 5;
+
+export function bookingRulesTotalMinutes(hours: string, minutes: string): number {
+  const h = Number.parseInt(String(hours ?? ""), 10);
+  const m = Number.parseInt(String(minutes ?? ""), 10);
+  return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
+}
+
+export function clampDesiredLocationInterval(
+  hours: string,
+  minutes: string,
+): { hours: string; minutes: string } {
+  const total = bookingRulesTotalMinutes(hours, minutes);
+  if (total >= DL_INTERVAL_MIN_MINUTES) {
+    return { hours: hours || "0", minutes: minutes || "0" };
+  }
+  return { hours: "0", minutes: String(DL_INTERVAL_MIN_MINUTES) };
+}
+
+export function withClampedDesiredLocationInterval(
+  rules: BookingRules,
+): BookingRules {
+  const clamped = clampDesiredLocationInterval(
+    rules.dlIntervalHours,
+    rules.dlIntervalMinutes,
+  );
+  if (
+    clamped.hours === rules.dlIntervalHours &&
+    clamped.minutes === rules.dlIntervalMinutes
+  ) {
+    return rules;
+  }
+  return {
+    ...rules,
+    dlIntervalHours: clamped.hours,
+    dlIntervalMinutes: clamped.minutes,
+  };
+}
 
 function normalizePublicBusinessHours(
   raw: unknown,
@@ -299,7 +339,10 @@ export function parseCalendarSettings(
   return {
     availability: {
       publicBusinessHours: normalizePublicBusinessHours(availability.publicBusinessHours),
-      bookingRules: { ...defaultBookingRules(), ...availability.bookingRules },
+      bookingRules: withClampedDesiredLocationInterval({
+        ...defaultBookingRules(),
+        ...availability.bookingRules,
+      }),
       serviceOrder: normalizeServiceOrderSettings(availability.serviceOrder as RawServiceOrderSettings | undefined),
       scheduleAvailability: availability.scheduleAvailability ?? [],
       dateOverrides: availability.dateOverrides ?? [],

@@ -133,8 +133,20 @@ export type CalendarBookingDetails = {
   paymentMethod?: "online" | "offline";
   lateCancellationFeePercent?: string;
   showLateCancellation?: boolean;
+  /** Policy ceiling at the moment the late-cancel section was enabled (decrease-only). */
+  lateCancellationFeePercentCeiling?: string;
   lateRescheduleFeePercent?: string;
   showLateRescheduling?: boolean;
+  /** Policy ceiling when late-reschedule section was enabled (decrease-only). */
+  lateRescheduleFeePercentCeiling?: string;
+  noShowFeePercent?: string;
+  showNoShowFee?: boolean;
+  /** Policy ceiling when no-show fee section was enabled (decrease-only). */
+  noShowFeePercentCeiling?: string;
+  /** ISO timestamp when a cancellation fee was attached / invoiced. */
+  cancellationFeeAt?: string;
+  /** Whether cancel exceeded the business-template notice window. */
+  exceededCancellationWindow?: boolean;
   internalNote?: string;
   showInternalNote?: boolean;
   /** Note written by the client on the original booking request. */
@@ -179,6 +191,22 @@ export type CalendarBookingDetails = {
   cancelledServiceIds?: string[];
   /** Guest name / contact-only change — tag Updated, do not start ER. */
   silentUpdated?: boolean;
+  /**
+   * Prior contact/guest values captured when a silent update is saved,
+   * so Activity can show original → new comparison lines.
+   */
+  silentUpdateSnapshot?: {
+    phoneCode?: string;
+    phoneNumber?: string;
+    guests?: CalendarBookingGuestItem[];
+    desiredLocation?: {
+      street: string;
+      number: string;
+      postalCode: string;
+      province: string;
+      municipality: string;
+    };
+  };
   /** Date/time changed on a Confirmed booking after ER/EBR accept. */
   scheduleEdited?: boolean;
   refunded?: boolean;

@@ -21,7 +21,6 @@ export type ProfessionalBookingAction =
   | "checkout"
   | "delete"
   | "rebook"
-  | "refund"
   | "ok";
 
 export type ClientBookingAction =
@@ -49,7 +48,6 @@ const falseProfessionalFlags = (): ProfessionalActionFlags => ({
   checkout: false,
   delete: false,
   rebook: false,
-  refund: false,
   ok: false,
 });
 
@@ -63,27 +61,6 @@ const falseClientFlags = (): ClientActionFlags => ({
   delete: false,
 });
 
-/** Refund shows only when prepaid money may need returning. */
-export function isRefundApplicable(input: {
-  status: CalendarEvent["status"] | ClientBookingStatus | string;
-  prepaid?: boolean;
-  prepaymentStatus?: string | null;
-  refundAmount?: number | null;
-}): boolean {
-  const status = String(input.status ?? "").toLowerCase().replace(/\s+/g, "_");
-  const terminal =
-    status === "completed" ||
-    status === "cancelled" ||
-    status === "canceled" ||
-    status === "no_show" ||
-    status === "invalid";
-  if (!terminal) return false;
-  if (typeof input.refundAmount === "number") return input.refundAmount > 0;
-  if (input.prepaid === true) return true;
-  const prepay = String(input.prepaymentStatus ?? "").toLowerCase();
-  return prepay === "confirmed" || prepay === "paid";
-}
-
 /**
  * Professional booking Action menu / footer visibility per Booking Status Guideline.
  */
@@ -92,13 +69,13 @@ export function resolveProfessionalBookingActions(
     CalendarEvent,
     "status" | "bookingScenario" | "bookingType" | "details"
   > | null | undefined,
-  opts?: { refundApplicable?: boolean },
+  opts?: { protectiveFeeCheckoutApplicable?: boolean },
 ): ProfessionalActionFlags {
   const flags = falseProfessionalFlags();
   if (!event) return flags;
 
   const status = event.status;
-  const refundOk = Boolean(opts?.refundApplicable);
+  const feeCheckoutOk = Boolean(opts?.protectiveFeeCheckoutApplicable);
 
   if (status === "Confirmed") {
     const erPending = event.bookingScenario === "ER";
@@ -144,14 +121,18 @@ export function resolveProfessionalBookingActions(
   if (status === "Completed") {
     flags.delete = true;
     flags.rebook = true;
-    flags.refund = refundOk;
     if (event.details?.needsOk) flags.ok = true;
     return flags;
   }
 
   if (status === "Cancelled" || status === "Invalid" || status === "No Show") {
     flags.delete = true;
-    flags.refund = refundOk;
+    if (
+      feeCheckoutOk &&
+      (status === "Cancelled" || status === "No Show")
+    ) {
+      flags.checkout = true;
+    }
     return flags;
   }
 

@@ -10,12 +10,16 @@ export default function FixedLocationCalendarPageView() {
     calendarSettings,
     serviceOptions,
     categoryOptions,
+    templateCategoryRows,
+    serviceNameToCategoryKey,
     serviceCatalog,
     serviceOrderDefaults,
     clientOptions,
     professionalClients,
     fixedLocationAddress,
     lateRescheduleFeePercentDefault,
+    lateCancellationFeePercentDefault,
+    noShowFeePercentDefault,
     prepaymentPercentDefault,
     cancellationBeforeHours,
     cancellationBeforeMinutes,
@@ -38,12 +42,16 @@ export default function FixedLocationCalendarPageView() {
       calendarSettings={calendarSettings}
       serviceOptions={serviceOptions}
       categoryOptions={categoryOptions}
+      templateCategoryRows={templateCategoryRows}
+      serviceNameToCategoryKey={serviceNameToCategoryKey}
       serviceCatalog={serviceCatalog}
       serviceOrderDefaults={serviceOrderDefaults}
       clientOptions={clientOptions}
       professionalClients={professionalClients}
       fixedLocationAddress={fixedLocationAddress}
       lateRescheduleFeePercentDefault={lateRescheduleFeePercentDefault}
+      lateCancellationFeePercentDefault={lateCancellationFeePercentDefault}
+      noShowFeePercentDefault={noShowFeePercentDefault}
       prepaymentPercentDefault={prepaymentPercentDefault}
       cancellationBeforeHours={cancellationBeforeHours}
       cancellationBeforeMinutes={cancellationBeforeMinutes}

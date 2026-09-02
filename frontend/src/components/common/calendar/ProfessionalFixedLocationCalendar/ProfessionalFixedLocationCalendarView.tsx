@@ -155,7 +155,6 @@ import CalendarHoursRulesPanel from "../CalendarHoursRulesPanel";
 import CalendarEditAvailabilityModal, {
   type EditAvailabilityDraft,
 } from "../CalendarEditAvailabilityModal";
-import CalendarServiceOrderModal from "../CalendarServiceOrderModal";
 import ManualEntryDiscountModal from "../../../sections/finance/ManualEntryDiscountModal";
 import {
   parseFinancePrice,
@@ -167,6 +166,16 @@ import {
   partitionBookingProducts,
   resolveBookingPriceDisplay,
 } from "../bookingTotal";
+import {
+  canAddLateCancellation,
+  canAddLateRescheduling,
+  canAddNoShowFee,
+  canAddPrepayment,
+  canCheckoutProtectiveFee,
+  clampProtectiveFeePercent,
+  parsePolicyPercentCeiling,
+} from "../bookingGroupAddOns";
+import { isLateCancellation } from "../../client-booking/settleCancellationFee";
 import {
   removeFinanceProduct,
   removeFinanceUniqueItem,
@@ -188,6 +197,10 @@ import BookingClientTags, {
 } from "../BookingClientTags";
 import BookingActivityOverview from "../BookingActivityOverview";
 import { buildBookingActivityTimeline } from "../buildBookingActivityTimeline";
+import {
+  ACTIVITY_COMPARISON_SIGNPOST,
+  findActivityComparisonItem,
+} from "../buildActivityComparison";
 import type { BookingActivityItem } from "../bookingActivity.types";
 import SalesOverview from "../SalesOverview";
 import CatalogItemDeleteDialog from "../CatalogItemDeleteDialog";
@@ -199,13 +212,11 @@ import { useCalendarFilters } from "../useCalendarFilters";
 import type { BookingCatalogService } from "../../../../data/bookingServiceCatalog.data";
 import { buildOrderedBookingServiceCategories } from "../../../../data/bookingServiceCatalog.data";
 import {
-  BUSINESS_SERVICE_CATEGORY_CATALOG,
-  resolveServiceCategorySliderIconId,
-} from "../../../../data/businessServiceCategorySlider.data";
-import {
   resolveDesiredVisitAddressOptions,
   type BusinessPublicProfileDesiredLocation,
 } from "../../../../data/businessPublicProfile.data";
+import { isConfiguredColor } from "../../../../lib/calendarDesign.utils";
+import type { TemplateCategoryRow } from "../../../../lib/businessTemplateCatalog";
 import {
   addMinutesToTime,
   buildBookingServiceLineItem,
@@ -251,12 +262,16 @@ import {
 import {
   defaultBookingRules,
   normalizeServiceOrderSettings,
+  withClampedDesiredLocationInterval,
   type BookingRules,
   type ParsedCalendarSettings,
   type ScheduleAvailabilityRow,
   type ServiceOrderSettings,
 } from "../calendar-settings.types";
-import { dedupeServiceOrderSettings } from "../serviceOrder.utils";
+import {
+  dedupeServiceOrderSettings,
+  shouldPreferTemplateServiceOrderDefaults,
+} from "../serviceOrder.utils";
 import {
   addDaysIso,
   addMonthsIso,
@@ -305,7 +320,6 @@ import {
   statusAccentColor,
 } from "../bookingStatus";
 import {
-  isRefundApplicable,
   resolveProfessionalBookingActions,
   showProfessionalActionMenu,
 } from "../bookingStatusActions";
@@ -361,12 +375,14 @@ import {
 } from "../calendar-entry.mappers";
 import type {
   BookingNotificationEvent,
+  CalendarBooking,
   CreateCalendarEntryRequest,
   CalendarEntry,
   UpsertCalendarSettingsRequest,
 } from "../../../../store/services/businessApi";
 import {
   useGetMyBookingsQuery,
+  useGetBookingActivityQuery,
   useLazyLookupMollureClientByEmailQuery,
   useUploadBookingAttachmentsMutation,
   useManageBookingEditRequestMutation,
@@ -389,10 +405,16 @@ export type ProfessionalFixedLocationCalendarProps = {
   calendarSettings?: ParsedCalendarSettings | null;
   serviceOptions?: string[];
   categoryOptions?: readonly { key: string; label: string }[];
+  /** Business Template category rows (categories that have ≥1 service). */
+  templateCategoryRows?: readonly TemplateCategoryRow[];
+  /** Exact service title → template category key for appearance colouring. */
+  serviceNameToCategoryKey?: Readonly<Record<string, string>>;
   serviceCatalog?: readonly BookingCatalogService[];
   serviceOrderDefaults?: ServiceOrderSettings;
   fixedLocationAddress?: string;
   lateRescheduleFeePercentDefault?: string;
+  lateCancellationFeePercentDefault?: string;
+  noShowFeePercentDefault?: string;
   prepaymentPercentDefault?: string;
   cancellationBeforeHours?: number | null;
   cancellationBeforeMinutes?: number | null;
@@ -505,10 +527,14 @@ export default function ProfessionalFixedLocationCalendar({
   calendarSettings,
   serviceOptions = [],
   categoryOptions = [],
+  templateCategoryRows = [],
+  serviceNameToCategoryKey = {},
   serviceCatalog = [],
   serviceOrderDefaults,
   fixedLocationAddress,
   lateRescheduleFeePercentDefault,
+  lateCancellationFeePercentDefault,
+  noShowFeePercentDefault,
   prepaymentPercentDefault,
   cancellationBeforeHours,
   cancellationBeforeMinutes,
@@ -902,9 +928,22 @@ export default function ProfessionalFixedLocationCalendar({
   const [showLateCancellation, setShowLateCancellation] = React.useState(false);
   const [lateCancellationFeePercent, setLateCancellationFeePercent] =
     React.useState("");
+  const [lateCancellationFeePercentCeiling, setLateCancellationFeePercentCeiling] =
+    React.useState("");
   const [showLateRescheduling, setShowLateRescheduling] = React.useState(false);
   const [lateRescheduleFeePercent, setLateRescheduleFeePercent] =
     React.useState("");
+  const [lateRescheduleFeePercentCeiling, setLateRescheduleFeePercentCeiling] =
+    React.useState("");
+  const [showNoShowFee, setShowNoShowFee] = React.useState(false);
+  const [noShowFeePercent, setNoShowFeePercent] = React.useState("");
+  const [noShowFeePercentCeiling, setNoShowFeePercentCeiling] =
+    React.useState("");
+  const [cancellationFeeAt, setCancellationFeeAt] = React.useState<
+    string | undefined
+  >(undefined);
+  const [exceededCancellationWindow, setExceededCancellationWindow] =
+    React.useState<boolean | undefined>(undefined);
   const [showInternalNote, setShowInternalNote] = React.useState(false);
   const [bookingInternalNote, setBookingInternalNote] = React.useState("");
   const [paymentMethod, setPaymentMethod] = React.useState<
@@ -1141,6 +1180,8 @@ export default function ProfessionalFixedLocationCalendar({
         lateCancellationFeePercent,
         showLateRescheduling,
         lateRescheduleFeePercent,
+        showNoShowFee,
+        noShowFeePercent,
         showPrepayment,
         prepaymentPercent,
         prepaymentPaid: false,
@@ -1151,10 +1192,12 @@ export default function ProfessionalFixedLocationCalendar({
       kilometerAllowanceAmount,
       lateCancellationFeePercent,
       lateRescheduleFeePercent,
+      noShowFeePercent,
       paymentMethod,
       prepaymentPercent,
       showLateCancellation,
       showLateRescheduling,
+      showNoShowFee,
       showPrepayment,
       subtotalPrice,
     ],
@@ -1162,6 +1205,7 @@ export default function ProfessionalFixedLocationCalendar({
   const bookingDiscountAmount = bookingPrice.discountAmount;
   const lateCancellationFeeAmount = bookingPrice.lateCancellationFeeAmount;
   const lateRescheduleFeeAmount = bookingPrice.lateRescheduleFeeAmount;
+  const noShowFeeAmount = bookingPrice.noShowFeeAmount;
   const prepaymentAmount = bookingPrice.prepaymentAmount;
   const remainingAfterPrepayment = bookingPrice.remainingAfterPrepayment;
   /** Amount due in the drawer (discount + fees + prepaid applied). */
@@ -1179,6 +1223,7 @@ export default function ProfessionalFixedLocationCalendar({
         discountAmount: bookingDiscountAmount,
         lateCancellationFeeAmount,
         lateRescheduleFeeAmount,
+        noShowFeeAmount,
       }),
     [
       bookingDiscountAmount,
@@ -1186,6 +1231,7 @@ export default function ProfessionalFixedLocationCalendar({
       kilometerAllowanceAmount,
       lateCancellationFeeAmount,
       lateRescheduleFeeAmount,
+      noShowFeeAmount,
       productsTotal,
       servicesTotal,
       uniqueItemsTotal,
@@ -1504,8 +1550,15 @@ export default function ProfessionalFixedLocationCalendar({
         paymentMethod,
         showLateCancellation,
         lateCancellationFeePercent,
+        lateCancellationFeePercentCeiling,
         showLateRescheduling,
         lateRescheduleFeePercent,
+        lateRescheduleFeePercentCeiling,
+        showNoShowFee,
+        noShowFeePercent,
+        noShowFeePercentCeiling,
+        cancellationFeeAt,
+        exceededCancellationWindow,
         showInternalNote,
         bookingInternalNote,
         bookingTotalDiscount,
@@ -1536,8 +1589,15 @@ export default function ProfessionalFixedLocationCalendar({
     paymentMethod,
     showLateCancellation,
     lateCancellationFeePercent,
+    lateCancellationFeePercentCeiling,
     showLateRescheduling,
     lateRescheduleFeePercent,
+    lateRescheduleFeePercentCeiling,
+    showNoShowFee,
+    noShowFeePercent,
+    noShowFeePercentCeiling,
+    cancellationFeeAt,
+    exceededCancellationWindow,
     showInternalNote,
     bookingInternalNote,
     bookingTotalDiscount,
@@ -1580,7 +1640,7 @@ export default function ProfessionalFixedLocationCalendar({
       ? (parseApiCalendarEventId(drawerSalesActivityContext.id)?.id ?? null)
       : null;
     const currentCode = drawerSalesActivityContext?.bookingCode ?? null;
-    return all.filter((booking) => {
+    const matched = all.filter((booking) => {
       if (currentId && String(booking.id) === String(currentId)) return true;
       if (
         currentCode &&
@@ -1588,22 +1648,91 @@ export default function ProfessionalFixedLocationCalendar({
         booking.unique_code === currentCode
       )
         return true;
-      const email = clientActivityIdentity.email.toLowerCase();
-      const name = clientActivityIdentity.name.toLowerCase();
-      const bookingEmail = (booking.customer_email ?? "").trim().toLowerCase();
-      const bookingName = (booking.customer_name || booking.client_name || "")
-        .trim()
-        .toLowerCase();
-      if (email && bookingEmail && email === bookingEmail) return true;
-      if (name && bookingName && name === bookingName) return true;
       return false;
     });
-  }, [
-    clientActivityIdentity.email,
-    clientActivityIdentity.name,
-    drawerSalesActivityContext,
-    myBookingsResponse?.data,
-  ]);
+
+    // Offline calendar entries often have no bookings row — synthesize one for fallback.
+    if (
+      matched.length === 0 &&
+      drawerSalesActivityContext &&
+      (currentId || currentCode)
+    ) {
+      const ev = drawerSalesActivityContext;
+      let totalPrice: number | null = null;
+      const details = ev.details;
+      if (details) {
+        let total = 0;
+        for (const service of details.services ?? []) {
+          total += Number(service.price) || 0;
+        }
+        for (const product of details.products ?? []) {
+          total += Number(product.price) || 0;
+        }
+        for (const guest of details.guests ?? []) {
+          for (const service of guest.services ?? []) {
+            total += Number(service.price) || 0;
+          }
+          for (const product of guest.products ?? []) {
+            total += Number(product.price) || 0;
+          }
+        }
+        if (total > 0) totalPrice = total;
+      }
+      const bookingType = ev.bookingType?.toLowerCase();
+      const synthetic: CalendarBooking = {
+        id: String(currentId || currentCode || ev.id),
+        unique_code: currentCode,
+        status: String(ev.status || "confirmed")
+          .toLowerCase()
+          .replace(/\s+/g, "_"),
+        prepayment_status:
+          ev.details?.prepaymentStatus === "confirmed"
+            ? "paid"
+            : ev.details?.prepaymentStatus || null,
+        total_price: totalPrice,
+        booking_type:
+          bookingType === "online" ||
+          bookingType === "offline" ||
+          bookingType === "project" ||
+          bookingType === "request"
+            ? bookingType
+            : null,
+        customer_name: ev.showClientName || null,
+        customer_email: ev.details?.clientEmail || null,
+        client_name: ev.showClientName || null,
+        service_title: ev.title || null,
+        notes: ev.notes || null,
+        created_at: ev.start || null,
+        updated_at: ev.start || null,
+        booking_date: ev.date || ev.start?.slice(0, 10) || "",
+        start_time: ev.start || null,
+        end_time: ev.end || null,
+        business_setup_id: "",
+        customer_id: ev.details?.customerId || "",
+        service_id: null,
+        team_member_id: ev.resourceId || null,
+        location_type: ev.location === "DL" ? "desired" : "fixed",
+      };
+      return [synthetic];
+    }
+
+    return matched;
+  }, [drawerSalesActivityContext, myBookingsResponse?.data]);
+
+  const activityBookingId = drawerSalesActivityContext
+    ? (parseApiCalendarEventId(drawerSalesActivityContext.id)?.id ?? null)
+    : null;
+  const activityBookingCode = drawerSalesActivityContext?.bookingCode ?? null;
+
+  const { data: bookingActivityResponse } = useGetBookingActivityQuery(
+    {
+      bookingId: activityBookingId,
+      bookingCode: activityBookingCode,
+    },
+    {
+      skip: !activityBookingId && !activityBookingCode,
+    },
+  );
 
   const activityTimelineItems = React.useMemo(
     () =>
@@ -1611,10 +1740,8 @@ export default function ProfessionalFixedLocationCalendar({
         bookings: clientBookingsForActivity,
         clientEmail: clientActivityIdentity.email,
         clientName: clientActivityIdentity.name,
-        currentBookingId: drawerSalesActivityContext
-          ? (parseApiCalendarEventId(drawerSalesActivityContext.id)?.id ?? null)
-          : null,
-        currentBookingCode: drawerSalesActivityContext?.bookingCode ?? null,
+        currentBookingId: activityBookingId,
+        currentBookingCode: activityBookingCode,
         currentScenario: drawerSalesActivityContext?.bookingScenario ?? null,
         currentStatus: drawerSalesActivityContext?.status ?? null,
         currentCancellationReason:
@@ -1623,15 +1750,41 @@ export default function ProfessionalFixedLocationCalendar({
           data.resources.find(
             (r) => r.id === drawerSalesActivityContext?.resourceId,
           )?.name ?? null,
+        currentBookingType: drawerSalesActivityContext?.bookingType ?? null,
+        currentDetails: drawerSalesActivityContext?.details ?? null,
+        currentDateISO: drawerSalesActivityContext?.date ?? null,
+        currentStart: drawerSalesActivityContext?.start ?? null,
+        apiEvents: bookingActivityResponse?.data ?? null,
         mode: "activity",
       }),
     [
+      activityBookingCode,
+      activityBookingId,
+      bookingActivityResponse?.data,
       clientActivityIdentity.email,
       clientActivityIdentity.name,
       clientBookingsForActivity,
       data.resources,
       drawerSalesActivityContext,
     ],
+  );
+
+  const openActivityComparison = React.useCallback(
+    (mode?: "ebr" | "er" | "silent_updated") => {
+      const bookingRef =
+        drawerSalesActivityContext?.bookingCode ||
+        (drawerSalesActivityContext
+          ? parseApiCalendarEventId(drawerSalesActivityContext.id)?.id
+          : null) ||
+        null;
+      const target = findActivityComparisonItem(activityTimelineItems, {
+        bookingRef,
+        mode,
+      });
+      setSlotDrawerTab("activity");
+      setActivityDetailItem(target);
+    },
+    [activityTimelineItems, drawerSalesActivityContext],
   );
 
   const isCompletedBooking = viewingBookingEvent?.status === "Completed";
@@ -1806,8 +1959,15 @@ export default function ProfessionalFixedLocationCalendar({
         paymentMethod,
         showLateCancellation,
         lateCancellationFeePercent,
+        lateCancellationFeePercentCeiling,
         showLateRescheduling,
         lateRescheduleFeePercent,
+        lateRescheduleFeePercentCeiling,
+        showNoShowFee,
+        noShowFeePercent,
+        noShowFeePercentCeiling,
+        cancellationFeeAt,
+        exceededCancellationWindow,
         showInternalNote,
         internalNote: bookingInternalNote,
         totalDiscount: bookingTotalDiscount,
@@ -1836,8 +1996,15 @@ export default function ProfessionalFixedLocationCalendar({
       paymentMethod,
       showLateCancellation,
       lateCancellationFeePercent,
+      lateCancellationFeePercentCeiling,
       showLateRescheduling,
       lateRescheduleFeePercent,
+      lateRescheduleFeePercentCeiling,
+      showNoShowFee,
+      noShowFeePercent,
+      noShowFeePercentCeiling,
+      cancellationFeeAt,
+      exceededCancellationWindow,
       showInternalNote,
       bookingInternalNote,
       bookingTotalDiscount,
@@ -2097,7 +2264,6 @@ export default function ProfessionalFixedLocationCalendar({
       serviceOrderDraft,
     );
   }, [selectableServiceCatalog, serviceOrderDraft]);
-  const [serviceOrderOpen, setServiceOrderOpen] = React.useState(false);
   const [scheduleResourceFilter, setScheduleResourceFilter] = React.useState<
     string[]
   >([]);
@@ -2121,7 +2287,12 @@ export default function ProfessionalFixedLocationCalendar({
     setDateOverrides(calendarSettings.availability.dateOverrides ?? []);
     setAppliedDesign(calendarSettings.design);
     setDesignDraft(calendarSettings.design);
-    if (calendarSettings.availability.serviceOrder) {
+    if (
+      calendarSettings.availability.serviceOrder &&
+      !shouldPreferTemplateServiceOrderDefaults(
+        calendarSettings.availability.serviceOrder,
+      )
+    ) {
       setServiceOrderDraft(
         dedupeServiceOrderSettings(
           normalizeServiceOrderSettings(
@@ -2185,32 +2356,35 @@ export default function ProfessionalFixedLocationCalendar({
     void persistAvailabilitySettings({ scheduleAvailability: next });
   }, [calendarSettings, onSaveCalendarSettings, persistAvailabilitySettings]);
 
-  const resolveEventCategoryKey = React.useCallback((event: CalendarEvent) => {
-    const candidates = [
-      event.title,
-      ...(event.details?.services?.map((service) => service.name) ?? []),
-    ].filter(Boolean);
+  const resolveEventCategoryKey = React.useCallback(
+    (event: CalendarEvent) => {
+      const candidates = [
+        ...(event.details?.services?.map((service) => service.name) ?? []),
+        event.title,
+      ]
+        .map((text) => String(text ?? "").trim())
+        .filter(Boolean);
 
-    for (const text of candidates) {
-      const iconId = resolveServiceCategorySliderIconId(String(text));
-      if (iconId !== "generic" && iconId !== "all") return iconId;
-    }
-    return null;
-  }, []);
+      for (const name of candidates) {
+        const direct = serviceNameToCategoryKey[name];
+        if (direct) return direct;
+        const lower = name.toLowerCase();
+        const matched = Object.entries(serviceNameToCategoryKey).find(
+          ([serviceTitle]) => serviceTitle.toLowerCase() === lower,
+        );
+        if (matched) return matched[1];
+      }
+      return null;
+    },
+    [serviceNameToCategoryKey],
+  );
 
   const lookupCategoryColor = React.useCallback(
     (categoryKey: string | null | undefined) => {
       if (!categoryKey) return undefined;
       const colors = appliedDesign.colorsByCategory ?? {};
-      if (colors[categoryKey]) return colors[categoryKey];
-
-      const entry = BUSINESS_SERVICE_CATEGORY_CATALOG.find(
-        (item) => item.key === categoryKey,
-      );
-      if (!entry) return undefined;
-      if (colors[entry.label]) return colors[entry.label];
-      if (entry.key === "hair" && colors.Haar) return colors.Haar;
-      return undefined;
+      const color = colors[categoryKey];
+      return isConfiguredColor(color) ? color : undefined;
     },
     [appliedDesign.colorsByCategory],
   );
@@ -2220,12 +2394,12 @@ export default function ProfessionalFixedLocationCalendar({
       const categoryKey = resolveEventCategoryKey(event);
       const categoryColor = lookupCategoryColor(categoryKey);
       const serviceNames = [
-        event.title,
         ...(event.details?.services?.map((service) => service.name) ?? []),
+        event.title,
       ].filter(Boolean);
       const namedServiceColor = serviceNames
         .map((name) => appliedDesign.colorsByService?.[String(name)])
-        .find(Boolean);
+        .find((color) => isConfiguredColor(color));
 
       const cardColor =
         appliedDesign.scope === "Services"
@@ -2326,7 +2500,6 @@ export default function ProfessionalFixedLocationCalendar({
         | "checkout"
         | "delete"
         | "rebook"
-        | "refund"
         | "ok",
     ) => {
       setBookingActionAnchor(null);
@@ -2391,6 +2564,99 @@ export default function ProfessionalFixedLocationCalendar({
         const current =
           viewingBookingEvent ??
           events.find((event) => event.id === editingEventId);
+        const status = current?.status;
+        const feeCheckout = canCheckoutProtectiveFee({
+          status,
+          showLateCancellation,
+          lateCancellationFeeAmount,
+          showNoShowFee,
+          noShowFeeAmount,
+        });
+
+        // Cancelled / No Show: invoice protective fee only — keep status, open Sales.
+        if (
+          feeCheckout &&
+          (status === "Cancelled" || status === "No Show")
+        ) {
+          const feeAmount =
+            status === "Cancelled"
+              ? lateCancellationFeeAmount
+              : noShowFeeAmount;
+          const nextDetails = {
+            ...(current?.details ?? {}),
+            showLateCancellation:
+              status === "Cancelled"
+                ? showLateCancellation
+                : current?.details?.showLateCancellation,
+            lateCancellationFeePercent:
+              status === "Cancelled"
+                ? lateCancellationFeePercent
+                : current?.details?.lateCancellationFeePercent,
+            lateCancellationFeePercentCeiling:
+              status === "Cancelled"
+                ? lateCancellationFeePercentCeiling
+                : current?.details?.lateCancellationFeePercentCeiling,
+            showNoShowFee:
+              status === "No Show"
+                ? showNoShowFee
+                : current?.details?.showNoShowFee,
+            noShowFeePercent:
+              status === "No Show"
+                ? noShowFeePercent
+                : current?.details?.noShowFeePercent,
+            noShowFeePercentCeiling:
+              status === "No Show"
+                ? noShowFeePercentCeiling
+                : current?.details?.noShowFeePercentCeiling,
+            cancellationFeeAt:
+              cancellationFeeAt ?? new Date().toISOString(),
+            ...(typeof exceededCancellationWindow === "boolean"
+              ? { exceededCancellationWindow }
+              : {}),
+            waitingForPayment: feeAmount > 0,
+            invoiceDueDate: new Date().toISOString().slice(0, 10),
+          };
+          const nextNotes = serializeCalendarEntryNotes(
+            nextDetails.internalNote ?? "",
+            nextDetails,
+            parseStoredEbrFromNotes(current?.notes),
+            parseStoredErFromNotes(current?.notes),
+          );
+          try {
+            await persistEventStatus(editingEventId, status, {
+              notes: nextNotes,
+              total_price: feeAmount,
+            });
+            setEvents((prev) =>
+              prev.map((event) =>
+                event.id === editingEventId
+                  ? {
+                      ...event,
+                      notes: nextNotes,
+                      details: nextDetails,
+                    }
+                  : event,
+              ),
+            );
+            setCancellationFeeAt(nextDetails.cancellationFeeAt);
+          } catch {
+            showSnackbar({
+              severity: "error",
+              message: "Unable to send fee checkout.",
+            });
+            return;
+          }
+          setSlotDrawerTab("sales");
+          showSnackbar({
+            severity: "success",
+            message:
+              status === "Cancelled"
+                ? "Cancellation fee checkout opened in Sales."
+                : "No-show fee checkout opened in Sales.",
+          });
+          return;
+        }
+
         const remaining = remainingAfterPrepayment;
         const waiting = remaining > 0;
         const nextDetails = {
@@ -2527,50 +2793,9 @@ export default function ProfessionalFixedLocationCalendar({
         return;
       }
 
-      if (action === "refund") {
-        const current =
-          viewingBookingEvent ??
-          events.find((event) => event.id === editingEventId);
-        const nextDetails = {
-          ...(current?.details ?? {}),
-          refunded: true,
-          waitingForPayment: false,
-        };
-        const nextNotes = serializeCalendarEntryNotes(
-          nextDetails.internalNote ?? "",
-          nextDetails,
-          parseStoredEbrFromNotes(current?.notes),
-          parseStoredErFromNotes(current?.notes),
-        );
-        try {
-          await persistEventStatus(editingEventId, current?.status ?? "Completed", {
-            notes: nextNotes,
-          });
-          setEvents((prev) =>
-            prev.map((event) =>
-              event.id === editingEventId
-                ? { ...event, notes: nextNotes, details: nextDetails }
-                : event,
-            ),
-          );
-        } catch {
-          showSnackbar({
-            severity: "error",
-            message: "Unable to mark refund.",
-          });
-          return;
-        }
-        setSlotDrawerTab("sales");
-        showSnackbar({
-          severity: "success",
-          message: "Refund recorded. Finish the payment in Sales if needed.",
-        });
-        return;
-      }
-
       setPendingBookingAction(action);
     },
-    [editingEventId, events, persistEventStatus, remainingAfterPrepayment, showSnackbar, viewingBookingEvent],
+    [editingEventId, events, persistEventStatus, remainingAfterPrepayment, showSnackbar, viewingBookingEvent, showLateCancellation, lateCancellationFeeAmount, showNoShowFee, noShowFeeAmount, lateCancellationFeePercent, lateCancellationFeePercentCeiling, noShowFeePercent, noShowFeePercentCeiling, cancellationFeeAt, exceededCancellationWindow],
   );
 
   const handleConfirmCancel = React.useCallback(async () => {
@@ -4455,8 +4680,15 @@ export default function ProfessionalFixedLocationCalendar({
       setBookingDiscountModalOpen(false);
       setShowLateCancellation(false);
       setLateCancellationFeePercent("");
+      setLateCancellationFeePercentCeiling("");
       setShowLateRescheduling(false);
       setLateRescheduleFeePercent(lateRescheduleFeePercentDefault ?? "");
+      setLateRescheduleFeePercentCeiling("");
+      setShowNoShowFee(false);
+      setNoShowFeePercent("");
+      setNoShowFeePercentCeiling("");
+      setCancellationFeeAt(undefined);
+      setExceededCancellationWindow(undefined);
       setShowInternalNote(false);
       setBookingInternalNote("");
       setShowPrepayment(false);
@@ -4653,8 +4885,19 @@ export default function ProfessionalFixedLocationCalendar({
     setPaymentMethod(hydration.paymentMethod);
     setShowLateCancellation(hydration.showLateCancellation);
     setLateCancellationFeePercent(hydration.lateCancellationFeePercent);
+    setLateCancellationFeePercentCeiling(
+      hydration.lateCancellationFeePercentCeiling,
+    );
     setShowLateRescheduling(hydration.showLateRescheduling);
     setLateRescheduleFeePercent(hydration.lateRescheduleFeePercent);
+    setLateRescheduleFeePercentCeiling(
+      hydration.lateRescheduleFeePercentCeiling,
+    );
+    setShowNoShowFee(hydration.showNoShowFee);
+    setNoShowFeePercent(hydration.noShowFeePercent);
+    setNoShowFeePercentCeiling(hydration.noShowFeePercentCeiling);
+    setCancellationFeeAt(ev.details?.cancellationFeeAt);
+    setExceededCancellationWindow(ev.details?.exceededCancellationWindow);
     setShowInternalNote(hydration.showInternalNote);
     setBookingInternalNote(hydration.internalNote);
     setBookingTotalDiscount(hydration.totalDiscount);
@@ -6502,8 +6745,15 @@ export default function ProfessionalFixedLocationCalendar({
           paymentMethod,
           showLateCancellation,
           lateCancellationFeePercent,
+          lateCancellationFeePercentCeiling,
           showLateRescheduling,
           lateRescheduleFeePercent,
+          lateRescheduleFeePercentCeiling,
+          showNoShowFee,
+          noShowFeePercent,
+          noShowFeePercentCeiling,
+          cancellationFeeAt,
+          exceededCancellationWindow,
           showInternalNote,
           bookingInternalNote,
           bookingTotalDiscount,
@@ -6803,8 +7053,15 @@ export default function ProfessionalFixedLocationCalendar({
           paymentMethod,
           showLateCancellation,
           lateCancellationFeePercent,
+          lateCancellationFeePercentCeiling,
           showLateRescheduling,
           lateRescheduleFeePercent,
+          lateRescheduleFeePercentCeiling,
+          showNoShowFee,
+          noShowFeePercent,
+          noShowFeePercentCeiling,
+          cancellationFeeAt,
+          exceededCancellationWindow,
           showInternalNote,
           bookingInternalNote,
           bookingTotalDiscount,
@@ -7108,6 +7365,12 @@ export default function ProfessionalFixedLocationCalendar({
         ) {
           details.silentUpdated = true;
           details.lastEditedBy = "professional";
+          details.silentUpdateSnapshot = {
+            phoneCode: existingEvent.details?.phoneCode,
+            phoneNumber: existingEvent.details?.phoneNumber,
+            guests: existingEvent.details?.guests,
+            desiredLocation: existingEvent.details?.desiredLocation,
+          };
         } else if (existingEvent.status === "Confirmed") {
           details.lastEditedBy = "professional";
         } else if (editedIds.length || editedProductIds.length) {
@@ -7419,6 +7682,7 @@ export default function ProfessionalFixedLocationCalendar({
       incomingRequestEditMode,
       kilometerAllowanceDraft,
       lateCancellationFeePercent,
+      lateCancellationFeePercentCeiling,
       nonMollureDraft.firstName,
       nonMollureDraft.lastName,
       onCreateCalendarEntry,
@@ -7442,6 +7706,12 @@ export default function ProfessionalFixedLocationCalendar({
       showLateCancellation,
       showLateRescheduling,
       lateRescheduleFeePercent,
+      lateRescheduleFeePercentCeiling,
+      showNoShowFee,
+      noShowFeePercent,
+      noShowFeePercentCeiling,
+      cancellationFeeAt,
+      exceededCancellationWindow,
       showPrepayment,
       showSnackbar,
       slotBookingType,
@@ -8973,6 +9243,7 @@ export default function ProfessionalFixedLocationCalendar({
           serviceOrder={serviceOrderDraft}
           appliedDesign={appliedDesign}
           categoryOptions={categoryOptions}
+          templateCategoryRows={templateCategoryRows}
           isSaving={isSaving}
           onBookingRulesChange={setBookingRules}
           onServiceOrderChange={setServiceOrderDraft}
@@ -8995,9 +9266,12 @@ export default function ProfessionalFixedLocationCalendar({
             }
             setPublicBusinessHoursOpen(true);
           }}
-          onOpenServiceOrder={() => setServiceOrderOpen(true)}
-          onSaveBookingRules={async () => {
-            await persistAvailabilitySettings({ bookingRules });
+          onSaveBookingRules={async (next) => {
+            const rules = withClampedDesiredLocationInterval(
+              next ?? bookingRules,
+            );
+            setBookingRules(rules);
+            await persistAvailabilitySettings({ bookingRules: rules });
             showSnackbar({
               severity: "success",
               message: "Booking rules saved.",
@@ -9027,7 +9301,10 @@ export default function ProfessionalFixedLocationCalendar({
           activityDetailItem
             ? activityDetailItem.detailType === "cancellation"
               ? "Activity Details"
-              : "Edit request details"
+              : activityDetailItem.detailType === "comparison" ||
+                  activityDetailItem.comparison
+                ? "Comparison"
+                : "Edit request details"
             : slotBookingScreen === "select-services"
               ? "Select Service"
               : slotBookingScreen === "edit-service"
@@ -9077,9 +9354,8 @@ export default function ProfessionalFixedLocationCalendar({
           selectedSlot && slotDrawerTab === "booking" && !activityDetailItem ? (
             <Box sx={{ px: 2.5, py: 2 }}>
               <Stack direction="row" alignItems="center" spacing={1.25}>
-                {slotBookingScreen === "new-booking" &&
-                slotClientAdded &&
-                !isViewingExisting ? (
+                {(slotBookingScreen === "new-booking" || isViewingExisting) &&
+                slotClientAdded ? (
                   <IconButton
                     size="small"
                     onClick={(e) => setBookingMoreAnchor(e.currentTarget)}
@@ -9091,6 +9367,7 @@ export default function ProfessionalFixedLocationCalendar({
                       color: alpha(m.navy, 0.68),
                       bgcolor: "#fff",
                     }}
+                    aria-label="Group add-ons"
                   >
                     <MoreVertRoundedIcon sx={{ fontSize: 18 }} />
                   </IconButton>
@@ -9112,75 +9389,155 @@ export default function ProfessionalFixedLocationCalendar({
                   }}
                 >
                   <Stack sx={{ py: 0.5 }}>
-                    {[
-                      {
-                        label: "Add Prepayment",
-                        onClick: () => {
-                          if (isViewingExisting) return;
-                          setShowPrepayment(true);
-                          setPrepaymentPercent((prev) =>
-                            prev.trim()
-                              ? prev
-                              : (prepaymentPercentDefault ?? ""),
-                          );
-                          showSnackbar({
-                            severity: "info",
-                            message: "Prepayment enabled.",
-                          });
-                        },
-                      },
-                      ...(slotLocation === "DL"
-                        ? ([
-                            {
+                    {(
+                      [
+                        canAddPrepayment({ alreadyShown: showPrepayment })
+                          ? {
+                              label: "Add Prepayment",
+                              onClick: () => {
+                                setShowPrepayment(true);
+                                setPrepaymentPercent((prev) =>
+                                  prev.trim()
+                                    ? prev
+                                    : (prepaymentPercentDefault ?? ""),
+                                );
+                                showSnackbar({
+                                  severity: "info",
+                                  message: "Prepayment enabled.",
+                                });
+                              },
+                            }
+                          : null,
+                        !isViewingExisting &&
+                        slotLocation === "DL" &&
+                        !showKilometerAllowance
+                          ? {
                               label: "Add Kilometer Allowance",
                               onClick: () => {
-                                if (isViewingExisting) return;
                                 setShowKilometerAllowance(true);
                                 showSnackbar({
                                   severity: "info",
                                   message: "Kilometer Allowance enabled.",
                                 });
                               },
-                            },
-                          ] as const)
-                        : []),
-                      {
-                        label: "Add Discount to Total",
-                        onClick: () => {
-                          if (isViewingExisting) return;
-                          setBookingDiscountModalOpen(true);
-                        },
-                      },
-                      {
-                        label: "Add Late Cancellation",
-                        onClick: () => {
-                          if (isViewingExisting) return;
-                          setShowLateCancellation(true);
-                        },
-                      },
-                      {
-                        label: "Add Late Rescheduling",
-                        onClick: () => {
-                          if (isViewingExisting) return;
-                          setShowLateRescheduling(true);
-                          if (
-                            !lateRescheduleFeePercent &&
-                            lateRescheduleFeePercentDefault
-                          ) {
-                            setLateRescheduleFeePercent(
-                              lateRescheduleFeePercentDefault,
-                            );
-                          }
-                        },
-                      },
-                      {
-                        label: "Add Note",
-                        onClick: () => {
-                          if (isViewingExisting) return;
-                          setShowInternalNote(true);
-                        },
-                      },
-                    ].map((item) => (
+                            }
+                          : null,
+                        !isViewingExisting
+                          ? {
+                              label: "Add Discount to Total",
+                              onClick: () => {
+                                setBookingDiscountModalOpen(true);
+                              },
+                            }
+                          : null,
+                        canAddLateCancellation({
+                          policyPercent: lateCancellationFeePercentDefault,
+                          status: viewingBookingEvent?.status ?? slotStatus,
+                          cancelledServiceIds:
+                            viewingBookingEvent?.details?.cancelledServiceIds ??
+                            negotiationDetails?.cancelledServiceIds,
+                          alreadyShown: showLateCancellation,
+                        })
+                          ? {
+                              label: "Add Late Cancellation",
+                              onClick: () => {
+                                const ceiling =
+                                  lateCancellationFeePercentDefault ?? "";
+                                setShowLateCancellation(true);
+                                setLateCancellationFeePercentCeiling(ceiling);
+                                setLateCancellationFeePercent((prev) =>
+                                  prev.trim() ? prev : ceiling,
+                                );
+                                const nowIso = new Date().toISOString();
+                                setCancellationFeeAt(nowIso);
+                                const startMs = viewingBookingEvent
+                                  ? Date.parse(
+                                      `${viewingBookingEvent.date}T${viewingBookingEvent.start}:00`,
+                                    )
+                                  : selectedSlot
+                                    ? Date.parse(
+                                        `${selectedSlot.date}T${selectedSlot.start}:00`,
+                                      )
+                                    : NaN;
+                                setExceededCancellationWindow(
+                                  isLateCancellation({
+                                    appointmentStartMs: startMs,
+                                    noticeHours: cancellationBeforeHours,
+                                    noticeMinutes: cancellationBeforeMinutes,
+                                  }),
+                                );
+                                showSnackbar({
+                                  severity: "info",
+                                  message: "Late cancellation fee enabled.",
+                                });
+                              },
+                            }
+                          : null,
+                        canAddLateRescheduling({
+                          policyPercent: lateRescheduleFeePercentDefault,
+                          scheduleEdited: Boolean(
+                            viewingBookingEvent?.details?.scheduleEdited,
+                          ),
+                          alreadyShown: showLateRescheduling,
+                        })
+                          ? {
+                              label: "Add Late Rescheduling",
+                              onClick: () => {
+                                const ceiling =
+                                  lateRescheduleFeePercentDefault ?? "";
+                                setShowLateRescheduling(true);
+                                setLateRescheduleFeePercentCeiling(ceiling);
+                                setLateRescheduleFeePercent((prev) =>
+                                  prev.trim() ? prev : ceiling,
+                                );
+                                showSnackbar({
+                                  severity: "info",
+                                  message: "Late rescheduling fee enabled.",
+                                });
+                              },
+                            }
+                          : null,
+                        canAddNoShowFee({
+                          policyPercent: noShowFeePercentDefault,
+                          status: viewingBookingEvent?.status ?? slotStatus,
+                          alreadyShown: showNoShowFee,
+                        })
+                          ? {
+                              label: "Add No-Show Fee",
+                              onClick: () => {
+                                const ceiling = noShowFeePercentDefault ?? "";
+                                setShowNoShowFee(true);
+                                setNoShowFeePercentCeiling(ceiling);
+                                setNoShowFeePercent((prev) =>
+                                  prev.trim() ? prev : ceiling,
+                                );
+                                showSnackbar({
+                                  severity: "info",
+                                  message: "No-show fee enabled.",
+                                });
+                              },
+                            }
+                          : null,
+                        !showInternalNote
+                          ? {
+                              label: "Add Note",
+                              onClick: () => {
+                                setShowInternalNote(true);
+                              },
+                            }
+                          : null,
+                      ] as Array<{
+                        label: string;
+                        onClick: () => void;
+                      } | null>
+                    )
+                      .filter(
+                        (
+                          item,
+                        ): item is { label: string; onClick: () => void } =>
+                          Boolean(item),
+                      )
+                      .map((item) => (
                       <Box
                         key={item.label}
                         role="button"
@@ -10574,19 +10931,18 @@ export default function ProfessionalFixedLocationCalendar({
                                 }}
                               >
                                 {(() => {
-                                  const refundApplicable = isRefundApplicable({
-                                    status: viewingBookingEvent.status,
-                                    prepaid:
-                                      viewingBookingEvent.details
-                                        ?.prepaymentStatus === "confirmed",
-                                    prepaymentStatus:
-                                      viewingBookingEvent.details
-                                        ?.prepaymentStatus,
-                                  });
+                                  const protectiveFeeCheckoutApplicable =
+                                    canCheckoutProtectiveFee({
+                                      status: viewingBookingEvent.status,
+                                      showLateCancellation,
+                                      lateCancellationFeeAmount,
+                                      showNoShowFee,
+                                      noShowFeeAmount,
+                                    });
                                   const actions =
                                     resolveProfessionalBookingActions(
                                       viewingBookingEvent,
-                                      { refundApplicable },
+                                      { protectiveFeeCheckoutApplicable },
                                     );
                                   const itemSx = {
                                     fontWeight: 800,
@@ -10654,6 +11010,12 @@ export default function ProfessionalFixedLocationCalendar({
                                     );
                                   }
                                   if (actions.checkout) {
+                                    const checkoutLabel =
+                                      viewingBookingEvent.status ===
+                                        "Cancelled" ||
+                                      viewingBookingEvent.status === "No Show"
+                                        ? "Send fee checkout"
+                                        : "Checkout";
                                     items.push(
                                       <MenuItem
                                         key="checkout"
@@ -10664,7 +11026,7 @@ export default function ProfessionalFixedLocationCalendar({
                                         }
                                         sx={itemSx}
                                       >
-                                        Checkout
+                                        {checkoutLabel}
                                       </MenuItem>,
                                     );
                                   }
@@ -10680,31 +11042,6 @@ export default function ProfessionalFixedLocationCalendar({
                                         sx={itemSx}
                                       >
                                         Rebook
-                                      </MenuItem>,
-                                    );
-                                  }
-                                  if (actions.refund) {
-                                    items.push(
-                                      <MenuItem
-                                        key="refund"
-                                        onClick={() =>
-                                          void handleBookingActionSelect(
-                                            "refund",
-                                          )
-                                        }
-                                        sx={itemSx}
-                                      >
-                                        <Stack
-                                          direction="row"
-                                          alignItems="center"
-                                          spacing={0.75}
-                                        >
-                                          <BookingGuidelineIcon
-                                            variant="refund_completed"
-                                            size={14}
-                                          />
-                                          <span>Refund</span>
-                                        </Stack>
                                       </MenuItem>,
                                     );
                                   }
@@ -10870,6 +11207,37 @@ export default function ProfessionalFixedLocationCalendar({
                                   ),
                                 }}
                               />
+                              {viewingBookingEvent.details?.silentUpdated &&
+                              viewingBookingEvent.bookingScenario !== "EBR" &&
+                              viewingBookingEvent.bookingScenario !== "ER" ? (
+                                <Tooltip
+                                  title={ACTIVITY_COMPARISON_SIGNPOST}
+                                  placement="top"
+                                >
+                                  <Chip
+                                    size="small"
+                                    label="Updated"
+                                    onClick={() =>
+                                      openActivityComparison("silent_updated")
+                                    }
+                                    sx={{
+                                      height: 18,
+                                      fontSize: 9,
+                                      fontWeight: 800,
+                                      borderRadius: "6px",
+                                      border: `1px solid ${alpha(m.teal, 0.4)}`,
+                                      bgcolor: alpha(m.teal, 0.12),
+                                      color: m.teal,
+                                      cursor: "pointer",
+                                      "& .MuiChip-label": {
+                                        px: 0.7,
+                                        py: 0,
+                                        lineHeight: 1.2,
+                                      },
+                                    }}
+                                  />
+                                </Tooltip>
+                              ) : null}
                               {getBookingScenarioIndicators(
                                 viewingBookingEvent,
                               )
@@ -10894,15 +11262,31 @@ export default function ProfessionalFixedLocationCalendar({
                                           (item) => item === "overdue_response",
                                         )
                                       : [];
+                                const comparisonSignpost =
+                                  indicator === "EBR" || indicator === "ER";
 
                                 return (
                                   <Tooltip
                                     key={indicator}
-                                    title={BOOKING_SCENARIO_LABELS[indicator]}
+                                    title={
+                                      comparisonSignpost
+                                        ? ACTIVITY_COMPARISON_SIGNPOST
+                                        : BOOKING_SCENARIO_LABELS[indicator]
+                                    }
                                     placement="top"
                                   >
                                     <Chip
                                       size="small"
+                                      onClick={
+                                        comparisonSignpost
+                                          ? () =>
+                                              openActivityComparison(
+                                                indicator === "ER"
+                                                  ? "er"
+                                                  : "ebr",
+                                              )
+                                          : undefined
+                                      }
                                       label={
                                         <Stack
                                           direction="row"
@@ -10979,6 +11363,9 @@ export default function ProfessionalFixedLocationCalendar({
                                         bgcolor: alpha(m.navy, 0.06),
                                         color: alpha(m.navy, 0.62),
                                         border: `1px solid ${alpha(m.navy, 0.14)}`,
+                                        cursor: comparisonSignpost
+                                          ? "pointer"
+                                          : "default",
                                         "& .MuiChip-label": { px: 0.85 },
                                       }}
                                     />
@@ -13230,13 +13617,14 @@ export default function ProfessionalFixedLocationCalendar({
                               <IconButton
                                 size="small"
                                 onClick={() => {
-                                  if (isViewingExisting) return;
                                   setShowLateCancellation(false);
                                   setLateCancellationFeePercent("");
+                                  setLateCancellationFeePercentCeiling("");
+                                  setCancellationFeeAt(undefined);
+                                  setExceededCancellationWindow(undefined);
                                 }}
                                 sx={{ color: alpha(m.navy, 0.35) }}
                                 aria-label="Remove late cancellation"
-                                disabled={isViewingExisting}
                               >
                                 <CloseRoundedIcon sx={{ fontSize: 17 }} />
                               </IconButton>
@@ -13252,6 +13640,11 @@ export default function ProfessionalFixedLocationCalendar({
                               }}
                             >
                               {lateCancelNoticeLabel}
+                              {typeof exceededCancellationWindow === "boolean"
+                                ? exceededCancellationWindow
+                                  ? " · Outside notice window"
+                                  : " · Within notice window"
+                                : null}
                             </BodyText>
 
                             <Stack
@@ -13284,11 +13677,20 @@ export default function ProfessionalFixedLocationCalendar({
                                 value={lateCancellationFeePercent}
                                 onChange={(e) =>
                                   setLateCancellationFeePercent(
-                                    sanitizeDecimalInput(e.target.value),
+                                    clampProtectiveFeePercent(
+                                      sanitizeDecimalInput(e.target.value),
+                                      lateCancellationFeePercentCeiling ||
+                                        lateCancellationFeePercentDefault,
+                                    ),
                                   )
                                 }
-                                disabled={isViewingExisting}
-                                inputProps={{ inputMode: "decimal" }}
+                                inputProps={{
+                                  inputMode: "decimal",
+                                  max: parsePolicyPercentCeiling(
+                                    lateCancellationFeePercentCeiling ||
+                                      lateCancellationFeePercentDefault,
+                                  ),
+                                }}
                                 sx={{ width: 72, flexShrink: 0 }}
                               />
                               <BodyText
@@ -13334,13 +13736,12 @@ export default function ProfessionalFixedLocationCalendar({
                               <IconButton
                                 size="small"
                                 onClick={() => {
-                                  if (isViewingExisting) return;
                                   setShowLateRescheduling(false);
                                   setLateRescheduleFeePercent("");
+                                  setLateRescheduleFeePercentCeiling("");
                                 }}
                                 sx={{ color: alpha(m.navy, 0.35) }}
                                 aria-label="Remove late rescheduling"
-                                disabled={isViewingExisting}
                               >
                                 <CloseRoundedIcon sx={{ fontSize: 17 }} />
                               </IconButton>
@@ -13389,11 +13790,20 @@ export default function ProfessionalFixedLocationCalendar({
                                 value={lateRescheduleFeePercent}
                                 onChange={(e) =>
                                   setLateRescheduleFeePercent(
-                                    sanitizeDecimalInput(e.target.value),
+                                    clampProtectiveFeePercent(
+                                      sanitizeDecimalInput(e.target.value),
+                                      lateRescheduleFeePercentCeiling ||
+                                        lateRescheduleFeePercentDefault,
+                                    ),
                                   )
                                 }
-                                disabled={isViewingExisting}
-                                inputProps={{ inputMode: "decimal" }}
+                                inputProps={{
+                                  inputMode: "decimal",
+                                  max: parsePolicyPercentCeiling(
+                                    lateRescheduleFeePercentCeiling ||
+                                      lateRescheduleFeePercentDefault,
+                                  ),
+                                }}
                                 sx={{ width: 72, flexShrink: 0 }}
                               />
                               <BodyText
@@ -13406,6 +13816,119 @@ export default function ProfessionalFixedLocationCalendar({
                                 }}
                               >
                                 €{lateRescheduleFeeAmount}
+                              </BodyText>
+                            </Stack>
+                          </Box>
+                        ) : null}
+
+                        {showNoShowFee ? (
+                          <Box
+                            sx={{
+                              borderRadius: "12px",
+                              bgcolor: "#fff",
+                              border: `1px solid ${alpha(m.navy, 0.08)}`,
+                              boxShadow: "0 10px 26px rgba(16, 35, 63, 0.08)",
+                              p: 1.5,
+                            }}
+                          >
+                            <Stack
+                              direction="row"
+                              alignItems="center"
+                              spacing={1}
+                            >
+                              <BodyText
+                                sx={{
+                                  flex: 1,
+                                  fontSize: 13,
+                                  fontWeight: 900,
+                                  color: alpha(m.navy, 0.82),
+                                }}
+                              >
+                                No-Show Fee
+                              </BodyText>
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  setShowNoShowFee(false);
+                                  setNoShowFeePercent("");
+                                  setNoShowFeePercentCeiling("");
+                                }}
+                                sx={{ color: alpha(m.navy, 0.35) }}
+                                aria-label="Remove no-show fee"
+                              >
+                                <CloseRoundedIcon sx={{ fontSize: 17 }} />
+                              </IconButton>
+                            </Stack>
+
+                            <BodyText
+                              sx={{
+                                mt: 0.5,
+                                fontSize: 11.5,
+                                fontWeight: 700,
+                                color: alpha(m.navy, 0.48),
+                                lineHeight: 1.35,
+                              }}
+                            >
+                              Fee for a guest tagged No Show. You may only
+                              decrease or remove this fee.
+                            </BodyText>
+
+                            <Stack
+                              direction="row"
+                              alignItems="center"
+                              spacing={1.25}
+                              sx={{ mt: 1.25 }}
+                            >
+                              <Stack
+                                direction="row"
+                                alignItems="center"
+                                spacing={0.5}
+                                sx={{ minWidth: 52 }}
+                              >
+                                <BodyText
+                                  sx={{
+                                    fontSize: 12.5,
+                                    fontWeight: 850,
+                                    color: alpha(m.navy, 0.62),
+                                  }}
+                                >
+                                  Fee
+                                </BodyText>
+                                <InfoOutlinedIcon
+                                  sx={{ fontSize: 15, color: m.teal }}
+                                />
+                              </Stack>
+                              <AppTextField
+                                placeholder="%"
+                                value={noShowFeePercent}
+                                onChange={(e) =>
+                                  setNoShowFeePercent(
+                                    clampProtectiveFeePercent(
+                                      sanitizeDecimalInput(e.target.value),
+                                      noShowFeePercentCeiling ||
+                                        noShowFeePercentDefault,
+                                    ),
+                                  )
+                                }
+                                inputProps={{
+                                  inputMode: "decimal",
+                                  max: parsePolicyPercentCeiling(
+                                    noShowFeePercentCeiling ||
+                                      noShowFeePercentDefault,
+                                  ),
+                                }}
+                                sx={{ width: 72, flexShrink: 0 }}
+                              />
+                              <BodyText
+                                sx={{
+                                  flex: 1,
+                                  textAlign: "right",
+                                  fontSize: 16,
+                                  fontWeight: 950,
+                                  color: alpha(m.navy, 0.85),
+                                }}
+                              >
+                                €{noShowFeeAmount}
                               </BodyText>
                             </Stack>
                           </Box>
@@ -13743,7 +14266,6 @@ export default function ProfessionalFixedLocationCalendar({
                               onChange={(e) =>
                                 setBookingInternalNote(e.target.value)
                               }
-                              disabled={isViewingExisting}
                               multiline
                               minRows={4}
                               fullWidth
@@ -13798,6 +14320,7 @@ export default function ProfessionalFixedLocationCalendar({
                             lateRescheduleFeeAmount={
                               bookingPrice.lateRescheduleFeeAmount
                             }
+                            noShowFeeAmount={bookingPrice.noShowFeeAmount}
                             prepaidApplied={
                               isDrawerPrepaymentPaid ? prepaymentAmount : 0
                             }
@@ -13970,7 +14493,7 @@ export default function ProfessionalFixedLocationCalendar({
                       <BookingActivityOverview
                         title="Activity Overview"
                         items={activityTimelineItems}
-                        emptyMessage="No activity for this client yet."
+                        emptyMessage="No activity for this booking yet."
                         selectedDetail={activityDetailItem}
                         onSelectedDetailChange={setActivityDetailItem}
                       />
@@ -14201,27 +14724,27 @@ export default function ProfessionalFixedLocationCalendar({
         onClose={() => setDesignOpen(false)}
         onApply={async () => {
           try {
-            // Persist only colours the professional explicitly chose (no defaults).
+            // Persist only colours the professional explicitly chose (no defaults / gray).
             const nextDesign: CalendarDesignDraft = {
               ...designDraft,
               colorsByCategory: Object.fromEntries(
                 Object.entries(designDraft.colorsByCategory ?? {}).filter(
-                  ([, color]) => Boolean(color?.trim()),
+                  ([, color]) => isConfiguredColor(color),
                 ),
               ),
               colorsByService: Object.fromEntries(
                 Object.entries(designDraft.colorsByService ?? {}).filter(
-                  ([, color]) => Boolean(color?.trim()),
+                  ([, color]) => isConfiguredColor(color),
                 ),
               ),
               colorsByStatus: Object.fromEntries(
                 Object.entries(designDraft.colorsByStatus ?? {}).filter(
-                  ([, color]) => Boolean(color?.trim()),
+                  ([, color]) => isConfiguredColor(color),
                 ),
               ) as CalendarDesignDraft["colorsByStatus"],
               colorsByTeamMember: Object.fromEntries(
                 Object.entries(designDraft.colorsByTeamMember ?? {}).filter(
-                  ([, color]) => Boolean(color?.trim()),
+                  ([, color]) => isConfiguredColor(color),
                 ),
               ),
             };
@@ -14241,29 +14764,7 @@ export default function ProfessionalFixedLocationCalendar({
         setDraft={setDesignDraft}
         serviceOptions={serviceOptions}
         categoryOptions={categoryOptions}
-      />
-      <CalendarServiceOrderModal
-        draft={serviceOrderDraft}
-        onApply={async () => {
-          try {
-            await persistAvailabilitySettings({
-              serviceOrder: serviceOrderDraft,
-            });
-            showSnackbar({
-              severity: "success",
-              message: "Service order saved.",
-            });
-            setServiceOrderOpen(false);
-          } catch {
-            showSnackbar({
-              severity: "error",
-              message: "Unable to save service order.",
-            });
-          }
-        }}
-        onClose={() => setServiceOrderOpen(false)}
-        open={serviceOrderOpen}
-        setDraft={setServiceOrderDraft}
+        templateCategoryRows={templateCategoryRows}
       />
       <CalendarEditAvailabilityModal
         availableLocations={data.supportedLocations}

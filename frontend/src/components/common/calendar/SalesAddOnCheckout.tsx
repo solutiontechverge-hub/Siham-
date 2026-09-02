@@ -45,7 +45,7 @@ type SalesAddOnCheckoutProps = {
   clientName: string;
   clientEmail?: string;
   onCancel: () => void;
-  onSave: (payload: SalesAddOnCheckoutPayload) => void;
+  onSave: (payload: SalesAddOnCheckoutPayload) => void | Promise<void>;
 };
 
 export default function SalesAddOnCheckout({

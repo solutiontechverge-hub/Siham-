@@ -1,7 +1,20 @@
 import { getBookingEditRequest } from "../client-booking/bookingEditRequest";
 import { getBookingCancellationReason } from "../client-booking/bookingCancellationReason";
-import { parseCalendarEntryNotes } from "./bookingEventDetails";
-import type { BookingActivityBuildInput, BookingActivityItem, BookingActivityKind } from "./bookingActivity.types";
+import {
+  parseCalendarEntryNotes,
+  parseStoredEbrFromNotes,
+} from "./bookingEventDetails";
+import {
+  buildActivityComparison,
+  type ActivityComparison,
+  type ActivityComparisonMode,
+} from "./buildActivityComparison";
+import type {
+  BookingActivityApiEvent,
+  BookingActivityBuildInput,
+  BookingActivityItem,
+  BookingActivityKind,
+} from "./bookingActivity.types";
 
 function parseDate(value?: string | null): Date | null {
   if (!value) return null;
@@ -34,27 +47,13 @@ function normalizeStatus(status: string): string {
     .replace(/\s+/g, "_");
 }
 
-function matchesClient(
-  booking: BookingActivityBuildInput["bookings"][number],
-  clientEmail?: string | null,
-  clientName?: string | null,
-): boolean {
-  const email = clientEmail?.trim().toLowerCase();
-  const name = clientName?.trim().toLowerCase();
-  const bookingEmail = (booking.customer_email ?? "").trim().toLowerCase();
-  const bookingName = (booking.customer_name || booking.client_name || "").trim().toLowerCase();
-
-  if (email && bookingEmail && email === bookingEmail) return true;
-  if (name && bookingName && name === bookingName) return true;
-  return false;
-}
-
 function isSalesKind(kind: BookingActivityKind): boolean {
   return (
     kind === "booking_prepaid" ||
     kind === "post_booking_paid" ||
     kind === "fee_paid" ||
-    kind === "addon_paid"
+    kind === "addon_paid" ||
+    kind === "refund_completed"
   );
 }
 
@@ -67,38 +66,389 @@ function pushItem(items: BookingActivityItem[], item: Omit<BookingActivityItem, 
   });
 }
 
-export function buildBookingActivityTimeline(input: BookingActivityBuildInput): BookingActivityItem[] {
+function isOfflineBooking(booking: {
+  booking_type?: string | null;
+  unique_code?: string | null;
+}): boolean {
+  const type = String(booking.booking_type ?? "").toLowerCase();
+  if (type === "offline") return true;
+  return String(booking.unique_code ?? "").startsWith("OF");
+}
+
+function isRequestFlowBooking(booking: {
+  status: string;
+  booking_type?: string | null;
+  unique_code?: string | null;
+}, scenario?: string | null): boolean {
+  if (isOfflineBooking(booking)) return false;
+  if (scenario === "BR") return true;
+  const status = normalizeStatus(booking.status);
+  return status === "requested";
+}
+
+function mapApiKind(kind: string): BookingActivityKind {
+  const k = String(kind || "").toLowerCase();
+  const allowed: BookingActivityKind[] = [
+    "booking_created",
+    "booking_request_sent",
+    "booking_accepted",
+    "booking_confirmed",
+    "booking_prepaid",
+    "edit_request_sent",
+    "edit_request_suggest",
+    "edit_request_accepted",
+    "booking_cancelled",
+    "booking_updated",
+    "post_booking_paid",
+    "fee_paid",
+    "addon_paid",
+    "refund_completed",
+  ];
+  if ((allowed as string[]).includes(k)) return k as BookingActivityKind;
+  return "booking_created";
+}
+
+function guestNames(
+  guests?: Array<{ name?: string | null }> | null,
+): string[] {
+  return (guests ?? [])
+    .map((guest) => (guest.name ?? "").trim())
+    .filter(Boolean);
+}
+
+function resolveComparisonForBooking(input: {
+  mode: ActivityComparisonMode;
+  notesDetails: ReturnType<typeof parseCalendarEntryNotes>;
+  ebr: ReturnType<typeof parseStoredEbrFromNotes>;
+  editReq: ReturnType<typeof getBookingEditRequest>;
+  currentDetails?: BookingActivityBuildInput["currentDetails"];
+  currentDateISO?: string | null;
+  currentStart?: string | null;
+  bookingDate?: string | null;
+  bookingStart?: string | null;
+}): ActivityComparison | null {
+  const {
+    mode,
+    notesDetails,
+    ebr,
+    editReq,
+    currentDetails,
+    currentDateISO,
+    currentStart,
+    bookingDate,
+    bookingStart,
+  } = input;
+
+  const details = currentDetails ?? null;
+  const originalServices =
+    details?.originalServices?.length
+      ? details.originalServices
+      : notesDetails?.originalServices?.length
+        ? notesDetails.originalServices
+        : null;
+
+  const suggestedServices =
+    ebr?.suggestedServices?.length
+      ? ebr.suggestedServices
+      : editReq.suggestedServices?.length
+        ? editReq.suggestedServices
+        : null;
+
+  const currentServices =
+    suggestedServices?.length
+      ? suggestedServices
+      : details?.services?.length
+        ? details.services
+        : notesDetails?.services?.length
+          ? notesDetails.services
+          : null;
+
+  const snapshot =
+    details?.silentUpdateSnapshot ?? notesDetails?.silentUpdateSnapshot;
+
+  return buildActivityComparison({
+    mode,
+    originalServices,
+    currentServices,
+    editedServiceIds:
+      details?.editedServiceIds ??
+      ebr?.editedServiceIds ??
+      editReq.editedServiceIds ??
+      notesDetails?.editedServiceIds,
+    addedServiceIds: details?.addedServiceIds ?? notesDetails?.addedServiceIds,
+    cancelledServiceIds:
+      details?.cancelledServiceIds ?? notesDetails?.cancelledServiceIds,
+    originalProducts: notesDetails?.products,
+    currentProducts:
+      ebr?.suggestedProducts ??
+      editReq.suggestedProducts ??
+      details?.products ??
+      notesDetails?.products,
+    editedProductIds:
+      details?.editedProductIds ??
+      ebr?.editedProductIds ??
+      editReq.editedProductIds ??
+      notesDetails?.editedProductIds,
+    originalDateISO:
+      ebr?.originalDateISO ||
+      editReq.originalDateISO ||
+      (mode === "silent_updated" ? null : bookingDate) ||
+      null,
+    originalTime:
+      ebr?.originalTime ||
+      editReq.originalTime ||
+      (mode === "silent_updated" ? null : bookingStart) ||
+      null,
+    newDateISO:
+      ebr?.suggestedDateISO ||
+      editReq.suggestedDateISO ||
+      currentDateISO ||
+      bookingDate ||
+      null,
+    newTime:
+      ebr?.suggestedTime ||
+      editReq.suggestedTime ||
+      currentStart ||
+      bookingStart ||
+      null,
+    originalPhoneCode: snapshot?.phoneCode,
+    originalPhoneNumber: snapshot?.phoneNumber,
+    newPhoneCode: details?.phoneCode ?? notesDetails?.phoneCode,
+    newPhoneNumber: details?.phoneNumber ?? notesDetails?.phoneNumber,
+    originalGuestNames: guestNames(snapshot?.guests),
+    newGuestNames: guestNames(details?.guests ?? notesDetails?.guests),
+    originalDesiredLocation: snapshot?.desiredLocation,
+    newDesiredLocation:
+      details?.desiredLocation ?? notesDetails?.desiredLocation,
+  });
+}
+
+/**
+ * Attach before/after comparison payloads to edit/update activity rows.
+ */
+function enrichItemsWithComparison(
+  items: BookingActivityItem[],
+  input: BookingActivityBuildInput,
+): BookingActivityItem[] {
+  const booking =
+    input.bookings.find((row) => {
+      const id = String(row.id);
+      if (input.currentBookingId && id === String(input.currentBookingId)) {
+        return true;
+      }
+      if (
+        input.currentBookingCode &&
+        row.unique_code &&
+        row.unique_code === input.currentBookingCode
+      ) {
+        return true;
+      }
+      return false;
+    }) ?? input.bookings[0];
+
+  if (!booking && !input.currentDetails) return items;
+
+  const code =
+    input.currentBookingCode ||
+    booking?.unique_code ||
+    input.currentBookingId ||
+    "";
+  const notesDetails = parseCalendarEntryNotes(booking?.notes ?? null);
+  const storedEbr = parseStoredEbrFromNotes(booking?.notes ?? null);
+  const editReq = getBookingEditRequest(String(code));
+  const scenario = input.currentScenario;
+  const effectiveStatus = input.currentStatus
+    ? normalizeStatus(input.currentStatus)
+    : normalizeStatus(booking?.status ?? "");
+
+  const comparisonMode: ActivityComparisonMode =
+    scenario === "ER" ||
+    (effectiveStatus === "confirmed" &&
+      (editReq.status === "pending" ||
+        editReq.status === "suggested" ||
+        editReq.status === "approved" ||
+        editReq.status === "rejected") &&
+      scenario !== "EBR")
+      ? "er"
+      : "ebr";
+
+  const editComparison = resolveComparisonForBooking({
+    mode: comparisonMode,
+    notesDetails,
+    ebr: storedEbr,
+    editReq,
+    currentDetails: input.currentDetails,
+    currentDateISO: input.currentDateISO,
+    currentStart: input.currentStart,
+    bookingDate: booking?.booking_date,
+    bookingStart: booking?.start_time,
+  });
+
+  const silentComparison =
+    input.currentDetails?.silentUpdated || notesDetails?.silentUpdated
+      ? resolveComparisonForBooking({
+          mode: "silent_updated",
+          notesDetails,
+          ebr: storedEbr,
+          editReq,
+          currentDetails: input.currentDetails,
+          currentDateISO: input.currentDateISO,
+          currentStart: input.currentStart,
+          bookingDate: booking?.booking_date,
+          bookingStart: booking?.start_time,
+        })
+      : null;
+
+  let next = items.map((item) => {
+    if (
+      item.kind === "edit_request_sent" ||
+      item.kind === "edit_request_suggest" ||
+      item.kind === "edit_request_accepted"
+    ) {
+      if (!editComparison) return item;
+      return {
+        ...item,
+        title:
+          item.kind === "edit_request_sent"
+            ? comparisonMode === "ebr"
+              ? "Edited Booking Request sent"
+              : "Edit Request sent"
+            : item.title,
+        hasDetailArrow: item.kind === "edit_request_sent" ? true : item.hasDetailArrow,
+        detailType: "comparison" as const,
+        comparison: editComparison,
+      };
+    }
+    if (item.kind === "booking_updated" && silentComparison) {
+      return {
+        ...item,
+        hasDetailArrow: true,
+        detailType: "comparison" as const,
+        comparison: silentComparison,
+        subtitle:
+          item.subtitle ||
+          silentComparison.rows.map((row) => row.label).join(", "),
+      };
+    }
+    return item;
+  });
+
+  const hasSilentItem = next.some((item) => item.kind === "booking_updated");
+  if (
+    silentComparison &&
+    !hasSilentItem &&
+    scenario !== "EBR" &&
+    scenario !== "ER"
+  ) {
+    const bookingId =
+      input.currentBookingId ||
+      (booking ? String(booking.id) : "booking");
+    const actor =
+      input.currentDetails?.lastEditedBy === "client" ? "client" : "professional";
+    const occurredAt =
+      parseDate(booking?.updated_at)?.toISOString() || new Date().toISOString();
+    pushItem(next, {
+      id: `${bookingId}-updated`,
+      bookingId: String(bookingId),
+      bookingCode: code || undefined,
+      kind: "booking_updated",
+      actor,
+      actorLabel:
+        actor === "client" ? input.clientName?.trim() || "Client" : "Professional",
+      title: "Updated",
+      subtitle: silentComparison.rows.map((row) => row.label).join(", "),
+      occurredAt,
+      hasDetailArrow: true,
+      detailType: "comparison",
+      comparison: silentComparison,
+      detailLines: [
+        {
+          label: "Booking code",
+          value: String(code).startsWith("#") ? String(code) : `#${code}`,
+        },
+        { label: "Status", value: "Updated" },
+      ],
+    });
+    next = next.sort((a, b) => {
+      const at = parseDate(a.occurredAt)?.getTime() ?? 0;
+      const bt = parseDate(b.occurredAt)?.getTime() ?? 0;
+      return bt - at;
+    });
+  }
+
+  return next;
+}
+
+function mapApiEventsToItems(
+  events: BookingActivityApiEvent[],
+  fallbackBookingId: string,
+): BookingActivityItem[] {
+  const items: BookingActivityItem[] = [];
+  for (const event of events) {
+    const kind = mapApiKind(event.kind);
+    const payload = event.payload ?? {};
+    const cancellationReason =
+      typeof payload.cancellationReason === "string" ? payload.cancellationReason : undefined;
+    pushItem(items, {
+      id: event.id,
+      bookingId: event.bookingId ? String(event.bookingId) : fallbackBookingId,
+      bookingCode: event.bookingCode ?? undefined,
+      kind,
+      actor: (event.actor as BookingActivityItem["actor"]) || "system",
+      actorLabel: event.actorLabel || "System",
+      title: event.title,
+      subtitle: event.subtitle ?? undefined,
+      occurredAt: event.occurredAt,
+      hasDetailArrow:
+        Boolean(cancellationReason) ||
+        kind === "edit_request_sent" ||
+        kind === "booking_updated",
+      detailType: cancellationReason
+        ? "cancellation"
+        : kind === "edit_request_sent" || kind === "booking_updated"
+          ? "ebr"
+          : undefined,
+      cancellationReason,
+    });
+  }
+  return items;
+}
+
+/**
+ * Legacy fallback when no persisted activity events exist.
+ * Booking-scoped only; channel-aware; never fabricates unpaid payment rows.
+ */
+function synthesizeBookingActivity(
+  input: BookingActivityBuildInput,
+): BookingActivityItem[] {
   const {
     bookings,
-    clientEmail,
-    clientName,
     currentBookingId,
     currentBookingCode,
     currentScenario,
     currentStatus,
     currentCancellationReason,
     currentProfessionalName,
+    currentBookingType,
     mode,
   } = input;
 
   const items: BookingActivityItem[] = [];
-  const clientLabel = clientName?.trim() || "Client";
+  const clientLabel = input.clientName?.trim() || "Client";
 
   const relevant = bookings.filter((booking) => {
     const id = String(booking.id);
-    if (currentBookingId && (id === currentBookingId || `b-${id}` === currentBookingId)) return true;
-    if (currentBookingCode && booking.unique_code && booking.unique_code === currentBookingCode) return true;
-    return matchesClient(booking, clientEmail, clientName);
+    if (currentBookingId && (id === currentBookingId || `b-${id}` === currentBookingId)) {
+      return true;
+    }
+    if (currentBookingCode && booking.unique_code && booking.unique_code === currentBookingCode) {
+      return true;
+    }
+    // Booking-scoped: do not merge sibling client bookings.
+    return false;
   });
 
-  // Prefer newest first
-  const sorted = [...relevant].sort((a, b) => {
-    const at = parseDate(a.updated_at || a.created_at || a.start_time)?.getTime() ?? 0;
-    const bt = parseDate(b.updated_at || b.created_at || b.start_time)?.getTime() ?? 0;
-    return bt - at;
-  });
-
-  for (const booking of sorted) {
+  for (const booking of relevant) {
     const bookingId = String(booking.id);
     const code = booking.unique_code || bookingId;
     const created = parseDate(booking.created_at || booking.start_time || booking.booking_date) ?? new Date();
@@ -106,28 +456,41 @@ export function buildBookingActivityTimeline(input: BookingActivityBuildInput): 
     const status = normalizeStatus(booking.status);
     const prepay = String(booking.prepayment_status ?? "").toLowerCase();
     const priceSub = moneyLabel(booking.total_price);
-    const isCurrent =
-      (currentBookingId && (bookingId === currentBookingId || `b-${bookingId}` === currentBookingId)) ||
-      (currentBookingCode && booking.unique_code === currentBookingCode);
+    const effectiveStatus = currentStatus ? normalizeStatus(currentStatus) : status;
+    const bookingType = currentBookingType || booking.booking_type;
+    const offline = isOfflineBooking({ ...booking, booking_type: bookingType });
+    const requestFlow =
+      isRequestFlowBooking({ ...booking, booking_type: bookingType, status: effectiveStatus }, currentScenario) ||
+      currentScenario === "BR";
 
-    const scenario = isCurrent ? currentScenario : undefined;
-    const effectiveStatus = isCurrent && currentStatus ? normalizeStatus(currentStatus) : status;
+    if (requestFlow && !offline) {
+      pushItem(items, {
+        id: `${bookingId}-request`,
+        bookingId,
+        bookingCode: code,
+        kind: "booking_request_sent",
+        actor: "client",
+        actorLabel: clientLabel,
+        title: "Booking Request sent",
+        occurredAt: created.toISOString(),
+        hasDetailArrow: false,
+      });
+    } else {
+      pushItem(items, {
+        id: `${bookingId}-created`,
+        bookingId,
+        bookingCode: code,
+        kind: "booking_created",
+        actor: offline ? "professional" : "client",
+        actorLabel: offline ? "Professional" : clientLabel,
+        title: prepay === "paid" ? "Booking created and prepaid" : "Booking created",
+        subtitle: prepay === "paid" ? priceSub : undefined,
+        occurredAt: created.toISOString(),
+        hasDetailArrow: false,
+      });
+    }
 
-    // Request / create
-    pushItem(items, {
-      id: `${bookingId}-request`,
-      bookingId,
-      bookingCode: code,
-      kind: "booking_request_sent",
-      actor: "client",
-      actorLabel: clientLabel,
-      title: prepay === "paid" ? "Booking created and prepaid" : "Booking Request sent",
-      subtitle: prepay === "paid" ? priceSub : undefined,
-      occurredAt: created.toISOString(),
-      hasDetailArrow: false,
-    });
-
-    if (prepay === "paid" || prepay === "required") {
+    if (prepay === "paid") {
       pushItem(items, {
         id: `${bookingId}-prepaid`,
         bookingId,
@@ -135,7 +498,7 @@ export function buildBookingActivityTimeline(input: BookingActivityBuildInput): 
         kind: "booking_prepaid",
         actor: "client",
         actorLabel: clientLabel,
-        title: "Booking Request Prepaid",
+        title: "Booking prepaid",
         subtitle: priceSub,
         occurredAt: created.toISOString(),
         hasDetailArrow: false,
@@ -143,24 +506,36 @@ export function buildBookingActivityTimeline(input: BookingActivityBuildInput): 
     }
 
     if (effectiveStatus === "confirmed" || effectiveStatus === "completed") {
+      if (requestFlow && !offline) {
+        pushItem(items, {
+          id: `${bookingId}-accepted`,
+          bookingId,
+          bookingCode: code,
+          kind: "booking_accepted",
+          actor: "professional",
+          actorLabel: "Professional",
+          title: "Booking Request Accepted",
+          occurredAt: updated.toISOString(),
+          hasDetailArrow: false,
+        });
+      }
       pushItem(items, {
-        id: `${bookingId}-accepted`,
+        id: `${bookingId}-confirmed`,
         bookingId,
         bookingCode: code,
-        kind: "booking_accepted",
+        kind: "booking_confirmed",
         actor: "professional",
         actorLabel: "Professional",
-        title: "Booking Request Accepted",
-        occurredAt: updated.toISOString(),
+        title: "Confirmed",
+        occurredAt: created.toISOString(),
         hasDetailArrow: false,
       });
     }
 
-    // EBR from scenario or local edit-request store
     const editReq = getBookingEditRequest(code);
     const hasEbr =
-      scenario === "EBR" ||
-      scenario === "ER" ||
+      currentScenario === "EBR" ||
+      currentScenario === "ER" ||
       editReq.status === "pending" ||
       editReq.status === "suggested" ||
       editReq.status === "approved" ||
@@ -187,7 +562,6 @@ export function buildBookingActivityTimeline(input: BookingActivityBuildInput): 
         });
       }
 
-      // Arrow only on the EBR "sent" entry (not suggest/accepted), matching product mock.
       pushItem(items, {
         id: `${bookingId}-ebr-sent`,
         bookingId,
@@ -218,22 +592,6 @@ export function buildBookingActivityTimeline(input: BookingActivityBuildInput): 
         });
       }
 
-      if (editReq.status === "pending" && editReq.clientNote) {
-        pushItem(items, {
-          id: `${bookingId}-ebr-client-suggest`,
-          bookingId,
-          bookingCode: code,
-          kind: "edit_request_suggest",
-          actor: "client",
-          actorLabel: clientLabel,
-          title: "Client Suggested Change",
-          occurredAt: (parseDate(editReq.requestedAt) ?? ebrAt).toISOString(),
-          hasDetailArrow: false,
-          detailType: "ebr",
-          detailLines: ebrLines,
-        });
-      }
-
       if (editReq.status === "approved") {
         pushItem(items, {
           id: `${bookingId}-ebr-accepted`,
@@ -255,12 +613,12 @@ export function buildBookingActivityTimeline(input: BookingActivityBuildInput): 
       const notesDetails = parseCalendarEntryNotes(booking.notes);
       const storedReason = getBookingCancellationReason(code);
       const reason =
-        (isCurrent ? currentCancellationReason?.trim() : "") ||
+        currentCancellationReason?.trim() ||
         notesDetails?.cancellationReason?.trim() ||
         storedReason?.reason ||
         "";
       const professionalName =
-        (isCurrent ? currentProfessionalName?.trim() : "") ||
+        currentProfessionalName?.trim() ||
         booking.team_member_name?.trim() ||
         booking.business_name?.trim() ||
         "Professional";
@@ -292,45 +650,16 @@ export function buildBookingActivityTimeline(input: BookingActivityBuildInput): 
       });
     }
 
-    if (effectiveStatus === "completed" || prepay === "paid") {
-      const notesDetails = parseCalendarEntryNotes(booking.notes);
-      if (notesDetails?.refunded) {
-        pushItem(items, {
-          id: `${bookingId}-refunded`,
-          bookingId,
-          bookingCode: code,
-          kind: "post_booking_paid",
-          actor: "professional",
-          actorLabel: "Professional",
-          title: "Refund completed",
-          occurredAt: updated.toISOString(),
-          hasDetailArrow: false,
-        });
-      }
-      if (notesDetails?.waitingForPayment) {
-        pushItem(items, {
-          id: `${bookingId}-waiting-payment`,
-          bookingId,
-          bookingCode: code,
-          kind: "fee_paid",
-          actor: "system",
-          actorLabel: "System",
-          title: notesDetails.invoiceDueDate
-            ? `Invoice due ${notesDetails.invoiceDueDate}`
-            : "Waiting for payment",
-          occurredAt: updated.toISOString(),
-          hasDetailArrow: false,
-        });
-      }
+    const notesDetails = parseCalendarEntryNotes(booking.notes);
+    if (notesDetails?.refunded) {
       pushItem(items, {
-        id: `${bookingId}-paid`,
+        id: `${bookingId}-refunded`,
         bookingId,
         bookingCode: code,
-        kind: "post_booking_paid",
-        actor: "client",
-        actorLabel: clientLabel,
-        title: effectiveStatus === "completed" ? "Post Booking Paid" : "Fee paid",
-        subtitle: priceSub,
+        kind: "refund_completed",
+        actor: "professional",
+        actorLabel: "Professional",
+        title: "Refund completed",
         occurredAt: updated.toISOString(),
         hasDetailArrow: false,
       });
@@ -344,4 +673,22 @@ export function buildBookingActivityTimeline(input: BookingActivityBuildInput): 
     const bt = parseDate(b.occurredAt)?.getTime() ?? 0;
     return bt - at;
   });
+}
+
+export function buildBookingActivityTimeline(input: BookingActivityBuildInput): BookingActivityItem[] {
+  const apiEvents = input.apiEvents;
+  if (apiEvents && apiEvents.length > 0) {
+    const fallbackId = input.currentBookingId || input.currentBookingCode || "booking";
+    const mapped = mapApiEventsToItems(apiEvents, fallbackId);
+    const filtered =
+      input.mode === "sales" ? mapped.filter((item) => isSalesKind(item.kind)) : mapped;
+    const sorted = filtered.sort((a, b) => {
+      const at = parseDate(a.occurredAt)?.getTime() ?? 0;
+      const bt = parseDate(b.occurredAt)?.getTime() ?? 0;
+      return bt - at;
+    });
+    return enrichItemsWithComparison(sorted, input);
+  }
+
+  return enrichItemsWithComparison(synthesizeBookingActivity(input), input);
 }

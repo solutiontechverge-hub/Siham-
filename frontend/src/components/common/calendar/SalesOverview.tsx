@@ -8,11 +8,12 @@ import {
   useGetProfessionalClientsQuery,
   useUpdateBookingStatusMutation,
 } from "../../../store/services/businessApi";
-import { useReissueFinanceInvoiceMutation } from "../../../store/services/financeApi";
+import { useReissueFinanceInvoiceMutation, useLazyGetFinanceTransactionsQuery, useBulkFinanceTransactionActionMutation, useCreateFinanceTransactionMutation } from "../../../store/services/financeApi";
 import {
   parseStoredEbrFromNotes,
   parseStoredErFromNotes,
   serializeCalendarEntryNotes,
+  parseCalendarEntryNotes,
 } from "./bookingEventDetails";
 import { buildSplitBillNotesPatch, resolveSalesPayerShares } from "./salesSplitBill";
 import type { CalendarBookingDetails, CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
@@ -124,6 +125,9 @@ export default function SalesOverview({
   const [updateBookingStatus, { isLoading: cancelling }] =
     useUpdateBookingStatusMutation();
   const [reissueFinanceInvoice] = useReissueFinanceInvoiceMutation();
+  const [fetchFinanceTransactions] = useLazyGetFinanceTransactionsQuery();
+  const [bulkFinanceAction] = useBulkFinanceTransactionActionMutation();
+  const [createFinanceTransaction] = useCreateFinanceTransactionMutation();
 
   const [revision, setRevision] = React.useState(0);
   const [checkoutBookingId, setCheckoutBookingId] = React.useState<
@@ -347,6 +351,10 @@ export default function SalesOverview({
       setCancelCard(card);
       return;
     }
+    if (action === "refundSales") {
+      await handleRefundSales(card);
+      return;
+    }
     if (action === "downloadInvoicePdf") {
       await handleDownload(card, "pdf");
       return;
@@ -361,6 +369,115 @@ export default function SalesOverview({
     }
     if (action === "reissueOverdue") {
       setOverdueCard(card);
+    }
+  };
+
+  const handleRefundSales = async (card: SalesOverviewCardData) => {
+    if (card.refunded || card.voided || card.canceled) return;
+
+    try {
+      const bookingRef = card.bookingCode || card.bookingId;
+      const financeResult = await fetchFinanceTransactions({
+        q: bookingRef,
+        limit: 50,
+      }).unwrap();
+      const rows = financeResult.data?.rows ?? [];
+      const refundable = rows.filter((row) => {
+        if (row.status !== "Paid" && row.status !== "Prepaid") return false;
+        const matchesBooking =
+          row.bookingId === card.bookingCode ||
+          row.bookingId === card.bookingId ||
+          row.entryId === card.bookingCode;
+        if (!matchesBooking) return false;
+        const phase = (row.document as { paymentPhase?: string; addonId?: string } | undefined)
+          ?.paymentPhase;
+        const addonId = (row.document as { addonId?: string } | undefined)?.addonId;
+        if (card.kind === "addon") {
+          const cardAddonId = card.id.replace(/^addon-/, "");
+          return phase === "addon" && (!addonId || addonId === cardAddonId || card.id.includes(addonId));
+        }
+        if (card.kind === "prepayment") return phase === "prepay" || !phase;
+        if (card.kind === "after_treatment") return phase === "full" || !phase;
+        return true;
+      });
+
+      if (refundable.length) {
+        await bulkFinanceAction({
+          ids: refundable.map((row) => row.id),
+          action: "refund",
+        }).unwrap();
+      }
+
+      if (card.kind === "addon") {
+        updateSalesAddon(card.id.replace(/^addon-/, ""), { refunded: true });
+      } else {
+        upsertSalesCardMeta({
+          bookingId: card.bookingId,
+          cardKind: card.kind,
+          cardId: card.id,
+          note: card.note,
+          refunded: true,
+          voided: card.voided,
+          canceled: card.canceled,
+          paymentMethod: card.paymentMethod,
+          dueDate: card.dueDate,
+        });
+      }
+
+      // Keep calendar refund indicators in sync for primary booking sales.
+      if (card.kind === "prepayment" || card.kind === "after_treatment") {
+        const booking = bookings.find(
+          (b) =>
+            String(b.id) === String(card.bookingId) ||
+            b.unique_code === card.bookingCode,
+        );
+        if (booking) {
+          const parsed = parseCalendarEntryNotes(booking.notes);
+          const nextDetails = {
+            ...(parsed ?? {}),
+            refunded: true,
+            waitingForPayment: false,
+          };
+          const nextNotes = serializeCalendarEntryNotes(
+            nextDetails.internalNote ?? "",
+            nextDetails,
+            parseStoredEbrFromNotes(booking.notes),
+            parseStoredErFromNotes(booking.notes),
+          );
+          await updateBookingStatus({
+            id: String(booking.id),
+            status: (() => {
+              const normalized = String(booking.status || "")
+                .toLowerCase()
+                .replace(/\s+/g, "_");
+              const allowed = [
+                "requested",
+                "cancelled",
+                "completed",
+                "confirmed",
+                "in_progress",
+                "no_show",
+                "invalid",
+              ] as const;
+              return (
+                allowed.find((value) => value === normalized) ?? "confirmed"
+              );
+            })(),
+            notes: nextNotes,
+          }).unwrap();
+        }
+      }
+
+      bump();
+      showSnackbar({
+        severity: "success",
+        message: "Sale refunded.",
+      });
+    } catch {
+      showSnackbar({
+        severity: "error",
+        message: "Unable to refund this sale.",
+      });
     }
   };
 
@@ -391,29 +508,56 @@ export default function SalesOverview({
     }
   };
 
-  const handleSaveAddon = (payload: SalesAddOnCheckoutPayload) => {
+  const handleSaveAddon = async (payload: SalesAddOnCheckoutPayload) => {
     if (!checkoutContext) return;
-    saveSalesAddon({
-      id: `addon-${Date.now()}`,
-      bookingId: checkoutContext.bookingId,
-      bookingCode: checkoutContext.bookingCode,
-      clientName: checkoutContext.clientName,
-      clientEmail: payload.clientEmail || checkoutContext.clientEmail,
-      lines: payload.lines,
-      discount: payload.discount,
-      discountAmount: payload.discountAmount,
-      totalPrice: payload.totalPrice,
-      paymentMethod: payload.paymentMethod,
-      createdAt: new Date().toISOString(),
-    });
-    setCheckoutBookingId(null);
-    setCheckoutBookingCode("");
-    setCheckoutCardId(null);
-    bump();
-    showSnackbar({
-      severity: "success",
-      message: "Add-ons saved to this sale.",
-    });
+    const addonId = `addon-${Date.now()}`;
+    try {
+      await createFinanceTransaction({
+        clientName: checkoutContext.clientName || clientName || "Client",
+        clientEmail: payload.clientEmail || checkoutContext.clientEmail || clientEmail || "",
+        clientType: clientKind === "company" ? "company" : "individual",
+        paymentMethod: payload.paymentMethod,
+        totalPrice: payload.totalPrice,
+        discountAmount: payload.discountAmount,
+        lines: payload.lines.map((line) => ({
+          name: line.name,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+        })),
+        bookingId: checkoutContext.bookingId,
+        bookingRef: checkoutContext.bookingCode,
+        paymentPhase: "addon",
+        addonId,
+        entryLabel: "Add-ons",
+      }).unwrap();
+
+      saveSalesAddon({
+        id: addonId,
+        bookingId: checkoutContext.bookingId,
+        bookingCode: checkoutContext.bookingCode,
+        clientName: checkoutContext.clientName,
+        clientEmail: payload.clientEmail || checkoutContext.clientEmail,
+        lines: payload.lines,
+        discount: payload.discount,
+        discountAmount: payload.discountAmount,
+        totalPrice: payload.totalPrice,
+        paymentMethod: payload.paymentMethod,
+        createdAt: new Date().toISOString(),
+      });
+      setCheckoutBookingId(null);
+      setCheckoutBookingCode("");
+      setCheckoutCardId(null);
+      bump();
+      showSnackbar({
+        severity: "success",
+        message: "New add-on sale created.",
+      });
+    } catch {
+      showSnackbar({
+        severity: "error",
+        message: "Unable to create add-on sale.",
+      });
+    }
   };
 
   const notifyClientInvoiceReissue = async (input: {

@@ -4,6 +4,7 @@ import AppButton from "../AppButton";
 import * as React from "react";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import DragIndicatorRoundedIcon from "@mui/icons-material/DragIndicatorRounded";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
@@ -29,6 +30,7 @@ import type {
   BookingRules,
   ServiceOrderSettings,
 } from "./calendar-settings.types";
+import { withClampedDesiredLocationInterval } from "./calendar-settings.types";
 import type { CalendarDesignDraft } from "./CalendarDesignModal";
 import { getCalendarDesignCategoryLabel } from "./CalendarDesignModal";
 import {
@@ -36,7 +38,9 @@ import {
   countConfiguredAppearanceColors,
   isAppearanceConfigured,
   isConfiguredColor,
+  UNCONFIGURED_GRAY,
 } from "../../../lib/calendarDesign.utils";
+import type { TemplateCategoryRow } from "../../../lib/businessTemplateCatalog";
 import type { PublicBusinessHoursEntry } from "./CalendarPublicBusinessHoursModal";
 import {
   locationHasPublicHoursConfigured,
@@ -61,13 +65,15 @@ type CalendarHoursRulesPanelProps = {
   serviceOrder: ServiceOrderSettings;
   appliedDesign: CalendarDesignDraft;
   categoryOptions?: readonly { key: string; label: string }[];
+  templateCategoryRows?: readonly TemplateCategoryRow[];
   isSaving?: boolean;
   onBookingRulesChange: (next: BookingRules) => void;
   onServiceOrderChange: (next: ServiceOrderSettings) => void;
   onOpenDesign: () => void;
   onOpenPublicHours: (location?: CalendarBookingLocation) => void;
-  onOpenServiceOrder: () => void;
-  onSaveBookingRules: () => Promise<void>;
+  /** @deprecated Service Order stays on-page; kept optional for call-site compatibility. */
+  onOpenServiceOrder?: () => void;
+  onSaveBookingRules: (next?: BookingRules) => Promise<void>;
   onSaveServiceOrder: () => Promise<void>;
 };
 
@@ -786,12 +792,12 @@ export default function CalendarHoursRulesPanel({
   serviceOrder,
   appliedDesign,
   categoryOptions = [],
+  templateCategoryRows = [],
   isSaving = false,
   onBookingRulesChange,
   onServiceOrderChange,
   onOpenDesign,
   onOpenPublicHours,
-  onOpenServiceOrder,
   onSaveBookingRules,
   onSaveServiceOrder,
 }: CalendarHoursRulesPanelProps) {
@@ -845,22 +851,69 @@ export default function CalendarHoursRulesPanel({
     return matchedKey ? (byCategory[matchedKey] ?? []) : [];
   }, [activeCategory, serviceOrder.servicesByCategory]);
 
+  const appearanceTemplateRows = React.useMemo(() => {
+    if (templateCategoryRows.length) return templateCategoryRows;
+    return categoryOptions.map((entry) => ({
+      key: entry.key,
+      label: entry.label,
+      services: [] as string[],
+    }));
+  }, [templateCategoryRows, categoryOptions]);
+
+  const appearanceConfiguredCount = countConfiguredAppearanceColors(
+    appliedDesign,
+    appliedDesign.scope === "Services" ? "Services" : "Categories",
+  );
+
+  type AppearanceSummaryRow = {
+    key: string;
+    label: string;
+    color: string;
+    configured: boolean;
+    kind: "category" | "service" | "group";
+  };
+
   const appearanceItems = React.useMemo(() => {
     const isServices = appliedDesign.scope === "Services";
-    const entries = isServices
-      ? Object.entries(appliedDesign.colorsByService ?? {})
-      : Object.entries(appliedDesign.colorsByCategory ?? {});
+    const rows: AppearanceSummaryRow[] = [];
 
-    return entries
-      .filter(([, color]) => isConfiguredColor(color))
-      .map(([key, color]) => ({
-        key,
-        label: isServices
-          ? key
-          : getCalendarDesignCategoryLabel(key, categoryOptions),
-        color: color as string,
-      }));
-  }, [appliedDesign, categoryOptions]);
+    if (isServices) {
+      for (const category of appearanceTemplateRows) {
+        rows.push({
+          key: `group:${category.key}`,
+          label: category.label,
+          color: UNCONFIGURED_GRAY,
+          configured: false,
+          kind: "group",
+        });
+        for (const serviceName of category.services) {
+          const color = appliedDesign.colorsByService?.[serviceName];
+          const configured = isConfiguredColor(color);
+          rows.push({
+            key: `service:${serviceName}`,
+            label: serviceName,
+            color: configured ? (color as string) : UNCONFIGURED_GRAY,
+            configured,
+            kind: "service",
+          });
+        }
+      }
+      return rows;
+    }
+
+    for (const category of appearanceTemplateRows) {
+      const color = appliedDesign.colorsByCategory?.[category.key];
+      const configured = isConfiguredColor(color);
+      rows.push({
+        key: category.key,
+        label: getCalendarDesignCategoryLabel(category.key, categoryOptions),
+        color: configured ? (color as string) : UNCONFIGURED_GRAY,
+        configured,
+        kind: "category",
+      });
+    }
+    return rows;
+  }, [appliedDesign, appearanceTemplateRows, categoryOptions]);
 
   const appearanceConfigured = isAppearanceConfigured(appliedDesign);
   const inactiveScope =
@@ -875,16 +928,17 @@ export default function CalendarHoursRulesPanel({
   };
 
   const handleServiceOrderEdit = () => {
-    if (categories.length === 0) {
-      onOpenServiceOrder();
-      return;
-    }
+    // Always edit on-page (template/platform defaults seed the list; never open a popup).
     setServiceOrderEditing(true);
   };
 
   const handleSaveBookingRules = async () => {
     try {
-      await onSaveBookingRules();
+      const clamped = withClampedDesiredLocationInterval(bookingRules);
+      if (clamped !== bookingRules) {
+        onBookingRulesChange(clamped);
+      }
+      await onSaveBookingRules(clamped);
       setBookingRulesEditing(false);
     } catch {
       // Parent handlers already surface errors via snackbar.
@@ -1010,6 +1064,7 @@ export default function CalendarHoursRulesPanel({
                         dlIntervalMinutes: value,
                       })
                     }
+                    helperText="Minimum 5 minutes (travel buffer). You can increase it."
                     disabled={!bookingRulesEditing || isSaving}
                   />
                   <DurationInput
@@ -1065,7 +1120,7 @@ export default function CalendarHoursRulesPanel({
                     mb: 0.5,
                   }}
                 >
-                  Select Categories
+                  Categories
                 </BodyText>
                 <BodyText
                   sx={{
@@ -1076,7 +1131,7 @@ export default function CalendarHoursRulesPanel({
                   }}
                 >
                   {serviceOrderEditing
-                    ? "Check to show, uncheck to hide. Drag to change placement (1 appears first)."
+                    ? "Check to show, uncheck to hide. Drag left or right to change placement (1 appears first)."
                     : "Edit to show/hide categories and rearrange their order."}
                 </BodyText>
                 <Box
@@ -1106,7 +1161,8 @@ export default function CalendarHoursRulesPanel({
                         order={index + 1}
                         checked={visible}
                         showCheckbox={serviceOrderEditing}
-                        active={false}
+                        showDragHandle={serviceOrderEditing}
+                        active={activeCategory === category}
                         draggable={serviceOrderEditing}
                         isDragging={draggingCategory === category}
                         onCheckedChange={(nextChecked) => {
@@ -1116,11 +1172,7 @@ export default function CalendarHoursRulesPanel({
                             toggleHiddenCategory(serviceOrder, category),
                           );
                         }}
-                        onClick={
-                          serviceOrderEditing
-                            ? () => setSelectedCategory(category)
-                            : undefined
-                        }
+                        onClick={() => setSelectedCategory(category)}
                         onDragStart={() => setDraggingCategory(category)}
                         onDragEnd={() => setDraggingCategory(null)}
                         onDragOver={(event) => event.preventDefault()}
@@ -1166,7 +1218,7 @@ export default function CalendarHoursRulesPanel({
                   }}
                 >
                   {serviceOrderEditing
-                    ? "Check to show, uncheck to hide. Drag to rearrange within this category."
+                    ? "Check to show, uncheck to hide. Drag up or down to rearrange within this category."
                     : activeCategory
                       ? `Services in ${resolveCategoryMeta(activeCategory).label}`
                       : "Select a category"}
@@ -1234,6 +1286,16 @@ export default function CalendarHoursRulesPanel({
                             userSelect: "none",
                           }}
                         >
+                          {serviceOrderEditing ? (
+                            <DragIndicatorRoundedIcon
+                              aria-hidden
+                              sx={{
+                                fontSize: 16,
+                                color: alpha(m.navy, 0.32),
+                                flexShrink: 0,
+                              }}
+                            />
+                          ) : null}
                           <Box
                             sx={{
                               width: 18,
@@ -1361,7 +1423,7 @@ export default function CalendarHoursRulesPanel({
             />
           }
         >
-          {appearanceConfigured || appearanceItems.length ? (
+          {appearanceConfigured || appearanceTemplateRows.length ? (
             <Box
               sx={{
                 borderRadius: "8px",
@@ -1396,8 +1458,8 @@ export default function CalendarHoursRulesPanel({
                   }}
                 >
                   {appearanceModeLabel(appliedDesign.scope)}
-                  {appearanceItems.length
-                    ? ` · ${appearanceItems.length} colour${appearanceItems.length === 1 ? "" : "s"}`
+                  {appearanceConfiguredCount
+                    ? ` · ${appearanceConfiguredCount} colour${appearanceConfiguredCount === 1 ? "" : "s"}`
                     : ""}
                 </BodyText>
                 <ExpandMoreRoundedIcon
@@ -1411,36 +1473,56 @@ export default function CalendarHoursRulesPanel({
               </Box>
               {appearanceExpanded ? (
                 <Stack spacing={0.75} sx={{ px: 1.5, pb: 1.25 }}>
-                  {appearanceItems.map((item) => (
-                    <Box
-                      key={item.key}
-                      sx={{
-                        display: "grid",
-                        gridTemplateColumns: "auto minmax(0, 1fr)",
-                        alignItems: "center",
-                        gap: 1.1,
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          width: 18,
-                          height: 18,
-                          borderRadius: "4px",
-                          bgcolor: item.color,
-                          border: `1px solid ${alpha(m.navy, 0.14)}`,
-                        }}
-                      />
+                  {appearanceItems.map((item) =>
+                    item.kind === "group" ? (
                       <BodyText
+                        key={item.key}
                         sx={{
-                          fontSize: 12.5,
-                          fontWeight: 600,
-                          color: alpha(m.navy, 0.68),
+                          fontSize: 11.5,
+                          fontWeight: 800,
+                          letterSpacing: "0.02em",
+                          textTransform: "uppercase",
+                          color: alpha(m.navy, 0.45),
+                          pt: 0.35,
                         }}
                       >
-                        {item.label} · {item.color.toUpperCase()}
+                        {item.label}
                       </BodyText>
-                    </Box>
-                  ))}
+                    ) : (
+                      <Box
+                        key={item.key}
+                        sx={{
+                          display: "grid",
+                          gridTemplateColumns: "auto minmax(0, 1fr)",
+                          alignItems: "center",
+                          gap: 1.1,
+                          pl: item.kind === "service" ? 1 : 0,
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: 18,
+                            height: 18,
+                            borderRadius: "4px",
+                            bgcolor: item.color,
+                            border: `1px solid ${alpha(m.navy, 0.14)}`,
+                            opacity: item.configured ? 1 : 0.55,
+                          }}
+                        />
+                        <BodyText
+                          sx={{
+                            fontSize: 12.5,
+                            fontWeight: 600,
+                            color: alpha(m.navy, item.configured ? 0.68 : 0.45),
+                          }}
+                        >
+                          {item.configured
+                            ? `${item.label} · ${item.color.toUpperCase()}`
+                            : item.label}
+                        </BodyText>
+                      </Box>
+                    ),
+                  )}
                 </Stack>
               ) : null}
               {inactiveColorCount > 0 ? (
@@ -1452,9 +1534,9 @@ export default function CalendarHoursRulesPanel({
                       color: alpha(m.navy, 0.42),
                     }}
                   >
-                    {inactiveColorCount} colour
-                    {inactiveColorCount === 1 ? "" : "s"} saved in{" "}
-                    {appearanceModeLabel(inactiveScope)} mode
+                    {appearanceModeLabel(inactiveScope)}: {inactiveColorCount}{" "}
+                    colour
+                    {inactiveColorCount === 1 ? "" : "s"} saved (inactive)
                   </BodyText>
                 </Box>
               ) : null}
