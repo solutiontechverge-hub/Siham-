@@ -2135,6 +2135,7 @@ export default function ProfessionalFixedLocationCalendar({
     string | null
   >(null);
   const staffConflictAckRef = React.useRef(false);
+  const inlineGuestFormRef = React.useRef<HTMLDivElement | null>(null);
   const emptyInlineGuestDraft = React.useMemo(
     () => ({
       firstName: "",
@@ -2145,6 +2146,14 @@ export default function ProfessionalFixedLocationCalendar({
     }),
     [],
   );
+
+  React.useEffect(() => {
+    if (!showInlineGuestField) return;
+    inlineGuestFormRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    });
+  }, [showInlineGuestField, editingInlineGuestId]);
 
   const persistOverviewBlockedTime = async (draft: BlockTimeDraft) => {
     const nextBlocks = buildBlocksFromDraft(draft, draft.teamIds);
@@ -3770,10 +3779,18 @@ export default function ProfessionalFixedLocationCalendar({
       errors.bookingClient =
         errors.bookingClient ?? "Select at least one item/service or product.";
     }
-    const bookingPhoneErrors = getOptionalPhoneValidationErrors(
-      bookingPhoneDraft.phoneCode,
-      bookingPhoneDraft.phoneNumber,
-    );
+    // Primary guest path keeps phone mandatory after attach; other clients stay optional.
+    const bookingPhoneErrors =
+      addClientSource === "guest"
+        ? getPhoneValidationErrors(
+            bookingPhoneDraft.phoneCode,
+            bookingPhoneDraft.phoneNumber,
+            { required: true },
+          )
+        : getOptionalPhoneValidationErrors(
+            bookingPhoneDraft.phoneCode,
+            bookingPhoneDraft.phoneNumber,
+          );
     if (bookingPhoneErrors.countryCode) {
       isValid = false;
       errors.bookingPhoneCode = bookingPhoneErrors.countryCode;
@@ -3792,6 +3809,7 @@ export default function ProfessionalFixedLocationCalendar({
     }
     return { isValid, errors };
   }, [
+    addClientSource,
     bookingPhoneDraft.phoneCode,
     bookingPhoneDraft.phoneNumber,
     guestDraft.firstName,
@@ -6942,8 +6960,6 @@ export default function ProfessionalFixedLocationCalendar({
           ...bookingGuests.flatMap((guest) =>
             guest.services.map((service) => service.name),
           ),
-          ...selectedProducts.map((product) => product.name),
-          ...bookingUniqueItems.map((item) => item.name),
         ],
         "Booking",
       );
@@ -9352,7 +9368,103 @@ export default function ProfessionalFixedLocationCalendar({
         }
         footer={
           selectedSlot && slotDrawerTab === "booking" && !activityDetailItem ? (
-            <Box sx={{ px: 2.5, py: 2 }}>
+            <Box
+              sx={{
+                px: 2.5,
+                pt: 1.25,
+                pb: 2,
+                borderTop: `1px solid ${alpha(m.navy, 0.08)}`,
+                bgcolor: "#fff",
+              }}
+            >
+              {slotBookingScreen === "new-booking" && slotClientAdded ? (
+                <Box sx={{ mb: 1.25 }}>
+                  {(() => {
+                    if (!selectedSlot || isViewingExisting) return null;
+                    const slotStart = selectedSlot.start.slice(0, 5);
+                    const slotEnd = selectedSlot.end.slice(0, 5);
+                    const staffIntervals: StaffServiceInterval[] = [
+                      ...selectedServices.map((service) => ({
+                        id: service.id,
+                        name: service.name,
+                        staffId:
+                          service.staffResourceId || selectedSlot.resourceId,
+                        start: (service.startTime || slotStart).slice(0, 5),
+                        end: (service.endTime || slotEnd).slice(0, 5),
+                      })),
+                      ...bookingGuests.flatMap((guest) =>
+                        guest.services.map((service) => ({
+                          id: `${guest.id}-${service.id}`,
+                          name: service.name,
+                          staffId:
+                            service.staffResourceId || selectedSlot.resourceId,
+                          start: (service.startTime || slotStart).slice(0, 5),
+                          end: (service.endTime || slotEnd).slice(0, 5),
+                        })),
+                      ),
+                    ];
+                    const hasInternal =
+                      findInternalStaffServiceOverlaps(staffIntervals).length >
+                      0;
+                    const hasExternal =
+                      findExternalStaffBookingOverlaps({
+                        bookingId: editingEventId,
+                        date: selectedSlot.date,
+                        services: staffIntervals,
+                        events,
+                      }).length > 0;
+                    if (!hasInternal && !hasExternal) return null;
+                    return (
+                      <Box
+                        sx={{
+                          mb: 1,
+                          px: 1.25,
+                          py: 1,
+                          borderRadius: "10px",
+                          bgcolor: alpha(m.statusOrangeFg, 0.1),
+                          border: `1px solid ${alpha(m.statusOrangeFg, 0.28)}`,
+                        }}
+                      >
+                        <BodyText
+                          sx={{
+                            fontSize: 12,
+                            fontWeight: 800,
+                            color: m.statusOrangeFg,
+                            lineHeight: 1.35,
+                          }}
+                        >
+                          Overlapping staff time detected. You can still save —
+                          you will be asked to confirm.
+                        </BodyText>
+                      </Box>
+                    );
+                  })()}
+                  <BookingDrawerParticipantActions
+                    kinds={drawerParticipantKinds}
+                    nameFieldOpen={
+                      showInlineGuestField && !editingInlineGuestId
+                    }
+                    onAddGuest={() => {
+                      setInlineGuestParticipantType("guest");
+                      setEditingInlineGuestId(null);
+                      setInlineGuestDraft(emptyInlineGuestDraft);
+                      setShowInlineGuestField(true);
+                    }}
+                    onAddModel={() => {
+                      setInlineGuestParticipantType("model");
+                      setEditingInlineGuestId(null);
+                      setInlineGuestDraft(emptyInlineGuestDraft);
+                      setShowInlineGuestField(true);
+                    }}
+                    onAddPlanning={() => {
+                      addDlParticipant("planning");
+                    }}
+                    onAddBuffer={() => {
+                      addDlParticipant("buffer");
+                    }}
+                  />
+                </Box>
+              ) : null}
               <Stack direction="row" alignItems="center" spacing={1.25}>
                 {(slotBookingScreen === "new-booking" || isViewingExisting) &&
                 slotClientAdded ? (
@@ -13042,6 +13154,7 @@ export default function ProfessionalFixedLocationCalendar({
 
                         {showInlineGuestField ? (
                           <Box
+                            ref={inlineGuestFormRef}
                             sx={{
                               borderRadius: "12px",
                               bgcolor: alpha(m.navy, 0.025),
@@ -13509,10 +13622,51 @@ export default function ProfessionalFixedLocationCalendar({
                           }
                           countryCodeError={slotErrors.bookingPhoneCode}
                           phoneError={slotErrors.bookingPhoneNumber}
+                          label={
+                            addClientSource === "guest"
+                              ? "Contact Number"
+                              : "Contact Number (optional)"
+                          }
                           phonePlaceholder="+316xxxxxxxx"
-                          required={false}
+                          required={addClientSource === "guest"}
                           disabled={isViewingExisting}
                         />
+
+                        {paymentMethod === "online" &&
+                        !isDrawerPrepaymentPaid &&
+                        !isViewingExisting ? (
+                          <AppTextField
+                            label="Email"
+                            placeholder="Email for online payment"
+                            value={selectedClient?.email ?? ""}
+                            onChange={(e) =>
+                              setSelectedClient((prev) =>
+                                prev
+                                  ? { ...prev, email: e.target.value }
+                                  : prev,
+                              )
+                            }
+                            fullWidth
+                            error={Boolean(slotErrors.bookingClientEmail)}
+                            helperText={
+                              slotErrors.bookingClientEmail ||
+                              (selectedClient?.email?.trim()
+                                ? undefined
+                                : "Required for online payment")
+                            }
+                          />
+                        ) : paymentMethod === "online" &&
+                          selectedClient?.email?.trim() ? (
+                          <BodyText
+                            sx={{
+                              fontSize: 12.5,
+                              fontWeight: 650,
+                              color: alpha(m.navy, 0.55),
+                            }}
+                          >
+                            Email: {selectedClient.email.trim()}
+                          </BodyText>
+                        ) : null}
 
                         {isViewingBooking &&
                         canDiscardBookingRequest(viewingBookingEvent) ? (
@@ -14331,111 +14485,6 @@ export default function ProfessionalFixedLocationCalendar({
                             remainingAmount={remainingAfterPrepayment}
                           />
                         )}
-
-                        <Box
-                          sx={{
-                            position: "sticky",
-                            bottom: 0,
-                            zIndex: 3,
-                            mt: 1,
-                            pt: 1,
-                            pb: 0.5,
-                            bgcolor: "#fff",
-                            borderTop: `1px solid ${alpha(m.navy, 0.08)}`,
-                          }}
-                        >
-                          {(() => {
-                            if (!selectedSlot || isViewingExisting) return null;
-                            const slotStart = selectedSlot.start.slice(0, 5);
-                            const slotEnd = selectedSlot.end.slice(0, 5);
-                            const staffIntervals: StaffServiceInterval[] = [
-                              ...selectedServices.map((service) => ({
-                                id: service.id,
-                                name: service.name,
-                                staffId:
-                                  service.staffResourceId ||
-                                  selectedSlot.resourceId,
-                                start: (service.startTime || slotStart).slice(
-                                  0,
-                                  5,
-                                ),
-                                end: (service.endTime || slotEnd).slice(0, 5),
-                              })),
-                              ...bookingGuests.flatMap((guest) =>
-                                guest.services.map((service) => ({
-                                  id: `${guest.id}-${service.id}`,
-                                  name: service.name,
-                                  staffId:
-                                    service.staffResourceId ||
-                                    selectedSlot.resourceId,
-                                  start: (
-                                    service.startTime || slotStart
-                                  ).slice(0, 5),
-                                  end: (service.endTime || slotEnd).slice(0, 5),
-                                })),
-                              ),
-                            ];
-                            const hasInternal =
-                              findInternalStaffServiceOverlaps(staffIntervals)
-                                .length > 0;
-                            const hasExternal =
-                              findExternalStaffBookingOverlaps({
-                                bookingId: editingEventId,
-                                date: selectedSlot.date,
-                                services: staffIntervals,
-                                events,
-                              }).length > 0;
-                            if (!hasInternal && !hasExternal) return null;
-                            return (
-                              <Box
-                                sx={{
-                                  mb: 1,
-                                  px: 1.25,
-                                  py: 1,
-                                  borderRadius: "10px",
-                                  bgcolor: alpha(m.statusOrangeFg, 0.1),
-                                  border: `1px solid ${alpha(m.statusOrangeFg, 0.28)}`,
-                                }}
-                              >
-                                <BodyText
-                                  sx={{
-                                    fontSize: 12,
-                                    fontWeight: 800,
-                                    color: m.statusOrangeFg,
-                                    lineHeight: 1.35,
-                                  }}
-                                >
-                                  Overlapping staff time detected. You can still
-                                  save — you will be asked to confirm.
-                                </BodyText>
-                              </Box>
-                            );
-                          })()}
-                          <BookingDrawerParticipantActions
-                            kinds={drawerParticipantKinds}
-                            nameFieldOpen={
-                              showInlineGuestField && !editingInlineGuestId
-                            }
-                            onAddGuest={() => {
-                              setInlineGuestParticipantType("guest");
-                              setEditingInlineGuestId(null);
-                              setInlineGuestDraft(emptyInlineGuestDraft);
-                              setShowInlineGuestField(true);
-                            }}
-                            onAddModel={() => {
-                              setInlineGuestParticipantType("model");
-                              setEditingInlineGuestId(null);
-                              setInlineGuestDraft(emptyInlineGuestDraft);
-                              setShowInlineGuestField(true);
-                            }}
-                            onAddPlanning={() => {
-                              addDlParticipant("planning");
-                            }}
-                            onAddBuffer={() => {
-                              addDlParticipant("buffer");
-                            }}
-                          />
-                        </Box>
 
                         <Box sx={{ flex: 1, minHeight: 40 }} />
                       </>

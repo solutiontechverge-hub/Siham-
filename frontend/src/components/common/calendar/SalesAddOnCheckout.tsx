@@ -531,11 +531,19 @@ export default function SalesAddOnCheckout({
                         >
                           <MollureFormField
                             label="Guest email"
-                            placeholder="Email for Guest"
+                            placeholder="Email for online payment"
                             value={guestEmail}
                             onChange={(e) => setGuestEmail(e.target.value)}
                             size="small"
                             fullWidth
+                            error={!guestEmail.trim()}
+                            helperText={
+                              !guestEmail.trim()
+                                ? "Required for online payment"
+                                : clientEmail?.trim()
+                                  ? "Reused from client profile"
+                                  : undefined
+                            }
                           />
                         </Box>
                       ) : null}

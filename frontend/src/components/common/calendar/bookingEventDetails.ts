@@ -667,11 +667,55 @@ export function hydrateBookingDrawerFromEvent(ev: CalendarEvent): BookingDrawerH
     details.phoneCode,
   );
 
+  const snapshotPeople = details.clientSnapshot?.people ?? [];
+  const snapshotServices = details.clientSnapshot?.services ?? [];
+  const guestsFromNotes = details.guests ?? [];
+  const guests =
+    guestsFromNotes.length > 0
+      ? guestsFromNotes.map((guest) => {
+          const person = snapshotPeople.find((p) => p.id === guest.id);
+          return {
+            ...guest,
+            email: guest.email || person?.email || "",
+            phoneCode: guest.phoneCode || person?.phoneCode || "",
+            phoneNumber: guest.phoneNumber || person?.phoneNumber || "",
+          };
+        })
+      : snapshotPeople
+          .filter(
+            (person) =>
+              !person.isRequester &&
+              person.participantType !== "notes" &&
+              person.name?.trim().toLowerCase() !== "notes",
+          )
+          .map((person) => ({
+            id: person.id,
+            name: person.name,
+            email: person.email,
+            phoneCode: person.phoneCode,
+            phoneNumber: person.phoneNumber,
+            services: snapshotServices
+              .filter((service) => service.guestId === person.id)
+              .map((service) => ({
+                id: service.id,
+                name: service.name,
+                price: service.price,
+                durationMins: service.durationMins,
+                staffResourceId: service.teamMemberId ?? undefined,
+              })),
+            products: [],
+            participantType: person.participantType ?? ("guest" as const),
+            planningActivity: person.planningActivity,
+            planningDuration: person.planningDuration,
+            bufferTeamMemberId: person.bufferTeamMemberId,
+            bufferEndTime: person.bufferEndTime,
+          }));
+
   return {
     clientEmail: details.clientEmail ?? "",
     services,
     products: details.products ?? [],
-    guests: details.guests ?? [],
+    guests,
     phoneCode: splitPhone.countryCode,
     phoneNumber: splitPhone.phone,
     desiredLocation: details.desiredLocation ?? emptyDesiredLocation(),
