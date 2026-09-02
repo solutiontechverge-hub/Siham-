@@ -300,6 +300,42 @@ const normalizeBookingStatus = (value, fallback = "requested") => {
   return bookingStatusSet.has(next) ? next : fallback;
 };
 
+/** Online / request / project channels mint non-OF codes; only true offline uses OF123. */
+const ONLINE_CHANNEL_BOOKING_TYPES = new Set(["online", "request", "project"]);
+const OFFLINE_DISALLOWED_STATUSES = new Set(["requested", "invalid"]);
+
+const normalizeCalendarBookingType = (value, status) => {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (raw === "online" || raw === "request" || raw === "project" || raw === "offline") {
+    // Canonical: approval-required rows store as online (not legacy "request").
+    if (raw === "request" || (raw === "offline" && String(status).toLowerCase() === "requested")) {
+      return "online";
+    }
+    return raw;
+  }
+  if (String(status).toLowerCase() === "requested") return "online";
+  return "offline";
+};
+
+const calendarCodePrefixFor = (status, bookingType) => {
+  if (String(status).toLowerCase() === "blocked") return "BLK";
+  if (ONLINE_CHANNEL_BOOKING_TYPES.has(String(bookingType).toLowerCase())) return "123";
+  if (String(status).toLowerCase() === "requested") return "123";
+  return "OF123";
+};
+
+const isOfflineBookingType = (bookingType) =>
+  String(bookingType ?? "").trim().toLowerCase() === "offline";
+
+const assertOfflineAllowsStatus = (bookingType, status) => {
+  if (!isOfflineBookingType(bookingType)) return null;
+  const next = String(status ?? "").trim().toLowerCase();
+  if (OFFLINE_DISALLOWED_STATUSES.has(next)) {
+    return "Offline bookings cannot use Requested or Invalid status.";
+  }
+  return null;
+};
+
 const normalizeServiceCategories = (value) => {
   return parseJsonArray(value)
     .map((item) => {
@@ -1502,9 +1538,19 @@ export const createCalendarEntry = async (req, res) => {
     }
 
     const normalizedStatus = normalizeCalendarStatus(req.body.status, "confirmed");
-    const normalizedBookingType = req.body.booking_type ?? (normalizedStatus === "requested" ? "request" : "offline");
-    const codePrefix =
-      normalizedStatus === "blocked" ? "BLK" : normalizedBookingType === "online" ? "123" : "OF123";
+    const normalizedBookingType = normalizeCalendarBookingType(
+      req.body.booking_type,
+      normalizedStatus,
+    );
+    const offlineStatusError = assertOfflineAllowsStatus(normalizedBookingType, normalizedStatus);
+    if (offlineStatusError) {
+      return res.status(400).json({
+        success: false,
+        message: offlineStatusError,
+        data: null,
+      });
+    }
+    const codePrefix = calendarCodePrefixFor(normalizedStatus, normalizedBookingType);
 
     const result = await query(
       `INSERT INTO calendar_entries (
@@ -1869,7 +1915,9 @@ const mirrorCalendarRequestToBooking = async ({
   );
   if (!businessSetup?.id) return null;
 
-  const uniqueCode = entry.unique_code || makeCalendarCode("OF123");
+  const uniqueCode =
+    entry.unique_code ||
+    makeCalendarCode(calendarCodePrefixFor(entry.status, entry.booking_type || "online"));
   const bookingDate =
     normalizeBookingDateInput(entry.start_date) ||
     normalizeBookingDateInput(entry.start_time) ||
@@ -1928,7 +1976,7 @@ const mirrorCalendarRequestToBooking = async ({
              WHEN LOWER(COALESCE(status, '')) IN ('cancelled', 'completed', 'no_show') THEN status
              ELSE 'requested'
            END,
-           booking_type = 'request',
+           booking_type = 'online',
            total_price = COALESCE($8, total_price),
            updated_at = NOW()
        WHERE id = $9
@@ -1985,7 +2033,7 @@ const mirrorCalendarRequestToBooking = async ({
        unique_code,
        total_price
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'requested', 'request', $10, $11)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'requested', 'online', $10, $11)
      RETURNING *`,
     [
       bookingDate,
@@ -2498,6 +2546,31 @@ export const updateCalendarEntryStatus = async (req, res) => {
       });
     }
 
+    const existingForGuard = await query(
+      `SELECT booking_type FROM calendar_entries
+       WHERE id = $1 AND professional_profile_id = $2
+       LIMIT 1`,
+      [entryId, professionalProfile.id],
+    );
+    if (!existingForGuard.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Calendar entry not found.",
+        data: null,
+      });
+    }
+    const offlineStatusError = assertOfflineAllowsStatus(
+      existingForGuard.rows[0].booking_type,
+      status,
+    );
+    if (offlineStatusError) {
+      return res.status(400).json({
+        success: false,
+        message: offlineStatusError,
+        data: null,
+      });
+    }
+
     const result = await query(
       `UPDATE calendar_entries
        SET status = $1,
@@ -2584,10 +2657,20 @@ export const updateCalendarEntry = async (req, res) => {
       req.body.status !== undefined && req.body.status !== null && req.body.status !== ""
         ? normalizeCalendarStatus(req.body.status, existing.status)
         : existing.status;
-    const normalizedBookingType =
+    const normalizedBookingType = normalizeCalendarBookingType(
       req.body.booking_type !== undefined && req.body.booking_type !== null && req.body.booking_type !== ""
         ? req.body.booking_type
-        : existing.booking_type;
+        : existing.booking_type,
+      normalizedStatus,
+    );
+    const offlineStatusError = assertOfflineAllowsStatus(normalizedBookingType, normalizedStatus);
+    if (offlineStatusError) {
+      return res.status(400).json({
+        success: false,
+        message: offlineStatusError,
+        data: null,
+      });
+    }
 
     const result = await query(
       `UPDATE calendar_entries

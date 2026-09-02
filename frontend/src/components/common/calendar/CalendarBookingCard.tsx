@@ -186,6 +186,9 @@ export default function CalendarBookingCard({
         idLabel={<BookingIdTooltipLabel bookingId={bookingRef} />}
         title={event.title}
         titleBold={emphasizeRequest}
+        titleLineClamp={
+          dense ? 1 : event.title.includes(" · ") ? 3 : 2
+        }
         timeLabel={dense ? "" : `(${event.start} to ${event.end})`}
         locationLabel={event.location}
         notePreview={
@@ -288,7 +291,6 @@ export default function CalendarBookingCard({
           }
           return raw.filter((item) => !skip.has(item));
         })()}
-        titleLineClamp={dense ? 1 : 1}
         calendarAction={{
           show: !isTicket && !dense,
           tooltip: "Open calendar",

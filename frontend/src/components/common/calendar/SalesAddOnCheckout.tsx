@@ -268,6 +268,7 @@ export default function SalesAddOnCheckout({
       return;
     }
     if (step === "payment") {
+      if (paymentMethod === "onlineDirect" && !guestEmail.trim()) return;
       setStep("summary");
       return;
     }
@@ -277,6 +278,7 @@ export default function SalesAddOnCheckout({
       discountAmount,
       totalPrice,
       paymentMethod,
+      clientEmail: guestEmail.trim() || clientEmail || null,
     });
   };
 

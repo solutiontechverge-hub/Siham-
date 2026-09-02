@@ -85,9 +85,14 @@ import {
 import BookingEditedTag from "../BookingEditedTag";
 import CalendarBookingTicketStack from "../CalendarBookingTicketStack";
 import {
+  buildMultiServiceBookingTitle,
   clusterSameStartTimeEvents,
+  findExternalStaffBookingOverlaps,
+  findInternalStaffServiceOverlaps,
   getClusterTimeBounds,
+  type StaffServiceInterval,
 } from "../calendar-overlap.utils";
+import type { CalendarScheduleConflictKind } from "../CalendarScheduleConflictDialog";
 import { useMessagingWidget } from "../../messaging/MessagingWidgetContext";
 import { useOpenMessagingForBookingMutation } from "../../../../store/services/messagingApi";
 import { useProfessionalMessagingUnread } from "../../messaging/useProfessionalMessagingUnread";
@@ -176,7 +181,9 @@ import BookingRequestResponseActions from "../BookingRequestResponseActions";
 import InlineTimedSnackbar from "../../InlineTimedSnackbar";
 import BookingDrawerSelectedItemsSection from "../BookingDrawerSelectedItemsSection";
 import BookingDrawerClientSnapshotSection from "../BookingDrawerClientSnapshotSection";
-import CompanyClientTag from "../CompanyClientTag";
+import BookingClientTags, {
+  bookingClientOptionLabel,
+} from "../BookingClientTags";
 import BookingActivityOverview from "../BookingActivityOverview";
 import { buildBookingActivityTimeline } from "../buildBookingActivityTimeline";
 import type { BookingActivityItem } from "../bookingActivity.types";
@@ -288,6 +295,7 @@ import {
   calendarBookingStatusLabel,
   canDiscardBookingRequest,
   getBookingScenarioIndicators,
+  isAllowedStatusForBookingType,
   isBookingRequestAccepted,
   scenarioIndicatorDisplayLabel,
   statusAccentColor,
@@ -392,6 +400,7 @@ export type ProfessionalFixedLocationCalendarProps = {
     phone?: string | null;
     countryCode?: string | null;
     clientKind?: "individual" | "company";
+    isMollure?: boolean;
   }[];
   professionalClients?: import("../../../../store/services/businessApi").ApiProfessionalClient[];
   isSaving?: boolean;
@@ -812,7 +821,13 @@ export default function ProfessionalFixedLocationCalendar({
   const [inlineGuestDraft, setInlineGuestDraft] = React.useState({
     firstName: "",
     lastName: "",
+    email: "",
+    phoneCode: "",
+    phoneNumber: "",
   });
+  const [editingInlineGuestId, setEditingInlineGuestId] = React.useState<
+    string | null
+  >(null);
   const [inlineGuestParticipantType, setInlineGuestParticipantType] =
     React.useState<"guest" | "model">("guest");
   const [bookingProjectEnabled, setBookingProjectEnabled] =
@@ -841,6 +856,9 @@ export default function ProfessionalFixedLocationCalendar({
     Array<{
       id: string;
       name: string;
+      email?: string;
+      phoneCode?: string;
+      phoneNumber?: string;
       services: BookingServiceLineItem[];
       products: BookingProductLineItem[];
       participantType?: "model" | "planning" | "guest" | "buffer" | "notes";
@@ -976,6 +994,7 @@ export default function ProfessionalFixedLocationCalendar({
     addIdentityToClientList,
     isAddingClient,
     saveClientTechnicalNote,
+    findListedClient,
   } = useCalendarClientProfile(professionalClients);
 
   const [teamProfileMemberId, setTeamProfileMemberId] = React.useState<
@@ -1385,7 +1404,47 @@ export default function ProfessionalFixedLocationCalendar({
 
   const drawerPaymentMethod =
     viewingBookingEvent?.details?.paymentMethod ?? paymentMethod;
-  const drawerPaymentIsOffline = isOfflinePaymentMethod(drawerPaymentMethod);
+  // Paid-like unlocks (accept bypass / receipt) only after Offline is persisted — not on draft select.
+  const persistedPaymentIsOffline = isOfflinePaymentMethod(
+    viewingBookingEvent?.details?.paymentMethod,
+  );
+  const drawerPaymentIsOffline = persistedPaymentIsOffline;
+
+  const isMollureClientPath =
+    addClientSource === "mollure-platform" ||
+    Boolean(selectedClient?.mollureUserId) ||
+    Boolean(viewingBookingEvent?.details?.customerId);
+  const isGuestClientPath =
+    addClientSource === "guest" ||
+    (viewingBookingEvent != null &&
+      viewingBookingEvent.bookingType === "Offline" &&
+      !String(
+        selectedClient?.email ?? viewingBookingEvent.details?.clientEmail ?? "",
+      ).trim());
+  const paymentMethodPolicy: "online-only" | "offline-only" | "either" =
+    viewingBookingEvent
+      ? viewingBookingEvent.bookingType === "Offline"
+        ? isGuestClientPath
+          ? "offline-only"
+          : "either"
+        : "online-only"
+      : isGuestClientPath
+        ? "offline-only"
+        : isMollureClientPath
+          ? "online-only"
+          : "either";
+
+  React.useEffect(() => {
+    if (viewingBookingEvent) return;
+    if (paymentMethodPolicy === "online-only" && paymentMethod !== "online") {
+      setPaymentMethod("online");
+    } else if (
+      paymentMethodPolicy === "offline-only" &&
+      paymentMethod !== "offline"
+    ) {
+      setPaymentMethod("offline");
+    }
+  }, [paymentMethod, paymentMethodPolicy, viewingBookingEvent]);
 
   const drawerDocumentDraft = React.useMemo(() => {
     if (!selectedServices.length) return null;
@@ -1966,6 +2025,21 @@ export default function ProfessionalFixedLocationCalendar({
   );
   const pendingOverviewBlockRef = React.useRef<BlockTimeDraft | null>(null);
   const [blockOverlapOpen, setBlockOverlapOpen] = React.useState(false);
+  const [staffConflictOpen, setStaffConflictOpen] = React.useState(false);
+  const [staffConflictMessage, setStaffConflictMessage] = React.useState<
+    string | null
+  >(null);
+  const staffConflictAckRef = React.useRef(false);
+  const emptyInlineGuestDraft = React.useMemo(
+    () => ({
+      firstName: "",
+      lastName: "",
+      email: "",
+      phoneCode: "",
+      phoneNumber: "",
+    }),
+    [],
+  );
 
   const persistOverviewBlockedTime = async (draft: BlockTimeDraft) => {
     const nextBlocks = buildBlocksFromDraft(draft, draft.teamIds);
@@ -2235,6 +2309,18 @@ export default function ProfessionalFixedLocationCalendar({
         end_time?: string | null;
       },
     ) => {
+      const current =
+        events.find((event) => event.id === eventId) ?? viewingBookingEvent;
+      if (
+        current &&
+        !isAllowedStatusForBookingType(status, current.bookingType)
+      ) {
+        showSnackbar({
+          severity: "warning",
+          message: "This status is not allowed for offline bookings.",
+        });
+        return;
+      }
       const parsed = parseApiCalendarEventId(eventId);
       if (!parsed) return;
       const apiStatus =
@@ -2261,7 +2347,13 @@ export default function ProfessionalFixedLocationCalendar({
         await onUpdateCalendarEntryStatus(parsed.id, apiStatus);
       }
     },
-    [onUpdateBookingStatus, onUpdateCalendarEntryStatus],
+    [
+      events,
+      onUpdateBookingStatus,
+      onUpdateCalendarEntryStatus,
+      showSnackbar,
+      viewingBookingEvent,
+    ],
   );
 
   const dispatchBookingEventIfApi = React.useCallback(
@@ -3203,6 +3295,8 @@ export default function ProfessionalFixedLocationCalendar({
         | "guestLastName"
         | "guestPhoneCode"
         | "guestPhoneNumber"
+        | "guestEmail"
+        | "bookingClientEmail"
         | "nonMollureFirstName"
         | "nonMollureLastName"
         | "nonMollureGender"
@@ -3298,13 +3392,10 @@ export default function ProfessionalFixedLocationCalendar({
         isValid = false;
         errors.guestFirstName = "First name is required.";
       }
-      if (isBlank(guestDraft.lastName)) {
-        isValid = false;
-        errors.guestLastName = "Last name is required.";
-      }
-      const guestPhoneErrors = getOptionalPhoneValidationErrors(
+      const guestPhoneErrors = getPhoneValidationErrors(
         guestDraft.phoneCode,
         guestDraft.phoneNumber,
+        { required: true },
       );
       if (guestPhoneErrors.countryCode) {
         isValid = false;
@@ -3444,16 +3535,25 @@ export default function ProfessionalFixedLocationCalendar({
       isValid = false;
       errors.bookingPhoneNumber = bookingPhoneErrors.phone;
     }
+    if (
+      paymentMethod === "online" &&
+      isBlank(selectedClient?.email ?? "")
+    ) {
+      isValid = false;
+      errors.bookingClientEmail =
+        "Email is required for online payment.";
+    }
     return { isValid, errors };
   }, [
     bookingPhoneDraft.phoneCode,
     bookingPhoneDraft.phoneNumber,
     guestDraft.firstName,
-    guestDraft.lastName,
     guestDraft.phoneCode,
     guestDraft.phoneNumber,
     nonMollureClientType,
     nonMollureDraft,
+    paymentMethod,
+    selectedClient?.email,
     selectedProducts.length,
     selectedServices.length,
     bookingUniqueItems.length,
@@ -4322,7 +4422,10 @@ export default function ProfessionalFixedLocationCalendar({
       setIsEditingExisting(false);
       setBookingGuests([]);
       setShowInlineGuestField(false);
+      setEditingInlineGuestId(null);
+      setInlineGuestDraft(emptyInlineGuestDraft);
       setInlineGuestParticipantType("guest");
+      staffConflictAckRef.current = false;
       setBookingProjectEnabled(false);
       setBookingProjectDescription("");
       setBookingProjectUploads([]);
@@ -4340,7 +4443,7 @@ export default function ProfessionalFixedLocationCalendar({
       setShowKilometerAllowance(false);
       setKilometerAllowanceDraft({ eurPerKm: "", totalKilometer: "" });
       setDesiredLocationDraft(emptyDesiredLocation());
-      setInlineGuestDraft({ firstName: "", lastName: "" });
+      setInlineGuestDraft(emptyInlineGuestDraft);
       setAddMenuTarget("client");
       setSelectionTarget("client");
       setSlotAddMenuAnchor(null);
@@ -4424,6 +4527,15 @@ export default function ProfessionalFixedLocationCalendar({
       mollureUserId: ev.details?.customerId ?? null,
       clientKind: ev.clientKind ?? ev.details?.clientKind,
     });
+    if (ev.details?.customerId) {
+      setAddClientSource("client-list");
+    } else if (ev.bookingType === "Offline" && !String(hydration.clientEmail ?? "").trim()) {
+      setAddClientSource("guest");
+    } else if (ev.bookingType === "Offline") {
+      setAddClientSource("non-mollure");
+    } else {
+      setAddClientSource("client-list");
+    }
     setSelectedServices(hydration.services);
     setSelectedProducts(
       hydration.products.filter(
@@ -4487,6 +4599,9 @@ export default function ProfessionalFixedLocationCalendar({
               .map((person) => ({
                 id: person.id,
                 name: person.name,
+                email: person.email,
+                phoneCode: person.phoneCode,
+                phoneNumber: person.phoneNumber,
                 services: (snap.services ?? [])
                   .filter((service) => service.guestId === person.id)
                   .map((service) => ({
@@ -6057,41 +6172,106 @@ export default function ProfessionalFixedLocationCalendar({
   const addInlineGuest = React.useCallback(() => {
     const guestName =
       `${inlineGuestDraft.firstName.trim()} ${inlineGuestDraft.lastName.trim()}`.trim();
-    if (!guestName) {
+    const email = inlineGuestDraft.email.trim();
+    const phoneCode = inlineGuestDraft.phoneCode;
+    const phoneNumber = inlineGuestDraft.phoneNumber.trim();
+    const phoneErrors = getOptionalPhoneValidationErrors(phoneCode, phoneNumber);
+    if (phoneErrors.countryCode || phoneErrors.phone) {
       showSnackbar({
         severity: "warning",
-        message:
-          inlineGuestParticipantType === "model"
-            ? "Model name is required."
-            : "Guest name is required.",
+        message: phoneErrors.phone || phoneErrors.countryCode || "Invalid phone.",
       });
       return;
     }
+
+    if (editingInlineGuestId) {
+      setBookingGuests((prev) =>
+        prev.map((guest) => {
+          if (guest.id !== editingInlineGuestId) return guest;
+          const fallback =
+            guest.participantType === "model" ? "Model" : "Guest";
+          return {
+            ...guest,
+            name: guestName || guest.name || fallback,
+            email,
+            phoneCode,
+            phoneNumber,
+          };
+        }),
+      );
+      setInlineGuestDraft(emptyInlineGuestDraft);
+      setEditingInlineGuestId(null);
+      setInlineGuestParticipantType("guest");
+      setShowInlineGuestField(false);
+      return;
+    }
+
     const modelCount =
       bookingGuests.filter((g) => g.participantType === "model").length + 1;
+    const guestCount =
+      bookingGuests.filter((g) => (g.participantType ?? "guest") === "guest")
+        .length + 1;
+    const fallbackName =
+      inlineGuestParticipantType === "model"
+        ? `Model ${modelCount}`
+        : `Guest ${guestCount}`;
     setBookingGuests((prev) => [
       ...prev,
       {
         id: `guest-${Date.now()}`,
-        name:
-          inlineGuestParticipantType === "model" && !guestName
-            ? `Model ${modelCount}`
-            : guestName,
+        name: guestName || fallbackName,
+        email,
+        phoneCode,
+        phoneNumber,
         services: [],
         products: [],
         participantType: inlineGuestParticipantType,
       },
     ]);
-    setInlineGuestDraft({ firstName: "", lastName: "" });
+    setInlineGuestDraft(emptyInlineGuestDraft);
+    setEditingInlineGuestId(null);
     setInlineGuestParticipantType("guest");
     setShowInlineGuestField(false);
   }, [
     bookingGuests,
+    editingInlineGuestId,
+    emptyInlineGuestDraft,
+    inlineGuestDraft.email,
     inlineGuestDraft.firstName,
     inlineGuestDraft.lastName,
+    inlineGuestDraft.phoneCode,
+    inlineGuestDraft.phoneNumber,
     inlineGuestParticipantType,
     showSnackbar,
   ]);
+
+  const beginEditInlineGuest = React.useCallback(
+    (guest: {
+      id: string;
+      name: string;
+      email?: string;
+      phoneCode?: string;
+      phoneNumber?: string;
+      participantType?: string;
+    }) => {
+      const parts = guest.name.trim().split(/\s+/);
+      const firstName = parts[0] || "";
+      const lastName = parts.slice(1).join(" ");
+      setInlineGuestDraft({
+        firstName,
+        lastName,
+        email: guest.email ?? "",
+        phoneCode: guest.phoneCode ?? "",
+        phoneNumber: guest.phoneNumber ?? "",
+      });
+      setEditingInlineGuestId(guest.id);
+      setInlineGuestParticipantType(
+        guest.participantType === "model" ? "model" : "guest",
+      );
+      setShowInlineGuestField(true);
+    },
+    [],
+  );
 
   const addDlParticipant = React.useCallback(
     (kind: "planning" | "buffer") => {
@@ -6484,11 +6664,74 @@ export default function ProfessionalFixedLocationCalendar({
         return true;
       }
 
-      const title =
-        selectedServices[0]?.name ??
-        selectedProducts[0]?.name ??
-        bookingUniqueItems[0]?.name ??
-        "Booking";
+      const title = buildMultiServiceBookingTitle(
+        [
+          ...selectedServices.map((service) => service.name),
+          ...bookingGuests.flatMap((guest) =>
+            guest.services.map((service) => service.name),
+          ),
+          ...selectedProducts.map((product) => product.name),
+          ...bookingUniqueItems.map((item) => item.name),
+        ],
+        "Booking",
+      );
+
+      if (!staffConflictAckRef.current) {
+        const slotStart = selectedSlot.start.slice(0, 5);
+        const slotEnd = selectedSlot.end.slice(0, 5);
+        const staffIntervals: StaffServiceInterval[] = [
+          ...selectedServices.map((service) => ({
+            id: service.id,
+            name: service.name,
+            staffId: service.staffResourceId || selectedSlot.resourceId,
+            start: (service.startTime || slotStart).slice(0, 5),
+            end: (service.endTime || slotEnd).slice(0, 5),
+          })),
+          ...bookingGuests.flatMap((guest) =>
+            guest.services.map((service) => ({
+              id: `${guest.id}-${service.id}`,
+              name: service.name,
+              staffId: service.staffResourceId || selectedSlot.resourceId,
+              start: (service.startTime || slotStart).slice(0, 5),
+              end: (service.endTime || slotEnd).slice(0, 5),
+            })),
+          ),
+        ];
+        const internalOverlaps =
+          findInternalStaffServiceOverlaps(staffIntervals);
+        const externalOverlaps = findExternalStaffBookingOverlaps({
+          bookingId: editingEventId,
+          date: selectedSlot.date,
+          services: staffIntervals,
+          events,
+        });
+        if (internalOverlaps.length || externalOverlaps.length) {
+          const parts: string[] = [];
+          if (internalOverlaps.length) {
+            parts.push(
+              `Same team member has overlapping services (${internalOverlaps
+                .map(({ a, b }) => `${a.name} & ${b.name}`)
+                .join(", ")})`,
+            );
+          }
+          if (externalOverlaps.length) {
+            parts.push(
+              `Overlaps another booking (${externalOverlaps
+                .map(({ service, event }) => `${service.name} / ${event.title}`)
+                .slice(0, 3)
+                .join(", ")})`,
+            );
+          }
+          setStaffConflictMessage(
+            `${parts.join(". ")}. You can still save this booking.`,
+          );
+          setStaffConflictOpen(true);
+          return false;
+        }
+      } else {
+        staffConflictAckRef.current = false;
+      }
+
       const clientName =
         selectedClient?.name?.trim() ||
         `${guestDraft.firstName} ${guestDraft.lastName}`.trim() ||
@@ -6572,8 +6815,10 @@ export default function ProfessionalFixedLocationCalendar({
         ...(showPrepayment
           ? {
               prepaymentStatus:
-                existingEvent?.details?.prepaymentStatus ??
-                ("pending" as const),
+                paymentMethod === "offline"
+                  ? ("confirmed" as const)
+                  : (existingEvent?.details?.prepaymentStatus ??
+                    ("pending" as const)),
             }
           : {}),
       };
@@ -6719,6 +6964,9 @@ export default function ProfessionalFixedLocationCalendar({
               return {
                 id: guest.id,
                 name: guest.name,
+                email: guest.email,
+                phoneCode: guest.phoneCode,
+                phoneNumber: guest.phoneNumber,
                 isRequester: false as const,
                 participantType:
                   guest.participantType ??
@@ -7071,6 +7319,26 @@ export default function ProfessionalFixedLocationCalendar({
           setEditingEventId(nextEvent.id);
           setSlotStatus(nextEvent.status);
           setIsEditingExisting(false);
+
+          if (
+            addClientSource === "mollure-platform" ||
+            addClientSource === "non-mollure"
+          ) {
+            const identity = {
+              name: selectedClient?.name,
+              email: selectedClient?.email,
+              customerId: selectedClient?.mollureUserId,
+              clientKind: selectedClient?.clientKind,
+              phone: [bookingPhoneDraft.phoneCode, bookingPhoneDraft.phoneNumber]
+                .map((part) => String(part ?? "").trim())
+                .filter(Boolean)
+                .join(" "),
+            };
+            if (!findListedClient(identity)) {
+              void addIdentityToClientList(identity, { silent: true });
+            }
+          }
+
           showSnackbar({
             severity: "success",
             message: isOfflineManualBooking
@@ -7159,6 +7427,10 @@ export default function ProfessionalFixedLocationCalendar({
       slotStatus,
       canUseBookingProject,
       resourceNameById,
+      addIdentityToClientList,
+      findListedClient,
+      bookingPhoneDraft.phoneCode,
+      bookingPhoneDraft.phoneNumber,
     ]);
 
   return (
@@ -9072,6 +9344,7 @@ export default function ProfessionalFixedLocationCalendar({
                             phoneCode: nonMollureDraft.phoneCode,
                             phoneNumber: nonMollureDraft.phoneNumber,
                           });
+                          setPaymentMethod("online");
                           setSlotClientAdded(true);
                           showSnackbar({
                             severity: "success",
@@ -9087,7 +9360,7 @@ export default function ProfessionalFixedLocationCalendar({
                             name:
                               `${guestDraft.firstName} ${guestDraft.lastName}`.trim() ||
                               "Guest",
-                            email: "",
+                            email: guestDraft.email.trim(),
                             mollureUserId: null,
                             clientKind: "individual",
                           });
@@ -9095,6 +9368,7 @@ export default function ProfessionalFixedLocationCalendar({
                             phoneCode: guestDraft.phoneCode,
                             phoneNumber: guestDraft.phoneNumber,
                           });
+                          setPaymentMethod("offline");
                           setSlotClientAdded(true);
                           showSnackbar({
                             severity: "success",
@@ -9481,12 +9755,17 @@ export default function ProfessionalFixedLocationCalendar({
                                   c.countryCode,
                                 ),
                               );
+                              setPaymentMethod("online");
                               setAddClientSource("client-list");
                               setSlotClientAdded(true);
                               setSlotBookingScreen("new-booking");
                             }}
                             options={clientList.map((c) => ({
-                              label: c.name,
+                              label: bookingClientOptionLabel({
+                                name: c.name,
+                                isMollure: Boolean(c.mollureUserId),
+                                clientKind: c.clientKind,
+                              }),
                               value: c.email,
                             }))}
                             fullWidth
@@ -9550,6 +9829,7 @@ export default function ProfessionalFixedLocationCalendar({
                                     );
                                   }
                                   setAddClientSource("mollure-platform");
+                                  setPaymentMethod("online");
                                   setSlotClientAdded(true);
                                   setPlatformEmailInput("");
                                   setSlotBookingScreen("new-booking");
@@ -9579,16 +9859,40 @@ export default function ProfessionalFixedLocationCalendar({
                                     .toUpperCase()}
                                 </Avatar>
                                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                                  <BodyText
-                                    sx={{
-                                      fontSize: 12.5,
-                                      fontWeight: 900,
-                                      color: alpha(m.navy, 0.78),
-                                      lineHeight: 1.2,
-                                    }}
+                                  <Stack
+                                    direction="row"
+                                    alignItems="center"
+                                    spacing={0.75}
+                                    sx={{ minWidth: 0 }}
                                   >
-                                    {platformEmailMatch.name}
-                                  </BodyText>
+                                    <BodyText
+                                      sx={{
+                                        fontSize: 12.5,
+                                        fontWeight: 900,
+                                        color: alpha(m.navy, 0.78),
+                                        lineHeight: 1.2,
+                                      }}
+                                    >
+                                      {platformEmailMatch.name}
+                                    </BodyText>
+                                    <BookingClientTags
+                                      isMollure
+                                      clientKind={
+                                        platformEmailMatch.userType ===
+                                          "company" ||
+                                        clientList.find(
+                                          (x) =>
+                                            x.email.toLowerCase() ===
+                                              platformEmailMatch.email.toLowerCase() ||
+                                            (platformEmailMatch.id &&
+                                              x.mollureUserId ===
+                                                platformEmailMatch.id),
+                                        )?.clientKind === "company"
+                                          ? "company"
+                                          : "individual"
+                                      }
+                                    />
+                                  </Stack>
                                   <BodyText
                                     sx={{
                                       fontSize: 11.5,
@@ -10125,7 +10429,7 @@ export default function ProfessionalFixedLocationCalendar({
                       />
                       <AppTextField
                         label="Last Name"
-                        placeholder="Enter last name"
+                        placeholder="Enter last name (optional)"
                         value={guestDraft.lastName}
                         onChange={(e) =>
                           setGuestDraft((p) => ({
@@ -10160,9 +10464,9 @@ export default function ProfessionalFixedLocationCalendar({
                       }
                       countryCodeError={slotErrors.guestPhoneCode}
                       phoneError={slotErrors.guestPhoneNumber}
-                      label="Contact Number (optional)"
+                      label="Contact Number"
                       phonePlaceholder="Phone number"
-                      required={false}
+                      required
                     />
 
                     <Box sx={{ flex: 1, minHeight: 200 }} />
@@ -11413,8 +11717,27 @@ export default function ProfessionalFixedLocationCalendar({
                                       {selectedClient?.name ?? "Client"}
                                     </BodyText>
                                   </ButtonBase>
-                                  {isSelectedCompanyClient ? (
-                                    <CompanyClientTag variant="dot" />
+                                  {isSelectedCompanyClient ||
+                                  Boolean(selectedClient?.mollureUserId) ||
+                                  addClientSource === "mollure-platform" ? (
+                                    <BookingClientTags
+                                      isMollure={
+                                        Boolean(selectedClient?.mollureUserId) ||
+                                        addClientSource === "mollure-platform"
+                                      }
+                                      clientKind={selectedClient?.clientKind}
+                                      showType={
+                                        isSelectedCompanyClient ||
+                                        selectedClient?.clientKind ===
+                                          "individual"
+                                      }
+                                    />
+                                  ) : selectedClient &&
+                                    addClientSource !== "guest" ? (
+                                    <BookingClientTags
+                                      isMollure={false}
+                                      clientKind={selectedClient.clientKind}
+                                    />
                                   ) : null}
                                 </Stack>
                                 <BodyText
@@ -11977,7 +12300,49 @@ export default function ProfessionalFixedLocationCalendar({
                                       </BodyText>
                                     </Stack>
                                   )}
-                                  {showClientRemoveButton ? (
+                                  {showClientRemoveButton &&
+                                  (participantKind === "guest" ||
+                                    participantKind === "model") ? (
+                                    <Stack direction="row" spacing={0.25}>
+                                      <IconButton
+                                        size="small"
+                                        onClick={() =>
+                                          beginEditInlineGuest(guest)
+                                        }
+                                        sx={{ color: alpha(m.navy, 0.45) }}
+                                        aria-label={`Edit ${guest.name}`}
+                                      >
+                                        <EditRoundedIcon sx={{ fontSize: 17 }} />
+                                      </IconButton>
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => {
+                                          setBookingGuests((prev) =>
+                                            prev.filter(
+                                              (item) => item.id !== guest.id,
+                                            ),
+                                          );
+                                          if (
+                                            editingInlineGuestId === guest.id
+                                          ) {
+                                            setEditingInlineGuestId(null);
+                                            setInlineGuestDraft(
+                                              emptyInlineGuestDraft,
+                                            );
+                                            setShowInlineGuestField(false);
+                                          }
+                                          if (addMenuTarget === guest.id)
+                                            setSlotAddMenuAnchor(null);
+                                        }}
+                                        sx={{ color: alpha(m.navy, 0.35) }}
+                                        aria-label={`Remove ${guest.name}`}
+                                      >
+                                        <CloseRoundedIcon
+                                          sx={{ fontSize: 17 }}
+                                        />
+                                      </IconButton>
+                                    </Stack>
+                                  ) : showClientRemoveButton ? (
                                     <IconButton
                                       size="small"
                                       onClick={() => {
@@ -12273,9 +12638,13 @@ export default function ProfessionalFixedLocationCalendar({
                                 mb: 1.25,
                               }}
                             >
-                              {inlineGuestParticipantType === "model"
-                                ? "Model"
-                                : "Guest"}
+                              {editingInlineGuestId
+                                ? inlineGuestParticipantType === "model"
+                                  ? "Edit Model"
+                                  : "Edit Guest"
+                                : inlineGuestParticipantType === "model"
+                                  ? "Model"
+                                  : "Guest"}
                             </BodyText>
                             <Stack
                               direction="row"
@@ -12297,7 +12666,7 @@ export default function ProfessionalFixedLocationCalendar({
                               />
                               <AppTextField
                                 label="Last Name"
-                                placeholder="Enter last name"
+                                placeholder="Optional"
                                 value={inlineGuestDraft.lastName}
                                 onChange={(e) =>
                                   setInlineGuestDraft((prev) => ({
@@ -12309,17 +12678,71 @@ export default function ProfessionalFixedLocationCalendar({
                                 disabled={isViewingExisting}
                               />
                             </Stack>
-                            <AppButton
-                              tone="primary"
-                              onClick={addInlineGuest}
+                            <AppTextField
+                              label="Email"
+                              placeholder="Email (optional)"
+                              value={inlineGuestDraft.email}
+                              onChange={(e) =>
+                                setInlineGuestDraft((prev) => ({
+                                  ...prev,
+                                  email: e.target.value,
+                                }))
+                              }
+                              fullWidth
                               disabled={isViewingExisting}
-                              sx={{
-                                height: 38,
-                                minWidth: 96,
-                              }}
+                              sx={{ mb: 1.25 }}
+                            />
+                            <AppCountryPhoneFields
+                              countryCode={inlineGuestDraft.phoneCode}
+                              phone={inlineGuestDraft.phoneNumber}
+                              onCountryCodeChange={(dialCode) =>
+                                setInlineGuestDraft((prev) => ({
+                                  ...prev,
+                                  phoneCode: dialCode,
+                                }))
+                              }
+                              onPhoneChange={(phone) =>
+                                setInlineGuestDraft((prev) => ({
+                                  ...prev,
+                                  phoneNumber: phone,
+                                }))
+                              }
+                              label="Contact Number (optional)"
+                              phonePlaceholder="Phone number"
+                              required={false}
+                              disabled={isViewingExisting}
+                            />
+                            <Stack
+                              direction="row"
+                              spacing={1}
+                              sx={{ mt: 1.25 }}
                             >
-                              Add
-                            </AppButton>
+                              <AppButton
+                                tone="primary"
+                                onClick={addInlineGuest}
+                                disabled={isViewingExisting}
+                                sx={{
+                                  height: 38,
+                                  minWidth: 96,
+                                }}
+                              >
+                                {editingInlineGuestId ? "Save" : "Add"}
+                              </AppButton>
+                              {editingInlineGuestId || showInlineGuestField ? (
+                                <AppButton
+                                  tone="secondary"
+                                  onClick={() => {
+                                    setShowInlineGuestField(false);
+                                    setEditingInlineGuestId(null);
+                                    setInlineGuestDraft(emptyInlineGuestDraft);
+                                  }}
+                                  disabled={isViewingExisting}
+                                  sx={{ height: 38, minWidth: 96 }}
+                                >
+                                  Cancel
+                                </AppButton>
+                              ) : null}
+                            </Stack>
                           </Box>
                         ) : null}
 
@@ -13077,66 +13500,96 @@ export default function ProfessionalFixedLocationCalendar({
                                   Payment method
                                 </BodyText>
 
-                                {[
-                                  {
-                                    key: "online" as const,
-                                    label: "Online Direct",
-                                  },
-                                  {
-                                    key: "offline" as const,
-                                    label: "Offline Direct",
-                                  },
-                                ].map((pm) => {
-                                  const active = paymentMethod === pm.key;
-                                  return (
-                                    <ButtonBase
-                                      key={pm.key}
-                                      onClick={() => setPaymentMethod(pm.key)}
-                                      sx={{
-                                        width: "100%",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "space-between",
-                                        py: 0.65,
-                                        borderRadius: "10px",
-                                        "&:hover": {
-                                          bgcolor: alpha(m.navy, 0.03),
-                                        },
-                                      }}
-                                    >
-                                      <BodyText
-                                        sx={{
-                                          fontSize: 12.75,
-                                          fontWeight: 850,
-                                          color: alpha(m.navy, 0.74),
-                                        }}
-                                      >
-                                        {pm.label}
-                                      </BodyText>
-                                      <Box
-                                        sx={{
-                                          width: 18,
-                                          height: 18,
-                                          borderRadius: "999px",
-                                          border: `2px solid ${active ? m.teal : alpha(m.navy, 0.22)}`,
-                                          display: "grid",
-                                          placeItems: "center",
-                                        }}
-                                      >
-                                        {active ? (
+                                {isDrawerPrepaymentPaid ? (
+                                  <BodyText
+                                    sx={{
+                                      fontSize: 12.75,
+                                      fontWeight: 850,
+                                      color: alpha(m.navy, 0.74),
+                                      py: 0.65,
+                                    }}
+                                  >
+                                    {persistedPaymentIsOffline ||
+                                    drawerPaymentMethod === "offline"
+                                      ? "Prepaid – Offline Direct"
+                                      : "Prepaid – Online Direct"}
+                                  </BodyText>
+                                ) : (
+                                  (
+                                    [
+                                      {
+                                        key: "online" as const,
+                                        label: "Online Direct",
+                                      },
+                                      {
+                                        key: "offline" as const,
+                                        label: "Offline Direct",
+                                      },
+                                    ] as const
+                                  )
+                                    .filter((pm) => {
+                                      if (paymentMethodPolicy === "online-only") {
+                                        return pm.key === "online";
+                                      }
+                                      if (paymentMethodPolicy === "offline-only") {
+                                        return pm.key === "offline";
+                                      }
+                                      return true;
+                                    })
+                                    .map((pm) => {
+                                      const active = paymentMethod === pm.key;
+                                      return (
+                                        <ButtonBase
+                                          key={pm.key}
+                                          onClick={() =>
+                                            setPaymentMethod(pm.key)
+                                          }
+                                          sx={{
+                                            width: "100%",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "space-between",
+                                            py: 0.65,
+                                            borderRadius: "10px",
+                                            "&:hover": {
+                                              bgcolor: alpha(m.navy, 0.03),
+                                            },
+                                          }}
+                                        >
+                                          <BodyText
+                                            sx={{
+                                              fontSize: 12.75,
+                                              fontWeight: 850,
+                                              color: alpha(m.navy, 0.74),
+                                            }}
+                                          >
+                                            {pm.label}
+                                          </BodyText>
                                           <Box
                                             sx={{
-                                              width: 8,
-                                              height: 8,
+                                              width: 18,
+                                              height: 18,
                                               borderRadius: "999px",
-                                              bgcolor: m.teal,
+                                              border: `2px solid ${active ? m.teal : alpha(m.navy, 0.22)}`,
+                                              display: "grid",
+                                              placeItems: "center",
                                             }}
-                                          />
-                                        ) : null}
-                                      </Box>
-                                    </ButtonBase>
-                                  );
-                                })}
+                                          >
+                                            {active ? (
+                                              <Box
+                                                sx={{
+                                                  width: 8,
+                                                  height: 8,
+                                                  borderRadius: "999px",
+                                                  bgcolor: m.teal,
+                                                }}
+                                              />
+                                            ) : null}
+                                          </Box>
+                                        </ButtonBase>
+                                      );
+                                    })
+                                )}
                               </Box>
                             </Box>
                           </>
@@ -13324,24 +13777,110 @@ export default function ProfessionalFixedLocationCalendar({
                           />
                         )}
 
-                        <BookingDrawerParticipantActions
-                          kinds={drawerParticipantKinds}
-                          nameFieldOpen={showInlineGuestField}
-                          onAddGuest={() => {
-                            setInlineGuestParticipantType("guest");
-                            setShowInlineGuestField(true);
+                        <Box
+                          sx={{
+                            position: "sticky",
+                            bottom: 0,
+                            zIndex: 3,
+                            mt: 1,
+                            pt: 1,
+                            pb: 0.5,
+                            bgcolor: "#fff",
+                            borderTop: `1px solid ${alpha(m.navy, 0.08)}`,
                           }}
-                          onAddModel={() => {
-                            setInlineGuestParticipantType("model");
-                            setShowInlineGuestField(true);
-                          }}
-                          onAddPlanning={() => {
-                            addDlParticipant("planning");
-                          }}
-                          onAddBuffer={() => {
-                            addDlParticipant("buffer");
-                          }}
-                        />
+                        >
+                          {(() => {
+                            if (!selectedSlot || isViewingExisting) return null;
+                            const slotStart = selectedSlot.start.slice(0, 5);
+                            const slotEnd = selectedSlot.end.slice(0, 5);
+                            const staffIntervals: StaffServiceInterval[] = [
+                              ...selectedServices.map((service) => ({
+                                id: service.id,
+                                name: service.name,
+                                staffId:
+                                  service.staffResourceId ||
+                                  selectedSlot.resourceId,
+                                start: (service.startTime || slotStart).slice(
+                                  0,
+                                  5,
+                                ),
+                                end: (service.endTime || slotEnd).slice(0, 5),
+                              })),
+                              ...bookingGuests.flatMap((guest) =>
+                                guest.services.map((service) => ({
+                                  id: `${guest.id}-${service.id}`,
+                                  name: service.name,
+                                  staffId:
+                                    service.staffResourceId ||
+                                    selectedSlot.resourceId,
+                                  start: (
+                                    service.startTime || slotStart
+                                  ).slice(0, 5),
+                                  end: (service.endTime || slotEnd).slice(0, 5),
+                                })),
+                              ),
+                            ];
+                            const hasInternal =
+                              findInternalStaffServiceOverlaps(staffIntervals)
+                                .length > 0;
+                            const hasExternal =
+                              findExternalStaffBookingOverlaps({
+                                bookingId: editingEventId,
+                                date: selectedSlot.date,
+                                services: staffIntervals,
+                                events,
+                              }).length > 0;
+                            if (!hasInternal && !hasExternal) return null;
+                            return (
+                              <Box
+                                sx={{
+                                  mb: 1,
+                                  px: 1.25,
+                                  py: 1,
+                                  borderRadius: "10px",
+                                  bgcolor: alpha(m.statusOrangeFg, 0.1),
+                                  border: `1px solid ${alpha(m.statusOrangeFg, 0.28)}`,
+                                }}
+                              >
+                                <BodyText
+                                  sx={{
+                                    fontSize: 12,
+                                    fontWeight: 800,
+                                    color: m.statusOrangeFg,
+                                    lineHeight: 1.35,
+                                  }}
+                                >
+                                  Overlapping staff time detected. You can still
+                                  save — you will be asked to confirm.
+                                </BodyText>
+                              </Box>
+                            );
+                          })()}
+                          <BookingDrawerParticipantActions
+                            kinds={drawerParticipantKinds}
+                            nameFieldOpen={
+                              showInlineGuestField && !editingInlineGuestId
+                            }
+                            onAddGuest={() => {
+                              setInlineGuestParticipantType("guest");
+                              setEditingInlineGuestId(null);
+                              setInlineGuestDraft(emptyInlineGuestDraft);
+                              setShowInlineGuestField(true);
+                            }}
+                            onAddModel={() => {
+                              setInlineGuestParticipantType("model");
+                              setEditingInlineGuestId(null);
+                              setInlineGuestDraft(emptyInlineGuestDraft);
+                              setShowInlineGuestField(true);
+                            }}
+                            onAddPlanning={() => {
+                              addDlParticipant("planning");
+                            }}
+                            onAddBuffer={() => {
+                              addDlParticipant("buffer");
+                            }}
+                          />
+                        </Box>
 
                         <Box sx={{ flex: 1, minHeight: 40 }} />
                       </>
@@ -13547,6 +14086,28 @@ export default function ProfessionalFixedLocationCalendar({
           setBlockOverlapOpen(false);
           if (!draft) return;
           void persistOverviewBlockedTime(draft);
+        }}
+      />
+      <CalendarScheduleConflictDialog
+        open={staffConflictOpen}
+        kind={
+          staffConflictOpen
+            ? ("staff_double_book" satisfies CalendarScheduleConflictKind)
+            : null
+        }
+        messageOverride={staffConflictMessage}
+        onClose={() => {
+          setStaffConflictOpen(false);
+          setStaffConflictMessage(null);
+          staffConflictAckRef.current = false;
+        }}
+        onConfirm={() => {
+          staffConflictAckRef.current = true;
+          setStaffConflictOpen(false);
+          setStaffConflictMessage(null);
+          void persistBookingFromDrawer().then((saved) => {
+            if (saved) closeBookingDrawer();
+          });
         }}
       />
       <CalendarPublicBusinessHoursModal

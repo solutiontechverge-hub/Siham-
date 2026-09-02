@@ -316,6 +316,7 @@ export function useFixedLocationCalendarPage() {
         mollureUserId: client.mollure_user_id,
         phone: client.phone ?? "",
         clientKind: client.client_kind,
+        isMollure: Boolean(client.is_mollure || client.mollure_user_id),
       })),
     [professionalClientsData],
   );

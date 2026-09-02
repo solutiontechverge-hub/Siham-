@@ -43,9 +43,17 @@ export function resolveCalendarPrepaymentStatus(
     event.status === "Cancelled" ||
     event.status === "Invalid";
 
-  // Offline prepayment is collected at the visit — waiting icon until done.
+  // Offline prepayment can be confirmed on save (pro acknowledges offline prepaid).
+  // Only force pending when offline and not yet confirmed/canceled/invalid.
   if (isOfflinePaymentMethod(details.paymentMethod)) {
     if (finished) return undefined;
+    if (
+      details.prepaymentStatus === "confirmed" ||
+      details.prepaymentStatus === "canceled" ||
+      details.prepaymentStatus === "invalid"
+    ) {
+      return details.prepaymentStatus;
+    }
     return "pending";
   }
 
