@@ -203,8 +203,14 @@ export function appendPublicHoursFromDraft(
   draft: PublicBusinessHoursDraft,
   current: PublicHoursState,
 ): PublicHoursState {
-  if (!draft.locations.length) return current;
-  return draft.locations.reduce((state, location) => {
+  const locations =
+    draft.location
+      ? [draft.location]
+      : draft.locations.length
+        ? draft.locations
+        : [];
+  if (!locations.length) return current;
+  return locations.reduce((state, location) => {
     const locationKey = location === "FL" ? "fixed" : "desired";
     const scheduleType =
       draft.schedule === "variable"
@@ -214,34 +220,47 @@ export function appendPublicHoursFromDraft(
           : locationKey === "fixed"
             ? "fixed"
             : "variable";
-    const nextSlot: PublicHoursSlot = {
-      id: `slot-${Date.now()}-${location}-${draft.day || "range"}`,
-      dayLabel: draft.day || "Date range",
-      startTime: draft.startTime || "08:00",
-      endTime: draft.endTime || "18:00",
-      scheduleType,
-      notAvailable: draft.notAvailable,
-      note: draft.note || undefined,
-    };
-    const locationState = state[locationKey];
-    const existingIndex = locationState.slots.findIndex(
-      (slot) =>
-        slot.dayLabel === nextSlot.dayLabel &&
-        slot.startTime === nextSlot.startTime &&
-        slot.endTime === nextSlot.endTime,
-    );
-    const slots =
-      existingIndex >= 0
-        ? locationState.slots.map((slot, index) =>
-            index === existingIndex ? { ...nextSlot, id: slot.id } : slot,
-          )
-        : [...locationState.slots, nextSlot];
-    const selectedId =
-      existingIndex >= 0 ? slots[existingIndex].id : nextSlot.id;
-    return {
-      ...state,
-      [locationKey]: { slots, selectedId },
-    };
+    const dayRows =
+      draft.days?.length
+        ? draft.days
+        : [
+            {
+              day: draft.day || "Monday",
+              startTime: draft.startTime || "08:00",
+              endTime: draft.endTime || "18:00",
+              off: draft.notAvailable,
+            },
+          ];
+    let nextState = state;
+    for (const dayRow of dayRows) {
+      const nextSlot: PublicHoursSlot = {
+        id: `slot-${Date.now()}-${location}-${dayRow.day}`,
+        dayLabel: dayRow.day,
+        startTime: dayRow.startTime || "08:00",
+        endTime: dayRow.endTime || "18:00",
+        scheduleType,
+        notAvailable: dayRow.off,
+        note:
+          scheduleType === "variable" ? draft.note || undefined : undefined,
+      };
+      const locationState = nextState[locationKey];
+      const existingIndex = locationState.slots.findIndex(
+        (slot) => slot.dayLabel === nextSlot.dayLabel,
+      );
+      const slots =
+        existingIndex >= 0
+          ? locationState.slots.map((slot, index) =>
+              index === existingIndex ? { ...nextSlot, id: slot.id } : slot,
+            )
+          : [...locationState.slots, nextSlot];
+      const selectedId =
+        existingIndex >= 0 ? slots[existingIndex].id : nextSlot.id;
+      nextState = {
+        ...nextState,
+        [locationKey]: { slots, selectedId },
+      };
+    }
+    return nextState;
   }, current);
 }
 

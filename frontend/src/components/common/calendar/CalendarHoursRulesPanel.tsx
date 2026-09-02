@@ -38,6 +38,13 @@ import {
   isConfiguredColor,
 } from "../../../lib/calendarDesign.utils";
 import type { PublicBusinessHoursEntry } from "./CalendarPublicBusinessHoursModal";
+import {
+  locationHasPublicHoursConfigured,
+  offLabelForLocation,
+  scheduleLabelForType,
+  scheduleTypeForLocation,
+  variableNoteForLocation,
+} from "./CalendarPublicBusinessHoursModal";
 import CalendarServiceOrderCard from "./CalendarServiceOrderCard";
 import {
   dedupeServiceOrderSettings,
@@ -104,30 +111,6 @@ function SettingsSection({
       </Stack>
       <Box sx={{ p: 2 }}>{children}</Box>
     </Paper>
-  );
-}
-
-function SetButton({
-  onClick,
-  disabled,
-}: {
-  onClick: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <AppButton
-      tone="primary"
-      disabled={disabled}
-      onClick={onClick}
-      sx={{
-        fontSize: 12.5,
-        minWidth: 58,
-        height: 30,
-        px: 1.75,
-      }}
-    >
-      Set
-    </AppButton>
   );
 }
 
@@ -436,13 +419,14 @@ function formatHoursTimeSpan(entry: PublicBusinessHoursEntry): {
 
 function formatHoursLabel(entry: PublicBusinessHoursEntry): string {
   const { start, end, dateSpan, fromLabel } = formatHoursTimeSpan(entry);
+  const offLabel = offLabelForLocation(entry.location);
 
   if (entry.notAvailable) {
     if (dateSpan) {
       const dayPrefix = entry.day ? `${entry.day} ` : "";
-      return `${dayPrefix}${dateSpan} (Not available)`;
+      return `${dayPrefix}${dateSpan} (${offLabel})`;
     }
-    return `${entry.day || "Day"} (Not available)`;
+    return `${entry.day || "Day"} (${offLabel})`;
   }
 
   if (isSingleDateEntry(entry)) {
@@ -650,16 +634,28 @@ function pickLatestHoursOption(
 
 function LocationHoursBlock({
   title,
-  scheduleLabel,
+  location,
   entries,
-  showInfo,
+  onEdit,
+  isSaving,
 }: {
   title: string;
-  scheduleLabel: string;
+  location: "FL" | "DL";
   entries: PublicBusinessHoursEntry[];
-  showInfo?: boolean;
+  onEdit: () => void;
+  isSaving?: boolean;
 }) {
   const m = useTheme().palette.mollure;
+  const configured = locationHasPublicHoursConfigured(entries, location);
+  const scheduleType = scheduleTypeForLocation(entries, location);
+  const scheduleLabel = scheduleLabelForType(
+    scheduleType || (location === "DL" ? "variable" : "fixed"),
+  );
+  const variableNote = variableNoteForLocation(entries, location);
+  const showInfo = scheduleType === "variable";
+  const infoTitle =
+    variableNote || "Variable schedule — add a note when editing.";
+
   const options = buildHoursDropdownOptions(entries, {
     override: m.requestAccent,
     notAvailable: m.blockedTimeFg,
@@ -689,16 +685,27 @@ function LocationHoursBlock({
         py: 1.5,
       }}
     >
-      <BodyText
-        sx={{
-          fontSize: 13,
-          fontWeight: 800,
-          color: alpha(m.navy, 0.78),
-          mb: 1.25,
-        }}
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        sx={{ mb: 1.25 }}
       >
-        {title}
-      </BodyText>
+        <BodyText
+          sx={{
+            fontSize: 13,
+            fontWeight: 800,
+            color: alpha(m.navy, 0.78),
+          }}
+        >
+          {title}
+        </BodyText>
+        <AppearanceActionButton
+          configured={configured}
+          disabled={isSaving}
+          onClick={onEdit}
+        />
+      </Stack>
       <Stack
         direction="row"
         spacing={1}
@@ -730,7 +737,7 @@ function LocationHoursBlock({
           />
         </Box>
         {showInfo ? (
-          <Tooltip title="Variable schedule applies to desired-location bookings.">
+          <Tooltip title={infoTitle}>
             <InfoOutlinedIcon sx={{ fontSize: 18, color: m.teal }} />
           </Tooltip>
         ) : null}
@@ -920,31 +927,24 @@ export default function CalendarHoursRulesPanel({
       </Box>
 
       <Stack spacing={1.75} sx={{ px: 2.5, py: 2.25 }}>
-        <SettingsSection
-          title="Public Hours"
-          action={
-            <SetButton
-              disabled={isSaving}
-              onClick={() =>
-                onOpenPublicHours(showFl ? "FL" : showDl ? "DL" : undefined)
-              }
-            />
-          }
-        >
+        <SettingsSection title="Public Hours">
           <Stack spacing={1.25}>
             {showFl ? (
               <LocationHoursBlock
                 title="Fixed Location"
-                scheduleLabel="Fixed Schedule"
+                location="FL"
                 entries={flEntries}
+                isSaving={isSaving}
+                onEdit={() => onOpenPublicHours("FL")}
               />
             ) : null}
             {showDl ? (
               <LocationHoursBlock
                 title="Desired Location"
-                scheduleLabel="Variable Schedule"
+                location="DL"
                 entries={dlEntries}
-                showInfo
+                isSaving={isSaving}
+                onEdit={() => onOpenPublicHours("DL")}
               />
             ) : null}
           </Stack>

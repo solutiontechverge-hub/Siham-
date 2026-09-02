@@ -354,6 +354,7 @@ export default function CalendarSchedulePanel({
     return blocks.filter((block) => block.date === activeDateIso);
   }, [activeDateIso, blocks, isArchived]);
 
+  // Always list every team member so empty schedules do not look "vanished".
   const visibleResources = React.useMemo(() => {
     const base =
       selectedResourceIds.length > 0
@@ -361,19 +362,8 @@ export default function CalendarSchedulePanel({
             selectedResourceIds.includes(resource.id),
           )
         : [...resources];
-    const withData = base.filter((resource) => {
-      const hasAvailability = filteredRows.some((row) =>
-        row.resourceIds.includes(resource.id),
-      );
-      const hasBlocked = filteredBlocks.some(
-        (block) => block.resourceId === resource.id,
-      );
-      return hasAvailability || hasBlocked;
-    });
-    return (withData.length ? withData : base.slice(0, 1)).sort((a, b) =>
-      a.name.localeCompare(b.name),
-    );
-  }, [filteredBlocks, filteredRows, resources, selectedResourceIds]);
+    return base.sort((a, b) => a.name.localeCompare(b.name));
+  }, [resources, selectedResourceIds]);
 
   const bodyCellSx = {
     fontSize: 13,
@@ -762,7 +752,7 @@ export default function CalendarSchedulePanel({
                           "Time - Time",
                           "Action",
                         ]}
-                        emptyLabel="No availability entries."
+                        emptyLabel="No availability set"
                         rows={memberRows.flatMap((row) =>
                           (row.locations.length
                             ? row.locations
@@ -812,7 +802,7 @@ export default function CalendarSchedulePanel({
                           "Time - Time",
                           "Action",
                         ]}
-                        emptyLabel="No blocked time entries."
+                        emptyLabel="No block time entries"
                         rows={memberBlocks.map((block) => (
                           <TableRow key={block.id}>
                             <TableCell sx={bodyCellSx}>
