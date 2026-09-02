@@ -12,6 +12,7 @@ export default function FixedLocationCalendarPageView() {
     serviceCatalog,
     serviceOrderDefaults,
     clientOptions,
+    professionalClients,
     fixedLocationAddress,
     lateRescheduleFeePercentDefault,
     prepaymentPercentDefault,
@@ -38,6 +39,7 @@ export default function FixedLocationCalendarPageView() {
       serviceCatalog={serviceCatalog}
       serviceOrderDefaults={serviceOrderDefaults}
       clientOptions={clientOptions}
+      professionalClients={professionalClients}
       fixedLocationAddress={fixedLocationAddress}
       lateRescheduleFeePercentDefault={lateRescheduleFeePercentDefault}
       prepaymentPercentDefault={prepaymentPercentDefault}

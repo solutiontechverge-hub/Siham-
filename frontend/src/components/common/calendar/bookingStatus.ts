@@ -14,6 +14,7 @@ import type {
   CalendarEvent,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import { isOutgoingBookingRequest } from "./bookingRequestNegotiation";
+import { parseStoredEbrFromNotes } from "./bookingEventDetails";
 
 export type BookingScenarioIndicator = "BR" | "EBR" | "ER" | "E";
 
@@ -133,10 +134,10 @@ export const BOOKING_STATUS_THEME: Record<CalendarBookingStatus, StatusTheme> = 
 };
 
 export function isOnlineBookingType(bookingType?: CalendarBookingType) {
-  return bookingType === "Online" || bookingType === "Requests";
+  return bookingType === "Online";
 }
 
-/** Online/Requests plus Desired Location "Project" bookings (BR / EBR / ER). */
+/** Online plus Desired Location "Project" bookings (BR / EBR / ER). */
 export function supportsBookingRequestScenario(bookingType?: CalendarBookingType) {
   return isOnlineBookingType(bookingType) || bookingType === "Project";
 }
@@ -244,4 +245,27 @@ export function isBookingRequestRejected(
 ) {
   if (!event || event.bookingScenario !== "BR") return false;
   return event.status === "Invalid";
+}
+
+/** Client rejected an outgoing plain BR from the professional. Not EBR. */
+export function isOutgoingPlainBookingRequestRejected(
+  event:
+    | Pick<CalendarEvent, "status" | "bookingScenario" | "details" | "notes">
+    | null
+    | undefined,
+) {
+  if (!event || event.status !== "Invalid") return false;
+  if (
+    event.bookingScenario === "EBR" ||
+    event.bookingScenario === "ER" ||
+    event.bookingScenario === "E"
+  ) {
+    return false;
+  }
+  if (event.details?.requestDirection !== "outgoing") return false;
+  if (event.notes) {
+    const ebr = parseStoredEbrFromNotes(event.notes);
+    if (ebr) return false;
+  }
+  return true;
 }

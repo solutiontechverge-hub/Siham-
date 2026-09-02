@@ -28,7 +28,7 @@ const bookingTypeFromApi: Record<string, CalendarBookingType> = {
   online: "Online",
   offline: "Offline",
   project: "Project",
-  request: "Requests",
+  request: "Online",
 };
 
 const locationFromApi: Record<string, CalendarBookingLocation> = {
@@ -123,9 +123,7 @@ export function mapCalendarEntryToOverviewEvent(
     location: entry.location_type ? (locationFromApi[entry.location_type] ?? "FL") : "FL",
     bookingType: entry.booking_type
       ? (bookingTypeFromApi[entry.booking_type] ?? "Offline")
-      : isRequested
-        ? "Requests"
-        : "Offline",
+      : "Offline",
     bookingScenario: isRequested ? "BR" : undefined,
     showClientName: entry.client_name ?? undefined,
     details: clientKind
@@ -313,11 +311,9 @@ export function mapCalendarBookingToEvent(
     title,
     status,
     location: booking.location_type ? (locationFromApi[booking.location_type] ?? "FL") : "FL",
-    bookingType: isRequestBooking
-      ? "Requests"
-      : booking.booking_type
-        ? (bookingTypeFromApi[booking.booking_type] ?? "Online")
-        : "Online",
+    bookingType: booking.booking_type
+      ? (bookingTypeFromApi[booking.booking_type] ?? "Online")
+      : "Online",
     // BR/EBR only while the request is still pending — hide after accept/reject.
     // Scenario E = Confirmed Edit after ER grant save or accepted EBR (FL + DL).
     bookingScenario: parsedNotes?.needsOk && parsedNotes.ackScenario
@@ -343,6 +339,7 @@ export function mapCalendarBookingToEvent(
     clientKind,
     details: {
       clientEmail: booking.customer_email ?? "",
+      customerId: booking.customer_id ?? null,
       ...(clientKind ? { clientKind } : {}),
       requestDirection: resolvedRequestDirection,
       ...(resolvedDesiredLocation &&

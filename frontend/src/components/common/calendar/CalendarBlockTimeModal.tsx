@@ -101,6 +101,7 @@ export default function CalendarBlockTimeModal({
             <AppButton
               tone="primary"
               onClick={onApply}
+              disabled={!draft.title}
               sx={{
                 height: 38,
                 minWidth: 110,

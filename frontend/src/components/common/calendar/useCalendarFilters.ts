@@ -5,9 +5,13 @@ import type {
   CalendarBookingType,
   CalendarResource,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
-import type { CalendarFilters } from "./calendar.utils";
+import {
+  EMPTY_CALENDAR_BOOKING_TYPES,
+  EMPTY_CALENDAR_STATUSES,
+  type CalendarFilters,
+} from "./calendar.utils";
 
-const bookingTypes: readonly CalendarBookingType[] = ["Online", "Offline", "Project", "Requests"];
+const bookingTypes: readonly CalendarBookingType[] = ["Online", "Offline", "Project"];
 const bookingStatuses: readonly CalendarBookingStatus[] = [
   "Confirmed",
   "Completed",
@@ -56,31 +60,19 @@ export function normalizeCalendarFilters(
       next = {
         ...next,
         bookingAll: true,
-        booking: {
-          Online: false,
-          Offline: false,
-          Project: false,
-          Requests: false,
-        },
+        booking: { ...EMPTY_CALENDAR_BOOKING_TYPES },
       };
     }
   }
 
   if (next.statusAll === false) {
     const selectedStatuses = bookingStatuses.filter((status) => next.statuses[status]);
-    if (!selectedStatuses.length) {
+    if (!selectedStatuses.length && !next.brRejectedOnly) {
       next = {
         ...next,
         statusAll: true,
-        statuses: {
-          Confirmed: false,
-          Completed: false,
-          Cancelled: false,
-          Invalid: false,
-          "No Show": false,
-          Requested: false,
-          "In Progress": false,
-        },
+        brRejectedOnly: false,
+        statuses: { ...EMPTY_CALENDAR_STATUSES },
       };
     }
   }
@@ -103,17 +95,10 @@ export function useCalendarFilters(
         DL: locations.length === 1 && locations[0] === "DL",
       },
       bookingAll: true,
-      booking: { Online: false, Offline: false, Project: false, Requests: false },
+      booking: { ...EMPTY_CALENDAR_BOOKING_TYPES },
       statusAll: true,
-      statuses: {
-        Confirmed: false,
-        Completed: false,
-        Cancelled: false,
-        Invalid: false,
-        "No Show": false,
-        Requested: false,
-        "In Progress": false,
-      },
+      brRejectedOnly: false,
+      statuses: { ...EMPTY_CALENDAR_STATUSES },
     }),
     [locations, resources],
   );

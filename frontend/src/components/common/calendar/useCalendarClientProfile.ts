@@ -1,0 +1,218 @@
+"use client";
+
+import * as React from "react";
+import { useSnackbar } from "../AppSnackbar";
+import { getApiErrorMessage } from "../../../lib/api-error";
+import { mapApiProfessionalClientToRecord } from "../../../app/professionals/fixed-location/client/mapApiProfessionalClient";
+import type { ClientRecord } from "../../../app/professionals/fixed-location/client/data/clientList";
+import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
+import type { ApiProfessionalClient } from "../../../store/services/businessApi";
+import {
+  useCreateProfessionalClientMutation,
+  useLazyLookupMollureClientByEmailQuery,
+  useUpdateProfessionalClientTechnicalNoteMutation,
+} from "../../../store/services/businessApi";
+import {
+  canAddIdentityToClientList,
+  findListedProfessionalClient,
+  identityFromCalendarEvent,
+  splitDisplayName,
+  type CalendarClientIdentity,
+} from "./calendarClientProfile";
+
+export type CalendarClientNotInListPopoverState = {
+  anchorEl: HTMLElement;
+  identity: CalendarClientIdentity;
+};
+
+export function useCalendarClientProfile(
+  professionalClients: readonly ApiProfessionalClient[],
+) {
+  const { showSnackbar } = useSnackbar();
+  const [createProfessionalClient, { isLoading: isAddingClient }] =
+    useCreateProfessionalClientMutation();
+  const [updateProfessionalClientTechnicalNote] =
+    useUpdateProfessionalClientTechnicalNoteMutation();
+  const [lookupMollureClientByEmail] = useLazyLookupMollureClientByEmailQuery();
+
+  const [viewClientId, setViewClientId] = React.useState<string | null>(null);
+  const [notInListPopover, setNotInListPopover] =
+    React.useState<CalendarClientNotInListPopoverState | null>(null);
+  const [bookingDrawerNotListedIdentity, setBookingDrawerNotListedIdentity] =
+    React.useState<CalendarClientIdentity | null>(null);
+
+  const viewClient = React.useMemo<ClientRecord | null>(() => {
+    if (!viewClientId) return null;
+    const row = professionalClients.find((client) => client.id === viewClientId);
+    return row ? mapApiProfessionalClientToRecord(row) : null;
+  }, [professionalClients, viewClientId]);
+
+  const closeClientDetailsDrawer = React.useCallback(() => {
+    setViewClientId(null);
+  }, []);
+
+  const closeNotInListPopover = React.useCallback(() => {
+    setNotInListPopover(null);
+  }, []);
+
+  const openListedClient = React.useCallback((clientId: string) => {
+    setBookingDrawerNotListedIdentity(null);
+    setNotInListPopover(null);
+    setViewClientId(clientId);
+  }, []);
+
+  const handleClientNameClick = React.useCallback(
+    (
+      source: CalendarEvent | CalendarClientIdentity,
+      anchorEl: HTMLElement | null,
+      context: "overview" | "booking-drawer",
+    ) => {
+      const identity =
+        "details" in source || "showClientName" in source
+          ? identityFromCalendarEvent(source as CalendarEvent)
+          : source;
+
+      const listed = findListedProfessionalClient(identity, professionalClients);
+      if (listed) {
+        openListedClient(listed.id);
+        return;
+      }
+
+      if (context === "overview" && anchorEl) {
+        setBookingDrawerNotListedIdentity(null);
+        setNotInListPopover({ anchorEl, identity });
+        return;
+      }
+
+      setNotInListPopover(null);
+      setBookingDrawerNotListedIdentity(identity);
+    },
+    [openListedClient, professionalClients],
+  );
+
+  const addIdentityToClientList = React.useCallback(
+    async (identity: CalendarClientIdentity) => {
+      const eligibility = canAddIdentityToClientList(identity);
+      if (!eligibility.ok) {
+        showSnackbar({ severity: "warning", message: eligibility.reason });
+        return false;
+      }
+
+      try {
+        let mollureUserId = String(identity.customerId ?? "").trim();
+
+        if (!mollureUserId && identity.email?.trim()) {
+          try {
+            const lookup = await lookupMollureClientByEmail({
+              email: identity.email.trim(),
+            }).unwrap();
+            mollureUserId = lookup.data?.id ?? "";
+          } catch {
+            mollureUserId = "";
+          }
+        }
+
+        if (mollureUserId) {
+          const created = await createProfessionalClient({
+            mollure_user_id: mollureUserId,
+          }).unwrap();
+          showSnackbar({
+            severity: "success",
+            message: "Client added to your Client List.",
+          });
+          setNotInListPopover(null);
+          setBookingDrawerNotListedIdentity(null);
+          openListedClient(created.data.id);
+          return true;
+        }
+
+        const email = identity.email!.trim().toLowerCase();
+        const isCompany = identity.clientKind === "company";
+        const { first_name, last_name } = splitDisplayName(
+          identity.name ?? "Client",
+        );
+
+        const created = await createProfessionalClient(
+          isCompany
+            ? {
+                client_kind: "company",
+                email,
+                legal_name: identity.name?.trim() || "Company Client",
+                contact_person_name: identity.name?.trim() || undefined,
+                phone: identity.phone?.trim() || undefined,
+              }
+            : {
+                client_kind: "individual",
+                email,
+                first_name,
+                last_name,
+                phone: identity.phone?.trim() || undefined,
+              },
+        ).unwrap();
+
+        showSnackbar({
+          severity: "success",
+          message: "Client added to your Client List.",
+        });
+        setNotInListPopover(null);
+        setBookingDrawerNotListedIdentity(null);
+        openListedClient(created.data.id);
+        return true;
+      } catch (error) {
+        showSnackbar({
+          severity: "error",
+          message: getApiErrorMessage(error, "Unable to add client."),
+        });
+        return false;
+      }
+    },
+    [
+      createProfessionalClient,
+      lookupMollureClientByEmail,
+      openListedClient,
+      showSnackbar,
+    ],
+  );
+
+  const saveClientTechnicalNote = React.useCallback(
+    async (note: string) => {
+      if (!viewClientId) return;
+      try {
+        await updateProfessionalClientTechnicalNote({
+          id: viewClientId,
+          technical_note: note.trim(),
+        }).unwrap();
+        showSnackbar({
+          severity: "success",
+          message: "Technical note saved",
+        });
+      } catch (error) {
+        showSnackbar({
+          severity: "error",
+          message: getApiErrorMessage(error, "Unable to save technical note."),
+        });
+      }
+    },
+    [showSnackbar, updateProfessionalClientTechnicalNote, viewClientId],
+  );
+
+  const clearBookingDrawerNotListedHint = React.useCallback(() => {
+    setBookingDrawerNotListedIdentity(null);
+  }, []);
+
+  return {
+    viewClientId,
+    viewClient,
+    closeClientDetailsDrawer,
+    handleClientNameClick,
+    notInListPopover,
+    closeNotInListPopover,
+    bookingDrawerNotListedIdentity,
+    clearBookingDrawerNotListedHint,
+    addIdentityToClientList,
+    isAddingClient,
+    saveClientTechnicalNote,
+    findListedClient: (identity: CalendarClientIdentity) =>
+      findListedProfessionalClient(identity, professionalClients),
+  };
+}

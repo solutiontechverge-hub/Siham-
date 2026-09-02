@@ -2778,7 +2778,7 @@ export default function ClientBookingDetailsView({
                       ? "Edit request rejected. Booking stays confirmed."
                       : isIncomingBr
                         ? "Booking request rejected."
-                        : "Edited booking request rejected."
+                        : "Edit request rejected. Booking stays confirmed."
                     : "You can now suggest a change.",
             });
           }

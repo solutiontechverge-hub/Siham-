@@ -25,10 +25,12 @@ export default function CalendarTimelineHoverIndicator({
       aria-hidden
       sx={{
         position: "absolute",
+        gridColumn: "1 / -1",
+        gridRow: 1,
         left: 0,
         right: 0,
         top,
-        zIndex: 6,
+        zIndex: 20,
         pointerEvents: "none",
       }}
     >

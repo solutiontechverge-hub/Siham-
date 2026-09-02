@@ -495,12 +495,15 @@ export default function BookingTimelineCard({
           }}
         >
           <BodyText
+            onClick={(event) => event.stopPropagation()}
+            onMouseDown={(event) => event.stopPropagation()}
             sx={{
               fontSize: 12,
               fontWeight: 400,
               color: "#3B3E45",
               lineHeight: "16px",
               whiteSpace: "nowrap",
+              pointerEvents: "auto",
             }}
           >
             {idLabel}
