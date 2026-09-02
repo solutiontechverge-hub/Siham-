@@ -199,7 +199,6 @@ export default function AppModal({
             overflow: "hidden",
             margin: 2,
             width: "100%",
-            maxWidth: "calc(100vw - 32px)",
             maxHeight: "calc(100vh - 48px)",
           },
           ...(Array.isArray(paperSx) ? paperSx : paperSx ? [paperSx] : []),

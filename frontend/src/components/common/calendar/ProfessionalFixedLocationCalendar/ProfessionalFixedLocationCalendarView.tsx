@@ -47,11 +47,15 @@ import AppPillTabs from "../../AppPillTabs";
 import AppDrawer from "../../AppDrawer";
 import AppDatePicker from "../../AppDatePicker";
 import { AppCalendarPanel } from "../../AppDatePicker";
+import { AppTimePanel } from "../../AppTimePicker";
 import AppTextField from "../../AppTextField";
 import AppCountryPhoneFields from "../../AppCountryPhoneFields";
 import AppDropdown from "../../AppDropdown";
 import AppSearchField from "../../AppSearchField";
 import CalendarAddMenu from "../CalendarAddMenu";
+import CalendarSlotAddMenu, {
+  type CalendarSlotAddAction,
+} from "../CalendarSlotAddMenu";
 import CalendarNoShowModal from "../CalendarNoShowModal";
 import CalendarCancelBookingModal from "../CalendarCancelBookingModal";
 import CalendarBookingActionConfirmDialog, {
@@ -775,6 +779,9 @@ export default function ProfessionalFixedLocationCalendar({
       emptyBookingServiceEditDraft(),
     );
   const [serviceEditAttempted, setServiceEditAttempted] = React.useState(false);
+  const [serviceEditOrigin, setServiceEditOrigin] = React.useState<
+    "select-services" | "new-booking"
+  >("select-services");
   const [selectedProducts, setSelectedProducts] = React.useState<
     BookingProductLineItem[]
   >([]);
@@ -1311,6 +1318,12 @@ export default function ProfessionalFixedLocationCalendar({
     }
   }, [data.supportedLocations, slotLocation]);
   const [blockTimeOpen, setBlockTimeOpen] = React.useState(false);
+  const [slotAddAnchor, setSlotAddAnchor] = React.useState<{
+    top: number;
+    left: number;
+  } | null>(null);
+  const [pendingSlotPayload, setPendingSlotPayload] =
+    React.useState<SelectedSlot | null>(null);
   const [publicBusinessHoursOpen, setPublicBusinessHoursOpen] =
     React.useState(false);
   const [designOpen, setDesignOpen] = React.useState(false);
@@ -3600,6 +3613,14 @@ export default function ProfessionalFixedLocationCalendar({
     todayIso,
   ]);
 
+  const drawerSelectableTimes = React.useMemo(
+    () =>
+      drawerAvailableTimeSlots
+        .filter((slot) => !slot.disabled)
+        .map((slot) => slot.time),
+    [drawerAvailableTimeSlots],
+  );
+
   /** Edit Service Start Time list: Available + Occupied (manual booking only). */
   const editServiceStartTimeSlots = React.useMemo(() => {
     if (!selectedSlot?.date) {
@@ -5326,6 +5347,7 @@ export default function ProfessionalFixedLocationCalendar({
       service: BookingCatalogService,
       lineItemOverride?: Partial<BookingServiceLineItem>,
       target: string = selectionTarget,
+      origin: "select-services" | "new-booking" = "select-services",
     ) => {
       if (target !== selectionTarget) {
         setSelectionTarget(target);
@@ -5358,6 +5380,7 @@ export default function ProfessionalFixedLocationCalendar({
         }),
       );
       setServiceEditAttempted(false);
+      setServiceEditOrigin(origin);
       setSlotBookingScreen("edit-service");
     },
     [
@@ -5388,6 +5411,7 @@ export default function ProfessionalFixedLocationCalendar({
           discount: service.discount,
         },
         target,
+        "new-booking",
       );
     },
     [openEditService, selectableServiceCatalog, selectionTarget],
@@ -5460,7 +5484,7 @@ export default function ProfessionalFixedLocationCalendar({
     }
 
     setServiceEditAttempted(false);
-    setSlotBookingScreen("select-services");
+    setSlotBookingScreen(serviceEditOrigin);
     void dispatchBookingEventIfApi(editingEventId, "service_edited", {
       initiated_by: "professional",
     });
@@ -5470,6 +5494,7 @@ export default function ProfessionalFixedLocationCalendar({
     editingEventId,
     selectableServiceCatalog,
     serviceEditDraft,
+    serviceEditOrigin,
   ]);
 
   const toggleServiceSelectionDraft = React.useCallback(
@@ -6157,7 +6182,12 @@ export default function ProfessionalFixedLocationCalendar({
   );
 
   const onEmptyClick = React.useCallback(
-    (resourceId: string, iso: string, minutes: number) => {
+    (
+      resourceId: string,
+      iso: string,
+      minutes: number,
+      anchor: { top: number; left: number },
+    ) => {
       if (iso < todayIso) {
         showSnackbar({
           severity: "info",
@@ -6195,7 +6225,7 @@ export default function ProfessionalFixedLocationCalendar({
       );
       const end = Math.min(segment.endMin, start + grid.stepMinutes);
 
-      const payload = {
+      const payload: SelectedSlot = {
         resourceId,
         date: iso,
         start: fmtMinToTime(start),
@@ -6203,17 +6233,44 @@ export default function ProfessionalFixedLocationCalendar({
         freeStart: fmtMinToTime(segment.startMin),
         freeEnd: fmtMinToTime(segment.endMin),
       };
-      // Timeline slot click: copy that 15-min start, hide Select time.
-      openBookingDrawer(payload, { allowTimeSelection: false });
+      // Timeline slot click: show Booking / Blocked time on-screen menu.
+      setPendingSlotPayload(payload);
+      setSlotAddAnchor(anchor);
     },
     [
       getAvailabilityFor,
       getBusyFor,
       grid.stepMinutes,
-      openBookingDrawer,
       showSnackbar,
       todayIso,
     ],
+  );
+
+  const handleSlotAddContinue = React.useCallback(
+    (action: CalendarSlotAddAction) => {
+      const payload = pendingSlotPayload;
+      setSlotAddAnchor(null);
+      setPendingSlotPayload(null);
+      if (!payload) return;
+
+      if (action === "booking") {
+        openBookingDrawer(payload, { allowTimeSelection: false });
+        return;
+      }
+
+      const draft = createEmptyBlockTimeDraft(
+        [payload.resourceId],
+        data.supportedLocations,
+        payload.date,
+      );
+      setBlockDraft({
+        ...draft,
+        startTime: payload.start.slice(0, 5),
+        endTime: payload.end.slice(0, 5),
+      });
+      setBlockTimeOpen(true);
+    },
+    [data.supportedLocations, openBookingDrawer, pendingSlotPayload],
   );
 
   const persistBookingFromDrawer =
@@ -8178,6 +8235,7 @@ export default function ProfessionalFixedLocationCalendar({
                                           resource.id,
                                           date,
                                           minutes,
+                                          { top: e.clientY, left: e.clientX },
                                         );
                                       }}
                                       onMouseMove={(e) => {
@@ -8706,7 +8764,7 @@ export default function ProfessionalFixedLocationCalendar({
                         ? "new-booking"
                         : "select-products"
                       : slotBookingScreen === "edit-service"
-                        ? "select-services"
+                        ? serviceEditOrigin
                         : "new-booking",
                   )
               : undefined
@@ -8863,7 +8921,7 @@ export default function ProfessionalFixedLocationCalendar({
                         return;
                       }
                       if (slotBookingScreen === "edit-service") {
-                        setSlotBookingScreen("select-services");
+                        setSlotBookingScreen(serviceEditOrigin);
                         return;
                       }
                       if (
@@ -10999,63 +11057,19 @@ export default function ProfessionalFixedLocationCalendar({
                           >
                             Select time
                           </BodyText>
-                          {drawerAvailableTimeSlots.length ? (
-                            <Box
-                              sx={{
-                                display: "grid",
-                                gridTemplateColumns:
-                                  "repeat(4, minmax(0, 1fr))",
-                                gap: 0.75,
-                                maxHeight: 168,
-                                overflowY: "auto",
-                                pr: 0.25,
-                              }}
-                            >
-                              {drawerAvailableTimeSlots.map(
-                                ({ time, disabled }) => {
-                                  const active =
-                                    !disabled &&
-                                    selectedSlot?.start?.slice(0, 5) === time;
-                                  return (
-                                    <ButtonBase
-                                      key={time}
-                                      disabled={disabled}
-                                      onClick={() => {
-                                        if (disabled) return;
-                                        applyDrawerTimeSlot(time);
-                                      }}
-                                      sx={{
-                                        height: 32,
-                                        borderRadius: "8px",
-                                        border: `1px solid ${active ? m.teal : alpha(m.navy, 0.12)}`,
-                                        bgcolor: active ? m.teal : "#fff",
-                                        color: disabled
-                                          ? alpha(m.navy, 0.32)
-                                          : active
-                                            ? "#fff"
-                                            : alpha(m.navy, 0.72),
-                                        fontSize: 11.5,
-                                        fontWeight: 800,
-                                        opacity: disabled ? 0.55 : 1,
-                                        cursor: disabled
-                                          ? "default"
-                                          : "pointer",
-                                        "&:hover": disabled
-                                          ? undefined
-                                          : {
-                                              bgcolor: active
-                                                ? m.tealDark
-                                                : alpha(m.teal, 0.08),
-                                              borderColor: m.teal,
-                                            },
-                                      }}
-                                    >
-                                      {time}
-                                    </ButtonBase>
-                                  );
-                                },
-                              )}
-                            </Box>
+                          {drawerSelectableTimes.length ? (
+                            <AppTimePanel
+                              compact
+                              hideHeader
+                              value={
+                                selectedSlot?.start?.slice(0, 5) ||
+                                drawerSelectableTimes[0] ||
+                                "09:00"
+                              }
+                              onChange={applyDrawerTimeSlot}
+                              minuteStep={grid.stepMinutes}
+                              allowedTimes={drawerSelectableTimes}
+                            />
                           ) : (
                             <BodyText
                               sx={{
@@ -13453,6 +13467,14 @@ export default function ProfessionalFixedLocationCalendar({
           applyFilters(filters);
           setFiltersOpen(false);
         }}
+      />
+      <CalendarSlotAddMenu
+        anchorPosition={slotAddAnchor}
+        onClose={() => {
+          setSlotAddAnchor(null);
+          setPendingSlotPayload(null);
+        }}
+        onSelect={handleSlotAddContinue}
       />
       <CalendarBlockTimeModal
         availableLocations={data.supportedLocations}
