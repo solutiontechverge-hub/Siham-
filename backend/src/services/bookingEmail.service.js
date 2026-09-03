@@ -34,6 +34,29 @@ export const BOOKING_EMAIL_TYPES = {
   NOTIFICATION_COMPANION: "notification_companion",
 };
 
+const CALENDAR_CLIENT_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+
+/** Pull client email from calendar notes meta or an email-shaped client_name. */
+export const extractCalendarClientEmail = (clientName, notes) => {
+  const fromName = String(clientName ?? "").trim();
+  if (CALENDAR_CLIENT_EMAIL_RE.test(fromName)) return fromName.toLowerCase();
+
+  const raw = String(notes ?? "");
+  const metaPart = raw.includes("---mollure-meta---")
+    ? raw.split("---mollure-meta---").slice(1).join("---mollure-meta---").trim()
+    : "";
+  if (metaPart) {
+    try {
+      const meta = JSON.parse(metaPart);
+      const fromMeta = String(meta?.clientEmail ?? "").trim();
+      if (CALENDAR_CLIENT_EMAIL_RE.test(fromMeta)) return fromMeta.toLowerCase();
+    } catch {
+      // ignore malformed meta
+    }
+  }
+  return null;
+};
+
 const EMAIL_BUILDERS = {
   [BOOKING_EMAIL_TYPES.CONFIRMED]: {
     subject: "Booking confirmed",
@@ -587,4 +610,157 @@ export const processRespondToRequestReminders = async () => {
   }
 
   return outcomes;
+};
+
+const sameCalendarInstant = (left, right) => {
+  if (left == null && right == null) return true;
+  if (left == null || right == null) return false;
+  return new Date(left).getTime() === new Date(right).getTime();
+};
+
+const loadCalendarEntryEmailContext = async (entry) => {
+  const customerEmail = extractCalendarClientEmail(entry?.client_name, entry?.notes);
+  if (!customerEmail) return null;
+
+  const result = await query(
+    `SELECT
+       ce.id,
+       ce.unique_code,
+       ce.start_time,
+       ce.status,
+       ce.title,
+       COALESCE(NULLIF(bs.salon_name, ''), NULLIF(bs.business_name, ''), 'Your salon') AS salon_name,
+       COALESCE(
+         NULLIF(TRIM(CONCAT(COALESCE(pp.contact_first_name, ''), ' ', COALESCE(pp.contact_last_name, ''))), ''),
+         NULLIF(TRIM(pp.legal_name), ''),
+         NULLIF(TRIM(bs.salon_name), ''),
+         NULLIF(TRIM(bs.business_name), ''),
+         'Professional'
+       ) AS professional_name
+     FROM calendar_entries ce
+     INNER JOIN professional_profiles pp ON pp.id = ce.professional_profile_id
+     LEFT JOIN LATERAL (
+       SELECT salon_name, business_name
+       FROM business_setups
+       WHERE professional_profile_id = pp.id
+       ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST
+       LIMIT 1
+     ) bs ON true
+     WHERE ce.id = $1
+     LIMIT 1`,
+    [entry.id],
+  );
+
+  const row = result.rows[0];
+  if (!row) return null;
+
+  return {
+    uniqueCode: row.unique_code,
+    startTime: row.start_time,
+    status: row.status,
+    salonName: row.salon_name,
+    professionalName: row.professional_name,
+    serviceName: row.title || "Service",
+    customerEmail,
+    hideCta: true,
+  };
+};
+
+const calendarEntryHasMollureBooking = async (uniqueCode) => {
+  const code = String(uniqueCode ?? "").trim();
+  if (!code) return false;
+  const result = await query(
+    `SELECT 1
+     FROM bookings
+     WHERE unique_code = $1
+       AND customer_id IS NOT NULL
+     LIMIT 1`,
+    [code],
+  );
+  return result.rowCount > 0;
+};
+
+/**
+ * Email non-Mollure calendar clients (offline / confirmed bookings without a
+ * Mollure user). Mollure clients already receive mail via `bookings.customer_id`.
+ */
+export const notifyNonMollureCalendarClient = async (entry, options = {}) => {
+  try {
+    if (!entry?.id) return { sent: false, reason: "missing_entry" };
+
+    const status = String(entry.status ?? "").toLowerCase();
+    if (status === "blocked" || status === "requested") {
+      return { sent: false, reason: "not_applicable" };
+    }
+
+    if (await calendarEntryHasMollureBooking(entry.unique_code)) {
+      return { sent: false, reason: "mollure_booking_exists" };
+    }
+
+    const ctx = await loadCalendarEntryEmailContext(entry);
+    if (!ctx?.customerEmail) {
+      return { sent: false, reason: "client_email_not_found" };
+    }
+
+    const previous = options.previousEntry ?? null;
+    const previousStatus = String(
+      options.previousStatus ?? previous?.status ?? "",
+    ).toLowerCase();
+    const kind = String(options.kind ?? "created").toLowerCase();
+
+    const statusChanged = Boolean(previousStatus) && previousStatus !== status;
+    const scheduleChanged = previous
+      ? !sameCalendarInstant(previous.start_time, entry.start_time) ||
+        !sameCalendarInstant(previous.end_time, entry.end_time) ||
+        !sameCalendarInstant(previous.start_date, entry.start_date)
+      : false;
+
+    let emailType = null;
+    const extras = {};
+
+    if (kind === "created") {
+      emailType =
+        status === "cancelled"
+          ? BOOKING_EMAIL_TYPES.CANCELLED
+          : BOOKING_EMAIL_TYPES.CONFIRMED;
+      extras.message =
+        status === "cancelled"
+          ? `${ctx.professionalName} cancelled your appointment.`
+          : `${ctx.professionalName} booked an appointment for you.`;
+    } else if (status === "cancelled" && statusChanged) {
+      emailType = BOOKING_EMAIL_TYPES.CANCELLED;
+      extras.message = `${ctx.professionalName} cancelled your appointment.`;
+    } else if (statusChanged) {
+      emailType = BOOKING_EMAIL_TYPES.PROFESSIONAL_ACTION;
+      extras.title = "Booking update from your professional";
+      extras.message = `${ctx.professionalName} updated your appointment status.`;
+    } else if (scheduleChanged) {
+      emailType = BOOKING_EMAIL_TYPES.PROFESSIONAL_ACTION;
+      extras.title = "Your appointment time was updated";
+      extras.message = `${ctx.professionalName} changed the time of your appointment.`;
+    } else {
+      return { sent: false, reason: "no_client_visible_change" };
+    }
+
+    const config = EMAIL_BUILDERS[emailType];
+    if (!config) {
+      return { sent: false, reason: "unknown_email_type" };
+    }
+
+    const { html, text } = config.build({ ...ctx, ...extras });
+    await sendMail({
+      to: ctx.customerEmail,
+      subject: extras.title || config.subject,
+      html,
+      text,
+    });
+
+    return { sent: true, to: ctx.customerEmail };
+  } catch (error) {
+    console.error(
+      `[booking-email] Non-Mollure calendar email failed for ${entry?.id}:`,
+      error.message,
+    );
+    return { sent: false, reason: "error", error: error.message };
+  }
 };

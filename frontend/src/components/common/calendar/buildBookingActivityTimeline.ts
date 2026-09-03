@@ -72,7 +72,9 @@ function isOfflineBooking(booking: {
 }): boolean {
   const type = String(booking.booking_type ?? "").toLowerCase();
   if (type === "offline") return true;
-  return String(booking.unique_code ?? "").startsWith("OF");
+  return String(booking.unique_code ?? "")
+    .toLowerCase()
+    .startsWith("of");
 }
 
 function isRequestFlowBooking(booking: {

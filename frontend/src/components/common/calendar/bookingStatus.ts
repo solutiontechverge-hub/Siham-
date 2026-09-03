@@ -29,6 +29,7 @@ export const ONLINE_BOOKING_STATUSES: readonly CalendarBookingStatus[] = [
 ];
 
 export const OFFLINE_BOOKING_STATUSES: readonly CalendarBookingStatus[] = [
+  "Requested",
   "Confirmed",
   "In Progress",
   "Completed",
@@ -62,6 +63,15 @@ export function calendarBookingStatusLabel(
   event: Pick<CalendarEvent, "bookingType" | "status" | "bookingScenario" | "details">,
 ): string {
   if (isConfirmedEditedEvent(event)) return "Confirmed Edited";
+  const method = String(event.details?.paymentMethod ?? "")
+    .toLowerCase()
+    .replace(/[\s_-]/g, "");
+  const prepaidOffline =
+    event.status === "Confirmed" &&
+    Boolean(event.details?.showPrepayment) &&
+    event.details?.prepaymentStatus === "confirmed" &&
+    method.startsWith("offline");
+  if (prepaidOffline) return "Prepaid Offline";
   return event.status;
 }
 

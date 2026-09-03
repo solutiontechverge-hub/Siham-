@@ -347,7 +347,7 @@ async function insertFinanceTransaction({
   const mollureFee = isOnline ? Math.round(gross * 0.01 * 100) / 100 : null;
   const net = gross - (stripeFee ?? 0) - (mollureFee ?? 0);
   const { methodTitle, methodDetail } = resolveMethod(booking, paymentMethod);
-  const entryId = booking.unique_code?.replace(/\D/g, "") || null;
+  const entryId = booking.unique_code || null;
   const docNumber = `INV-${booking.unique_code}${docSuffix || ""}`;
   const invoiceDate = toIsoDate(new Date());
   const invoiceSettings = await loadInvoiceSettingsForProfessional(

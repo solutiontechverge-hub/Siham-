@@ -126,6 +126,7 @@ type StoredBookingNoteMeta = Partial<
     | "invoiceDueDate"
     | "splitBill"
     | "clientKind"
+    | "isGuest"
   >
 > & {
   ebr?: StoredEbrNotePayload;
@@ -226,6 +227,7 @@ export function serializeCalendarEntryNotes(
     ...(details?.invoiceDueDate ? { invoiceDueDate: details.invoiceDueDate } : {}),
     ...(details?.splitBill ? { splitBill: details.splitBill } : {}),
     ...(details?.clientKind ? { clientKind: details.clientKind } : {}),
+    ...(details?.isGuest ? { isGuest: true } : {}),
     ...(ebr ? { ebr } : {}),
     ...(er ? { er } : {}),
   };
@@ -439,6 +441,8 @@ export function mainDrawerServicesFromClientSnapshot(
     price: Number(service.price) || 0,
     durationMins: Math.max(15, Number(service.durationMins) || 15),
     ...(service.teamMemberId ? { staffResourceId: String(service.teamMemberId) } : {}),
+    ...(service.teamMemberName ? { teamMemberName: service.teamMemberName } : {}),
+    ...(service.guestId != null ? { guestId: service.guestId } : {}),
   }));
 }
 
@@ -566,6 +570,7 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
       ...(meta.invoiceDueDate ? { invoiceDueDate: meta.invoiceDueDate } : {}),
       ...(meta.splitBill ? { splitBill: meta.splitBill } : {}),
       ...(meta.clientKind ? { clientKind: meta.clientKind } : {}),
+      ...(meta.isGuest ? { isGuest: true } : {}),
       ...(ebr?.status !== "rejected" && ebr?.editedServiceIds?.length && !meta.editedServiceIds?.length
         ? { editedServiceIds: ebr.editedServiceIds }
         : {}),
@@ -752,7 +757,9 @@ export function buildBookingDetailsSnapshot(input: {
     email: string;
     clientKind?: "individual" | "company";
     mollureUserId?: string | null;
+    isGuest?: boolean;
   } | null;
+  isGuest?: boolean;
   selectedServices: BookingDrawerHydration["services"];
   selectedProducts: BookingDrawerHydration["products"];
   bookingGuests: BookingDrawerHydration["guests"];
@@ -787,12 +794,16 @@ export function buildBookingDetailsSnapshot(input: {
   const mollureId = String(input.selectedClient?.mollureUserId ?? "").trim();
   const customerId =
     mollureId && mollureId !== "platform" ? mollureId : undefined;
+  const isGuest =
+    Boolean(input.isGuest) || Boolean(input.selectedClient?.isGuest);
   return {
     clientEmail: input.selectedClient?.email ?? "",
-    ...(customerId ? { customerId } : {}),
-    ...(input.selectedClient?.clientKind
-      ? { clientKind: input.selectedClient.clientKind }
-      : {}),
+    ...(customerId && !isGuest ? { customerId } : {}),
+    ...(isGuest
+      ? { isGuest: true }
+      : input.selectedClient?.clientKind
+        ? { clientKind: input.selectedClient.clientKind }
+        : {}),
     services: input.selectedServices,
     products: input.selectedProducts,
     guests: input.bookingGuests,

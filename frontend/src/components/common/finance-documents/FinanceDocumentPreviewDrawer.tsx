@@ -15,7 +15,7 @@ import FinanceInvoicePreview from "./FinanceInvoicePreview";
 import FinanceReceiptPreview, {
   resolveReceiptTotalLabel,
 } from "./FinanceReceiptPreview";
-import { buildPreviewLineItems } from "./financeDocumentUtils";
+import { buildPreviewLineItems, resolveInvoiceTemplateType } from "./financeDocumentUtils";
 import {
   canEditFinanceInvoiceClient,
   isMollureFinanceClient,
@@ -50,6 +50,17 @@ export default function FinanceDocumentPreviewDrawer({
   professionalBusinessOverride = null,
 }: FinanceDocumentPreviewDrawerProps) {
   const m = useTheme().palette.mollure;
+  const resolvedInvoiceType = React.useMemo(
+    () =>
+      resolveInvoiceTemplateType({
+        fallback: invoiceType,
+        invoiceType,
+        clientType: row?.clientType,
+        vatNumber: row?.document?.client?.vatNumber,
+        cocNumber: row?.document?.client?.cocNumber,
+      }),
+    [invoiceType, row],
+  );
   const lineItems = React.useMemo(
     () => buildPreviewLineItems(settings, row),
     [settings, row],
@@ -102,7 +113,7 @@ export default function FinanceDocumentPreviewDrawer({
             row={row}
             lineItems={lineItems}
             totalPriceLabel={totalPriceLabel}
-            invoiceType={invoiceType}
+            invoiceType={resolvedInvoiceType}
             profileData={profileData}
             professionalBusinessOverride={professionalBusinessOverride}
           />
@@ -143,7 +154,7 @@ export default function FinanceDocumentPreviewDrawer({
                 <BodyText
                   sx={{ fontWeight: 900, color: alpha(m.navy, 0.78), mb: 1.25 }}
                 >
-                  {invoiceType === "company"
+                  {resolvedInvoiceType === "company"
                     ? "Edit company client details"
                     : "Edit client details"}
                 </BodyText>
@@ -184,7 +195,7 @@ export default function FinanceDocumentPreviewDrawer({
                     fullWidth
                     sx={fieldSx}
                   />
-                  {invoiceType === "company" ? (
+                  {resolvedInvoiceType === "company" ? (
                     <>
                       <MollureFormField
                         label="VAT number"
@@ -219,7 +230,7 @@ export default function FinanceDocumentPreviewDrawer({
             <FinanceInvoicePreview
               row={row}
               settings={settings}
-              invoiceType={invoiceType}
+              invoiceType={resolvedInvoiceType}
               profileData={profileData}
               professionalBusinessOverride={professionalBusinessOverride}
               clientPartyOverride={canEditClient ? clientDraft : null}

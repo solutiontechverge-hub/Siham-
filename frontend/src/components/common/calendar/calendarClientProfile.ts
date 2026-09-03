@@ -1,4 +1,7 @@
-import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
+import {
+  calendarEventIsGuest,
+  type CalendarEvent,
+} from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { ApiProfessionalClient } from "../../../store/services/businessApi";
 
 export const CALENDAR_CLIENT_NOT_IN_LIST_COPY =
@@ -10,6 +13,7 @@ export type CalendarClientIdentity = {
   customerId?: string | null;
   clientKind?: "individual" | "company";
   phone?: string;
+  isGuest?: boolean;
 };
 
 export function identityFromCalendarEvent(
@@ -25,6 +29,7 @@ export function identityFromCalendarEvent(
     customerId: event.details?.customerId ?? null,
     clientKind: event.clientKind ?? event.details?.clientKind,
     phone: phone || undefined,
+    isGuest: calendarEventIsGuest(event),
   };
 }
 
@@ -52,6 +57,12 @@ export function findListedProfessionalClient(
 export function canAddIdentityToClientList(
   identity: CalendarClientIdentity,
 ): { ok: true } | { ok: false; reason: string } {
+  if (identity.isGuest) {
+    return {
+      ok: false,
+      reason: "Guests stay on the booking only — they are not added to the Client List.",
+    };
+  }
   if (String(identity.customerId ?? "").trim()) return { ok: true };
   if (identity.email?.trim().includes("@")) return { ok: true };
   return {

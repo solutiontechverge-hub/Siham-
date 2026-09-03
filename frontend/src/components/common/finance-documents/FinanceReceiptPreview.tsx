@@ -18,6 +18,7 @@ import {
   receiptNumberLabelForStatus,
   receiptTitleForStatus,
   resolveProfessionalBusinessDisplay,
+  toInvoiceDisplayLineItems,
   type PreviewLineItem,
 } from "./financeDocumentUtils";
 import type { FinanceProfessionalBusinessOverride } from "./financeDocumentTypes";
@@ -83,6 +84,10 @@ export default function FinanceReceiptPreview({
   const professionalLines = professionalBusinessInfoLines(
     professionalDisplay,
     invoiceType,
+  );
+  const displayLineItems = React.useMemo(
+    () => toInvoiceDisplayLineItems(lineItems, invoiceType),
+    [invoiceType, lineItems],
   );
 
   const receiptTitle = receiptTitleForStatus(row?.status);
@@ -162,14 +167,14 @@ export default function FinanceReceiptPreview({
       doc.text(itemsTitle, left, y);
       y += 18;
       doc.setFont("helvetica", "normal");
-      lineItems.forEach((item) => {
-        doc.text(item.description, left, y);
+      displayLineItems.forEach((item) => {
+        doc.text(item.displayDescription, left, y);
         doc.text(item.totalPrice, left + usableWidth, y, { align: "right" });
         y += 18;
       });
       if (
         prepaidAmountLabel &&
-        !lineItems.some((item) => item.description.toLowerCase() === "prepayment")
+        !displayLineItems.some((item) => item.description.toLowerCase() === "prepayment")
       ) {
         doc.text("Prepayment", left, y);
         doc.text(prepaidAmountLabel, left + usableWidth, y, { align: "right" });
@@ -200,7 +205,7 @@ export default function FinanceReceiptPreview({
     invoiceNumber,
     isRefund,
     itemsTitle,
-    lineItems,
+    displayLineItems,
     onDownload,
     paymentMethod,
     paymentStatus,
@@ -282,9 +287,9 @@ export default function FinanceReceiptPreview({
       </BodyText>
 
       <Stack spacing={0.85}>
-        {lineItems.map((item, index) => (
+        {displayLineItems.map((item, index) => (
           <Stack
-            key={`${item.description}-${index}`}
+            key={`${item.displayDescription}-${index}`}
             direction="row"
             justifyContent="space-between"
             alignItems="center"
@@ -292,7 +297,7 @@ export default function FinanceReceiptPreview({
             <BodyText
               sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.72) }}
             >
-              {item.description}
+              {item.displayDescription}
             </BodyText>
             <BodyText
               sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.82) }}
@@ -302,7 +307,7 @@ export default function FinanceReceiptPreview({
           </Stack>
         ))}
         {prepaidAmountLabel &&
-        !lineItems.some(
+        !displayLineItems.some(
           (item) => item.description.toLowerCase() === "prepayment",
         ) ? (
           <Stack

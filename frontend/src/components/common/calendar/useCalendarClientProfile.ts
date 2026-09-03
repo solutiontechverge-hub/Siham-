@@ -67,10 +67,12 @@ export function useCalendarClientProfile(
       anchorEl: HTMLElement | null,
       context: "overview" | "booking-drawer",
     ) => {
-      const identity =
+      const identity: CalendarClientIdentity =
         "details" in source || "showClientName" in source
           ? identityFromCalendarEvent(source as CalendarEvent)
           : source;
+
+      if (identity.isGuest) return;
 
       const listed = findListedProfessionalClient(identity, professionalClients);
       if (listed) {

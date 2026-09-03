@@ -11,9 +11,8 @@ import {
 
 const formatBookingId = (uniqueCode) => {
   const code = String(uniqueCode ?? "").trim();
-  if (!code) return "BK-00000";
-  if (code.toUpperCase().startsWith("BK-")) return code.toUpperCase();
-  return `BK-${code}`;
+  if (!code) return "ol00000";
+  return code;
 };
 
 const formatStartTime = (startTime) => {
@@ -66,10 +65,13 @@ const bookingCardEmail = ({
   status,
   ctaUrl,
   message,
+  serviceName,
+  hideCta,
 }) => {
   const detailsUrl = ctaUrl || buildBookingDetailsUrl(uniqueCode);
   const rows = [
     { label: "Professional", value: professionalName },
+    ...(serviceName ? [{ label: "Service", value: serviceName }] : []),
     { label: "Start Time", value: formatStartTime(startTime) },
     { label: "Booking ID", value: formatBookingId(uniqueCode) },
   ];
@@ -80,6 +82,7 @@ const bookingCardEmail = ({
   const messageHtml = message
     ? `<p style="margin:0 0 16px;font-size:15px;color:#5c6778;line-height:1.5;">${escapeHtml(message)}</p>`
     : "";
+  const ctaHtml = hideCta ? "" : primaryButton(ctaLabel || "View Booking Details", detailsUrl);
 
   const html = wrapEmail(`
     ${statusIcon(iconType)}
@@ -87,10 +90,10 @@ const bookingCardEmail = ({
     <p style="margin:0 0 4px;font-size:16px;color:#5c6778;font-weight:600;">${escapeHtml(salonName)}</p>
     ${messageHtml}
     ${detailsBox(rows)}
-    ${primaryButton(ctaLabel || "View Booking Details", detailsUrl)}
+    ${ctaHtml}
   `);
 
-  const text = `${title}\n${salonName}${message ? `\n${message}` : ""}\nProfessional: ${professionalName}\nStart: ${formatStartTime(startTime)}\nBooking ID: ${formatBookingId(uniqueCode)}${status ? `\nStatus: ${formatStatusLabel(status)}` : ""}\n${detailsUrl}`;
+  const text = `${title}\n${salonName}${message ? `\n${message}` : ""}${serviceName ? `\nService: ${serviceName}` : ""}\nProfessional: ${professionalName}\nStart: ${formatStartTime(startTime)}\nBooking ID: ${formatBookingId(uniqueCode)}${status ? `\nStatus: ${formatStatusLabel(status)}` : ""}${hideCta ? "" : `\n${detailsUrl}`}`;
   return { html, text };
 };
 
@@ -103,6 +106,9 @@ export const buildBookingConfirmedEmail = (ctx) =>
     uniqueCode: ctx.uniqueCode,
     iconType: "confirmed",
     status: ctx.status || "confirmed",
+    message: ctx.message,
+    serviceName: ctx.serviceName,
+    hideCta: Boolean(ctx.hideCta),
   });
 
 export const buildIncomingErEmail = (ctx) => {
@@ -145,6 +151,9 @@ export const buildBookingCancelledEmail = (ctx) =>
     uniqueCode: ctx.uniqueCode,
     iconType: "cancelled",
     status: ctx.status || "cancelled",
+    message: ctx.message,
+    serviceName: ctx.serviceName,
+    hideCta: Boolean(ctx.hideCta),
   });
 
 export const buildAppointmentReminderEmail = (ctx) =>
@@ -170,6 +179,8 @@ export const buildProfessionalActionEmail = (ctx) =>
     status: ctx.status,
     ctaLabel: "View booking section",
     message: ctx.message || null,
+    serviceName: ctx.serviceName,
+    hideCta: Boolean(ctx.hideCta),
   });
 
 export const buildReviewInviteEmail = (ctx) => {

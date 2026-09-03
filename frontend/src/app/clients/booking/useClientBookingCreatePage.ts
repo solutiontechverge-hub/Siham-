@@ -2329,7 +2329,7 @@ export function useClientBookingCreatePage() {
   };
 
   const continueLabel = isConfirmedEbrEdit
-    ? "Send EBR to professional"
+    ? "Save changes"
     : isEbrSuggest
       ? "Save & return"
       : "Continue";

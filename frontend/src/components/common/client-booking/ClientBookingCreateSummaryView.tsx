@@ -948,6 +948,7 @@ export default function ClientBookingCreateSummaryView() {
                           resolveTeamMemberFirstName(
                             item.teamMemberId,
                             draft.teamMembers,
+                            item.teamMemberName,
                           ) || section.teamMemberLabel;
                         return (
                           <Box

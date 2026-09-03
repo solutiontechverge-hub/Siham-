@@ -31,7 +31,7 @@ export function unlockEbrDraft() {
 
 export function createBookingRef() {
   const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
-  return `B${Date.now()}${suffix}`;
+  return `ol${Date.now()}${suffix}`;
 }
 
 export function getActiveBookingSession(): ClientBookingRecord | null {
