@@ -35,7 +35,7 @@ type ServiceLike = {
   durationMins?: number;
   startTime?: string;
   endTime?: string;
-  teamMemberName?: string;
+  teamMemberName?: string | null;
   staffResourceId?: string | null;
 };
 

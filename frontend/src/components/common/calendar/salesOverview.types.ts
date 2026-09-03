@@ -17,13 +17,41 @@ export type SalesPayerRole = "main_client" | "guest" | "model";
 export type SalesClientKind = "individual" | "company";
 
 export type SalesPaymentState =
-  | "prepayment_due"
-  | "prepaid"
-  | "not_paid"
-  | "pending"
   | "payment_due"
+  | "pending"
+  | "prepaid"
   | "paid"
-  | "overdue";
+  | "refunded"
+  | "voided"
+  | "failed"
+  | "overdue"
+  | "overdue_invoice"
+  | "unpaid";
+
+export type SalesOverdueKind = "prepayment" | "invoice";
+
+export type SalesPenaltyPrompt = "automatic" | "manual" | "none";
+
+/** Finance row overlay used to auto-settle Pending → Paid and terminal statuses. */
+export type SalesFinanceHint = {
+  bookingId?: string;
+  bookingCode?: string;
+  phase?: "prepay" | "full" | "addon" | string;
+  addonId?: string;
+  payerKey?: string;
+  status: string;
+  paidAt?: string | null;
+  dueDate?: string | null;
+  paymentMethod?: string;
+  penaltyAmount?: number;
+};
+
+export type SalesPaymentTermsInput = {
+  originalDueValue?: string;
+  originalDueUnit?: string;
+  firstReissueTrigger?: string;
+  secondReissueTrigger?: string;
+};
 
 /** Extended checkout payment methods for Sales Edit. */
 export type SalesCheckoutPaymentMethod =
@@ -44,9 +72,14 @@ export type SalesSubCardData = {
   highlightAmount: number;
   statusBadge?: string;
   paymentState?: SalesPaymentState;
+  overdueKind?: SalesOverdueKind;
+  markedUnpaid?: boolean;
+  paidAt?: string | null;
+  penaltyPrompt?: SalesPenaltyPrompt;
   methodDateLine?: string;
   dueDate?: string | null;
   showAddOns?: boolean;
+  limitedMenu?: boolean;
   /** Parent client name for context on invoices. */
   parentClientName?: string;
 };
@@ -67,6 +100,10 @@ export type SalesOverviewCardData = {
   clientKind?: SalesClientKind;
   statusBadge?: string;
   paymentState?: SalesPaymentState;
+  overdueKind?: SalesOverdueKind;
+  markedUnpaid?: boolean;
+  paidAt?: string | null;
+  penaltyPrompt?: SalesPenaltyPrompt;
   lines: SalesLineItem[];
   /** Line ids wrapped in the dotted highlight box (payer's own services). */
   highlightedLineIds?: string[];
@@ -95,6 +132,7 @@ export type SalesOverviewCardData = {
   /** Limited 3-dot menu (no Cancel) for overdue/reissued cards. */
   limitedMenu?: boolean;
   penaltyAmount?: number;
+  invoiceSeq?: number;
 };
 
 export type SalesAddonRecord = {
@@ -122,6 +160,9 @@ export type SalesCardMetaRecord = {
   voided?: boolean;
   refunded?: boolean;
   canceled?: boolean;
+  markedUnpaid?: boolean;
+  paidAt?: string | null;
+  invoiceSeq?: number;
   paymentMethod?: SalesCheckoutPaymentMethod;
   dueDate?: string | null;
   penaltyAmount?: number;
@@ -131,6 +172,7 @@ export type SalesCardMetaRecord = {
   discount?: ManualEntryDiscount | null;
   discountAmount?: number;
   totalPrice?: number;
+  paid?: boolean;
 };
 
 export type SalesAddOnCheckoutPayload = {
@@ -151,3 +193,27 @@ export type SalesEditCheckoutPayload = {
   dueDate?: string | null;
   clientEmail?: string | null;
 };
+
+export function salesPaymentBadge(state: SalesPaymentState): string {
+  switch (state) {
+    case "payment_due":
+      return "Payment Due";
+    case "pending":
+      return "Pending";
+    case "prepaid":
+      return "Prepaid";
+    case "paid":
+      return "Paid";
+    case "refunded":
+      return "Refunded";
+    case "voided":
+      return "Voided";
+    case "failed":
+      return "Failed";
+    case "overdue":
+    case "overdue_invoice":
+      return "!Overdue";
+    case "unpaid":
+      return "Unpaid";
+  }
+}

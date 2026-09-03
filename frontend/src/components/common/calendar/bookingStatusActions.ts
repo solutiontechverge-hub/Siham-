@@ -113,7 +113,7 @@ export function resolveProfessionalBookingActions(
   }
 
   if (status === "In Progress") {
-    flags.checkout = true;
+    // Checkout lives as a persistent footer button, not in the Action menu.
     flags.no_show = true;
     return flags;
   }
@@ -244,6 +244,13 @@ export function showProfessionalActionMenu(
     event.status === "Invalid" ||
     event.status === "No Show"
   );
+}
+
+/** In Progress checkout stays pinned at the panel footer across tabs. */
+export function showPersistentCheckoutButton(
+  event: Pick<CalendarEvent, "status"> | null | undefined,
+): boolean {
+  return event?.status === "In Progress";
 }
 
 export function isOutgoingBookingRequestEvent(

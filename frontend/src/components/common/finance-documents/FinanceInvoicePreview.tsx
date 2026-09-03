@@ -29,9 +29,13 @@ import {
   formatDocumentDate,
   formatDocumentDateTime,
   formatCurrencyValue,
+  getInvoiceLineItemCellValue,
+  getInvoiceLineItemColumns,
   parseCurrencyValue,
   professionalBusinessInfoLines,
+  resolveInvoiceLineItemLayout,
   resolveProfessionalBusinessDisplay,
+  toInvoiceDisplayLineItems,
 } from "./financeDocumentUtils";
 import type {
   FinanceInvoiceSettings,
@@ -71,6 +75,15 @@ export default function FinanceInvoicePreview({
     () => buildPreviewLineItems(settings, row),
     [settings, row],
   );
+  const lineItemLayout = resolveInvoiceLineItemLayout(invoiceType);
+  const displayLineItems = React.useMemo(
+    () => toInvoiceDisplayLineItems(lineItems, invoiceType),
+    [invoiceType, lineItems],
+  );
+  const lineItemColumns = React.useMemo(
+    () => getInvoiceLineItemColumns(lineItemLayout),
+    [lineItemLayout],
+  );
   const serviceDate =
     formatDocumentDateTime(
       row?.document?.serviceDate || row?.date,
@@ -90,7 +103,7 @@ export default function FinanceInvoicePreview({
     "12/04/2023";
   const documentNumber =
     row?.document?.documentNumber || row?.entryId || row?.id || "0535833";
-  const totalAmount = lineItems.reduce(
+  const totalAmount = displayLineItems.reduce(
     (sum, item) => sum + parseCurrencyValue(item.totalPrice),
     0,
   );
@@ -217,46 +230,35 @@ export default function FinanceInvoicePreview({
       ]);
 
       const tableTop = y + 10;
-      const cols = [
-        { label: "Description", w: 180 },
-        { label: "Quantity", w: 70 },
-        { label: "VAT %", w: 60 },
-        { label: "Price/Unit", w: 100 },
-        { label: "Total", w: 80 },
-      ] as const;
+      const cols = lineItemColumns;
+      const tableWidth = cols.reduce((sum, col) => sum + col.pdfWidth, 0);
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
       let x = left;
       cols.forEach((col) => {
-        doc.text(col.label, x, tableTop);
-        x += col.w;
+        doc.text(col.label, col.align === "right" ? x + col.pdfWidth : x, tableTop, {
+          align: col.align === "right" ? "right" : "left",
+        });
+        x += col.pdfWidth;
       });
       doc.setDrawColor(220);
-      doc.line(
-        left,
-        tableTop + 6,
-        left + cols.reduce((sum, col) => sum + col.w, 0),
-        tableTop + 6,
-      );
+      doc.line(left, tableTop + 6, left + tableWidth, tableTop + 6);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10.5);
-      lineItems.forEach((item, index) => {
+      displayLineItems.forEach((item, index) => {
         let cursorX = left;
         const rowY = tableTop + 26 + index * 18;
-        [
-          item.description,
-          item.quantity,
-          item.vat,
-          item.pricePerUnit,
-          item.totalPrice,
-        ].forEach((cell, cellIndex) => {
-          doc.text(cell, cursorX, rowY);
-          cursorX += cols[cellIndex].w;
+        cols.forEach((col) => {
+          const cell = getInvoiceLineItemCellValue(item, col.key);
+          doc.text(cell, col.align === "right" ? cursorX + col.pdfWidth : cursorX, rowY, {
+            align: col.align === "right" ? "right" : "left",
+          });
+          cursorX += col.pdfWidth;
         });
       });
       doc.setFont("helvetica", "bold");
-      let totalsY = tableTop + 26 + lineItems.length * 18 + 22;
+      let totalsY = tableTop + 26 + displayLineItems.length * 18 + 22;
       doc.text("Total (incl. VAT)", left, totalsY);
       doc.text(totalPriceLabel, left + usableWidth - 20, totalsY, {
         align: "right",
@@ -297,8 +299,9 @@ export default function FinanceInvoicePreview({
     documentNumber,
     dueDate,
     invoiceDate,
+    displayLineItems,
     invoiceType,
-    lineItems,
+    lineItemColumns,
     penaltySummary,
     prepaidAmountLabel,
     prepaidAmountValue,
@@ -419,15 +422,10 @@ export default function FinanceInvoicePreview({
         <Table size="small">
           <TableHead>
             <TableRow>
-              {[
-                "Description",
-                "Quantity",
-                "VAT %",
-                "Price Per Unit",
-                "Total Price",
-              ].map((header) => (
+              {lineItemColumns.map((column) => (
                 <TableCell
-                  key={header}
+                  key={column.key}
+                  align={column.align === "right" ? "right" : "left"}
                   sx={{
                     fontSize: 12,
                     fontWeight: 900,
@@ -435,29 +433,23 @@ export default function FinanceInvoicePreview({
                     borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
                   }}
                 >
-                  {header}
+                  {column.label}
                 </TableCell>
               ))}
             </TableRow>
           </TableHead>
           <TableBody>
-            {lineItems.map((item, index) => (
-              <TableRow key={`${item.description}-${index}`} hover>
-                <TableCell sx={{ fontSize: 12.5, color: alpha(m.navy, 0.75) }}>
-                  {item.description}
-                </TableCell>
-                <TableCell sx={{ fontSize: 12.5, color: alpha(m.navy, 0.75) }}>
-                  {item.quantity}
-                </TableCell>
-                <TableCell sx={{ fontSize: 12.5, color: alpha(m.navy, 0.75) }}>
-                  {item.vat}
-                </TableCell>
-                <TableCell sx={{ fontSize: 12.5, color: alpha(m.navy, 0.75) }}>
-                  {item.pricePerUnit}
-                </TableCell>
-                <TableCell sx={{ fontSize: 12.5, color: alpha(m.navy, 0.75) }}>
-                  {item.totalPrice}
-                </TableCell>
+            {displayLineItems.map((item, index) => (
+              <TableRow key={`${item.displayDescription}-${index}`} hover>
+                {lineItemColumns.map((column) => (
+                  <TableCell
+                    key={column.key}
+                    align={column.align === "right" ? "right" : "left"}
+                    sx={{ fontSize: 12.5, color: alpha(m.navy, 0.75) }}
+                  >
+                    {getInvoiceLineItemCellValue(item, column.key)}
+                  </TableCell>
+                ))}
               </TableRow>
             ))}
           </TableBody>

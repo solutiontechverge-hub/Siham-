@@ -67,7 +67,33 @@ export function listSalesCardMetaForBooking(bookingId: string): SalesCardMetaRec
 
 export function upsertSalesCardMeta(record: SalesCardMetaRecord) {
   const all = readJson<SalesCardMetaRecord[]>(META_KEY, []);
-  const next = [...all.filter((row) => row.cardId !== record.cardId), record];
+  const existing = all.find((row) => row.cardId === record.cardId);
+  const merged = existing ? { ...existing, ...record } : record;
+  const next = [...all.filter((row) => row.cardId !== record.cardId), merged];
   writeJsonValue(META_KEY, next);
   emitSalesMetaChanged();
+}
+
+function seqFromCardId(baseId: string, cardId: string): number {
+  if (cardId === baseId) return 0;
+  const prefix = `${baseId}-v`;
+  if (!cardId.startsWith(prefix)) return 0;
+  const n = Number(cardId.slice(prefix.length));
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Live (non-canceled) card id after Cancel Sales tears down prior invoices. */
+export function resolveLiveCardId(bookingId: string, baseId: string): string {
+  const metas = listSalesCardMetaForBooking(bookingId);
+  const canceled = metas.filter(
+    (row) =>
+      row.canceled &&
+      (row.cardId === baseId || row.cardId.startsWith(`${baseId}-v`)),
+  );
+  if (!canceled.length) return baseId;
+  const maxSeq = Math.max(
+    0,
+    ...canceled.map((row) => row.invoiceSeq ?? seqFromCardId(baseId, row.cardId)),
+  );
+  return `${baseId}-v${maxSeq + 1}`;
 }

@@ -47,7 +47,8 @@ import { useFixedLocationClientPage } from "./useFixedLocationClientPage";
 import ClientDetailsViewPanel from "./ClientDetailsViewPanel";
 import ClientListFilterDrawer from "./ClientListFilterDrawer";
 import { isClientBlocked } from "./data/clientList";
-import { clientTypeLabel, platformLabel } from "./data/clientListFilters";
+import { isMollureClient } from "./data/clientListFilters";
+import ClientPlatformTag from "../../../../components/common/ClientPlatformTag";
 import {
   ADD_CLIENT_MENU_OPTIONS,
   CLIENT_LIST_SORT_OPTIONS,
@@ -469,8 +470,6 @@ export default function ClientPageView() {
                   <TableBody>
                     {filtered.map((c) => {
                       const blocked = isClientBlocked(c);
-                      const typeLabel = clientTypeLabel(c);
-                      const platform = platformLabel(c);
                       return (
                         <TableRow
                           key={c.id}
@@ -534,6 +533,10 @@ export default function ClientPageView() {
                                   >
                                     {c.name}
                                   </Typography>
+                                  <ClientPlatformTag
+                                    isMollure={isMollureClient(c)}
+                                    clientKind={c.kind}
+                                  />
                                   {blocked ? (
                                     <Chip
                                       label="Blocked"
@@ -621,40 +624,6 @@ export default function ClientPageView() {
                                 </Typography>
                               </Box>
                             </Stack>
-                          </TableCell>
-                          <TableCell
-                            sx={{
-                              fontSize: 12,
-                              fontWeight: 800,
-                              color: alpha(m.navy, 0.72),
-                            }}
-                          >
-                            <Chip
-                              label={typeLabel}
-                              size="small"
-                              sx={{
-                                height: 16,
-                                borderRadius: "6px",
-                                fontWeight: 700,
-                                bgcolor: alpha(m.teal, 0.12),
-                                color: m.teal,
-                                "& .MuiChip-label": {
-                                  fontSize: 9,
-                                  px: 0.65,
-                                  py: 0,
-                                  lineHeight: 1.2,
-                                },
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell
-                            sx={{
-                              fontSize: 12,
-                              fontWeight: 700,
-                              color: alpha(m.navy, 0.72),
-                            }}
-                          >
-                            {platform}
                           </TableCell>
                           <TableCell
                             sx={{
@@ -1034,24 +1003,10 @@ export default function ClientPageView() {
                           >
                             {viewClient.name}
                           </Typography>
-                          {viewClient.tags.includes("CC") && (
-                            <Box
-                              sx={{
-                                width: 22,
-                                height: 22,
-                                borderRadius: "999px",
-                                bgcolor: alpha(m.teal, 0.2),
-                                color: m.teal,
-                                fontSize: 10,
-                                fontWeight: 900,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                              }}
-                            >
-                              CC
-                            </Box>
-                          )}
+                          <ClientPlatformTag
+                            isMollure={isMollureClient(viewClient)}
+                            clientKind={viewClient.kind}
+                          />
                         </Stack>
                         <Typography
                           sx={{
@@ -1356,24 +1311,10 @@ export default function ClientPageView() {
                           >
                             {viewClient.name}
                           </Typography>
-                          {viewClient.tags.includes("CC") && (
-                            <Box
-                              sx={{
-                                width: 22,
-                                height: 22,
-                                borderRadius: "999px",
-                                bgcolor: alpha(m.teal, 0.2),
-                                color: m.teal,
-                                fontSize: 10,
-                                fontWeight: 900,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                              }}
-                            >
-                              CC
-                            </Box>
-                          )}
+                          <ClientPlatformTag
+                            isMollure={isMollureClient(viewClient)}
+                            clientKind={viewClient.kind}
+                          />
                         </Stack>
                         <Typography
                           sx={{
@@ -1692,23 +1633,7 @@ export default function ClientPageView() {
                       >
                         {r.name}
                       </Typography>
-                      <Chip
-                        label="Mollure"
-                        size="small"
-                        sx={{
-                          height: 16,
-                          borderRadius: "999px",
-                          bgcolor: alpha(theme.palette.primary.main, 0.1),
-                          color: theme.palette.primary.main,
-                          fontWeight: 700,
-                          "& .MuiChip-label": {
-                            fontSize: 9,
-                            px: 0.65,
-                            py: 0,
-                            lineHeight: 1.2,
-                          },
-                        }}
-                      />
+                      <ClientPlatformTag isMollure />
                     </Stack>
                     <Typography
                       sx={{

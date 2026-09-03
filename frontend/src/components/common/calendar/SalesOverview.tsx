@@ -1,5 +1,6 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
 import { Box, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -8,7 +9,14 @@ import {
   useGetProfessionalClientsQuery,
   useUpdateBookingStatusMutation,
 } from "../../../store/services/businessApi";
-import { useReissueFinanceInvoiceMutation, useLazyGetFinanceTransactionsQuery, useBulkFinanceTransactionActionMutation, useCreateFinanceTransactionMutation } from "../../../store/services/financeApi";
+import {
+  useReissueFinanceInvoiceMutation,
+  useLazyGetFinanceTransactionsQuery,
+  useGetFinanceTransactionsQuery,
+  useBulkFinanceTransactionActionMutation,
+  useCreateFinanceTransactionMutation,
+  useProcessFinanceInvoiceReissuesMutation,
+} from "../../../store/services/financeApi";
 import {
   parseStoredEbrFromNotes,
   parseStoredErFromNotes,
@@ -28,6 +36,7 @@ import {
   checkoutPaymentMethodDetail,
   checkoutPaymentMethodTitle,
 } from "../client-booking/checkoutPaymentOptions";
+import PaymentDueIcon from "../client-booking/PaymentDueIcon";
 import { useFinanceInvoiceSettings } from "../../sections/finance/useFinanceInvoiceSettings";
 import TransactionNoteModal from "../../sections/finance/TransactionNoteModal";
 import type { ClientBookingDraft } from "../client-booking/types";
@@ -52,6 +61,7 @@ import type {
   SalesAddOnCheckoutPayload,
   SalesClientKind,
   SalesEditCheckoutPayload,
+  SalesFinanceHint,
   SalesOverviewCardData,
   SalesSubCardData,
 } from "./salesOverview.types";
@@ -63,9 +73,59 @@ type SalesOverviewProps = {
   clientEmail?: string;
   clientPhone?: string;
   fallbackResourceId?: string;
+  focusCardId?: string | null;
   onBookingCancelled?: () => void;
   onBookingCompleted?: (bookingId: string) => void;
 };
+
+function allowedBookingStatus(
+  status: string | null | undefined,
+): "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show" | "invalid" {
+  const normalized = String(status || "")
+    .toLowerCase()
+    .replace(/\s+/g, "_");
+  const allowed = [
+    "requested",
+    "cancelled",
+    "completed",
+    "confirmed",
+    "in_progress",
+    "no_show",
+    "invalid",
+  ] as const;
+  return allowed.find((value) => value === normalized) ?? "confirmed";
+}
+
+function toFinanceHints(rows: TransactionRow[]): SalesFinanceHint[] {
+  return rows.map((row) => {
+    const doc = row.document as
+      | {
+          paymentPhase?: string;
+          addonId?: string;
+          dueDate?: string;
+          penaltyAmount?: number;
+          payerKey?: string;
+        }
+      | undefined;
+    const paid =
+      row.status === "Paid" || row.status === "Prepaid"
+        ? row.date
+          ? `${row.date}T12:00:00`
+          : null
+        : null;
+    return {
+      bookingId: row.bookingId,
+      bookingCode: row.entryId || row.bookingId,
+      phase: doc?.paymentPhase,
+      addonId: doc?.addonId,
+      payerKey: doc?.payerKey,
+      status: row.status,
+      paidAt: paid,
+      dueDate: doc?.dueDate || row.document?.dueDate || null,
+      penaltyAmount: doc?.penaltyAmount,
+    };
+  });
+}
 
 function timeFromOccurredAt(iso: string): string {
   if (!iso) return "";
@@ -114,6 +174,7 @@ export default function SalesOverview({
   clientEmail = "",
   clientPhone = "",
   fallbackResourceId = "unassigned",
+  focusCardId = null,
   onBookingCancelled,
   onBookingCompleted,
 }: SalesOverviewProps) {
@@ -128,6 +189,17 @@ export default function SalesOverview({
   const [fetchFinanceTransactions] = useLazyGetFinanceTransactionsQuery();
   const [bulkFinanceAction] = useBulkFinanceTransactionActionMutation();
   const [createFinanceTransaction] = useCreateFinanceTransactionMutation();
+  const [processFinanceInvoiceReissues] = useProcessFinanceInvoiceReissuesMutation();
+
+  const financeQuery = currentEvent?.bookingCode || bookings[0]?.unique_code || bookings[0]?.id || "";
+  const { data: financeResponse } = useGetFinanceTransactionsQuery(
+    { q: String(financeQuery), limit: 50 },
+    { skip: !financeQuery },
+  );
+  const financeHints = React.useMemo(
+    () => toFinanceHints(financeResponse?.data?.rows ?? []),
+    [financeResponse?.data?.rows],
+  );
 
   const [revision, setRevision] = React.useState(0);
   const [checkoutBookingId, setCheckoutBookingId] = React.useState<
@@ -176,6 +248,8 @@ export default function SalesOverview({
         clientPhone,
         clientKind,
         fallbackResourceId,
+        financeHints,
+        paymentTerms: financeSettings.paymentTerms,
       }),
     // revision forces rebuild after localStorage mutations
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -187,9 +261,21 @@ export default function SalesOverview({
       clientPhone,
       clientKind,
       fallbackResourceId,
+      financeHints,
+      financeSettings.paymentTerms,
       revision,
     ],
   );
+
+  React.useEffect(() => {
+    if (!focusCardId) return;
+    const node = document.querySelector(
+      `[data-sales-card-id="${CSS.escape(focusCardId)}"]`,
+    );
+    if (node instanceof HTMLElement) {
+      node.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [focusCardId, cards]);
 
   const subToCard = React.useCallback(
     (
@@ -216,6 +302,10 @@ export default function SalesOverview({
       showAddOns: sub.showAddOns,
       paymentState: sub.paymentState,
       statusBadge: sub.statusBadge,
+      markedUnpaid: sub.markedUnpaid,
+      paidAt: sub.paidAt,
+      penaltyPrompt: sub.penaltyPrompt,
+      overdueKind: sub.overdueKind,
       documentAmount: sub.highlightAmount,
       occurredAt: parent.occurredAt,
       paymentMethodLabel: parent.paymentMethodLabel,
@@ -323,6 +413,32 @@ export default function SalesOverview({
 
   const bump = () => setRevision((n) => n + 1);
 
+  const overdueManualCard = React.useMemo(
+    () => cards.find((card) => card.penaltyPrompt === "manual") ?? null,
+    [cards],
+  );
+  const needsAutomaticReissue = cards.some((card) => card.penaltyPrompt === "automatic");
+  const autoReissueKeyRef = React.useRef<string>("");
+
+  React.useEffect(() => {
+    if (!needsAutomaticReissue) return;
+    const key = cards
+      .filter((card) => card.penaltyPrompt === "automatic")
+      .map((card) => card.id)
+      .join("|");
+    if (!key || autoReissueKeyRef.current === key) return;
+    autoReissueKeyRef.current = key;
+    void processFinanceInvoiceReissues()
+      .unwrap()
+      .then((result) => {
+        const created = result.data?.created ?? 0;
+        if (created > 0) bump();
+      })
+      .catch(() => {
+        autoReissueKeyRef.current = "";
+      });
+  }, [cards, needsAutomaticReissue, processFinanceInvoiceReissues]);
+
   const handleDownload = React.useCallback(
     async (card: SalesOverviewCardData, format: "pdf" | "excel") => {
       try {
@@ -353,6 +469,23 @@ export default function SalesOverview({
     }
     if (action === "refundSales") {
       await handleRefundSales(card);
+      return;
+    }
+    if (action === "markUnpaid") {
+      upsertSalesCardMeta({
+        bookingId: card.bookingId,
+        cardKind: card.kind,
+        cardId: card.id,
+        note: card.note,
+        markedUnpaid: true,
+        paymentMethod: card.paymentMethod,
+        dueDate: card.dueDate,
+        voided: card.voided,
+        refunded: card.refunded,
+        canceled: card.canceled,
+      });
+      bump();
+      showSnackbar({ severity: "success", message: "Sale marked as Unpaid." });
       return;
     }
     if (action === "downloadInvoicePdf") {
@@ -484,27 +617,90 @@ export default function SalesOverview({
   const handleConfirmCancel = async () => {
     if (!cancelCard) return;
     try {
-      await updateBookingStatus({
-        id: cancelCard.bookingId,
-        status: "cancelled",
+      const bookingRef = cancelCard.bookingCode || cancelCard.bookingId;
+      const financeResult = await fetchFinanceTransactions({
+        q: bookingRef,
+        limit: 50,
       }).unwrap();
+      const rows = financeResult.data?.rows ?? [];
+      const cancelable = rows.filter((row) => {
+        const matchesBooking =
+          row.bookingId === cancelCard.bookingCode ||
+          row.bookingId === cancelCard.bookingId ||
+          row.entryId === cancelCard.bookingCode;
+        if (!matchesBooking) return false;
+        const open =
+          row.status === "Pending" ||
+          row.status === "Payment due" ||
+          row.status === "Overdue" ||
+          row.status === "Failed" ||
+          row.status === "Prepayment due";
+        if (!open) return false;
+        const phase = (row.document as { paymentPhase?: string; addonId?: string } | undefined)
+          ?.paymentPhase;
+        if (cancelCard.kind === "addon") {
+          const cardAddonId = cancelCard.id.replace(/^addon-/, "");
+          const addonId = (row.document as { addonId?: string } | undefined)?.addonId;
+          return phase === "addon" && (!addonId || addonId === cardAddonId || cancelCard.id.includes(addonId));
+        }
+        if (cancelCard.kind === "prepayment") return phase === "prepay" || !phase;
+        return phase === "full" || !phase;
+      });
+
+      if (cancelable.length) {
+        await bulkFinanceAction({
+          ids: cancelable.map((row) => row.id),
+          action: "cancel",
+        }).unwrap();
+      }
+
+      const booking = bookings.find(
+        (b) =>
+          String(b.id) === String(cancelCard.bookingId) ||
+          b.unique_code === cancelCard.bookingCode,
+      );
+      if (booking) {
+        const parsed = parseCalendarEntryNotes(booking.notes);
+        const nextDetails = {
+          ...(parsed ?? {}),
+          waitingForPayment: false,
+        };
+        const nextNotes = serializeCalendarEntryNotes(
+          nextDetails.internalNote ?? "",
+          nextDetails,
+          parseStoredEbrFromNotes(booking.notes),
+          parseStoredErFromNotes(booking.notes),
+        );
+        await updateBookingStatus({
+          id: String(booking.id),
+          status: allowedBookingStatus(booking.status),
+          notes: nextNotes,
+        }).unwrap();
+      }
+
+      if (cancelCard.kind === "addon") {
+        updateSalesAddon(cancelCard.id.replace(/^addon-/, ""), { voided: true });
+      }
+
+      const seqMatch = cancelCard.id.match(/-v(\d+)$/);
       upsertSalesCardMeta({
         bookingId: cancelCard.bookingId,
         cardKind: cancelCard.kind,
         cardId: cancelCard.id,
         note: cancelCard.note,
         canceled: true,
-        voided: true,
+        invoiceSeq: seqMatch ? Number(seqMatch[1]) : 0,
+        paymentMethod: cancelCard.paymentMethod,
+        dueDate: cancelCard.dueDate,
       });
       setCancelCard(null);
       bump();
-      onBookingCancelled?.();
       showSnackbar({
         severity: "success",
-        message: "Sale canceled. Booking marked cancelled.",
+        message: "Sale canceled. Payment link deactivated.",
       });
     } catch {
-      showSnackbar({ severity: "error", message: "Failed to cancel booking." });
+      showSnackbar({ severity: "error", message: "Failed to cancel sale." });
     }
   };
 
@@ -618,6 +814,7 @@ export default function SalesOverview({
       discount: payload.discount,
       discountAmount: payload.discountAmount,
       totalPrice: payload.totalPrice,
+      markedUnpaid: false,
       ...(isReissue && payload.dueDate
         ? { reissuedAt: new Date().toISOString() }
         : {}),
@@ -773,6 +970,79 @@ export default function SalesOverview({
         Sales Overview
       </Typography>
 
+      {overdueManualCard ? (
+        <Box
+          sx={{
+            width: "100%",
+            borderRadius: "12px",
+            px: 1.35,
+            py: 1.05,
+            mb: 1.5,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 1,
+            bgcolor: alpha("#F79009", 0.08),
+            border: `1px solid ${alpha("#F79009", 0.28)}`,
+          }}
+        >
+          <Stack direction="row" alignItems="center" spacing={0.85} sx={{ minWidth: 0 }}>
+            <Box
+              sx={{
+                display: "grid",
+                placeItems: "center",
+                width: 28,
+                height: 28,
+                borderRadius: "9px",
+                bgcolor: alpha("#F79009", 0.16),
+                flexShrink: 0,
+              }}
+            >
+              <PaymentDueIcon size={18} />
+            </Box>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography
+                sx={{
+                  fontSize: 12.5,
+                  fontWeight: 900,
+                  color: alpha(m.navy, 0.82),
+                  lineHeight: 1.2,
+                }}
+              >
+                Penalty invoice
+              </Typography>
+              <Typography
+                sx={{
+                  mt: 0.2,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.5),
+                  lineHeight: 1.2,
+                }}
+              >
+                This invoice is overdue. Send a penalty invoice to the client.
+              </Typography>
+            </Box>
+          </Stack>
+          <AppButton
+            size="small"
+            onClick={() => setOverdueCard(overdueManualCard)}
+            sx={{
+              flexShrink: 0,
+              textTransform: "none",
+              fontWeight: 800,
+              fontSize: 12,
+              borderRadius: "8px",
+              bgcolor: "#F79009",
+              color: "#fff",
+              "&:hover": { bgcolor: "#DC6803" },
+            }}
+          >
+            Send penalty invoice
+          </AppButton>
+        </Box>
+      ) : null}
+
       {cards.length === 0 ? (
         <Typography sx={{ fontSize: 12.5, color: alpha(m.navy, 0.6) }}>
           No sales for this client yet.
@@ -783,6 +1053,12 @@ export default function SalesOverview({
             <SalesOverviewCard
               key={card.id}
               card={card}
+              highlighted={
+                Boolean(focusCardId) &&
+                (card.id === focusCardId ||
+                  Boolean(card.subCards?.some((sub) => sub.id === focusCardId)))
+              }
+              highlightId={focusCardId}
               onViewInvoice={() => openDocument(card, "invoice")}
               onViewReceipt={() => openDocument(card, "receipt")}
               onAddOns={() => {
@@ -791,11 +1067,6 @@ export default function SalesOverview({
                 setCheckoutCardId(card.id);
               }}
               onMenuAction={(action) => void handleMenuAction(card, action)}
-              onOverdueAction={
-                card.paymentState === "overdue"
-                  ? () => setOverdueCard(card)
-                  : undefined
-              }
               onSubViewInvoice={(sub) =>
                 openDocument(subToCard(sub, card), "invoice")
               }

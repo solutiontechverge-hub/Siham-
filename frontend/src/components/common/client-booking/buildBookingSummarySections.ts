@@ -1,4 +1,27 @@
-import type { ClientBookingDraft, ClientBookingDraftPerson, ClientBookingSummarySection } from "./types";
+import type {
+  ClientBookingDraft,
+  ClientBookingDraftPerson,
+  ClientBookingDraftTeamMember,
+  ClientBookingSummarySection,
+} from "./types";
+
+export function mergeBookingTeamMembers(
+  ...lists: Array<
+    ReadonlyArray<{ id?: string | null; name?: string | null }> | null | undefined
+  >
+): ClientBookingDraftTeamMember[] {
+  const map = new Map<string, string>();
+  for (const list of lists) {
+    for (const member of list ?? []) {
+      const id = String(member.id ?? "").trim();
+      if (!id) continue;
+      const name = String(member.name ?? "").trim();
+      if (name) map.set(id, name);
+      else if (!map.has(id)) map.set(id, "Team member");
+    }
+  }
+  return [...map.entries()].map(([id, name]) => ({ id, name }));
+}
 
 function isPlanningPerson(p: ClientBookingDraftPerson) {
   return p.participantType === "planning" || p.name === "Planning";
@@ -16,7 +39,9 @@ export function buildBookingSummarySections(draft: ClientBookingDraft | null): C
   }
 
   const teamMemberNameById = new Map<string, string>();
-  for (const tm of draft.teamMembers ?? []) teamMemberNameById.set(tm.id, tm.name);
+  for (const tm of draft.teamMembers ?? []) {
+    teamMemberNameById.set(String(tm.id), tm.name);
+  }
 
   const teamMemberChipLabelForItems = (items: ClientBookingDraft["services"]) => {
     const ids = [...new Set(items.map((s) => s.teamMemberId).filter((id): id is string => Boolean(id)))];
@@ -102,9 +127,13 @@ export function buildBookingSummarySections(draft: ClientBookingDraft | null): C
 export function resolveTeamMemberFirstName(
   teamMemberId: string | null | undefined,
   teamMembers: ClientBookingDraft["teamMembers"],
+  fallbackName?: string | null,
 ): string | undefined {
-  if (!teamMemberId) return undefined;
-  const fullName = teamMembers?.find((tm) => tm.id === teamMemberId)?.name;
+  const id = String(teamMemberId ?? "").trim();
+  const fullName =
+    (id
+      ? teamMembers?.find((tm) => String(tm.id) === id)?.name
+      : undefined) || fallbackName?.trim() || undefined;
   if (!fullName) return undefined;
   return fullName.split(/\s+/)[0];
 }

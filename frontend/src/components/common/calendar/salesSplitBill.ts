@@ -387,26 +387,163 @@ export function buildSplitPaymentAmounts(input: {
   });
 }
 
+export type BookingSplitBillMode = "single" | "split";
+
+export type BookingSplitPayerRecord = {
+  key: string;
+  role: SalesPayerRole;
+  label: string;
+  displayName: string;
+  subtotal: number;
+  paymentAmount: number;
+  lineIds: string[];
+  paid?: boolean;
+  paidAt?: string | null;
+  paymentMethod?: string | null;
+};
+
+export type BookingSplitBillState = {
+  mode: BookingSplitBillMode;
+  prepaidAmount: number;
+  prepaidBy?: string;
+  payers: BookingSplitPayerRecord[];
+};
+
+function isPayerRole(value: unknown): value is SalesPayerRole {
+  return value === "main_client" || value === "guest" || value === "model";
+}
+
+export function parseSplitBillState(raw: unknown): BookingSplitBillState | null {
+  if (!raw || typeof raw !== "object") return null;
+  const value = raw as Record<string, unknown>;
+  const payersRaw = Array.isArray(value.payers) ? value.payers : [];
+  const payers = payersRaw.flatMap((row): BookingSplitPayerRecord[] => {
+    if (!row || typeof row !== "object") return [];
+    const payer = row as Record<string, unknown>;
+    const key = String(payer.key ?? "").trim();
+    if (!key) return [];
+    return [
+      {
+        key,
+        role: isPayerRole(payer.role) ? payer.role : "guest",
+        label: String(payer.label ?? "Guest"),
+        displayName: String(payer.displayName ?? payer.label ?? "Guest"),
+        subtotal: roundMoney(Number(payer.subtotal) || 0),
+        paymentAmount: roundMoney(Number(payer.paymentAmount) || 0),
+        lineIds: Array.isArray(payer.lineIds)
+          ? payer.lineIds.map((id) => String(id))
+          : [],
+        paid: Boolean(payer.paid),
+        paidAt: typeof payer.paidAt === "string" ? payer.paidAt : null,
+        paymentMethod:
+          typeof payer.paymentMethod === "string" ? payer.paymentMethod : null,
+      },
+    ];
+  });
+
+  if (!payers.length) return null;
+  return {
+    mode: value.mode === "single" ? "single" : "split",
+    prepaidAmount: roundMoney(Number(value.prepaidAmount) || 0),
+    prepaidBy: typeof value.prepaidBy === "string" ? value.prepaidBy : "main_client",
+    payers,
+  };
+}
+
+export function unpaidSplitPayers(state: BookingSplitBillState | null | undefined) {
+  return (state?.payers ?? []).filter(
+    (payer) => !payer.paid && roundMoney(payer.paymentAmount) > 0,
+  );
+}
+
+export function isSplitPayerPaid(
+  split: BookingSplitBillState | null | undefined,
+  payerKey: string,
+): boolean {
+  if (!split) return false;
+  if (split.mode === "single" && split.payers.some((payer) => payer.paid)) {
+    return true;
+  }
+  return Boolean(split.payers.find((payer) => payer.key === payerKey)?.paid);
+}
+
+export function markSplitPayersPaid(
+  state: BookingSplitBillState,
+  payerKeys: string[],
+  paymentMethod?: string | null,
+  paidAt = new Date().toISOString(),
+): BookingSplitBillState {
+  const keySet = new Set(payerKeys);
+  return {
+    ...state,
+    payers: state.payers.map((payer) =>
+      keySet.has(payer.key)
+        ? {
+            ...payer,
+            paid: true,
+            paidAt,
+            paymentMethod: paymentMethod ?? payer.paymentMethod,
+          }
+        : payer,
+    ),
+  };
+}
+
+/** One selected person covers every unpaid share (and already-paid ones stay). */
+export function collapseSharesOntoPayer(
+  shares: Array<SalesPayerShare & { paymentAmount: number }>,
+  payerKey: string,
+): Array<SalesPayerShare & { paymentAmount: number }> {
+  const chosen = shares.find((share) => share.key === payerKey) ?? shares[0];
+  if (!chosen) return shares;
+  const others = shares.filter((share) => share.key !== chosen.key);
+  const extraLines = others.flatMap((share) => share.lines);
+  const extraAmount = others.reduce((sum, share) => sum + share.paymentAmount, 0);
+  return [
+    {
+      ...chosen,
+      lines: [...chosen.lines, ...extraLines],
+      subtotal: roundMoney(chosen.subtotal + extraAmount),
+      paymentAmount: roundMoney(chosen.paymentAmount + extraAmount),
+    },
+  ];
+}
+
 /** Serialize split payers into booking notes meta for finance sync / persistence. */
 export function buildSplitBillNotesPatch(
   details: CalendarBookingDetails | undefined,
   shares: Array<SalesPayerShare & { paymentAmount: number }>,
   prepaidAmount: number,
+  extras?: {
+    mode?: BookingSplitBillMode;
+    existing?: BookingSplitBillState | null;
+  },
 ): Record<string, unknown> {
+  const existing = extras?.existing ?? parseSplitBillState(details?.splitBill);
+  const paidByKey = new Map(
+    (existing?.payers ?? []).map((payer) => [payer.key, payer]),
+  );
   return {
     splitBill: {
+      mode: extras?.mode ?? existing?.mode ?? (shares.length > 1 ? "split" : "single"),
       prepaidAmount,
-      prepaidBy: "main_client",
-      payers: shares.map((share) => ({
-        key: share.key,
-        role: share.role,
-        label: share.label,
-        displayName: share.displayName,
-        subtotal: share.subtotal,
-        paymentAmount: share.paymentAmount,
-        lineIds: share.lines.map((line) => line.id),
-      })),
-    },
+      prepaidBy: existing?.prepaidBy ?? "main_client",
+      payers: shares.map((share) => {
+        const prev = paidByKey.get(share.key);
+        return {
+          key: share.key,
+          role: share.role,
+          label: share.label,
+          displayName: share.displayName,
+          subtotal: share.subtotal,
+          paymentAmount: share.paymentAmount,
+          lineIds: share.lines.map((line) => line.id),
+          paid: Boolean(prev?.paid),
+          paidAt: prev?.paidAt ?? null,
+          paymentMethod: prev?.paymentMethod ?? null,
+        };
+      }),
+    } satisfies BookingSplitBillState,
     ...(details?.clientSnapshot ? { clientSnapshot: details.clientSnapshot } : {}),
     ...(details?.guests?.length ? { guests: details.guests } : {}),
   };
