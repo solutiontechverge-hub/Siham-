@@ -101,7 +101,7 @@ export type BookingActivityBuildInput = {
       durationMins?: number;
       startTime?: string;
       endTime?: string;
-      teamMemberName?: string;
+      teamMemberName?: string | null;
       staffResourceId?: string | null;
     }> | null;
     services?: Array<{
@@ -111,7 +111,7 @@ export type BookingActivityBuildInput = {
       durationMins?: number;
       startTime?: string;
       endTime?: string;
-      teamMemberName?: string;
+      teamMemberName?: string | null;
       staffResourceId?: string | null;
     }> | null;
     products?: Array<{

@@ -60,10 +60,15 @@ export function formatEntryIdDisplay(
   if (entryLabel?.toLowerCase().includes("manual") || entryType === "manualEntry") {
     return entryId ? `M${entryId}` : "Manual entry";
   }
-  if (entryType === "offlineBooking" && entryId) {
-    return `OF${entryId}`;
+  if (entryId) {
+    const lower = entryId.toLowerCase();
+    if (lower.startsWith("of") || lower.startsWith("ol") || lower.startsWith("m")) {
+      return entryId;
+    }
+    if (entryType === "offlineBooking") return `of${entryId}`;
+    if (entryType === "onlineBooking") return `ol${entryId}`;
+    return entryId;
   }
-  if (entryId) return entryId;
   return entryLabel ?? "";
 }
 

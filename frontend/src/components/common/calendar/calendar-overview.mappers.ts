@@ -67,6 +67,7 @@ export function applyProfessionalClientKind(
   event: CalendarEvent,
   clients: readonly { email: string; client_kind?: "individual" | "company" }[],
 ): CalendarEvent {
+  if (event.details?.isGuest) return event;
   if (event.clientKind === "company" || event.details?.clientKind === "company") {
     return {
       ...event,
@@ -577,7 +578,7 @@ export function mergeCalendarOverviewEvents(
     ),
   );
 
-  // Prefer booking rows over mirrored calendar entries (same OF123 / same slot).
+  // Prefer booking rows over mirrored calendar entries (same of/ol code / same slot).
   const dedupedEntries = entryEvents.filter((event) => {
     const code = String(event.bookingCode ?? "").trim();
     if (code && bookingCodes.has(code)) return false;

@@ -18,6 +18,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 import type {
   SalesLineItem,
   SalesOverviewCardData,
+  SalesPaymentState,
   SalesSubCardData,
 } from "./salesOverview.types";
 
@@ -25,6 +26,7 @@ export type SalesCardMenuAction =
   | "editSales"
   | "cancelSales"
   | "refundSales"
+  | "markUnpaid"
   | "downloadInvoicePdf"
   | "downloadInvoiceExcel"
   | "addNote"
@@ -32,11 +34,12 @@ export type SalesCardMenuAction =
 
 type SalesOverviewCardProps = {
   card: SalesOverviewCardData;
+  highlighted?: boolean;
+  highlightId?: string | null;
   onViewInvoice?: () => void;
   onViewReceipt?: () => void;
   onAddOns?: () => void;
   onMenuAction?: (action: SalesCardMenuAction) => void;
-  onOverdueAction?: () => void;
   onSubViewInvoice?: (sub: SalesSubCardData) => void;
   onSubViewReceipt?: (sub: SalesSubCardData) => void;
   onSubAddOns?: (sub: SalesSubCardData) => void;
@@ -136,7 +139,11 @@ function statusBadgeSx(
     statusGreyFg: string;
     fxGrayF2F4F7: string;
   },
+  paymentState?: SalesPaymentState,
 ) {
+  if (paymentState === "overdue_invoice" || paymentState === "unpaid") {
+    return { color: m.statusRedFg, bgcolor: m.statusRedBg };
+  }
   const value = String(badge ?? "")
     .toLowerCase()
     .replace(/^!/, "")
@@ -144,15 +151,15 @@ function statusBadgeSx(
   if (value === "prepaid" || value === "paid") {
     return { color: m.statusGreenFg, bgcolor: m.statusGreenBg };
   }
-  if (value === "failed") {
-    return { color: m.statusRedFg, bgcolor: m.statusRedBg };
-  }
   if (
-    value === "prepayment due" ||
     value === "payment due" ||
     value === "pending" ||
-    value === "not paid" ||
-    value === "overdue"
+    value === "failed" ||
+    value === "overdue" ||
+    paymentState === "overdue" ||
+    paymentState === "failed" ||
+    paymentState === "payment_due" ||
+    paymentState === "pending"
   ) {
     return { color: m.statusOrangeFg, bgcolor: m.statusOrangeBg };
   }
@@ -187,6 +194,7 @@ function useActionsMenu(onAction?: (action: SalesCardMenuAction) => void) {
 function SalesActionsMenu({
   limitedMenu,
   showRefund,
+  showMarkUnpaid,
   menuAnchor,
   downloadAnchor,
   setDownloadAnchor,
@@ -196,6 +204,7 @@ function SalesActionsMenu({
   limitedMenu?: boolean;
   /** Show Refund when the sale has received money and is not already muted. */
   showRefund?: boolean;
+  showMarkUnpaid?: boolean;
   menuAnchor: HTMLElement | null;
   downloadAnchor: HTMLElement | null;
   setDownloadAnchor: (el: HTMLElement | null) => void;
@@ -215,6 +224,7 @@ function SalesActionsMenu({
     : [
         { id: "editSales", label: "Edit Sales" },
         { id: "cancelSales", label: "Cancel Sales" },
+        ...(showMarkUnpaid ? [{ id: "markUnpaid" as const, label: "Mark as Unpaid" }] : []),
         ...(showRefund ? [{ id: "refundSales" as const, label: "Refund" }] : []),
         { id: "downloadInvoice", label: "Download Invoice" },
         { id: "addNote", label: "Add note" },
@@ -331,6 +341,7 @@ function SalesActionsMenu({
 function SubSummaryCard({
   sub,
   limitedMenu,
+  highlighted = false,
   onViewInvoice,
   onViewReceipt,
   onAddOns,
@@ -338,13 +349,14 @@ function SubSummaryCard({
 }: {
   sub: SalesSubCardData;
   limitedMenu?: boolean;
+  highlighted?: boolean;
   onViewInvoice?: () => void;
   onViewReceipt?: () => void;
   onAddOns?: () => void;
   onMenuAction?: (action: SalesCardMenuAction) => void;
 }) {
   const m = useTheme().palette.mollure;
-  const badge = statusBadgeSx(sub.statusBadge, m);
+  const badge = statusBadgeSx(sub.statusBadge, m, sub.paymentState);
   const {
     menuAnchor,
     setMenuAnchor,
@@ -357,12 +369,14 @@ function SubSummaryCard({
 
   return (
     <Box
+      data-sales-card-id={sub.id}
       sx={{
         borderRadius: "10px",
-        border: `1.5px dashed ${alpha(m.navy, 0.28)}`,
-        bgcolor: alpha(m.navy, 0.015),
+        border: `1.5px dashed ${highlighted ? alpha(m.teal, 0.55) : alpha(m.navy, 0.28)}`,
+        bgcolor: highlighted ? alpha(m.teal, 0.06) : alpha(m.navy, 0.015),
         px: 1.25,
         py: 1.1,
+        scrollMarginTop: 12,
       }}
     >
       <Stack
@@ -494,6 +508,7 @@ function SubSummaryCard({
         showRefund={
           sub.paymentState === "paid" || sub.paymentState === "prepaid"
         }
+        showMarkUnpaid={sub.paymentState === "pending"}
         menuAnchor={menuAnchor}
         downloadAnchor={downloadAnchor}
         setDownloadAnchor={setDownloadAnchor}
@@ -506,18 +521,18 @@ function SubSummaryCard({
 
 export default function SalesOverviewCard({
   card,
+  highlighted = false,
+  highlightId = null,
   onViewInvoice,
   onViewReceipt,
   onAddOns,
   onMenuAction,
-  onOverdueAction,
   onSubViewInvoice,
   onSubViewReceipt,
   onSubAddOns,
   onSubMenuAction,
 }: SalesOverviewCardProps) {
   const m = useTheme().palette.mollure;
-  const muted = Boolean(card.voided || card.refunded || card.canceled);
   const {
     menuAnchor,
     setMenuAnchor,
@@ -541,7 +556,7 @@ export default function SalesOverviewCard({
 
   const isGuestOrModel =
     card.payerRole === "guest" || card.payerRole === "model";
-  const badge = statusBadgeSx(card.statusBadge, m);
+  const badge = statusBadgeSx(card.statusBadge, m, card.paymentState);
   const clientBadge =
     card.clientKind === "company"
       ? "CC Client"
@@ -553,13 +568,15 @@ export default function SalesOverviewCard({
 
   return (
     <Box
+      data-sales-card-id={card.id}
       sx={{
         borderRadius: "12px",
-        border: `1px solid ${alpha(m.navy, 0.1)}`,
-        bgcolor: "#fff",
+        border: `1px solid ${highlighted ? alpha(m.teal, 0.55) : alpha(m.navy, 0.1)}`,
+        bgcolor: highlighted ? alpha(m.teal, 0.05) : "#fff",
+        boxShadow: highlighted ? `0 0 0 3px ${alpha(m.teal, 0.12)}` : "none",
         px: 1.75,
         py: 1.5,
-        opacity: muted ? 0.62 : 1,
+        scrollMarginTop: 12,
       }}
     >
       <Stack
@@ -667,6 +684,7 @@ export default function SalesOverviewCard({
             key={sub.id}
             sub={sub}
             limitedMenu={card.limitedMenu}
+            highlighted={highlightId === sub.id}
             onViewInvoice={() => onSubViewInvoice?.(sub)}
             onViewReceipt={() => onSubViewReceipt?.(sub)}
             onAddOns={() => onSubAddOns?.(sub)}
@@ -752,26 +770,6 @@ export default function SalesOverviewCard({
         </Typography>
       ) : null}
 
-      {card.paymentState === "overdue" && onOverdueAction ? (
-        <AppButton
-          variant="outlined"
-          size="small"
-          onClick={onOverdueAction}
-          sx={{
-            mt: 1,
-            mb: 0.5,
-            textTransform: "none",
-            fontWeight: 800,
-            fontSize: 12,
-            borderRadius: "8px",
-            borderColor: alpha("#F79009", 0.45),
-            color: "#B54708",
-          }}
-        >
-          Add penalty & reissue due date
-        </AppButton>
-      ) : null}
-
       <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 1.35 }}>
         <AppButton
           tone="secondary"
@@ -838,9 +836,9 @@ export default function SalesOverviewCard({
       <SalesActionsMenu
         limitedMenu={card.limitedMenu}
         showRefund={
-          !muted &&
-          (card.paymentState === "paid" || card.paymentState === "prepaid")
+          card.paymentState === "paid" || card.paymentState === "prepaid"
         }
+        showMarkUnpaid={card.paymentState === "pending"}
         menuAnchor={menuAnchor}
         downloadAnchor={downloadAnchor}
         setDownloadAnchor={setDownloadAnchor}

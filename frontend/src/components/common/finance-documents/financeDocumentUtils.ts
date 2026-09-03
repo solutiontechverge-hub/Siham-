@@ -15,6 +15,31 @@ export type PreviewLineItem = {
   totalPrice: string;
 };
 
+/** B2B invoices are fully itemized; individual invoices use a simplified table. */
+export type InvoiceLineItemLayout = "itemized" | "simplified";
+
+export type InvoiceLineItemColumnKey =
+  | "description"
+  | "unit"
+  | "vat"
+  | "pricePerUnit"
+  | "totalPrice";
+
+export type InvoiceLineItemColumn = {
+  key: InvoiceLineItemColumnKey;
+  label: string;
+  pdfWidth: number;
+  align?: "left" | "right";
+};
+
+export type InvoiceDisplayLineItem = PreviewLineItem & {
+  unit: string;
+  displayDescription: string;
+};
+
+const LINE_QTY_SUFFIX_RE = /(?:,\s*)?[x×]\s*(\d+(?:\.\d+)?)\s*$/i;
+const NON_AGGREGATABLE_LINE_RE = /^(prepayment|discount)$/i;
+
 export function formatDocumentDate(value?: string | null) {
   if (!value) return "";
   const isoDate = value.includes("T") ? value.slice(0, 10) : value;
@@ -104,6 +129,171 @@ export function formatCurrencyValue(amount: number) {
   }).format(amount);
 }
 
+export function isBusinessInvoiceTemplate(
+  invoiceType?: FinanceInvoiceTemplateType | string | null,
+) {
+  return invoiceType === "company";
+}
+
+export function resolveInvoiceLineItemLayout(
+  invoiceType?: FinanceInvoiceTemplateType | string | null,
+): InvoiceLineItemLayout {
+  return isBusinessInvoiceTemplate(invoiceType) ? "itemized" : "simplified";
+}
+
+export function resolveInvoiceTemplateType(input: {
+  fallback?: FinanceInvoiceTemplateType;
+  invoiceType?: FinanceInvoiceTemplateType | string | null;
+  clientKind?: string | null;
+  clientType?: string | null;
+  vatNumber?: string | null;
+  cocNumber?: string | null;
+}): FinanceInvoiceTemplateType {
+  const signals = [input.clientKind, input.clientType];
+  if (
+    signals.some((value) => {
+      const normalized = String(value ?? "").trim().toLowerCase();
+      return normalized === "company" || normalized === "business";
+    })
+  ) {
+    return "company";
+  }
+  if (input.vatNumber?.trim() || input.cocNumber?.trim()) {
+    return "company";
+  }
+  if (input.invoiceType === "company" || input.invoiceType === "individual") {
+    return input.invoiceType;
+  }
+  return input.fallback === "company" ? "company" : "individual";
+}
+
+export function getInvoiceLineItemColumns(
+  layout: InvoiceLineItemLayout,
+): InvoiceLineItemColumn[] {
+  if (layout === "simplified") {
+    return [
+      { key: "description", label: "Description", pdfWidth: 360 },
+      { key: "totalPrice", label: "Total", pdfWidth: 130, align: "right" },
+    ];
+  }
+  return [
+    { key: "description", label: "Description", pdfWidth: 190 },
+    { key: "unit", label: "Unit", pdfWidth: 60 },
+    { key: "vat", label: "VAT %", pdfWidth: 60 },
+    { key: "pricePerUnit", label: "Price per unit", pdfWidth: 110, align: "right" },
+    { key: "totalPrice", label: "Total", pdfWidth: 90, align: "right" },
+  ];
+}
+
+export function formatLineItemQuantity(quantity: number) {
+  if (!Number.isFinite(quantity) || quantity <= 0) return "1";
+  return Number.isInteger(quantity) ? String(quantity) : String(quantity);
+}
+
+export function stripLineItemQuantitySuffix(description: string) {
+  return description.replace(LINE_QTY_SUFFIX_RE, "").trim();
+}
+
+function quantityFromDescription(description: string) {
+  const match = LINE_QTY_SUFFIX_RE.exec(description.trim());
+  if (!match) return 0;
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+export function parseLineItemQuantity(item: Pick<PreviewLineItem, "description" | "quantity">) {
+  const fromField = Number.parseFloat(String(item.quantity ?? "").replace(",", "."));
+  const fieldQty = Number.isFinite(fromField) && fromField > 0 ? fromField : 0;
+  const nameQty = quantityFromDescription(item.description);
+  if (fieldQty > 1) return fieldQty;
+  if (nameQty > 1) return nameQty;
+  return fieldQty || 1;
+}
+
+export function formatSimplifiedLineItemDescription(description: string, quantity: number) {
+  const base = stripLineItemQuantitySuffix(description) || description;
+  if (quantity > 1) return `${base}, ×${formatLineItemQuantity(quantity)}`;
+  return base;
+}
+
+export function getInvoiceLineItemCellValue(
+  item: InvoiceDisplayLineItem,
+  key: InvoiceLineItemColumnKey,
+) {
+  switch (key) {
+    case "description":
+      return item.displayDescription;
+    case "unit":
+      return item.unit;
+    case "vat":
+      return item.vat;
+    case "pricePerUnit":
+      return item.pricePerUnit;
+    case "totalPrice":
+      return item.totalPrice;
+  }
+}
+
+function aggregatePreviewLineItems(items: PreviewLineItem[]): PreviewLineItem[] {
+  const groups = new Map<string, PreviewLineItem & { qty: number; total: number }>();
+  const order: string[] = [];
+
+  items.forEach((item, index) => {
+    const baseDescription = stripLineItemQuantitySuffix(item.description) || item.description;
+    const qty = parseLineItemQuantity(item);
+    const skipAggregate = NON_AGGREGATABLE_LINE_RE.test(baseDescription);
+    const key = skipAggregate
+      ? `__unique__${index}`
+      : `${baseDescription.toLowerCase()}|${item.vat}|${item.pricePerUnit}`;
+    const existing = groups.get(key);
+    if (existing) {
+      existing.qty += qty;
+      existing.total += parseCurrencyValue(item.totalPrice);
+      existing.quantity = formatLineItemQuantity(existing.qty);
+      existing.totalPrice = formatCurrencyValue(existing.total);
+      return;
+    }
+    groups.set(key, {
+      description: baseDescription,
+      quantity: formatLineItemQuantity(qty),
+      vat: item.vat,
+      pricePerUnit: item.pricePerUnit,
+      totalPrice: item.totalPrice,
+      qty,
+      total: parseCurrencyValue(item.totalPrice),
+    });
+    order.push(key);
+  });
+
+  return order.map((key) => {
+    const group = groups.get(key);
+    if (!group) {
+      return items[0];
+    }
+    const { qty: _qty, total: _total, ...line } = group;
+    return line;
+  });
+}
+
+export function toInvoiceDisplayLineItems(
+  items: PreviewLineItem[],
+  invoiceType?: FinanceInvoiceTemplateType | string | null,
+): InvoiceDisplayLineItem[] {
+  const layout = resolveInvoiceLineItemLayout(invoiceType);
+  return aggregatePreviewLineItems(items).map((item) => {
+    const quantity = parseLineItemQuantity(item);
+    return {
+      ...item,
+      quantity: formatLineItemQuantity(quantity),
+      unit: formatLineItemQuantity(quantity),
+      displayDescription:
+        layout === "simplified"
+          ? formatSimplifiedLineItemDescription(item.description, quantity)
+          : stripLineItemQuantitySuffix(item.description) || item.description,
+    };
+  });
+}
+
 export function addDuration(dateText: string, value: string, unit: string) {
   const amount = Number(value);
   if (!dateText || !Number.isFinite(amount) || amount <= 0) return "";
@@ -122,7 +312,7 @@ export function addDuration(dateText: string, value: string, unit: string) {
 export function normalizePreviewLineItems(items: TransactionDocumentLineItem[]): PreviewLineItem[] {
   return items.map((item) => ({
     description: item.description,
-    quantity: item.quantity,
+    quantity: formatLineItemQuantity(parseLineItemQuantity(item)),
     vat: item.vat,
     pricePerUnit: item.pricePerUnit,
     totalPrice: item.totalPrice,

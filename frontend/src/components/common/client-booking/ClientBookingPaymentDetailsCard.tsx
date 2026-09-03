@@ -364,6 +364,7 @@ export default function ClientBookingPaymentDetailsCard({
     const teamFirst = resolveTeamMemberFirstName(
       service.teamMemberId,
       draft?.teamMembers,
+      service.teamMemberName,
     );
     const timeRange = draft?.selectedTime
       ? serviceTimeRangeLabel(scheduleOffset, service.durationMins)

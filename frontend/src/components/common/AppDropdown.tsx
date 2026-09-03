@@ -18,6 +18,8 @@ export type AppDropdownOption = {
   value: string;
   /** Optional leading icon / logo for the menu row. */
   icon?: React.ReactNode;
+  /** Optional tag / mark rendered after the label (selected value + menu). */
+  endAdornment?: React.ReactNode;
   /** Optional text color for the option (and selected value). */
   color?: string;
   /** Grey, not selectable (e.g. booked team member). */
@@ -134,8 +136,27 @@ export default function AppDropdown({
             const option = options.find((o) => o.value === v);
             const label = option?.label;
             return (
-              <span style={option?.color ? { color: option.color, fontWeight: 700 } : undefined}>
-                {label ?? String(v)}
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  minWidth: 0,
+                  ...(option?.color
+                    ? { color: option.color, fontWeight: 700 }
+                    : undefined),
+                }}
+              >
+                <span
+                  style={{
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {label ?? String(v)}
+                </span>
+                {option?.endAdornment}
               </span>
             );
           }),
@@ -205,6 +226,7 @@ export default function AppDropdown({
             ) : (
               option.label
             )}
+            {option.endAdornment}
           </MenuItem>
         );
         return item;

@@ -15,7 +15,7 @@ export default function CompanyClientTag({
   return (
     <Box
       component="span"
-      aria-label="Company Client"
+      aria-label="Business Client"
       sx={{
         display: "inline-flex",
         alignItems: "center",
@@ -33,7 +33,7 @@ export default function CompanyClientTag({
         lineHeight: 1,
       }}
     >
-      CC
+      BC
     </Box>
   );
 }

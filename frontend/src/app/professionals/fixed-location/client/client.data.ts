@@ -25,8 +25,6 @@ export const ADD_CLIENT_MENU_OPTIONS: readonly AddClientMenuOption[] = [
 
 export const CLIENT_TABLE_HEADERS = [
   "Client Name",
-  "Type",
-  "Platform",
   "Date Added",
   "Phone Number",
   "Total Sales",

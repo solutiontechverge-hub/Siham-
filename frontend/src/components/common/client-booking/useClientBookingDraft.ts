@@ -4,6 +4,7 @@ import * as React from "react";
 import type { ClientBookingRecord } from "../../../app/clients/booking/clientBookingRecords";
 import { useBusinessPublicProfile } from "../../../hooks/useBusinessPublicProfile";
 import { useActiveClientBooking } from "./useActiveClientBooking";
+import { mergeBookingTeamMembers } from "./buildBookingSummarySections";
 import type { ClientBookingDraft, ClientBookingSelectedShop } from "./types";
 import { parsePrepaymentPercent } from "./parsePrepaymentPercent";
 
@@ -54,6 +55,18 @@ export function useClientBookingDraft() {
 
   const { profile: businessProfile, isLoading: isBusinessProfileLoading } = useBusinessPublicProfile(shop?.shopId);
 
+  const draftWithTeamMembers = React.useMemo(() => {
+    if (!draft) return null;
+    const teamMembers = mergeBookingTeamMembers(
+      draft.teamMembers,
+      (businessProfile?.teamMembers ?? []).map((member) => ({
+        id: String(member.id),
+        name: member.name,
+      })),
+    );
+    return teamMembers.length ? { ...draft, teamMembers } : draft;
+  }, [businessProfile?.teamMembers, draft]);
+
   const prepaymentPercent = React.useMemo(
     () => parsePrepaymentPercent(businessProfile?.prepaymentLabel),
     [businessProfile?.prepaymentLabel],
@@ -73,7 +86,7 @@ export function useClientBookingDraft() {
   ]);
 
   return {
-    draft,
+    draft: draftWithTeamMembers,
     shop,
     businessProfile,
     prepaymentPercent:

@@ -87,6 +87,12 @@ export default function AppCountryPhoneFields({
           }}
         >
           {label}
+          {required ? (
+            <Box component="span" sx={{ color: "error.main", fontWeight: 700 }}>
+              {" "}
+              *
+            </Box>
+          ) : null}
         </BodyText>
       ) : null}
       <Stack
