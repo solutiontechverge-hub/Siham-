@@ -25,6 +25,7 @@ import {
 import { submitClientBookingRequest } from "../../../app/clients/booking/submitClientBookingRequest";
 import { resolveCreateBookingStatus } from "../../../app/clients/booking/resolveCreateBookingStatus";
 import { parseTimeLabelToMinutes, buildWallClockDateTimeIso } from "../../../app/clients/booking/booking-time";
+import { recalculateServiceStartEndTimes } from "../../../data/bookingServiceEdit.data";
 import {
   clearActiveBookingSession,
   getActiveBookingSession,
@@ -114,6 +115,7 @@ import {
   useUpdateMyBookingMutation,
 } from "../../../store/services/businessApi";
 import { useSyncFinanceTransactionFromBookingMutation } from "../../../store/services/financeApi";
+import { prepareBookingMessagingOpen } from "../messaging/openBookingMessaging";
 import { useOpenMessagingForBookingMutation } from "../../../store/services/messagingApi";
 import { getApiErrorMessage } from "../../../lib/api-error";
 import { useBookingRealtimeSync } from "../../../hooks/useBookingRealtimeSync";
@@ -542,7 +544,6 @@ export default function ClientBookingDetailsView({
         visit.number,
         visit.postalCode,
         visit.municipality,
-        visit.province,
       ]
         .map((part) => String(part ?? "").trim())
         .filter(Boolean)
@@ -1213,6 +1214,8 @@ export default function ClientBookingDetailsView({
                     name: service.name,
                     durationMins: service.durationMins,
                     price: service.price,
+                    startTime: service.startTime,
+                    endTime: service.endTime,
                     guestId: service.guestId ?? null,
                     teamMemberId: service.teamMemberId ?? null,
                   }));
@@ -1226,11 +1229,22 @@ export default function ClientBookingDetailsView({
                     quantity: product.quantity || 1,
                     unitPrice: product.price,
                   }));
+            const suggestedStart = ebr?.suggestedStart;
+            const suggestedEnd = ebr?.suggestedEnd;
+            const suggestedDate = ebr?.suggestedDateISO;
+            // Accepted schedule wins: re-sequence the lines from the new start.
+            const resolvedServices =
+              suggestedStart && suggestedServices?.length
+                ? recalculateServiceStartEndTimes(
+                    suggestedServices,
+                    suggestedStart,
+                  )
+                : suggestedServices;
             const appliedNotes = markClientEbrAcceptedInNotes(
               activeBooking?.notes,
               {
                 internalNote: priorNotes?.internalNote ?? "",
-                services: suggestedServices,
+                services: resolvedServices,
                 products: suggestedProducts,
                 lastEditedBy: ebr?.lastEditedBy ?? "professional",
                 editedServiceIds:
@@ -1239,13 +1253,15 @@ export default function ClientBookingDetailsView({
                   ebr?.editedProductIds ?? editRequest.editedProductIds,
                 clientSnapshot: {
                   ...(priorNotes?.clientSnapshot ?? {}),
-                  ...(suggestedServices?.length
+                  ...(resolvedServices?.length
                     ? {
-                        services: suggestedServices.map((service) => ({
+                        services: resolvedServices.map((service) => ({
                           id: service.id,
                           name: service.name,
                           price: service.price,
                           durationMins: service.durationMins,
+                          startTime: service.startTime,
+                          endTime: service.endTime,
                           guestId: service.guestId ?? null,
                           teamMemberId: service.teamMemberId ?? null,
                         })),
@@ -1268,9 +1284,6 @@ export default function ClientBookingDetailsView({
                     sum + (Number(product.price) || 0) * (product.quantity || 1),
                   0,
                 );
-            const suggestedStart = ebr?.suggestedStart;
-            const suggestedEnd = ebr?.suggestedEnd;
-            const suggestedDate = ebr?.suggestedDateISO;
             await updateMyBooking({
               id: apiBookingId,
               status: "confirmed",
@@ -1499,12 +1512,7 @@ export default function ClientBookingDetailsView({
     if (!bookingRef) return;
     try {
       const result = await openMessagingForBooking({ bookingRef }).unwrap();
-      messagingWidget?.openMessaging({
-        threadId: result.threadId,
-        bookingRef: result.bookingRef,
-        businessSetupId: result.businessSetupId,
-        searchPrefill: result.thread?.name || undefined,
-      });
+      messagingWidget?.openMessaging(prepareBookingMessagingOpen(result));
     } catch (error) {
       setResponseActionsDismissed(false);
       setActionFeedback(null);
@@ -2277,9 +2285,52 @@ export default function ClientBookingDetailsView({
   );
 
   /**
-   * Line-change tags after EBR accept (client or professional).
+   * Line-change tags after EBR accept (client or professional),
+   * or Pending while a bundled edit awaits client approval.
    */
+  const clientChangesAwaitingApproval =
+    editRequest.isSuggested || isEbrIncoming;
+
+  const pendingServiceChangeSets = React.useMemo(() => {
+    if (!clientChangesAwaitingApproval) return null;
+    const toComparable = (
+      services: readonly {
+        id: string;
+        name: string;
+        price: number;
+        durationMins: number;
+        startTime?: string;
+        endTime?: string;
+        teamMemberId?: string | null;
+        staffResourceId?: string | null;
+      }[],
+    ) =>
+      services.map((service) => ({
+        id: service.id,
+        name: service.name,
+        price: service.price,
+        durationMins: service.durationMins,
+        startTime: service.startTime,
+        endTime: service.endTime,
+        staffResourceId: service.teamMemberId ?? service.staffResourceId ?? undefined,
+      }));
+    const original = toComparable(
+      bookingNotesMeta?.originalServices ??
+        draft?.services ??
+        displayDraft?.services ??
+        [],
+    );
+    const current = toComparable(displayDraft?.services ?? draft?.services ?? []);
+    return detectServiceLineChanges(original, current);
+  }, [
+    bookingNotesMeta?.originalServices,
+    clientChangesAwaitingApproval,
+    displayDraft?.services,
+    draft?.services,
+  ]);
+
   const clientVisibleEditedServiceIds = React.useMemo(() => {
+    if (pendingServiceChangeSets) return pendingServiceChangeSets.edited;
     return (
       bookingNotesMeta?.editedServiceIds ??
       editRequest.editedServiceIds ??
@@ -2289,17 +2340,25 @@ export default function ClientBookingDetailsView({
     activeBooking?.editedServiceIds,
     bookingNotesMeta?.editedServiceIds,
     editRequest.editedServiceIds,
+    pendingServiceChangeSets,
   ]);
   const clientVisibleAddedServiceIds = React.useMemo(
-    () => bookingNotesMeta?.addedServiceIds,
-    [bookingNotesMeta?.addedServiceIds],
+    () =>
+      pendingServiceChangeSets?.added ?? bookingNotesMeta?.addedServiceIds,
+    [bookingNotesMeta?.addedServiceIds, pendingServiceChangeSets],
   );
   const clientVisibleCancelledServiceIds = React.useMemo(
-    () => bookingNotesMeta?.cancelledServiceIds,
-    [bookingNotesMeta?.cancelledServiceIds],
+    () =>
+      pendingServiceChangeSets?.cancelled ??
+      bookingNotesMeta?.cancelledServiceIds,
+    [bookingNotesMeta?.cancelledServiceIds, pendingServiceChangeSets],
   );
   const cancelledServicesForDisplay = React.useMemo(() => {
-    const ids = new Set(bookingNotesMeta?.cancelledServiceIds ?? []);
+    const ids = new Set(
+      clientVisibleCancelledServiceIds ??
+        bookingNotesMeta?.cancelledServiceIds ??
+        [],
+    );
     const originals = bookingNotesMeta?.originalServices ?? [];
     const currentIds = new Set((displayDraft?.services ?? []).map((s) => s.id));
     if (!ids.size) return [];
@@ -2316,12 +2375,13 @@ export default function ClientBookingDetailsView({
   }, [
     bookingNotesMeta?.cancelledServiceIds,
     bookingNotesMeta?.originalServices,
+    clientVisibleCancelledServiceIds,
     displayDraft?.services,
   ]);
   const clientVisibleEditedProductIds = React.useMemo(() => {
     if (bookingNotesMeta?.lastEditedBy === "client") return undefined;
     if (editRequest.isPending) return undefined;
-    if (isEbrIncoming) {
+    if (isEbrIncoming || editRequest.isSuggested) {
       return editRequest.editedProductIds ?? activeBooking?.editedProductIds;
     }
     if (bookingNotesMeta?.lastEditedBy === "professional") {
@@ -2338,6 +2398,23 @@ export default function ClientBookingDetailsView({
     editRequest.isAccepted,
     editRequest.isPending,
     editRequest.isRejected,
+    editRequest.isSuggested,
+    isEbrIncoming,
+  ]);
+  const lineTagComparisonMode = React.useMemo(():
+    | "ebr"
+    | "er"
+    | "silent_updated" => {
+    if (clientChangesAwaitingApproval) {
+      return isEbrIncoming ? "ebr" : "er";
+    }
+    if (bookingNotesMeta?.silentUpdated) return "silent_updated";
+    if (bookingStatus === "requested") return "ebr";
+    return "er";
+  }, [
+    bookingNotesMeta?.silentUpdated,
+    bookingStatus,
+    clientChangesAwaitingApproval,
     isEbrIncoming,
   ]);
   const kilometerAllowanceAmount = React.useMemo(

@@ -7,6 +7,7 @@ import {
   ListingImage6,
 } from "../../../../images";
 import type { ListingCardData } from "./listing.data";
+import { resolveResponseWindowMinutes } from "../../../components/common/calendar/bookingResponseDeadline";
 import {
   buildDesiredLocationFromSetupFields,
   type BusinessPublicProfileBookCombo,
@@ -124,6 +125,16 @@ function formatTimeBlock(block: BusinessSetupListingTimeBlock | undefined | null
   if (hours > 0 && minutes > 0) return `${hours} h ${minutes} min`;
   if (hours > 0) return `${hours} h`;
   return `${minutes} min`;
+}
+
+function formatEffectiveResponseTime(
+  block: BusinessSetupListingTimeBlock | undefined | null,
+) {
+  const totalMinutes = resolveResponseWindowMinutes(block);
+  return formatTimeBlock({
+    hours: Math.floor(totalMinutes / 60) || null,
+    minutes: totalMinutes % 60 || null,
+  });
 }
 
 function formatPercent(value: number | null | undefined) {
@@ -478,7 +489,7 @@ function buildServiceForItems(setup: BusinessSetupListing): BusinessPublicProfil
 function buildPolicySections(setup: BusinessSetupListing): BusinessPublicProfilePolicySection[] {
   const sections: BusinessPublicProfilePolicySection[] = [];
 
-  const responseLabel = formatTimeBlock(setup.responseTime);
+  const responseLabel = formatEffectiveResponseTime(setup.responseTime);
   if (responseLabel || setup.prepaymentPercentage != null || setup.policyCustomInstruction) {
     const fields: Array<{ label: string; value: string }> = [];
     if (responseLabel) fields.push({ label: "Response Time", value: responseLabel });

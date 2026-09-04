@@ -1,5 +1,38 @@
 import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
+import { resolveParentCalendarEventId } from "../../../data/bookingChronologicalBlocks";
 import { minutesSinceMidnight } from "./calendar.utils";
+import { isTeamSharedBooking } from "./teamMemberBookings";
+
+export function resolveCalendarBookingIdentity(
+  event: Pick<CalendarEvent, "id" | "bookingCode">,
+) {
+  return event.bookingCode?.trim() || resolveParentCalendarEventId(event.id);
+}
+
+export function countUniqueCalendarBookings(
+  events: readonly Pick<CalendarEvent, "id" | "bookingCode">[],
+) {
+  return new Set(events.map(resolveCalendarBookingIdentity)).size;
+}
+
+export type SameTimeStackChip =
+  | { kind: "requests"; count: number }
+  | { kind: "shared" };
+
+/** Side label for cards stacked in one slot — unique bookings, not segments. */
+export function resolveSameTimeStackChip(
+  events: readonly CalendarEvent[],
+): SameTimeStackChip | null {
+  if (events.length <= 1) return null;
+  const uniqueBookingCount = countUniqueCalendarBookings(events);
+  if (uniqueBookingCount > 1) {
+    return { kind: "requests", count: uniqueBookingCount };
+  }
+  if (events.some((event) => isTeamSharedBooking(event))) {
+    return { kind: "shared" };
+  }
+  return null;
+}
 
 export function eventsOverlap(a: CalendarEvent, b: CalendarEvent): boolean {
   const aStart = minutesSinceMidnight(a.start);
@@ -67,6 +100,11 @@ export function findExternalStaffBookingOverlaps(input: {
     if (!service.staffId) continue;
     for (const event of input.events) {
       if (input.bookingId && event.id === input.bookingId) continue;
+      if (
+        input.bookingId &&
+        event.id.startsWith(`${input.bookingId}::segment-`)
+      )
+        continue;
       if (event.date !== input.date) continue;
       if (event.resourceId !== service.staffId) continue;
       if (

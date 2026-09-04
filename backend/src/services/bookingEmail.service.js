@@ -1,5 +1,6 @@
 import { query } from "../db/index.js";
 import { sendMail } from "../helpers/email.helper.js";
+import { DEFAULT_RESPONSE_WINDOW_MINUTES } from "../utils/bookingResponseWindow.js";
 import {
   buildAppointmentReminderEmail,
   buildBookingCancelledEmail,
@@ -110,11 +111,10 @@ const loadBookingEmailContext = async (bookingId) => {
        u.email AS customer_email,
        COALESCE(NULLIF(bs.salon_name, ''), NULLIF(bs.business_name, ''), 'Your salon') AS salon_name,
        COALESCE(
-         NULLIF(TRIM(tm.full_name), ''),
-         NULLIF(TRIM(CONCAT(COALESCE(pp.contact_first_name, ''), ' ', COALESCE(pp.contact_last_name, ''))), ''),
-         NULLIF(TRIM(pp.legal_name), ''),
          NULLIF(TRIM(bs.salon_name), ''),
          NULLIF(TRIM(bs.business_name), ''),
+         NULLIF(TRIM(pp.legal_name), ''),
+         NULLIF(TRIM(CONCAT(COALESCE(pp.contact_first_name, ''), ' ', COALESCE(pp.contact_last_name, ''))), ''),
          'Professional'
        ) AS professional_name,
        COALESCE(NULLIF(sc.title, ''), 'Service') AS service_name
@@ -122,7 +122,6 @@ const loadBookingEmailContext = async (bookingId) => {
      INNER JOIN users u ON u.id = b.customer_id
      INNER JOIN business_setups bs ON bs.id = b.business_setup_id
      INNER JOIN professional_profiles pp ON pp.id = bs.professional_profile_id
-     LEFT JOIN business_team_members tm ON tm.id = b.team_member_id
      LEFT JOIN subcategories sc ON sc.id = b.service_id
      WHERE b.id = $1
      LIMIT 1`,
@@ -554,7 +553,6 @@ export const notifyBookingStatusChange = async (bookingId, previousStatus, nextS
 
 const REMINDER_WINDOW_MINUTES = Number(process.env.BOOKING_REMINDER_WINDOW_MINUTES || 5);
 const REMINDER_HOURS_BEFORE = Number(process.env.BOOKING_REMINDER_HOURS_BEFORE || 2);
-const RESPOND_REMINDER_HOURS = Number(process.env.BOOKING_RESPOND_REMINDER_HOURS || 24);
 
 export const processAppointmentReminders = async () => {
   const windowMs = REMINDER_WINDOW_MINUTES * 60 * 1000;
@@ -593,14 +591,14 @@ export const processRespondToRequestReminders = async () => {
     `SELECT b.id
      FROM bookings b
      WHERE b.status = 'requested'
-       AND b.created_at <= NOW() - ($1::int || ' hours')::interval
+       AND b.created_at <= NOW() - ($1::int || ' minutes')::interval
        AND NOT EXISTS (
          SELECT 1
          FROM booking_email_notifications n
          WHERE n.booking_id = b.id
            AND n.email_type = $2
        )`,
-    [RESPOND_REMINDER_HOURS, BOOKING_EMAIL_TYPES.RESPOND_REQUEST_REMINDER],
+    [DEFAULT_RESPONSE_WINDOW_MINUTES, BOOKING_EMAIL_TYPES.RESPOND_REQUEST_REMINDER],
   );
 
   const outcomes = [];

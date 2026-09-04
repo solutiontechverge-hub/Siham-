@@ -26,7 +26,7 @@ export default function DiscardEbrDialog({
       contentSx={{ px: 2.5 }}
       footerVariant="actions"
       open={open}
-      title="Discard EBR"
+      title="Discard edited booking request"
       onClose={onClose}
       maxWidth="sm"
       headerTone="danger"
@@ -56,7 +56,7 @@ export default function DiscardEbrDialog({
             px: 1,
           }}
         >
-          This will end the EBR. The client will no longer be able to respond.
+          This will end the edited booking request. The client will no longer be able to respond.
         </Typography>
       </Box>
     </AppModal>

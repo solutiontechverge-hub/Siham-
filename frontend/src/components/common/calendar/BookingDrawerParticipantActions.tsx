@@ -15,6 +15,8 @@ type BookingDrawerParticipantActionsProps = {
   kinds: readonly BookingDrawerParticipantKind[];
   disabled?: boolean;
   nameFieldOpen?: boolean;
+  /** `inline` sits beside other add controls; `panel` is the sticky footer strip. */
+  variant?: "panel" | "inline";
   onAddGuest?: () => void;
   onAddModel?: () => void;
   onAddPlanning?: () => void;
@@ -22,10 +24,10 @@ type BookingDrawerParticipantActionsProps = {
 };
 
 const LABELS: Record<BookingDrawerParticipantKind, string> = {
-  guest: "Guest",
-  model: "Model",
-  planning: "Planning",
-  buffer: "Buffer",
+  guest: "Add Guest",
+  model: "Add Model",
+  planning: "Add Planning",
+  buffer: "Add Buffer",
 };
 
 function AddPersonButton({
@@ -52,6 +54,8 @@ function AddPersonButton({
         gap: 1.25,
         px: 1.5,
         bgcolor: "#fff",
+        flexShrink: 0,
+        whiteSpace: "nowrap",
         "&.Mui-disabled": {
           opacity: 0.55,
           cursor: "not-allowed",
@@ -92,6 +96,7 @@ export default function BookingDrawerParticipantActions({
   kinds,
   disabled = false,
   nameFieldOpen = false,
+  variant = "panel",
   onAddGuest,
   onAddModel,
   onAddPlanning,
@@ -110,6 +115,24 @@ export default function BookingDrawerParticipantActions({
     buffer: onAddBuffer,
   };
 
+  const buttons = (
+    <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+      {kinds.map((kind) => {
+        const needsNameField = kind === "guest" || kind === "model";
+        return (
+          <AddPersonButton
+            key={kind}
+            label={LABELS[kind]}
+            onClick={() => handlers[kind]?.()}
+            disabled={disabled || (needsNameField && nameFieldOpen)}
+          />
+        );
+      })}
+    </Stack>
+  );
+
+  if (variant === "inline") return buttons;
+
   return (
     <Box
       sx={{
@@ -118,19 +141,7 @@ export default function BookingDrawerParticipantActions({
         p: 1.5,
       }}
     >
-      <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-        {kinds.map((kind) => {
-          const needsNameField = kind === "guest" || kind === "model";
-          return (
-            <AddPersonButton
-              key={kind}
-              label={LABELS[kind]}
-              onClick={() => handlers[kind]?.()}
-              disabled={disabled || (needsNameField && nameFieldOpen)}
-            />
-          );
-        })}
-      </Stack>
+      {buttons}
     </Box>
   );
 }

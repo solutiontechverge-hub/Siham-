@@ -109,21 +109,24 @@ export function useCalendarFilters(
   const resourceKey = React.useMemo(() => resources.map((resource) => resource.id).join("|"), [resources]);
 
   React.useEffect(() => {
-    const mergeTeamIds = (prev: CalendarFilters) => ({
-      ...Object.fromEntries(resources.map((resource) => [resource.id, false])),
-      ...prev.teamIds,
-    });
+    const mergeTeamState = (prev: CalendarFilters): CalendarFilters => {
+      const teamIds = {
+        ...Object.fromEntries(resources.map((resource) => [resource.id, false])),
+        ...prev.teamIds,
+      };
+      const knownIds = new Set(resources.map((resource) => resource.id));
+      const selectedStillExist = Object.entries(teamIds).some(
+        ([id, checked]) => checked && knownIds.has(id),
+      );
+      return {
+        ...prev,
+        teamIds,
+        teamAll: prev.teamAll || !selectedStillExist,
+      };
+    };
 
-    setDraftFilters((prev) => ({
-      ...prev,
-      teamAll: true,
-      teamIds: mergeTeamIds(prev),
-    }));
-    setAppliedFilters((prev) => ({
-      ...prev,
-      teamAll: true,
-      teamIds: mergeTeamIds(prev),
-    }));
+    setDraftFilters(mergeTeamState);
+    setAppliedFilters(mergeTeamState);
   }, [resourceKey, resources]);
 
   const filteredResources = React.useMemo(() => {

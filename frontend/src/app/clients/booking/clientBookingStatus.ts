@@ -4,6 +4,7 @@ import type { ClientBookingStatus } from "./clientBookingRecords";
 
 const CLIENT_TO_CALENDAR: Record<Exclude<ClientBookingStatus, "draft">, CalendarBookingStatus> = {
   requested: "Requested",
+  br_accepted: "BR Accepted",
   confirmed: "Confirmed",
   in_progress: "In Progress",
   completed: "Completed",
@@ -22,6 +23,8 @@ export function bookingStatusLabel(
       return "Draft";
     case "requested":
       return "Requested";
+    case "br_accepted":
+      return "BR Accepted";
     case "confirmed":
       return options?.edited ? "Confirmed Edited" : "Confirmed";
     case "in_progress":
@@ -63,15 +66,27 @@ export function bookingStatusChipColors(status: ClientBookingStatus): {
 export function mapApiBookingStatusToClient(status: string): ClientBookingStatus | null {
   const normalized = status.trim().toLowerCase();
   if (normalized === "requested") return "requested";
+  if (normalized === "br_accepted" || normalized === "br accepted") return "br_accepted";
   if (normalized === "confirmed") return "confirmed";
   if (normalized === "in_progress" || normalized === "in progress") return "in_progress";
   if (normalized === "completed") return "completed";
   if (normalized === "cancelled") return "cancelled";
   if (normalized === "no_show" || normalized === "no show") return "no_show";
   if (normalized === "invalid") return "invalid";
-  // Legacy alias — keep requested + waiting icon instead of a fake status.
+  // Legacy alias — map to br_accepted when prepay was outstanding after accept.
   if (normalized === "waiting_for_prepayment" || normalized === "waiting for prepayment") {
-    return "requested";
+    return "br_accepted";
   }
   return null;
+}
+
+export function mapClientStatusToApi(status: ClientBookingStatus): string {
+  if (status === "br_accepted") return "br_accepted";
+  if (status === "confirmed") return "confirmed";
+  if (status === "completed") return "completed";
+  if (status === "cancelled") return "cancelled";
+  if (status === "no_show") return "no_show";
+  if (status === "invalid") return "invalid";
+  if (status === "in_progress") return "in_progress";
+  return "requested";
 }

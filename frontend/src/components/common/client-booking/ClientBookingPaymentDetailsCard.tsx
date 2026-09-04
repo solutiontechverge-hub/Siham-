@@ -17,6 +17,7 @@ import {
 } from "../calendar/bookingTotal";
 import type { ManualEntryDiscount } from "../../sections/finance/manualEntry.data";
 import type { BookingEditTagVariant } from "../calendar/bookingRequestNegotiation";
+import { resolveServiceChangeTag } from "../calendar/bookingRequestNegotiation";
 import {
   buildBookingSummarySections,
   resolveTeamMemberFirstName,
@@ -194,6 +195,10 @@ type Props = {
   cancelledServices?: ReadonlyArray<ClientBookingDraft["services"][number]>;
   products?: readonly BookingEditSuggestedProduct[];
   editedProductIds?: readonly string[];
+  /** When true, changed lines show Pending instead of Edited/Added/Cancelled. */
+  changesAwaitingApproval?: boolean;
+  editTagSignpostTitle?: string;
+  onEditTagSignpostClick?: () => void;
   onPayNow?: () => void;
   /** Extra block under Total Price (payment summary, notes). */
   footer?: React.ReactNode;
@@ -226,6 +231,9 @@ export default function ClientBookingPaymentDetailsCard({
   cancelledServices = [],
   products = [],
   editedProductIds = [],
+  changesAwaitingApproval = false,
+  editTagSignpostTitle,
+  onEditTagSignpostClick,
   onPayNow,
   footer,
   acceptedChangesNote = null,
@@ -260,13 +268,27 @@ export default function ClientBookingPaymentDetailsCard({
   );
 
   const serviceChangeTag = React.useCallback(
-    (serviceId: string): BookingEditTagVariant | null => {
-      if (cancelledServiceIdSet.has(serviceId)) return "cancelled";
-      if (addedServiceIdSet.has(serviceId)) return "added";
-      if (editedServiceIdSet.has(serviceId)) return "edited";
-      return null;
+    (serviceId: string): BookingEditTagVariant | null =>
+      resolveServiceChangeTag(serviceId, {
+        editedIds: editedServiceIds,
+        addedIds: addedServiceIds,
+        cancelledIds: cancelledServiceIds,
+        awaitingApproval: changesAwaitingApproval,
+      }),
+    [
+      addedServiceIds,
+      cancelledServiceIds,
+      changesAwaitingApproval,
+      editedServiceIds,
+    ],
+  );
+
+  const productChangeTag = React.useCallback(
+    (productId: string): BookingEditTagVariant | null => {
+      if (!editedProductIdSet.has(productId)) return null;
+      return changesAwaitingApproval ? "pending" : "edited";
     },
-    [addedServiceIdSet, cancelledServiceIdSet, editedServiceIdSet],
+    [changesAwaitingApproval, editedProductIdSet],
   );
 
   const listedProducts = products.length
@@ -305,20 +327,8 @@ export default function ClientBookingPaymentDetailsCard({
     mb: 1,
   } as const;
 
-  const requesterSections = sections.filter(
-    (s) => s.isRequester || s.participantType === "requester",
-  );
-  const modelSections = sections.filter((s) => s.participantType === "model");
-  const guestSections = sections.filter((s) => s.participantType === "guest");
-  const planningSections = sections.filter(
-    (s) => s.participantType === "planning",
-  );
-
   const fallbackRequesterSection: ClientBookingSummarySection[] =
-    requesterSections.length === 0 &&
-    (draft?.services?.length ?? 0) > 0 &&
-    modelSections.length === 0 &&
-    guestSections.length === 0
+    sections.length === 0 && (draft?.services?.length ?? 0) > 0
       ? [
           {
             key: "requester-services",
@@ -329,47 +339,66 @@ export default function ClientBookingPaymentDetailsCard({
           },
         ]
       : [];
-  const clientServiceSections = requesterSections.length
-    ? requesterSections
-    : fallbackRequesterSection;
 
-  const attachCancelled = (
-    section: ClientBookingSummarySection,
-  ): ClientBookingSummarySection => {
-    const extra = cancelledServices.filter((s) => {
-      if (section.isRequester || section.participantType === "requester") {
-        return !s.guestId || s.guestId === section.key;
-      }
-      return s.guestId === section.key;
-    });
-    if (!extra.length) return section;
-    const existing = new Set(section.items.map((item) => item.id));
-    return {
-      ...section,
-      items: [
-        ...section.items,
-        ...extra.filter((item) => !existing.has(item.id)),
-      ],
-    };
-  };
+  const attachCancelled = React.useCallback(
+    (section: ClientBookingSummarySection): ClientBookingSummarySection => {
+      const participantId = section.key.split("::")[0] ?? section.key;
+      const extra = cancelledServices.filter((s) => {
+        if (section.isRequester || section.participantType === "requester") {
+          return !s.guestId || s.guestId === participantId;
+        }
+        return s.guestId === participantId;
+      });
+      if (!extra.length) return section;
+      const existing = new Set(section.items.map((item) => item.id));
+      return {
+        ...section,
+        items: [
+          ...section.items,
+          ...extra.filter((item) => !existing.has(item.id)),
+        ],
+      };
+    },
+    [cancelledServices],
+  );
+
+  const chronologicalSections = React.useMemo(
+    () =>
+      (sections.length ? sections : fallbackRequesterSection).map(
+        attachCancelled,
+      ),
+    [attachCancelled, fallbackRequesterSection, sections],
+  );
 
   const project = draft?.projectDetails;
   const hasProject =
     Boolean(project?.description?.trim()) ||
     (project?.uploads?.length ?? 0) > 0;
 
-  let scheduleOffset = bookingStartMinutes;
-
-  const renderService = (service: ClientBookingDraft["services"][number]) => {
+  const renderService = (
+    service: ClientBookingDraft["services"][number],
+    section: ClientBookingSummarySection,
+  ) => {
     const teamFirst = resolveTeamMemberFirstName(
       service.teamMemberId,
       draft?.teamMembers,
       service.teamMemberName,
     );
+    const sectionStartMinutes = section.startTime
+      ? parseTimeLabelToMinutes(section.startTime)
+      : bookingStartMinutes;
+    const serviceOffset = section.items
+      .slice(
+        0,
+        section.items.findIndex((item) => item.id === service.id),
+      )
+      .reduce((sum, item) => sum + item.durationMins, 0);
+    const serviceStartMinutes = service.startTime
+      ? parseTimeLabelToMinutes(service.startTime)
+      : sectionStartMinutes + serviceOffset;
     const timeRange = draft?.selectedTime
-      ? serviceTimeRangeLabel(scheduleOffset, service.durationMins)
+      ? serviceTimeRangeLabel(serviceStartMinutes, service.durationMins)
       : undefined;
-    scheduleOffset += service.durationMins;
     const changeTag = serviceChangeTag(service.id);
 
     return (
@@ -427,7 +456,11 @@ export default function ClientBookingPaymentDetailsCard({
             ) : null}
             {changeTag ? (
               <Box sx={{ mt: 0.7 }}>
-                <BookingEditedTag variant={changeTag} />
+                <BookingEditedTag
+                  variant={changeTag}
+                  signpostTitle={editTagSignpostTitle}
+                  onSignpostClick={onEditTagSignpostClick}
+                />
               </Box>
             ) : null}
           </Box>
@@ -487,9 +520,16 @@ export default function ClientBookingPaymentDetailsCard({
               ? `${item.name} ×${item.quantity}`
               : item.name}
           </Typography>
-          {editedProductIdSet.has(item.id) ? (
-            <BookingEditedTag variant="edited" />
-          ) : null}
+          {(() => {
+            const productTag = productChangeTag(item.id);
+            return productTag ? (
+              <BookingEditedTag
+                variant={productTag}
+                signpostTitle={editTagSignpostTitle}
+                onSignpostClick={onEditTagSignpostClick}
+              />
+            ) : null;
+          })()}
         </Stack>
         <BookingLineAmount
           amount={item.price}
@@ -535,7 +575,10 @@ export default function ClientBookingPaymentDetailsCard({
     py: 1.25,
   } as const;
 
-  const requesterSectionKey = clientServiceSections[0]?.key ?? "";
+  const requesterSectionKey =
+    chronologicalSections.find(
+      (section) => section.isRequester || section.participantType === "requester",
+    )?.key ?? "";
 
   const catalogItemsForSection = (
     items: typeof catalogProducts,
@@ -637,7 +680,7 @@ export default function ClientBookingPaymentDetailsCard({
         <Box>
           <Typography sx={catalogHeadingSx}>Service</Typography>
           <Stack spacing={1}>
-            {services.map((service) => renderService(service))}
+            {services.map((service) => renderService(service, section))}
           </Stack>
         </Box>
       ) : null}
@@ -784,40 +827,34 @@ export default function ClientBookingPaymentDetailsCard({
         ) : null}
 
         <Stack spacing={2}>
-          {clientServiceSections.map((section) =>
-            renderSectionBlock(attachCancelled(section)),
-          )}
-
-          {modelSections.map((section) =>
-            renderSectionBlock(
-              attachCancelled(section),
-              section.title,
-              true,
-            ),
-          )}
-
-          {guestSections.map((section) => {
-            const guestTitle = section.title.trim();
-            const heading =
-              guestTitle.toLowerCase().startsWith("guest")
-                ? guestTitle
-                : `Guest: ${guestTitle}`;
-            return renderSectionBlock(
-              attachCancelled(section),
-              heading,
-              true,
+          {chronologicalSections.map((section) => {
+            const isRequester = Boolean(
+              section.isRequester || section.participantType === "requester",
             );
+            const requesterAppearanceIndex = chronologicalSections
+              .filter(
+                (row) => row.isRequester || row.participantType === "requester",
+              )
+              .findIndex((row) => row.key === section.key);
+            const asPersonCard =
+              section.participantType === "planning" ||
+              section.participantType === "buffer" ||
+              section.participantType === "guest" ||
+              section.participantType === "model" ||
+              (isRequester && requesterAppearanceIndex > 0);
+            const heading = isRequester
+              ? section.title
+              : section.participantType === "guest"
+                ? section.title.trim().toLowerCase().startsWith("guest")
+                  ? section.title
+                  : `Guest: ${section.title}`
+                : section.participantType === "planning"
+                  ? "Planning Details"
+                  : section.title;
+            return renderSectionBlock(section, heading, asPersonCard);
           })}
 
-          {planningSections.map((section) =>
-            renderSectionBlock(
-              attachCancelled(section),
-              "Planning Details",
-              true,
-            ),
-          )}
-
-          {clientServiceSections.length === 0 ? (
+          {chronologicalSections.length === 0 ? (
             <>
               {renderCatalogGroup("Product", catalogProducts)}
               {renderCatalogGroup("Unique item", catalogUniqueItems)}

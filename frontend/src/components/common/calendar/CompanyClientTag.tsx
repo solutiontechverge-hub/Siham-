@@ -4,13 +4,10 @@ import * as React from "react";
 import { Box } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 
-export default function CompanyClientTag({
-  variant = "pill",
-}: {
+export default function CompanyClientTag(_props?: {
   variant?: "pill" | "dot";
 }) {
   const m = useTheme().palette.mollure;
-  const isDot = variant === "dot";
 
   return (
     <Box
@@ -21,16 +18,17 @@ export default function CompanyClientTag({
         alignItems: "center",
         justifyContent: "center",
         flexShrink: 0,
-        height: isDot ? 22 : 20,
-        minWidth: isDot ? 22 : 22,
-        px: isDot ? 0 : 0.65,
+        height: 18,
+        px: 0.85,
         borderRadius: "999px",
-        bgcolor: alpha(m.teal, isDot ? 0.2 : 0.16),
+        bgcolor: alpha(m.teal, 0.12),
         color: m.teal,
-        border: `1px solid ${alpha(m.teal, 0.4)}`,
-        fontSize: isDot ? 10 : 9.5,
-        fontWeight: 900,
-        lineHeight: 1,
+        border: `1px solid ${alpha(m.teal, 0.28)}`,
+        fontSize: 10,
+        fontWeight: 800,
+        lineHeight: 1.2,
+        letterSpacing: "0.04em",
+        whiteSpace: "nowrap",
       }}
     >
       BC

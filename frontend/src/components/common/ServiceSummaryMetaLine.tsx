@@ -6,7 +6,7 @@ import { MollureMetaDot } from "./MollureMetaDot";
 
 type ServiceSummaryMetaLineProps = {
   timeRange?: string;
-  durationLabel: string;
+  durationLabel?: string;
   staffName?: string;
 };
 
@@ -30,9 +30,9 @@ export function ServiceSummaryMetaLine({
       sx={{ mt: 0.25, flexWrap: "wrap" }}
     >
       {timeRange ? <Typography sx={textSx}>{timeRange}</Typography> : null}
-      {timeRange ? <MollureMetaDot /> : null}
-      <Typography sx={textSx}>{durationLabel}</Typography>
-      {staffName ? <MollureMetaDot /> : null}
+      {timeRange && durationLabel ? <MollureMetaDot /> : null}
+      {durationLabel ? <Typography sx={textSx}>{durationLabel}</Typography> : null}
+      {staffName && (timeRange || durationLabel) ? <MollureMetaDot /> : null}
       {staffName ? <Typography sx={textSx}>{staffName}</Typography> : null}
     </Stack>
   );

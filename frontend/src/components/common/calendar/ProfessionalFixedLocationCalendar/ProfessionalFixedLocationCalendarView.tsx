@@ -32,6 +32,7 @@ import {
   Tooltip,
   Checkbox,
   FormControlLabel,
+  InputAdornment,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -47,7 +48,7 @@ import AppPillTabs from "../../AppPillTabs";
 import AppDrawer from "../../AppDrawer";
 import AppDatePicker from "../../AppDatePicker";
 import { AppCalendarPanel } from "../../AppDatePicker";
-import { AppTimePanel } from "../../AppTimePicker";
+import AppTimePicker, { AppTimePanel } from "../../AppTimePicker";
 import AppTextField from "../../AppTextField";
 import AppCountryPhoneFields from "../../AppCountryPhoneFields";
 import AppDropdown from "../../AppDropdown";
@@ -76,9 +77,11 @@ import {
   identityFromCalendarEvent,
 } from "../calendarClientProfile";
 import {
+  collectEventTeamMemberIds,
   eventBelongsToTeamMember,
   eventHasKnownTeamAssignment,
   getTeamMemberBookings,
+  isTeamSharedBooking,
   rankResourcesForCalendarDay,
 } from "../teamMemberBookings";
 import BookingEditedTag from "../BookingEditedTag";
@@ -93,6 +96,7 @@ import {
 } from "../calendar-overlap.utils";
 import type { CalendarScheduleConflictKind } from "../CalendarScheduleConflictDialog";
 import { useMessagingWidget } from "../../messaging/MessagingWidgetContext";
+import { prepareBookingMessagingOpen } from "../../messaging/openBookingMessaging";
 import { useOpenMessagingForBookingMutation } from "../../../../store/services/messagingApi";
 import { useProfessionalMessagingUnread } from "../../messaging/useProfessionalMessagingUnread";
 import {
@@ -161,6 +165,7 @@ import {
 import {
   buildBookingPriceSummaryLines,
   computeBookingPrice,
+  isUniqueItemId,
   partitionBookingProducts,
   resolveBookingPriceDisplay,
 } from "../bookingTotal";
@@ -186,6 +191,7 @@ import { useFinanceInvoiceSettings } from "../../../sections/finance/useFinanceI
 import BookingSelectServicesScreen from "../BookingSelectServicesScreen";
 import DiscardBrDialog from "../DiscardBrDialog";
 import DiscardEbrDialog from "../DiscardEbrDialog";
+import DiscardErDialog from "../DiscardErDialog";
 import BookingRequestConfirmDialog from "../BookingRequestConfirmDialog";
 import BookingRequestResponseActions from "../BookingRequestResponseActions";
 import InlineTimedSnackbar from "../../InlineTimedSnackbar";
@@ -216,11 +222,11 @@ import {
 } from "../salesSplitBill";
 import { upsertSalesCardMeta } from "../salesOverview.storage";
 import type { SalesCheckoutPaymentMethod } from "../salesOverview.types";
-import CatalogItemDeleteDialog from "../CatalogItemDeleteDialog";
 import BookingEditServiceScreen from "../BookingEditServiceScreen";
 import BookingSelectProductsScreen from "../BookingSelectProductsScreen";
 import BookingAddUniqueItemScreen from "../BookingAddUniqueItemScreen";
 import BookingEditCatalogItemScreen from "../BookingEditCatalogItemScreen";
+import CatalogItemDeleteDialog from "../CatalogItemDeleteDialog";
 import { useCalendarFilters } from "../useCalendarFilters";
 import type { BookingCatalogService } from "../../../../data/bookingServiceCatalog.data";
 import { buildOrderedBookingServiceCategories } from "../../../../data/bookingServiceCatalog.data";
@@ -237,10 +243,26 @@ import {
   emptyBookingServiceEditDraft,
   getBookingServiceEditErrors,
   getEffectiveServicePrice,
+  getLatestTimedEnd,
   lineItemToOverride,
+  minutesBetweenTimes,
+  parseDurationMinsLabel,
+  formatDurationMinsLabel,
+  placeServicesSequentially,
+  recalculateGroupedServiceStartEndTimes,
+  recalculateServiceStartEndTimes,
+  sortServicesByStartTime,
   type BookingServiceEditDraft,
   type BookingServiceLineItem,
 } from "../../../../data/bookingServiceEdit.data";
+import {
+  buildDrawerChronologicalBlocks,
+  calendarEventToDisplaySegments,
+  expandCalendarEventToChronologicalSegments,
+  getBookingTimedSpanMins,
+  resolveParentCalendarEventId,
+  sortCalendarGuestsByStartTime,
+} from "../../../../data/bookingChronologicalBlocks";
 import {
   buildBookingProductLine,
   createEmptyProductSelectionDraft,
@@ -260,6 +282,7 @@ import {
   type BookingUniqueItemDraft,
   type BookingUniqueItemLine,
 } from "../../../../data/bookingUniqueItem.data";
+import { stampProductsToEarliestBlock } from "../../../../data/bookingProductPlacement";
 import {
   archiveFullyPastScheduleRows,
   findBookingsInTimeslot,
@@ -319,8 +342,8 @@ import {
   sumIntervalsMins,
   toMonthIso,
   toIsoLocalDate,
-  eventMatchesBookingTypeFilter,
-  eventMatchesStatusFilter,
+  eventMatchesNonTeamCalendarFilters,
+  calendarFiltersAreNarrowing,
 } from "../calendar.utils";
 import {
   BOOKING_SCENARIO_LABELS,
@@ -337,7 +360,13 @@ import {
   showPersistentCheckoutButton,
   showProfessionalActionMenu,
 } from "../bookingStatusActions";
+import BookingResponseExpiryBanner from "../BookingResponseExpiryBanner";
 import BookingGuidelineIcon from "../BookingGuidelineIcon";
+import {
+  buildAcceptAckDetails,
+  prepayBlocksConfirmation,
+  professionalShouldAck,
+} from "../bookingAcknowledgment";
 import BookingRequestAcceptedPanel from "../BookingRequestAcceptedPanel";
 import BookingDrawerTotalPriceCard from "../BookingDrawerTotalPriceCard";
 import {
@@ -407,7 +436,6 @@ import { useCreateFinanceTransactionMutation } from "../../../../store/services/
 import { GENDER_OPTIONS, type GenderOption } from "../../../../lib/gender-options";
 import {
   sanitizeDecimalInput,
-  sanitizeDigitsInput,
   sanitizeNameInput,
 } from "../../../../lib/field-input";
 import {
@@ -435,6 +463,8 @@ export type ProfessionalFixedLocationCalendarProps = {
   prepaymentPercentDefault?: string;
   cancellationBeforeHours?: number | null;
   cancellationBeforeMinutes?: number | null;
+  responseTimeHours?: number | null;
+  responseTimeMinutes?: number | null;
   desiredLocationSetup?: BusinessPublicProfileDesiredLocation | null;
   clientOptions?: readonly {
     name: string;
@@ -555,6 +585,8 @@ export default function ProfessionalFixedLocationCalendar({
   prepaymentPercentDefault,
   cancellationBeforeHours,
   cancellationBeforeMinutes,
+  responseTimeHours,
+  responseTimeMinutes,
   desiredLocationSetup = null,
   clientOptions = [],
   professionalClients = [],
@@ -584,6 +616,13 @@ export default function ProfessionalFixedLocationCalendar({
     ],
   );
   const { showSnackbar } = useSnackbar();
+  const businessResponseWindowInput = React.useMemo(
+    () => ({
+      hours: responseTimeHours,
+      minutes: responseTimeMinutes,
+    }),
+    [responseTimeHours, responseTimeMinutes],
+  );
   const { settings: financeSettings, setSettings: setFinanceSettings } =
     useFinanceInvoiceSettings();
   const professionalBusinessOverride = useProfessionalBusinessOverride();
@@ -612,15 +651,10 @@ export default function ProfessionalFixedLocationCalendar({
   const openBookingMessages = React.useCallback(
     (ev: CalendarEvent) => {
       const bookingRef = ev.bookingCode ?? extractBookingId(ev.id);
-      const clientName = ev.showClientName?.trim();
       void (async () => {
         try {
           const result = await openMessagingForBooking({ bookingRef }).unwrap();
-          openMessaging({
-            threadId: result.threadId,
-            bookingRef: result.bookingRef,
-            searchPrefill: result.thread?.name || clientName || undefined,
-          });
+          openMessaging(prepareBookingMessagingOpen(result));
         } catch (error) {
           showSnackbar({
             severity: "error",
@@ -628,10 +662,6 @@ export default function ProfessionalFixedLocationCalendar({
               error,
               "Unable to open chat for this booking.",
             ),
-          });
-          openMessaging({
-            bookingRef,
-            searchPrefill: clientName || undefined,
           });
         }
       })();
@@ -702,9 +732,12 @@ export default function ProfessionalFixedLocationCalendar({
   const [productCatalog, setProductCatalog] = React.useState<
     BookingCatalogProduct[]
   >([]);
-  const [editingCatalogProductId, setEditingCatalogProductId] = React.useState<
-    string | null
-  >(null);
+  /** Booking-scoped line edit (never mutates master catalog definitions). */
+  const [editingBookingLine, setEditingBookingLine] = React.useState<null | {
+    kind: "product" | "unique";
+    id: string;
+    owner: "client" | string;
+  }>(null);
 
   /** Sync retail products from this professional's finance settings (backend). */
   React.useEffect(() => {
@@ -782,15 +815,8 @@ export default function ProfessionalFixedLocationCalendar({
     React.useState<CalendarBookingLocation>(data.supportedLocations[0] ?? "FL");
   const [slotBookingType, setSlotBookingType] =
     React.useState<CalendarBookingType>("Online");
-  const [slotStatus, setSlotStatus] = React.useState<
-    | "Confirmed"
-    | "Requested"
-    | "In Progress"
-    | "No Show"
-    | "Completed"
-    | "Cancelled"
-    | "Invalid"
-  >("Requested");
+  const [slotStatus, setSlotStatus] =
+    React.useState<CalendarBookingStatus>("Requested");
   const [slotClientAdded, setSlotClientAdded] = React.useState(false);
   const [slotCalendarOpen, setSlotCalendarOpen] = React.useState(false);
   const [slotCalendarTouched, setSlotCalendarTouched] = React.useState(false);
@@ -799,6 +825,8 @@ export default function ProfessionalFixedLocationCalendar({
     React.useState(false);
   const [discardBrOpen, setDiscardBrOpen] = React.useState(false);
   const [discardEbrOpen, setDiscardEbrOpen] = React.useState(false);
+  const [discardErOpen, setDiscardErOpen] = React.useState(false);
+  const [erNoteDialogOpen, setErNoteDialogOpen] = React.useState(false);
   const [incomingConfirmAction, setIncomingConfirmAction] = React.useState<
     "accept" | "suggest" | "reject" | null
   >(null);
@@ -861,22 +889,30 @@ export default function ProfessionalFixedLocationCalendar({
   const [uniqueItemDraft, setUniqueItemDraft] =
     React.useState<BookingUniqueItemDraft>(() => emptyBookingUniqueItemDraft());
   const [uniqueItemOrigin, setUniqueItemOrigin] = React.useState<
-    "products" | "booking"
-  >("products");
+    "products" | "unique"
+  >("unique");
+  const [editingCatalogProductId, setEditingCatalogProductId] = React.useState<
+    string | null
+  >(null);
+  const [pendingCatalogDelete, setPendingCatalogDelete] =
+    React.useState<BookingCatalogProduct | null>(null);
   const [bookingUniqueItems, setBookingUniqueItems] = React.useState<
     BookingUniqueItemLine[]
   >([]);
   const [customBookingProducts, setCustomBookingProducts] = React.useState<
     BookingCatalogProduct[]
   >([]);
-  const [pendingCatalogDelete, setPendingCatalogDelete] =
-    React.useState<BookingCatalogProduct | null>(null);
   const mergedCustomBookingProducts = React.useMemo(() => {
     const byId = new Map<string, BookingCatalogProduct>();
-    persistedUniqueCatalog.forEach((product) => byId.set(product.id, product));
-    customBookingProducts.forEach((product) => byId.set(product.id, product));
+    customBookingProducts.forEach((product) => {
+      if (!isUniqueItemId(product.id)) byId.set(product.id, product);
+    });
     return Array.from(byId.values());
-  }, [customBookingProducts, persistedUniqueCatalog]);
+  }, [customBookingProducts]);
+  const [uniqueItemSelectionDraft, setUniqueItemSelectionDraft] =
+    React.useState<BookingProductSelectionDraft>(() =>
+      createEmptyProductSelectionDraft(),
+    );
   const [showInlineGuestField, setShowInlineGuestField] = React.useState(false);
   const [inlineGuestDraft, setInlineGuestDraft] = React.useState({
     firstName: "",
@@ -908,10 +944,14 @@ export default function ProfessionalFixedLocationCalendar({
   const projectFileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [bufferDraft, setBufferDraft] = React.useState({
     title: "",
-    teamMemberId: "",
-    durationMins: "45",
+    teamMemberIds: [] as string[],
+    durationMins: "",
+    startTime: "",
     endTime: "",
   });
+  const [editingBufferId, setEditingBufferId] = React.useState<string | null>(
+    null,
+  );
   const [bookingGuests, setBookingGuests] = React.useState<
     Array<{
       id: string;
@@ -924,7 +964,10 @@ export default function ProfessionalFixedLocationCalendar({
       participantType?: "model" | "planning" | "guest" | "buffer" | "notes";
       planningActivity?: string;
       planningDuration?: string;
+      planningStartTime?: string;
+      planningEndTime?: string;
       bufferTeamMemberId?: string;
+      bufferStartTime?: string;
       bufferEndTime?: string;
     }>
   >([]);
@@ -1010,6 +1053,7 @@ export default function ProfessionalFixedLocationCalendar({
     | "select-services"
     | "edit-service"
     | "select-products"
+    | "select-unique-items"
     | "add-unique-item"
     | "add-buffer"
   >("new-booking");
@@ -1051,6 +1095,7 @@ export default function ProfessionalFixedLocationCalendar({
   React.useEffect(() => {
     if (slotBookingScreen !== "add-client-choice") return;
     setAddClientSource("");
+    setClientListSelectedEmail("");
     setPlatformEmailInput("");
     setPlatformEmailMatch(null);
     setPlatformLookupStatus("idle");
@@ -1429,6 +1474,12 @@ export default function ProfessionalFixedLocationCalendar({
     viewingBookingEvent?.details?.paymentMethod,
   );
   const drawerPaymentIsOffline = persistedPaymentIsOffline;
+  const onlinePrepayBlocksAccept = prepayBlocksConfirmation({
+    prepayRequired:
+      showPrepayment &&
+      ((Number(prepaymentPercent) || 0) > 0 || prepaymentAmount > 0),
+    prepayPaid: isDrawerPrepaymentPaid || drawerPaymentIsOffline,
+  });
 
   const isGuestClientPath =
     addClientSource === "guest" ||
@@ -1824,6 +1875,22 @@ export default function ProfessionalFixedLocationCalendar({
     [activityTimelineItems, drawerSalesActivityContext],
   );
 
+  const drawerLineTagComparisonMode = React.useMemo(():
+    | "ebr"
+    | "er"
+    | "silent_updated" => {
+    if (viewingBookingEvent?.details?.silentUpdated) return "silent_updated";
+    if (viewingBookingEvent?.bookingScenario === "EBR") return "ebr";
+    return "er";
+  }, [
+    viewingBookingEvent?.bookingScenario,
+    viewingBookingEvent?.details?.silentUpdated,
+  ]);
+
+  const openDrawerLineTagComparison = React.useCallback(() => {
+    openActivityComparison(drawerLineTagComparisonMode);
+  }, [drawerLineTagComparisonMode, openActivityComparison]);
+
   const isCompletedBooking = viewingBookingEvent?.status === "Completed";
   const isCancelledOrInvalidBooking =
     viewingBookingEvent?.status === "Cancelled" ||
@@ -1867,12 +1934,6 @@ export default function ProfessionalFixedLocationCalendar({
     isViewingBooking &&
     canRespondToIncomingRequest(viewingBookingEvent) &&
     !isEditingExisting;
-  const onlinePrepayBlocksAccept =
-    showIncomingRequestActions &&
-    showPrepayment &&
-    ((Number(prepaymentPercent) || 0) > 0 || prepaymentAmount > 0) &&
-    !isDrawerPrepaymentPaid &&
-    !drawerPaymentIsOffline;
   const showIncomingErActions =
     isViewingBooking &&
     canRespondToConfirmedEr(viewingBookingEvent) &&
@@ -1968,7 +2029,24 @@ export default function ProfessionalFixedLocationCalendar({
     isCompletedBooking ||
     isCancelledOrInvalidBooking ||
     (Boolean(editingEventId) && !isEditingExisting);
-  const isSelectedCompanyClient = selectedClient?.clientKind === "company";
+  const resolvedSelectedClientKind:
+    | "individual"
+    | "company"
+    | undefined = (() => {
+    if (selectedClient?.clientKind) return selectedClient.clientKind;
+    const email = selectedClient?.email?.trim().toLowerCase();
+    if (email) {
+      const listed = clientList.find(
+        (c) => c.email.trim().toLowerCase() === email,
+      );
+      if (listed?.clientKind) return listed.clientKind;
+    }
+    return (
+      viewingBookingEvent?.clientKind ??
+      viewingBookingEvent?.details?.clientKind
+    );
+  })();
+  const isSelectedCompanyClient = resolvedSelectedClientKind === "company";
   const canUseBookingProject =
     slotLocation === "DL" && slotClientAdded && isSelectedCompanyClient;
 
@@ -2104,11 +2182,14 @@ export default function ProfessionalFixedLocationCalendar({
     BookingDrawerParticipantKind[]
   >(() => {
     if (!showManualBookingParticipantActions) return [];
+    // Fixed Location (standard): Add Guest only.
     if (slotLocation === "FL") {
       if (isSelectedCompanyClient) return [];
       return extraGuestCount < FIXED_LOCATION_MAX_GUESTS ? ["guest"] : [];
     }
     if (slotLocation !== "DL") return [];
+    // Desired Location: company = Model, individual = Guest; Buffer always.
+    // Planning is project-only (never on DL standard).
     if (isSelectedCompanyClient) {
       return bookingProjectEnabled
         ? ["model", "planning", "buffer"]
@@ -2122,6 +2203,21 @@ export default function ProfessionalFixedLocationCalendar({
     showManualBookingParticipantActions,
     slotLocation,
   ]);
+  const openInlineGuestForm = React.useCallback(
+    (participantType: "guest" | "model") => {
+      setInlineGuestParticipantType(participantType);
+      setEditingInlineGuestId(null);
+      setInlineGuestDraft({
+        firstName: "",
+        lastName: "",
+        email: "",
+        phoneCode: "",
+        phoneNumber: "",
+      });
+      setShowInlineGuestField(true);
+    },
+    [],
+  );
   const showLineItemRemoveButton = !isViewingExisting;
   const showClientRemoveButton =
     showLineItemRemoveButton && !lockClientIdentity;
@@ -2131,6 +2227,7 @@ export default function ProfessionalFixedLocationCalendar({
   const isBookingSubScreen =
     slotBookingScreen === "select-services" ||
     slotBookingScreen === "select-products" ||
+    slotBookingScreen === "select-unique-items" ||
     slotBookingScreen === "edit-service" ||
     slotBookingScreen === "add-unique-item" ||
     slotBookingScreen === "add-buffer";
@@ -2581,10 +2678,30 @@ export default function ProfessionalFixedLocationCalendar({
         | "checkout"
         | "delete"
         | "rebook"
-        | "ok",
+        | "ok"
+        | "discard",
     ) => {
       setBookingActionAnchor(null);
       if (!editingEventId) return;
+
+      if (action === "discard") {
+        const current =
+          viewingBookingEvent ??
+          events.find((event) => event.id === editingEventId);
+        if (
+          current?.status === "Confirmed" &&
+          current.bookingScenario === "ER"
+        ) {
+          setDiscardErOpen(true);
+          return;
+        }
+        if (canDiscardEbr(current)) {
+          setDiscardEbrOpen(true);
+          return;
+        }
+        setDiscardBrOpen(true);
+        return;
+      }
 
       if (action === "edit") {
         if (
@@ -2935,17 +3052,58 @@ export default function ProfessionalFixedLocationCalendar({
   }, [activeDateIso, viewMode]);
 
   // Overview calendar: hide members with neither availability nor block on visible dates.
+  // When a drawer filter is applied, also keep members who have matching bookings
+  // so results are searched across the whole team, not only the focused person.
+  const locationFilterAvailable = data.supportedLocations.length > 1;
+  const filtersAreNarrowing = calendarFiltersAreNarrowing(appliedFilters, {
+    locationFilterAvailable,
+  });
+  const eventsMatchingDrawerFilters = React.useMemo(
+    () =>
+      events.filter((event) => {
+        if (appliedFilters.teamAll === false) {
+          const selectedIds = Object.entries(appliedFilters.teamIds)
+            .filter(([, checked]) => checked)
+            .map(([id]) => id);
+          if (
+            selectedIds.length &&
+            !selectedIds.some((id) => eventBelongsToTeamMember(event, id))
+          ) {
+            return false;
+          }
+        }
+        return eventMatchesNonTeamCalendarFilters(event, appliedFilters);
+      }),
+    [appliedFilters, events],
+  );
   const filteredResources = React.useMemo(
     () =>
-      filterDrawerResources.filter((resource) =>
-        resourceHasScheduleOrBlockOnAnyDate(
-          resource.id,
-          visibleDates,
-          scheduleRows,
-          blocks,
-        ),
-      ),
-    [blocks, filterDrawerResources, scheduleRows, visibleDates],
+      filterDrawerResources.filter((resource) => {
+        if (
+          resourceHasScheduleOrBlockOnAnyDate(
+            resource.id,
+            visibleDates,
+            scheduleRows,
+            blocks,
+          )
+        ) {
+          return true;
+        }
+        if (!filtersAreNarrowing) return false;
+        return eventsMatchingDrawerFilters.some(
+          (event) =>
+            visibleDates.includes(event.date) &&
+            eventBelongsToTeamMember(event, resource.id),
+        );
+      }),
+    [
+      blocks,
+      eventsMatchingDrawerFilters,
+      filterDrawerResources,
+      filtersAreNarrowing,
+      scheduleRows,
+      visibleDates,
+    ],
   );
 
   const alphabeticalResources = React.useMemo(
@@ -2957,15 +3115,22 @@ export default function ProfessionalFixedLocationCalendar({
   );
   const dayRankedResources = React.useMemo(
     () =>
-      rankResourcesForCalendarDay(filteredResources, events, activeDateIso, {
-        fallbackTeamMemberId,
-        knownTeamIds: knownTeamMemberIds,
-      }),
+      rankResourcesForCalendarDay(
+        filteredResources,
+        filtersAreNarrowing ? eventsMatchingDrawerFilters : events,
+        activeDateIso,
+        {
+          fallbackTeamMemberId,
+          knownTeamIds: knownTeamMemberIds,
+        },
+      ),
     [
       activeDateIso,
       events,
+      eventsMatchingDrawerFilters,
       fallbackTeamMemberId,
       filteredResources,
+      filtersAreNarrowing,
       knownTeamMemberIds,
     ],
   );
@@ -3052,6 +3217,27 @@ export default function ProfessionalFixedLocationCalendar({
     [dateOverrides, scheduleRows],
   );
 
+  const getFilteredAvailabilityFor = React.useCallback(
+    (resourceId: string, iso: string): Interval[] => {
+      if (appliedFilters.locationAll) return getAvailabilityFor(resourceId, iso);
+      const selected = (["FL", "DL"] as const).filter(
+        (location) => appliedFilters.locations[location],
+      );
+      if (!selected.length) return getAvailabilityFor(resourceId, iso);
+      return mergeIntervals(
+        selected.flatMap((location) =>
+          getLocationAvailability(resourceId, iso, location),
+        ),
+      );
+    },
+    [
+      appliedFilters.locationAll,
+      appliedFilters.locations,
+      getAvailabilityFor,
+      getLocationAvailability,
+    ],
+  );
+
   /** Grid height follows schedule, bookings, and blocks on visible days. */
   const { startMin, endMin } = React.useMemo(() => {
     const step = grid.stepMinutes;
@@ -3062,12 +3248,14 @@ export default function ProfessionalFixedLocationCalendar({
     ).map((resource) => resource.id);
     for (const iso of visibleDates) {
       for (const resourceId of resourceIds) {
-        for (const hours of getAvailabilityFor(resourceId, iso)) {
+        for (const hours of getFilteredAvailabilityFor(resourceId, iso)) {
           start = Math.min(start, hours.startMin);
           end = Math.max(end, hours.endMin);
         }
       }
-      for (const event of events) {
+      for (const event of filtersAreNarrowing
+        ? eventsMatchingDrawerFilters
+        : events) {
         if (event.date !== iso || event.status === "Cancelled") continue;
         start = Math.min(start, minutesSinceMidnight(event.start));
         end = Math.max(end, minutesSinceMidnight(event.end));
@@ -3092,8 +3280,10 @@ export default function ProfessionalFixedLocationCalendar({
     blocks,
     data.resources,
     events,
+    eventsMatchingDrawerFilters,
     filteredResources,
-    getAvailabilityFor,
+    filtersAreNarrowing,
+    getFilteredAvailabilityFor,
     grid.endHour,
     grid.startHour,
     grid.stepMinutes,
@@ -3121,6 +3311,11 @@ export default function ProfessionalFixedLocationCalendar({
       );
     }
 
+    // Drawer filters search the whole team: show every matching member as a column.
+    if (filtersAreNarrowing && filteredResources.length > 0) {
+      return filteredResources;
+    }
+
     const selectedMember =
       filteredResources.find((resource) => resource.id === selectedResourceId) ??
       filteredResources.find(
@@ -3128,6 +3323,47 @@ export default function ProfessionalFixedLocationCalendar({
       ) ??
       dayRankedResources[0] ??
       filteredResources[0];
+    const selectedId = String(selectedMember?.id ?? "");
+    const sharedColumnIds = new Set<string>();
+    for (const event of eventsMatchingDrawerFilters) {
+      if (event.date !== activeDateIso) continue;
+      const teamIds = [
+        ...new Set(
+          [
+            ...collectEventTeamMemberIds(event),
+            String(event.resourceId ?? "").trim(),
+          ].filter(Boolean),
+        ),
+      ];
+      if (teamIds.length <= 1) continue;
+      const involvesSelected =
+        !selectedId ||
+        teamIds.includes(selectedId) ||
+        eventBelongsToTeamMember(event, selectedId);
+      if (!involvesSelected) continue;
+      for (const teamId of teamIds) {
+        if (
+          filteredResources.some(
+            (resource) => String(resource.id) === String(teamId),
+          )
+        ) {
+          sharedColumnIds.add(String(teamId));
+        }
+      }
+    }
+    if (sharedColumnIds.size > 1) {
+      const ranked = dayRankedResources.filter((resource) =>
+        sharedColumnIds.has(String(resource.id)),
+      );
+      const extras = filteredResources.filter(
+        (resource) =>
+          sharedColumnIds.has(String(resource.id)) &&
+          !ranked.some((row) => row.id === resource.id),
+      );
+      const columns = [...ranked, ...extras];
+      if (columns.length > 1) return columns;
+    }
+
     if (selectedMember) return [selectedMember];
 
     if (data.resources.length === 0) {
@@ -3141,16 +3377,19 @@ export default function ProfessionalFixedLocationCalendar({
     }
     return [] as typeof filteredResources;
   }, [
+    activeDateIso,
     data.resources.length,
     dayRankedResources,
     defaultDaySelectedResourceId,
+    eventsMatchingDrawerFilters,
     filteredResources,
+    filtersAreNarrowing,
     selectedResourceId,
     splitScreen,
     viewMode,
   ]);
   const dayViewBodyGridTemplateColumns =
-    splitScreen && dayViewMemberColumnSource.length > 1
+    dayViewMemberColumnSource.length > 1
       ? `repeat(${dayViewMemberColumnSource.length}, minmax(0, 1fr))`
       : "1fr";
   // Week always needs the date header row; day only needs a header when staff exist.
@@ -3350,58 +3589,34 @@ export default function ProfessionalFixedLocationCalendar({
   );
 
   const eventsInRange = React.useMemo(() => {
-    const base = events.filter((e) => visibleDates.includes(e.date));
-    const focusedTeamId = String(
-      selectedResourceId || activeResource?.id || "",
+    const base = eventsMatchingDrawerFilters.filter((e) =>
+      visibleDates.includes(e.date),
     );
-    const fallbackTeamId = String(data.resources[0]?.id ?? "");
-    const byTeam = base.filter((event) => {
-      if (
-        appliedFilters.teamAll === false &&
-        event.resourceId &&
-        knownResourceIds.has(String(event.resourceId)) &&
-        !appliedFilters.teamIds[event.resourceId]
-      ) {
-        return false;
-      }
-      // Day view shows every visible member in parallel columns; per-column filtering happens in the grid.
-      if (viewMode === "day") return true;
-      if (!focusedTeamId) return true;
-      if (eventBelongsToTeamMember(event, focusedTeamId)) return true;
-      const hasKnownTeam =
-        Boolean(
-          event.resourceId && knownResourceIds.has(String(event.resourceId)),
-        ) ||
-        Boolean(
-          event.details?.services?.some(
-            (service) =>
-              service.teamMemberId &&
-              knownResourceIds.has(String(service.teamMemberId)),
-          ),
+    const scoped = (() => {
+      if (filtersAreNarrowing || viewMode === "day") return base;
+      const focusedTeamId = String(
+        selectedResourceId || activeResource?.id || "",
+      );
+      const fallbackTeamId = String(data.resources[0]?.id ?? "");
+      if (!focusedTeamId) return base;
+      return base.filter((event) => {
+        if (eventBelongsToTeamMember(event, focusedTeamId)) return true;
+        return (
+          !eventHasKnownTeamAssignment(event, knownResourceIds) &&
+          focusedTeamId === fallbackTeamId
         );
-      return !hasKnownTeam && focusedTeamId === fallbackTeamId;
-    });
-    const byLocation = appliedFilters.locationAll
-      ? byTeam
-      : byTeam.filter((e) => appliedFilters.locations[e.location]);
-    const byBooking = byLocation.filter((e) =>
-      eventMatchesBookingTypeFilter(e, appliedFilters),
+      });
+    })();
+    return scoped.flatMap((event) =>
+      calendarEventToDisplaySegments(event, resourceNameById),
     );
-    return byBooking.filter((e) => eventMatchesStatusFilter(e, appliedFilters));
   }, [
     activeResource?.id,
-    appliedFilters.booking,
-    appliedFilters.bookingAll,
-    appliedFilters.brRejectedOnly,
-    appliedFilters.statusAll,
-    appliedFilters.statuses,
-    appliedFilters.locationAll,
-    appliedFilters.locations,
-    appliedFilters.teamAll,
-    appliedFilters.teamIds,
     data.resources,
-    events,
+    eventsMatchingDrawerFilters,
+    filtersAreNarrowing,
     knownResourceIds,
+    resourceNameById,
     selectedResourceId,
     viewMode,
     visibleDates,
@@ -3463,20 +3678,16 @@ export default function ProfessionalFixedLocationCalendar({
     [activeDateIso],
   );
   const monthEvents = React.useMemo(() => {
-    const base = events.filter((e) => toMonthIso(e.date) === activeMonthIso);
+    const base = eventsMatchingDrawerFilters.filter(
+      (e) => toMonthIso(e.date) === activeMonthIso,
+    );
+    if (filtersAreNarrowing) return base;
     const focusedTeamId = String(
       selectedResourceId || activeResource?.id || "",
     );
     const fallbackTeamId = String(data.resources[0]?.id ?? "");
-    const byTeam = base.filter((event) => {
-      if (
-        appliedFilters.teamAll === false &&
-        event.resourceId &&
-        !appliedFilters.teamIds[event.resourceId]
-      ) {
-        return false;
-      }
-      if (!focusedTeamId) return true;
+    if (!focusedTeamId) return base;
+    return base.filter((event) => {
       if (eventBelongsToTeamMember(event, focusedTeamId)) return true;
       const hasKnownTeam = Boolean(
         event.resourceId &&
@@ -3486,27 +3697,12 @@ export default function ProfessionalFixedLocationCalendar({
       );
       return !hasKnownTeam && focusedTeamId === fallbackTeamId;
     });
-    const byLocation = appliedFilters.locationAll
-      ? byTeam
-      : byTeam.filter((e) => appliedFilters.locations[e.location]);
-    const byBooking = byLocation.filter((e) =>
-      eventMatchesBookingTypeFilter(e, appliedFilters),
-    );
-    return byBooking.filter((e) => eventMatchesStatusFilter(e, appliedFilters));
   }, [
     activeMonthIso,
     activeResource?.id,
-    appliedFilters.booking,
-    appliedFilters.bookingAll,
-    appliedFilters.brRejectedOnly,
-    appliedFilters.statusAll,
-    appliedFilters.statuses,
-    appliedFilters.locationAll,
-    appliedFilters.locations,
-    appliedFilters.teamAll,
-    appliedFilters.teamIds,
     data.resources,
-    events,
+    eventsMatchingDrawerFilters,
+    filtersAreNarrowing,
     selectedResourceId,
   ]);
   const monthCells = React.useMemo(() => {
@@ -3580,7 +3776,10 @@ export default function ProfessionalFixedLocationCalendar({
         | "uniqueItemProductName"
         | "uniqueItemPrice"
         | "bufferTitle"
-        | "bufferDuration",
+        | "bufferDuration"
+        | "bufferStartTime"
+        | "bufferEndTime"
+        | "bufferTeamMembers",
         string
       >
     > = {};
@@ -3622,6 +3821,17 @@ export default function ProfessionalFixedLocationCalendar({
       return { isValid, errors };
     }
 
+    if (slotBookingScreen === "select-unique-items") {
+      const hasSelected = Object.values(uniqueItemSelectionDraft).some(
+        (item) => item.selected,
+      );
+      if (!hasSelected) {
+        isValid = false;
+        errors.bookingClient = "Select at least one unique item.";
+      }
+      return { isValid, errors };
+    }
+
     if (slotBookingScreen === "add-unique-item") {
       const uniqueErrors = getUniqueItemDraftErrors(uniqueItemDraft);
       if (uniqueErrors.productName) {
@@ -3640,9 +3850,24 @@ export default function ProfessionalFixedLocationCalendar({
         isValid = false;
         errors.bufferTitle = "Title is required.";
       }
-      if (isBlank(bufferDraft.durationMins)) {
+      if (isBlank(bufferDraft.startTime)) {
         isValid = false;
-        errors.bufferDuration = "Duration is required.";
+        errors.bufferStartTime = "Start time is required.";
+      }
+      if (isBlank(bufferDraft.endTime)) {
+        isValid = false;
+        errors.bufferEndTime = "End time is required.";
+      } else if (
+        bufferDraft.startTime &&
+        minutesSinceMidnight(bufferDraft.endTime) <=
+          minutesSinceMidnight(bufferDraft.startTime)
+      ) {
+        isValid = false;
+        errors.bufferEndTime = "End time must be after start time.";
+      }
+      if (!bufferDraft.teamMemberIds.length) {
+        isValid = false;
+        errors.bufferTeamMembers = "Select at least one team member.";
       }
       return { isValid, errors };
     }
@@ -3833,6 +4058,7 @@ export default function ProfessionalFixedLocationCalendar({
     serviceSelectionDraft,
     serviceEditDraft,
     productSelectionDraft,
+    uniqueItemSelectionDraft,
     uniqueItemDraft,
     bufferDraft,
   ]);
@@ -3880,15 +4106,20 @@ export default function ProfessionalFixedLocationCalendar({
         if (e.date !== iso) continue;
         // Cancelled slots stay visually shown but are free to rebook.
         if (e.status === "Cancelled") continue;
-        const belongs =
-          eventBelongsToTeamMember(e, resourceId) ||
-          (resourceId === fallbackTeamMemberId &&
-            !eventHasKnownTeamAssignment(e, knownTeamMemberIds));
-        if (!belongs) continue;
-        busy.push({
-          startMin: minutesSinceMidnight(e.start),
-          endMin: minutesSinceMidnight(e.end),
-        });
+        const segments = expandCalendarEventToChronologicalSegments(e);
+        for (const segment of segments) {
+          const assignedId = String(segment.resourceId || e.resourceId);
+          const belongs =
+            assignedId === String(resourceId) ||
+            (resourceId === fallbackTeamMemberId &&
+              !eventHasKnownTeamAssignment(e, knownTeamMemberIds) &&
+              assignedId === String(e.resourceId));
+          if (!belongs) continue;
+          busy.push({
+            startMin: minutesSinceMidnight(segment.start),
+            endMin: minutesSinceMidnight(segment.end),
+          });
+        }
       }
       for (const b of blocks) {
         if (b.resourceId !== resourceId || b.date !== iso) continue;
@@ -3903,12 +4134,95 @@ export default function ProfessionalFixedLocationCalendar({
   );
 
   const drawerBookingDurationMins = React.useMemo(() => {
+    const span = getBookingTimedSpanMins({
+      bookingStart: selectedSlot?.start,
+      requesterPerson: {
+        id: "client",
+        name: selectedClient?.name ?? "Client",
+        isRequester: true,
+      },
+      mainServices: selectedServices,
+      guests: bookingGuests.map((guest) => ({
+        person: {
+          id: guest.id,
+          name: guest.name,
+          participantType: guest.participantType,
+          planningActivity: guest.planningActivity,
+          planningDuration: guest.planningDuration,
+          planningStartTime: guest.planningStartTime,
+          planningEndTime: guest.planningEndTime,
+          bufferStartTime: guest.bufferStartTime,
+          bufferEndTime: guest.bufferEndTime,
+          bufferTeamMemberId: guest.bufferTeamMemberId,
+        },
+        services: guest.services,
+      })),
+    });
+    if (span > 0) return span;
     const fromServices = selectedServices.reduce(
       (sum, service) => sum + (service.durationMins || 0),
       0,
     );
-    return fromServices > 0 ? fromServices : grid.stepMinutes;
-  }, [grid.stepMinutes, selectedServices]);
+    const fromGuests = bookingGuests.reduce((sum, guest) => {
+      const serviceMins = guest.services.reduce(
+        (inner, service) => inner + (service.durationMins || 0),
+        0,
+      );
+      const planningMins =
+        parseDurationMinsLabel(guest.planningDuration) ??
+        (guest.planningStartTime && guest.planningEndTime
+          ? minutesSinceMidnight(guest.planningEndTime) -
+            minutesSinceMidnight(guest.planningStartTime)
+          : guest.bufferStartTime && guest.bufferEndTime
+            ? minutesSinceMidnight(guest.bufferEndTime) -
+              minutesSinceMidnight(guest.bufferStartTime)
+            : 0);
+      return sum + serviceMins + Math.max(0, planningMins);
+    }, 0);
+    const total = fromServices + fromGuests;
+    return total > 0 ? total : grid.stepMinutes;
+  }, [
+    bookingGuests,
+    grid.stepMinutes,
+    selectedClient?.name,
+    selectedServices,
+    selectedSlot?.start,
+  ]);
+
+  const drawerChronologicalBlocks = React.useMemo(
+    () =>
+      buildDrawerChronologicalBlocks({
+        bookingStart: selectedSlot?.start,
+        requesterPerson: {
+          id: "client",
+          name: selectedClient?.name ?? "Client",
+          isRequester: true,
+        },
+        mainServices: selectedServices,
+        guests: bookingGuests,
+      }),
+    [bookingGuests, selectedClient?.name, selectedServices, selectedSlot?.start],
+  );
+
+  const primaryMainClientServices = React.useMemo(() => {
+    const firstMainBlock = drawerChronologicalBlocks.find(
+      (block) => block.isMainClient,
+    );
+    return firstMainBlock?.services ?? selectedServices;
+  }, [drawerChronologicalBlocks, selectedServices]);
+
+  const additionalDrawerBlocks = React.useMemo(
+    () =>
+      drawerChronologicalBlocks.filter(
+        (block) => !block.isMainClient || block.blockIndex > 0,
+      ),
+    [drawerChronologicalBlocks],
+  );
+
+  const chronologicalDrawerGuests = React.useMemo(
+    () => sortCalendarGuestsByStartTime(bookingGuests),
+    [bookingGuests],
+  );
 
   const hasScheduleAvailabilityOnDate = React.useCallback(
     (isoDate: string, resourceId?: string) => {
@@ -4067,20 +4381,59 @@ export default function ProfessionalFixedLocationCalendar({
   const applyDrawerTimeSlot = React.useCallback(
     (startTime: string) => {
       if (!selectedSlot || isViewingExisting) return;
-      const start = minutesSinceMidnight(startTime);
-      const end = start + drawerBookingDurationMins;
+      const newStart = fmtMinToTime(minutesSinceMidnight(startTime));
+      const [nextSelectedServices, ...nextGuestServiceGroups] =
+        recalculateGroupedServiceStartEndTimes(
+          [selectedServices, ...bookingGuests.map((guest) => guest.services)],
+          newStart,
+        );
+      const nextGuests = bookingGuests.map((guest, index) => ({
+        ...guest,
+        services: nextGuestServiceGroups[index] ?? [],
+      }));
+      const allServices = [
+        ...nextSelectedServices,
+        ...nextGuests.flatMap((guest) => guest.services),
+      ];
+
+      if (allServices.length > 0) {
+        const overridePatch: Record<
+          string,
+          Partial<BookingServiceLineItem>
+        > = {};
+        for (const service of allServices) {
+          overridePatch[service.id] = lineItemToOverride(service);
+        }
+        setServiceOverridesDraft((prev) => ({ ...prev, ...overridePatch }));
+        setSelectedServices(nextSelectedServices);
+        setBookingGuests(nextGuests);
+      }
+
+      const durationMins =
+        allServices.reduce(
+          (sum, service) => sum + (service.durationMins || 0),
+          0,
+        ) || drawerBookingDurationMins;
+      const start = minutesSinceMidnight(newStart);
+      const end = start + durationMins;
       setSelectedSlot((prev) =>
         prev
           ? {
               ...prev,
-              start: fmtMinToTime(start),
+              start: newStart,
               end: fmtMinToTime(end),
             }
           : prev,
       );
       setSlotCalendarTouched(true);
     },
-    [drawerBookingDurationMins, isViewingExisting, selectedSlot],
+    [
+      bookingGuests,
+      drawerBookingDurationMins,
+      isViewingExisting,
+      selectedServices,
+      selectedSlot,
+    ],
   );
 
   const getDailyBookingRatio = React.useCallback(
@@ -4414,14 +4767,14 @@ export default function ProfessionalFixedLocationCalendar({
         : [];
     const intervals: Interval[] = [];
     for (const member of members) {
-      intervals.push(...getAvailabilityFor(member.id, activeDateIso));
+      intervals.push(...getFilteredAvailabilityFor(member.id, activeDateIso));
     }
     return mergeIntervals(intervals);
   }, [
     activeDateIso,
     activeResource,
     dayViewMemberColumnSource,
-    getAvailabilityFor,
+    getFilteredAvailabilityFor,
     viewMode,
   ]);
 
@@ -4683,10 +5036,14 @@ export default function ProfessionalFixedLocationCalendar({
       setServiceEditDraft(emptyBookingServiceEditDraft());
       setServiceEditAttempted(false);
       setProductSelectionDraft(createEmptyProductSelectionDraft());
+      setUniqueItemSelectionDraft(createEmptyProductSelectionDraft());
       setUniqueItemDraft(emptyBookingUniqueItemDraft());
+      setUniqueItemOrigin("unique");
+      setEditingCatalogProductId(null);
+      setPendingCatalogDelete(null);
       setBookingUniqueItems([]);
       setCustomBookingProducts([]);
-      setEditingCatalogProductId(null);
+      setEditingBookingLine(null);
       setEditingEventId(null);
       setIsEditingExisting(false);
       setBookingGuests([]);
@@ -4761,6 +5118,7 @@ export default function ProfessionalFixedLocationCalendar({
       setOriginalServicesSnapshot([]);
       setDiscardBrOpen(false);
       setDiscardEbrOpen(false);
+      setDiscardErOpen(false);
       setSlotDrawerOpen(true);
     },
     [
@@ -4788,15 +5146,19 @@ export default function ProfessionalFixedLocationCalendar({
 
   const openExistingBooking = React.useCallback((ev: CalendarEvent) => {
     clearBookingDrawerNotListedHint();
-    const hydration = hydrateBookingDrawerFromEvent(ev);
+    const parentId = resolveParentCalendarEventId(ev.id);
+    const resolved =
+      events.find((item) => item.id === parentId) ??
+      (parentId !== ev.id ? { ...ev, id: parentId } : ev);
+    const hydration = hydrateBookingDrawerFromEvent(resolved);
 
     setSelectedSlot({
-      resourceId: ev.resourceId,
-      date: ev.date,
-      start: ev.start,
-      end: ev.end,
-      freeStart: ev.start,
-      freeEnd: ev.end,
+      resourceId: resolved.resourceId,
+      date: resolved.date,
+      start: resolved.start,
+      end: resolved.end,
+      freeStart: resolved.start,
+      freeEnd: resolved.end,
     });
     setSlotDrawerTab("booking");
     setSlotBookingScreen("new-booking");
@@ -4806,6 +5168,9 @@ export default function ProfessionalFixedLocationCalendar({
     setAllowDrawerTimeSelection(false);
     setSlotCalendarOpen(false);
     setSlotCalendarTouched(true);
+    const hydratedEmail = String(hydration.clientEmail ?? "")
+      .trim()
+      .toLowerCase();
     const isGuest = calendarEventIsGuest(ev);
     setSelectedClient({
       name: ev.showClientName ?? "Client",
@@ -4813,7 +5178,13 @@ export default function ProfessionalFixedLocationCalendar({
       mollureUserId: isGuest ? null : (ev.details?.customerId ?? null),
       clientKind: isGuest
         ? undefined
-        : (ev.clientKind ?? ev.details?.clientKind),
+        : (ev.clientKind ??
+          ev.details?.clientKind ??
+          (hydratedEmail
+            ? clientOptions.find(
+                (c) => c.email.trim().toLowerCase() === hydratedEmail,
+              )?.clientKind
+            : undefined)),
       isGuest,
       isMollure: !isGuest && Boolean(ev.details?.customerId),
     });
@@ -4847,13 +5218,17 @@ export default function ProfessionalFixedLocationCalendar({
     );
     setServiceSelectionDraft(hydration.services.map((service) => service.id));
     setProductSelectionDraft(createEmptyProductSelectionDraft());
+    setUniqueItemSelectionDraft(createEmptyProductSelectionDraft());
     setUniqueItemDraft(emptyBookingUniqueItemDraft());
-    setCustomBookingProducts([]);
+    setUniqueItemOrigin("unique");
     setEditingCatalogProductId(null);
+    setPendingCatalogDelete(null);
+    setCustomBookingProducts([]);
+    setEditingBookingLine(null);
       setBookingGuests(hydration.guests);
       setShowInlineGuestField(false);
       {
-        const snap = ev.details?.clientSnapshot;
+        const snap = resolved.details?.clientSnapshot;
         const project = snap?.projectDetails;
         setBookingProjectEnabled(
           Boolean(
@@ -4893,19 +5268,29 @@ export default function ProfessionalFixedLocationCalendar({
                 phoneCode: person.phoneCode,
                 phoneNumber: person.phoneNumber,
                 services: (snap.services ?? [])
-                  .filter((service) => service.guestId === person.id)
+                  .filter(
+                    (service) =>
+                      String(service.guestId ?? "").trim() === String(person.id),
+                  )
                   .map((service) => ({
                     id: service.id,
                     name: service.name,
                     price: service.price,
                     durationMins: service.durationMins,
                     staffResourceId: service.teamMemberId ?? undefined,
+                    guestId: service.guestId ?? person.id,
                   })),
-                products: [],
+                products: (resolved.details?.products ?? []).filter(
+                  (product) =>
+                    String(product.guestId ?? "").trim() === String(person.id),
+                ),
                 participantType: person.participantType ?? "guest",
                 planningActivity: person.planningActivity,
                 planningDuration: person.planningDuration,
+                planningStartTime: person.planningStartTime,
+                planningEndTime: person.planningEndTime,
                 bufferTeamMemberId: person.bufferTeamMemberId,
+                bufferStartTime: person.bufferStartTime,
                 bufferEndTime: person.bufferEndTime,
               })),
           );
@@ -4932,20 +5317,20 @@ export default function ProfessionalFixedLocationCalendar({
     setShowNoShowFee(hydration.showNoShowFee);
     setNoShowFeePercent(hydration.noShowFeePercent);
     setNoShowFeePercentCeiling(hydration.noShowFeePercentCeiling);
-    setCancellationFeeAt(ev.details?.cancellationFeeAt);
-    setExceededCancellationWindow(ev.details?.exceededCancellationWindow);
+    setCancellationFeeAt(resolved.details?.cancellationFeeAt);
+    setExceededCancellationWindow(resolved.details?.exceededCancellationWindow);
     setShowInternalNote(hydration.showInternalNote);
     setBookingInternalNote(hydration.internalNote);
     setBookingTotalDiscount(hydration.totalDiscount);
     setBookingDiscountModalOpen(false);
     setShowKilometerAllowance(hydration.showKilometerAllowance);
     setKilometerAllowanceDraft(hydration.kilometerAllowance);
-    setEditingEventId(ev.id);
-    setSlotStatus(ev.status);
+    setEditingEventId(resolved.id);
+    setSlotStatus(resolved.status);
     setIsEditingExisting(false);
     setIncomingRequestEditMode(false);
     setOriginalServicesSnapshot([
-      ...resolveOriginalServices(ev, hydration.services),
+      ...resolveOriginalServices(resolved, hydration.services),
       ...hydration.guests.flatMap((guest) => guest.services),
     ]);
     setSlotSaveAttempted(false);
@@ -4954,7 +5339,7 @@ export default function ProfessionalFixedLocationCalendar({
     setSlotAddMenuAnchor(null);
     setBookingMoreAnchor(null);
     setSlotDrawerOpen(true);
-    lastLiveHydratedEventKeyRef.current = bookingEventLiveKey(ev);
+    lastLiveHydratedEventKeyRef.current = bookingEventLiveKey(resolved);
     if (
       !(
         bookingCheckoutOpenRef.current &&
@@ -4965,10 +5350,10 @@ export default function ProfessionalFixedLocationCalendar({
     }
     markBookingUpdateSeen(
       "professional",
-      ev.bookingCode ?? extractBookingId(ev.id),
-      ev.updatedAt,
+      resolved.bookingCode ?? extractBookingId(resolved.id),
+      resolved.updatedAt,
     );
-  }, [bookingEventLiveKey, clearBookingDrawerNotListedHint]);
+  }, [bookingEventLiveKey, clearBookingDrawerNotListedHint, clientOptions, events]);
 
   React.useEffect(() => {
     if (!slotDrawerOpen) {
@@ -5195,10 +5580,74 @@ export default function ProfessionalFixedLocationCalendar({
     });
   }, [editingEventId, persistEventStatus, showSnackbar]);
 
+  const handleDiscardConfirmedEr = React.useCallback(async () => {
+    if (!editingEventId || !viewingBookingEvent) return;
+    const parsed = parseApiCalendarEventId(editingEventId);
+    if (parsed?.kind !== "booking") return;
+    const bookingRef =
+      viewingBookingEvent.bookingCode ?? extractBookingId(editingEventId);
+    try {
+      const result = await manageBookingEditRequest({
+        id: parsed.id,
+        action: "reject",
+      }).unwrap();
+      syncEditRequestFromBookingApi(bookingRef, result.data?.edit_request);
+      const details = { ...(viewingBookingEvent.details ?? {}) };
+      delete details.requestDirection;
+      const nextNotes = serializeCalendarEntryNotes(
+        details.internalNote ?? "",
+        details,
+        parseStoredEbrFromNotes(viewingBookingEvent.notes),
+        null,
+      );
+      await persistEventStatus(editingEventId, "Confirmed", {
+        notes: nextNotes,
+      });
+      setEvents((prev) =>
+        prev.map((event) =>
+          event.id === editingEventId
+            ? {
+                ...event,
+                status: "Confirmed",
+                bookingScenario: undefined,
+                notes: nextNotes,
+                details,
+              }
+            : event,
+        ),
+      );
+      showSnackbar({
+        severity: "success",
+        message: "Edit request discarded.",
+      });
+    } catch (error) {
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Unable to discard edit request."),
+      });
+    }
+  }, [
+    editingEventId,
+    manageBookingEditRequest,
+    persistEventStatus,
+    showSnackbar,
+    viewingBookingEvent,
+  ]);
+
   const handleRestartResponseTime = React.useCallback(async () => {
     if (!editingEventId || !viewingBookingEvent) return;
     const details = viewingBookingEvent.details ?? {};
-    const deadline = restartResponseDeadline(details);
+    const deadline = restartResponseDeadline(
+      details,
+      businessResponseWindowInput,
+    );
+    if (!deadline) {
+      showSnackbar({
+        severity: "info",
+        message: "No response time is configured for this business.",
+      });
+      return;
+    }
     const nextDetails = {
       ...details,
       ...deadline,
@@ -5241,6 +5690,7 @@ export default function ProfessionalFixedLocationCalendar({
       message: "Response time restarted.",
     });
   }, [
+    businessResponseWindowInput,
     editingEventId,
     persistEventStatus,
     showSnackbar,
@@ -5256,6 +5706,7 @@ export default function ProfessionalFixedLocationCalendar({
       ...(current?.details ?? {}),
       needsOk: false,
       ackScenario: undefined,
+      ackRecipient: undefined,
     };
     const nextNotes = serializeCalendarEntryNotes(
       nextDetails.internalNote ?? "",
@@ -5263,10 +5714,17 @@ export default function ProfessionalFixedLocationCalendar({
       parseStoredEbrFromNotes(current?.notes),
       parseStoredErFromNotes(current?.notes),
     );
+    const parsed = parseApiCalendarEventId(editingEventId);
     try {
-      await persistEventStatus(editingEventId, current?.status ?? "Confirmed", {
-        notes: nextNotes,
-      });
+      if (parsed?.kind === "booking" && onUpdateBookingStatus) {
+        await onUpdateBookingStatus(parsed.id, "confirmed", {
+          notes: nextNotes ?? undefined,
+        });
+      } else {
+        await persistEventStatus(editingEventId, "Confirmed", {
+          notes: nextNotes,
+        });
+      }
     } catch {
       showSnackbar({
         severity: "error",
@@ -5279,25 +5737,61 @@ export default function ProfessionalFixedLocationCalendar({
         event.id === editingEventId
           ? {
               ...event,
+              status: "Confirmed",
               bookingScenario: undefined,
               notes: nextNotes,
-              details: { ...(event.details ?? {}), needsOk: false, ackScenario: undefined },
+              details: {
+                ...(event.details ?? {}),
+                needsOk: false,
+                ackScenario: undefined,
+                ackRecipient: undefined,
+              },
             }
           : event,
       ),
     );
+    setSlotStatus("Confirmed");
     showSnackbar({
       severity: "success",
       message: "Booking request acknowledged.",
     });
-  }, [editingEventId, events, persistEventStatus, showSnackbar, viewingBookingEvent]);
+  }, [
+    editingEventId,
+    events,
+    onUpdateBookingStatus,
+    persistEventStatus,
+    showSnackbar,
+    viewingBookingEvent,
+  ]);
 
   const handleAcceptIncomingRequest = React.useCallback(async () => {
     if (!editingEventId || !viewingBookingEvent) return;
     const parsed = parseApiCalendarEventId(editingEventId);
+    const prepayRequired =
+      showPrepayment &&
+      ((Number(prepaymentPercent) || 0) > 0 || prepaymentAmount > 0);
+    const prepayPaid = isDrawerPrepaymentPaid || drawerPaymentIsOffline;
+    const ackScenario =
+      viewingBookingEvent.bookingScenario === "EBR" ? "EBR" : "BR";
+    const ackDetails = buildAcceptAckDetails({
+      prepayRequired,
+      prepayPaid,
+      requestDirection: viewingBookingEvent.details?.requestDirection ?? "incoming",
+      ackScenario,
+      base: viewingBookingEvent.details,
+    });
+
     if (!parsed || parsed.kind !== "booking" || !onUpdateBookingStatus) {
+      const nextNotes = serializeCalendarEntryNotes(
+        ackDetails.internalNote ?? "",
+        ackDetails,
+        parseStoredEbrFromNotes(viewingBookingEvent.notes),
+        parseStoredErFromNotes(viewingBookingEvent.notes),
+      );
       try {
-        await persistEventStatus(editingEventId, "Confirmed");
+        await persistEventStatus(editingEventId, "BR Accepted", {
+          notes: nextNotes,
+        });
       } catch (error) {
         showSnackbar({
           severity: "error",
@@ -5314,36 +5808,21 @@ export default function ProfessionalFixedLocationCalendar({
           event.id === editingEventId
             ? {
                 ...event,
-                status: "Confirmed",
-                bookingScenario: event.bookingScenario ?? "BR",
-                details: {
-                  ...(event.details ?? {}),
-                  needsOk: true,
-                  ackScenario: event.bookingScenario ?? "BR",
-                },
+                status: "BR Accepted",
+                bookingScenario: ackDetails.needsOk ? ackScenario : undefined,
+                notes: nextNotes,
+                details: ackDetails,
               }
             : event,
         ),
       );
-      setSlotStatus("Confirmed");
+      setSlotStatus("BR Accepted");
       setIncomingRequestEditMode(false);
       setIsEditingExisting(false);
       return;
     }
 
     try {
-      const prepayRequired =
-        showPrepayment &&
-        ((Number(prepaymentPercent) || 0) > 0 || prepaymentAmount > 0);
-      if (prepayRequired && !isDrawerPrepaymentPaid && !drawerPaymentIsOffline) {
-        showSnackbar({
-          severity: "warning",
-          message:
-            "Prepayment is required. The client must pay before you can accept this booking.",
-        });
-        restoreIncomingActions();
-        return;
-      }
       const ebr = parseStoredEbrFromNotes(viewingBookingEvent.notes);
       const isClientEbr =
         viewingBookingEvent.bookingScenario === "EBR" &&
@@ -5375,9 +5854,18 @@ export default function ProfessionalFixedLocationCalendar({
           price: product.price,
           quantity: product.quantity,
           unitPrice: product.unitPrice ?? product.price,
+          guestId: null as string | null,
         })),
-        ...bookingUniqueItems,
-        ...bookingGuests.flatMap((guest) => guest.products),
+        ...bookingUniqueItems.map((product) => ({
+          ...product,
+          guestId: null as string | null,
+        })),
+        ...bookingGuests.flatMap((guest) =>
+          guest.products.map((product) => ({
+            ...product,
+            guestId: guest.id,
+          })),
+        ),
       ];
       const suggestedServices = drawerServiceLines.length
         ? drawerServiceLines
@@ -5402,13 +5890,18 @@ export default function ProfessionalFixedLocationCalendar({
       const suggestedDate = ebr?.suggestedDateISO;
       const suggestedStart = ebr?.suggestedStart;
       const suggestedEnd = ebr?.suggestedEnd;
+      // Suggested schedule wins: re-sequence the lines from the accepted start.
+      const resolvedSuggestedServices =
+        suggestedStart && suggestedServices?.length
+          ? recalculateServiceStartEndTimes(suggestedServices, suggestedStart)
+          : suggestedServices;
       const originalServices =
         viewingBookingEvent.details?.originalServices ??
         viewingBookingEvent.details?.services ??
         [];
       const lineChanges = detectServiceLineChanges(
         originalServices,
-        suggestedServices ?? [],
+        resolvedSuggestedServices ?? [],
       );
       const ebrSuggestedIds = new Set(
         (ebr?.suggestedServices ?? []).map((service) => service.id),
@@ -5434,7 +5927,7 @@ export default function ProfessionalFixedLocationCalendar({
         ).trim();
         nextNotes = markClientEbrAcceptedInNotes(viewingBookingEvent.notes, {
           internalNote: appliedNote,
-          services: suggestedServices,
+          services: resolvedSuggestedServices,
           products: suggestedProducts,
           lastEditedBy: professionalAddedLines
             ? "professional"
@@ -5448,13 +5941,15 @@ export default function ProfessionalFixedLocationCalendar({
           cancelledServiceIds: lineChanges.cancelled,
           clientSnapshot: {
             ...(viewingBookingEvent.details?.clientSnapshot ?? {}),
-            ...(suggestedServices?.length
+            ...(resolvedSuggestedServices?.length
               ? {
-                  services: suggestedServices.map((s) => ({
+                  services: resolvedSuggestedServices.map((s) => ({
                     id: s.id,
                     name: s.name,
                     price: s.price,
                     durationMins: s.durationMins,
+                    startTime: s.startTime,
+                    endTime: s.endTime,
                     guestId: s.guestId,
                     teamMemberId: s.teamMemberId ?? s.staffResourceId,
                   })),
@@ -5517,8 +6012,8 @@ export default function ProfessionalFixedLocationCalendar({
               ],
               addedServiceIds: lineChanges.added,
               cancelledServiceIds: lineChanges.cancelled,
-              ...(suggestedServices?.length
-                ? { services: suggestedServices }
+              ...(resolvedSuggestedServices?.length
+                ? { services: resolvedSuggestedServices }
                 : {}),
               ...(suggestedProducts?.length
                 ? { products: suggestedProducts }
@@ -5733,6 +6228,16 @@ export default function ProfessionalFixedLocationCalendar({
         override?.staffResourceId?.trim() ||
         existingOnBooking?.staffResourceId?.trim() ||
         "";
+      const timedEnds: Array<{ endTime?: string }> = [
+        ...selectedServices.map((service) => ({ endTime: service.endTime })),
+        ...bookingGuests.flatMap((guest) => [
+          ...guest.services.map((service) => ({ endTime: service.endTime })),
+          { endTime: guest.planningEndTime || guest.bufferEndTime },
+        ]),
+      ];
+      const defaultStartAfterPrevious =
+        getLatestTimedEnd(timedEnds, selectedSlot?.start) ||
+        selectedSlot?.start;
       setServiceEditDraft(
         buildServiceEditDraftFromCatalog(service, {
           override: {
@@ -5742,7 +6247,7 @@ export default function ProfessionalFixedLocationCalendar({
           defaultStartTime:
             override?.startTime ??
             existingOnBooking?.startTime ??
-            selectedSlot?.start,
+            defaultStartAfterPrevious,
           defaultStaffResourceId: assignedStaff,
         }),
       );
@@ -5814,8 +6319,10 @@ export default function ProfessionalFixedLocationCalendar({
     const syncServices = (services: BookingServiceLineItem[]) => {
       const exists = services.some((service) => service.id === lineItem.id);
       if (!exists) return services;
-      return services.map((service) =>
-        service.id === lineItem.id ? { ...service, ...lineItem } : service,
+      return sortServicesByStartTime(
+        services.map((service) =>
+          service.id === lineItem.id ? { ...service, ...lineItem } : service,
+        ),
       );
     };
     setSelectedServices((prev) => syncServices(prev));
@@ -5889,7 +6396,7 @@ export default function ProfessionalFixedLocationCalendar({
       currentServices.map((service) => [service.id, service]),
     );
 
-    const pickedServices = serviceSelectionDraft
+    const pickedServicesRaw = serviceSelectionDraft
       .map((id) => {
         const catalogService = byId.get(id);
         if (catalogService) {
@@ -5901,20 +6408,23 @@ export default function ProfessionalFixedLocationCalendar({
             );
           }
           const existing = currentById.get(id);
+          // Sequential placement below; preserve staff only unless edited via override.
           return {
             id: catalogService.id,
             name: catalogService.name,
             price: catalogService.price,
             durationMins: catalogService.durationMins,
-            startTime: selectedSlot?.start,
-            endTime: selectedSlot?.end,
-            // Keep prior assignment if service was already on the booking.
             staffResourceId: existing?.staffResourceId,
           } satisfies BookingServiceLineItem;
         }
         return currentById.get(id) ?? null;
       })
       .filter((service): service is BookingServiceLineItem => Boolean(service));
+
+    const pickedServices = placeServicesSequentially(
+      pickedServicesRaw,
+      selectedSlot?.start,
+    );
 
     // Auto-assign most-available team member (client-like):
     // Desired Location → one shared member; Fixed → per service.
@@ -5953,23 +6463,17 @@ export default function ProfessionalFixedLocationCalendar({
           }
         }
       } else {
-        let cursor = minutesSinceMidnight(
-          pickedServices.find((service) => service.startTime)?.startTime ??
-            selectedSlot?.start ??
-            "00:00",
-        );
         for (let i = 0; i < pickedServices.length; i += 1) {
           const service = pickedServices[i];
           const duration = Math.max(1, service.durationMins || 0);
-          const startMin = service.startTime
-            ? minutesSinceMidnight(service.startTime)
-            : cursor;
+          const startMin = minutesSinceMidnight(
+            service.startTime ?? selectedSlot?.start ?? "00:00",
+          );
           if (service.staffResourceId) {
             const memberId = service.staffResourceId;
             const busy = virtualBusy.get(memberId) ?? [];
             busy.push({ startMin, endMin: startMin + duration });
             virtualBusy.set(memberId, busy);
-            cursor = startMin + duration;
             continue;
           }
           const memberId = pickMostAvailableTeamMemberId(
@@ -5987,7 +6491,6 @@ export default function ProfessionalFixedLocationCalendar({
             ...service,
             staffResourceId: memberId || undefined,
           };
-          cursor = startMin + duration;
         }
       }
     }
@@ -6002,7 +6505,7 @@ export default function ProfessionalFixedLocationCalendar({
       }
     }
     for (const service of pickedServices) mergedById.set(service.id, service);
-    const nextServices = Array.from(mergedById.values());
+    const nextServices = sortServicesByStartTime(Array.from(mergedById.values()));
 
     // Service start times take priority for the calendar booking slot.
     const timedServices = nextServices
@@ -6014,9 +6517,14 @@ export default function ProfessionalFixedLocationCalendar({
       );
     if (timedServices.length > 0) {
       const first = timedServices[0];
+      const last = timedServices[timedServices.length - 1];
       const start = first.startTime!;
       const end =
-        first.endTime || addMinutesToTime(start, first.durationMins);
+        last.endTime ||
+        addMinutesToTime(
+          last.startTime ?? start,
+          last.durationMins,
+        );
       setSelectedSlot((prev) =>
         prev
           ? {
@@ -6063,33 +6571,12 @@ export default function ProfessionalFixedLocationCalendar({
 
   const openSelectProducts = React.useCallback(() => {
     setSelectionTarget(addMenuTarget);
-    const currentProducts =
-      addMenuTarget === "client"
-        ? selectedProducts
-        : (bookingGuests.find((item) => item.id === addMenuTarget)?.products ??
-          []);
-
-    const customFromSelection = currentProducts
-      .filter((product) => product.id.startsWith("unique-"))
-      .map((product) => ({
-        id: product.id,
-        name: getProductBaseName(product.name, product.quantity),
-        price: product.unitPrice,
-      }));
-
-    setCustomBookingProducts((prev) => {
-      const merged = new Map<string, BookingCatalogProduct>();
-      prev.forEach((product) => merged.set(product.id, product));
-      customFromSelection.forEach((product) => merged.set(product.id, product));
-      return Array.from(merged.values());
-    });
-
     // Add flow: nothing preselected — only what the user picks is added.
     setProductSelectionDraft(createEmptyProductSelectionDraft());
 
     setSlotAddMenuAnchor(null);
     setSlotBookingScreen("select-products");
-  }, [addMenuTarget, bookingGuests, selectedProducts]);
+  }, [addMenuTarget]);
 
   const toggleProductSelectionDraft = React.useCallback(
     (productId: string) => {
@@ -6136,7 +6623,9 @@ export default function ProfessionalFixedLocationCalendar({
         return buildBookingProductLine(product, quantity);
       });
 
-    const nextProducts = [...catalogProducts, ...customProducts];
+    const nextProducts = [...catalogProducts, ...customProducts].filter(
+      (product) => !isUniqueItemId(product.id),
+    );
     const currentProducts =
       selectionTarget === "client"
         ? selectedProducts
@@ -6152,13 +6641,25 @@ export default function ProfessionalFixedLocationCalendar({
     }
     const mergedProducts = Array.from(mergedById.values());
 
+    // Section 2.9: stamp onto the person's earliest chronological service block.
+    const ownerServices =
+      selectionTarget === "client"
+        ? selectedServices
+        : (bookingGuests.find((item) => item.id === selectionTarget)
+            ?.services ?? []);
+    const stampedProducts = stampProductsToEarliestBlock(
+      mergedProducts,
+      ownerServices,
+      selectionTarget === "client" ? null : selectionTarget,
+    );
+
     if (selectionTarget === "client") {
-      setSelectedProducts(mergedProducts);
+      setSelectedProducts(stampedProducts);
     } else {
       setBookingGuests((prev) =>
         prev.map((guest) =>
           guest.id === selectionTarget
-            ? { ...guest, products: mergedProducts }
+            ? { ...guest, products: stampedProducts }
             : guest,
         ),
       );
@@ -6171,13 +6672,135 @@ export default function ProfessionalFixedLocationCalendar({
     productCatalog,
     productSelectionDraft,
     selectedProducts,
+    selectedServices,
     selectionTarget,
   ]);
 
+  const openSelectUniqueItems = React.useCallback(() => {
+    setSelectionTarget(addMenuTarget);
+    setUniqueItemSelectionDraft(createEmptyProductSelectionDraft());
+    setSlotAddMenuAnchor(null);
+    setSlotBookingScreen("select-unique-items");
+  }, [addMenuTarget]);
+
+  const toggleUniqueItemSelectionDraft = React.useCallback(
+    (productId: string) => {
+      if (isViewingExisting) return;
+      setUniqueItemSelectionDraft((prev) => {
+        const current = prev[productId] ?? { selected: false, quantity: 1 };
+        return {
+          ...prev,
+          [productId]: { ...current, selected: !current.selected },
+        };
+      });
+    },
+    [isViewingExisting],
+  );
+
+  const adjustUniqueItemQuantityDraft = React.useCallback(
+    (productId: string, delta: number) => {
+      if (isViewingExisting) return;
+      setUniqueItemSelectionDraft((prev) => {
+        const current = prev[productId] ?? { selected: false, quantity: 1 };
+        if (!current.selected) return prev;
+        const nextQty = Math.max(1, current.quantity + delta);
+        return {
+          ...prev,
+          [productId]: { ...current, quantity: nextQty },
+        };
+      });
+    },
+    [isViewingExisting],
+  );
+
+  const applyUniqueItemSelection = React.useCallback(() => {
+    const nextItems = persistedUniqueCatalog
+      .filter((item) => uniqueItemSelectionDraft[item.id]?.selected)
+      .map((item) => {
+        const quantity = uniqueItemSelectionDraft[item.id]?.quantity ?? 1;
+        const line = buildBookingProductLine(item, quantity);
+        const id = isUniqueItemId(line.id) ? line.id : `unique-${line.id}`;
+        return { ...line, id };
+      });
+
+    const ownerServices =
+      selectionTarget === "client"
+        ? selectedServices
+        : (bookingGuests.find((item) => item.id === selectionTarget)
+            ?.services ?? []);
+
+    if (selectionTarget === "client") {
+      const mergedById = new Map(
+        bookingUniqueItems.map((item) => [item.id, item]),
+      );
+      for (const item of nextItems) {
+        mergedById.set(item.id, item);
+      }
+      setBookingUniqueItems(
+        stampProductsToEarliestBlock(
+          Array.from(mergedById.values()),
+          ownerServices,
+          null,
+        ),
+      );
+    } else {
+      const current =
+        bookingGuests.find((item) => item.id === selectionTarget)?.products ??
+        [];
+      const mergedById = new Map(current.map((item) => [item.id, item]));
+      for (const item of nextItems) {
+        mergedById.set(item.id, item);
+      }
+      const stamped = stampProductsToEarliestBlock(
+        Array.from(mergedById.values()),
+        ownerServices,
+        selectionTarget,
+      );
+      setBookingGuests((prev) =>
+        prev.map((guest) =>
+          guest.id === selectionTarget
+            ? { ...guest, products: stamped }
+            : guest,
+        ),
+      );
+    }
+    setSlotBookingScreen("new-booking");
+    setSlotSaveAttempted(false);
+  }, [
+    bookingGuests,
+    bookingUniqueItems,
+    persistedUniqueCatalog,
+    selectedServices,
+    selectionTarget,
+    uniqueItemSelectionDraft,
+  ]);
+
+  const resetUniqueItemForm = React.useCallback(() => {
+    setEditingBookingLine(null);
+    setEditingCatalogProductId(null);
+    setUniqueItemOrigin("unique");
+    setUniqueItemDraft(emptyBookingUniqueItemDraft());
+  }, []);
+
+  const leaveUniqueItemScreen = React.useCallback(() => {
+    if (editingBookingLine) {
+      resetUniqueItemForm();
+      setSlotBookingScreen("new-booking");
+      return;
+    }
+    const back =
+      uniqueItemOrigin === "products"
+        ? "select-products"
+        : "select-unique-items";
+    resetUniqueItemForm();
+    setSlotBookingScreen(back);
+  }, [editingBookingLine, resetUniqueItemForm, uniqueItemOrigin]);
+
   const openAddUniqueItem = React.useCallback(
-    (origin: "products" | "booking" = "products") => {
-      setUniqueItemOrigin(origin);
+    (origin: "products" | "unique" = "unique") => {
+      setEditingBookingLine(null);
       setEditingCatalogProductId(null);
+      setUniqueItemOrigin(origin);
       setUniqueItemDraft(emptyBookingUniqueItemDraft());
       setSlotBookingScreen("add-unique-item");
     },
@@ -6185,18 +6808,89 @@ export default function ProfessionalFixedLocationCalendar({
   );
 
   const openEditCatalogProduct = React.useCallback(
-    (product: BookingCatalogProduct) => {
+    (
+      product: BookingCatalogProduct,
+      origin: "products" | "unique" = "products",
+    ) => {
       if (isViewingExisting) return;
-      setUniqueItemOrigin("products");
+      setEditingBookingLine(null);
       setEditingCatalogProductId(product.id);
+      setUniqueItemOrigin(origin);
       setUniqueItemDraft(buildUniqueItemDraftFromProduct(product));
       setSlotBookingScreen("add-unique-item");
     },
     [isViewingExisting],
   );
 
-  const persistBookingCatalogProduct = React.useCallback(
-    (product: BookingCatalogProduct, kind: "product" | "unique") => {
+  const draftFromBookingLine = React.useCallback(
+    (line: {
+      id: string;
+      name: string;
+      quantity: number;
+      unitPrice: number;
+      vat?: string;
+      discount?: { type: "fixed" | "percentage"; amount: number } | null;
+    }) => {
+      const catalogMatch = productCatalog.find((product) => product.id === line.id);
+      return buildUniqueItemDraftFromProduct({
+        name: getProductBaseName(line.name, line.quantity),
+        price: line.unitPrice,
+        vat: line.vat ?? catalogMatch?.vat,
+        unit: line.quantity,
+        discountType: line.discount?.type ?? "fixed",
+        discountAmount: line.discount
+          ? String(line.discount.amount)
+          : "0",
+      });
+    },
+    [productCatalog],
+  );
+
+  const openEditBookingProductLine = React.useCallback(
+    (
+      product: {
+        id: string;
+        name: string;
+        quantity: number;
+        unitPrice: number;
+        vat?: string;
+        discount?: { type: "fixed" | "percentage"; amount: number } | null;
+      },
+      owner: "client" | string,
+    ) => {
+      if (isViewingExisting && !incomingRequestEditMode) return;
+      setUniqueItemOrigin("products");
+      setEditingBookingLine({ kind: "product", id: product.id, owner });
+      setUniqueItemDraft(draftFromBookingLine(product));
+      setSlotBookingScreen("add-unique-item");
+    },
+    [draftFromBookingLine, incomingRequestEditMode, isViewingExisting],
+  );
+
+  const openEditBookingUniqueLine = React.useCallback(
+    (
+      item: {
+        id: string;
+        name: string;
+        quantity: number;
+        unitPrice: number;
+        vat?: string;
+        discount?: { type: "fixed" | "percentage"; amount: number } | null;
+      },
+      owner: "client" | string = "client",
+    ) => {
+      if (isViewingExisting && !incomingRequestEditMode) return;
+      setEditingCatalogProductId(null);
+      setUniqueItemOrigin("unique");
+      setEditingBookingLine({ kind: "unique", id: item.id, owner });
+      setUniqueItemDraft(draftFromBookingLine(item));
+      setSlotBookingScreen("add-unique-item");
+    },
+    [draftFromBookingLine, incomingRequestEditMode, isViewingExisting],
+  );
+
+  const persistBookingUniqueCatalogItem = React.useCallback(
+    (product: BookingCatalogProduct) => {
       const payload = toFinanceCatalogProduct({
         id: product.id,
         name: product.name,
@@ -6206,136 +6900,114 @@ export default function ProfessionalFixedLocationCalendar({
         discountType: product.discountType,
         discountAmount: product.discountAmount,
       });
-      setFinanceSettings((prev) =>
-        kind === "unique"
-          ? upsertFinanceUniqueItem(prev, payload)
-          : upsertFinanceProduct(prev, payload),
-      );
+      setFinanceSettings((prev) => upsertFinanceUniqueItem(prev, payload));
     },
     [setFinanceSettings],
   );
 
-  const applyUniqueItem = React.useCallback(() => {
-    if (editingCatalogProductId) {
-      const updated = buildCatalogProductFromUniqueItemDraft(
-        uniqueItemDraft,
-        editingCatalogProductId,
-      );
-      if (!updated) return;
+  const persistBookingCatalogProduct = React.useCallback(
+    (product: BookingCatalogProduct) => {
+      const payload = toFinanceCatalogProduct({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        vat: product.vat,
+        unit: product.unit,
+        discountType: product.discountType,
+        discountAmount: product.discountAmount,
+      });
+      setFinanceSettings((prev) => upsertFinanceProduct(prev, payload));
+    },
+    [setFinanceSettings],
+  );
 
-      const isPersistedUnique =
-        editingCatalogProductId.startsWith("unique-") ||
-        customBookingProducts.some(
-          (product) => product.id === editingCatalogProductId,
-        ) ||
-        (financeSettings.uniqueItems ?? []).some(
-          (item) => item.id === editingCatalogProductId,
-        );
-      const isCustom = customBookingProducts.some(
-        (product) => product.id === editingCatalogProductId,
+  const confirmCatalogDelete = React.useCallback(() => {
+    if (!pendingCatalogDelete) return;
+    const id = pendingCatalogDelete.id;
+    const inProductCatalog = productCatalog.some((product) => product.id === id);
+    if (inProductCatalog) {
+      setFinanceSettings((prev) => removeFinanceProduct(prev, id));
+    } else {
+      setFinanceSettings((prev) => removeFinanceUniqueItem(prev, id));
+      setCustomBookingProducts((prev) =>
+        prev.filter((product) => product.id !== id),
       );
-      if (isCustom) {
-        setCustomBookingProducts((prev) =>
+    }
+    setProductSelectionDraft((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setUniqueItemSelectionDraft((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setPendingCatalogDelete(null);
+  }, [pendingCatalogDelete, productCatalog, setFinanceSettings]);
+
+  const applyUniqueItem = React.useCallback(() => {
+    // Booking-scoped edit: update only this booking's line, never the master catalog.
+    if (editingBookingLine) {
+      const line = buildUniqueItemLine(uniqueItemDraft, editingBookingLine.id);
+      if (!line) return;
+
+      const ownerServices =
+        editingBookingLine.owner === "client"
+          ? selectedServices
+          : (bookingGuests.find((guest) => guest.id === editingBookingLine.owner)
+              ?.services ?? []);
+      const [stamped] = stampProductsToEarliestBlock(
+        [line],
+        ownerServices,
+        editingBookingLine.owner === "client" ? null : editingBookingLine.owner,
+      );
+
+      if (editingBookingLine.kind === "unique") {
+        if (editingBookingLine.owner === "client") {
+          setBookingUniqueItems((prev) =>
+            prev.map((item) =>
+              item.id === editingBookingLine.id ? stamped : item,
+            ),
+          );
+        } else {
+          const ownerId = editingBookingLine.owner;
+          setBookingGuests((prev) =>
+            prev.map((guest) =>
+              guest.id === ownerId
+                ? {
+                    ...guest,
+                    products: guest.products.map((product) =>
+                      product.id === editingBookingLine.id ? stamped : product,
+                    ),
+                  }
+                : guest,
+            ),
+          );
+        }
+      } else if (editingBookingLine.owner === "client") {
+        setSelectedProducts((prev) =>
           prev.map((product) =>
-            product.id === editingCatalogProductId ? updated : product,
+            product.id === editingBookingLine.id ? stamped : product,
           ),
         );
-      } else if (!isPersistedUnique) {
-        setProductCatalog((prev) =>
-          prev.map((product) =>
-            product.id === editingCatalogProductId ? updated : product,
-          ),
-        );
-        setFinanceSettings((prev) => ({
-          ...prev,
-          products: prev.products.map((product) =>
-            product.id === editingCatalogProductId
+      } else {
+        const ownerId = editingBookingLine.owner;
+        setBookingGuests((prev) =>
+          prev.map((guest) =>
+            guest.id === ownerId
               ? {
-                  ...product,
-                  name: updated.name,
-                  price: `${updated.price}EUR`,
-                  vat: updated.vat?.trim() || product.vat,
-                  unit: updated.unit,
-                  discountType: updated.discountType,
-                  discountAmount: updated.discountAmount,
+                  ...guest,
+                  products: guest.products.map((product) =>
+                    product.id === editingBookingLine.id ? stamped : product,
+                  ),
                 }
-              : product,
+              : guest,
           ),
-        }));
+        );
       }
 
-      persistBookingCatalogProduct(
-        updated,
-        isPersistedUnique ? "unique" : "product",
-      );
-
-      const syncSelectedProducts = (
-        products: Array<{
-          id: string;
-          name: string;
-          price: number;
-          quantity: number;
-          unitPrice: number;
-        }>,
-      ) =>
-        products.map((product) => {
-          if (product.id !== editingCatalogProductId) return product;
-          const quantity = Math.max(1, product.quantity);
-          return {
-            ...product,
-            name: formatProductLineName(updated.name, quantity),
-            unitPrice: updated.price,
-            price: updated.price * quantity,
-          };
-        });
-
-      setSelectedProducts((prev) => syncSelectedProducts(prev));
-      setBookingGuests((prev) =>
-        prev.map((guest) => ({
-          ...guest,
-          products: syncSelectedProducts(guest.products),
-        })),
-      );
-
-      setProductSelectionDraft((prev) => {
-        const current = prev[editingCatalogProductId];
-        if (!current) return prev;
-        return {
-          ...prev,
-          [editingCatalogProductId]: {
-            ...current,
-            quantity: Math.max(1, uniqueItemDraft.unit || current.quantity),
-          },
-        };
-      });
-
-      setEditingCatalogProductId(null);
-      setUniqueItemDraft(emptyBookingUniqueItemDraft());
-      setSlotBookingScreen("select-products");
-      setSlotSaveAttempted(false);
-      return;
-    }
-
-    const line = buildUniqueItemLine(uniqueItemDraft);
-    if (!line) return;
-
-    if (uniqueItemOrigin === "booking") {
-      setBookingUniqueItems((prev) => [
-        ...prev,
-        { ...line, name: uniqueItemDraft.productName.trim() },
-      ]);
-      persistBookingCatalogProduct(
-        {
-          id: line.id,
-          name: uniqueItemDraft.productName.trim(),
-          price: line.unitPrice,
-          vat: uniqueItemDraft.vat.trim() || undefined,
-          unit: line.quantity,
-          discountType: uniqueItemDraft.discountType,
-          discountAmount: uniqueItemDraft.discountAmount,
-        },
-        "unique",
-      );
+      setEditingBookingLine(null);
       setUniqueItemDraft(emptyBookingUniqueItemDraft());
       setSlotBookingScreen("new-booking");
       setSlotSaveAttempted(false);
@@ -6345,75 +7017,112 @@ export default function ProfessionalFixedLocationCalendar({
       return;
     }
 
-    const catalogId = `p-${Date.now()}`;
-    const customProduct: BookingCatalogProduct = {
-      id: catalogId,
-      name: uniqueItemDraft.productName.trim(),
-      price: line.unitPrice,
-      vat: uniqueItemDraft.vat.trim() || undefined,
-      unit: line.quantity,
-      discountType: uniqueItemDraft.discountType,
-      discountAmount: uniqueItemDraft.discountAmount,
-    };
+    if (editingCatalogProductId) {
+      const next = buildCatalogProductFromUniqueItemDraft(
+        uniqueItemDraft,
+        editingCatalogProductId,
+      );
+      if (!next) return;
+      const editingProduct = uniqueItemOrigin === "products";
+      if (editingProduct) {
+        persistBookingCatalogProduct(next);
+        setProductSelectionDraft((prev) => {
+          const current = prev[next.id];
+          if (!current) return prev;
+          return {
+            ...prev,
+            [next.id]: {
+              ...current,
+              quantity: Math.max(1, next.unit ?? current.quantity),
+            },
+          };
+        });
+      } else {
+        persistBookingUniqueCatalogItem(next);
+        setUniqueItemSelectionDraft((prev) => {
+          const current = prev[next.id];
+          if (!current) return prev;
+          return {
+            ...prev,
+            [next.id]: {
+              ...current,
+              quantity: Math.max(1, next.unit ?? current.quantity),
+            },
+          };
+        });
+      }
+      resetUniqueItemForm();
+      setSlotBookingScreen(
+        editingProduct ? "select-products" : "select-unique-items",
+      );
+      setSlotSaveAttempted(false);
+      return;
+    }
 
-    persistBookingCatalogProduct(customProduct, "product");
-    setProductSelectionDraft((prev) => ({
+    if (uniqueItemOrigin === "products") {
+      const next = buildCatalogProductFromUniqueItemDraft(
+        uniqueItemDraft,
+        `prod-${Date.now()}`,
+      );
+      if (!next) return;
+      persistBookingCatalogProduct(next);
+      setProductSelectionDraft((prev) => ({
+        ...prev,
+        [next.id]: { selected: true, quantity: Math.max(1, next.unit ?? 1) },
+      }));
+      resetUniqueItemForm();
+      setSlotBookingScreen("select-products");
+      setSlotSaveAttempted(false);
+      return;
+    }
+
+    const next = buildCatalogProductFromUniqueItemDraft(
+      uniqueItemDraft,
+      `unique-${Date.now()}`,
+    );
+    if (!next) return;
+    persistBookingUniqueCatalogItem(next);
+    setUniqueItemSelectionDraft((prev) => ({
       ...prev,
-      [catalogId]: { selected: true, quantity: line.quantity },
+      [next.id]: { selected: true, quantity: Math.max(1, next.unit ?? 1) },
     }));
-    setUniqueItemDraft(emptyBookingUniqueItemDraft());
-    setSlotBookingScreen("select-products");
+    resetUniqueItemForm();
+    setSlotBookingScreen("select-unique-items");
     setSlotSaveAttempted(false);
-    void dispatchBookingEventIfApi(editingEventId, "unique_item_edited", {
-      initiated_by: "professional",
-    });
   }, [
-    customBookingProducts,
+    bookingGuests,
     dispatchBookingEventIfApi,
+    editingBookingLine,
     editingCatalogProductId,
     editingEventId,
-    financeSettings.uniqueItems,
     persistBookingCatalogProduct,
-    setFinanceSettings,
+    persistBookingUniqueCatalogItem,
+    resetUniqueItemForm,
+    selectedServices,
     uniqueItemDraft,
     uniqueItemOrigin,
-  ]);
-
-  const confirmDeleteCatalogProduct = React.useCallback(() => {
-    if (!pendingCatalogDelete) return;
-    const id = pendingCatalogDelete.id;
-    const isUnique =
-      id.startsWith("unique-") ||
-      (financeSettings.uniqueItems ?? []).some((item) => item.id === id) ||
-      customBookingProducts.some((product) => product.id === id);
-
-    setFinanceSettings((prev) =>
-      isUnique ? removeFinanceUniqueItem(prev, id) : removeFinanceProduct(prev, id),
-    );
-    setCustomBookingProducts((prev) =>
-      prev.filter((product) => product.id !== id),
-    );
-    setProductCatalog((prev) => prev.filter((product) => product.id !== id));
-    setProductSelectionDraft((prev) => {
-      if (!prev[id]) return prev;
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-    setPendingCatalogDelete(null);
-  }, [
-    customBookingProducts,
-    financeSettings.uniqueItems,
-    pendingCatalogDelete,
-    setFinanceSettings,
   ]);
 
   const isBookingDetailsSubScreen =
     slotBookingScreen === "select-services" ||
     slotBookingScreen === "edit-service" ||
     slotBookingScreen === "select-products" ||
+    slotBookingScreen === "select-unique-items" ||
     slotBookingScreen === "add-unique-item" ||
     slotBookingScreen === "add-buffer";
+
+  const uniqueItemFlowIsProduct =
+    uniqueItemOrigin === "products" || editingBookingLine?.kind === "product";
+  const uniqueItemFlowTitle = editingBookingLine || editingCatalogProductId
+    ? uniqueItemFlowIsProduct
+      ? "Edit Product"
+      : "Edit Unique Item"
+    : uniqueItemFlowIsProduct
+      ? "Add Product"
+      : "Add Unique Item";
+  const uniqueItemFlowNamePlaceholder = uniqueItemFlowIsProduct
+    ? "Product Name"
+    : "Unique Name";
 
   const serviceEditErrors = React.useMemo(
     () =>
@@ -6537,57 +7246,185 @@ export default function ProfessionalFixedLocationCalendar({
 
   const addDlParticipant = React.useCallback(
     (kind: "planning" | "buffer") => {
+      const timedEnds: Array<{ endTime?: string }> = [
+        ...selectedServices.map((service) => ({ endTime: service.endTime })),
+        ...bookingGuests.flatMap((guest) => [
+          ...guest.services.map((service) => ({ endTime: service.endTime })),
+          {
+            endTime: guest.planningEndTime || guest.bufferEndTime,
+          },
+        ]),
+      ];
+      const defaultStart =
+        getLatestTimedEnd(timedEnds, selectedSlot?.start) ||
+        selectedSlot?.start?.slice(0, 5) ||
+        "";
+
       if (kind === "buffer") {
-        const defaultEnd =
-          selectedSlot?.end?.slice(0, 5) ||
-          selectedSlot?.start?.slice(0, 5) ||
-          "";
+        const defaultMemberId =
+          selectedSlot?.resourceId || data.resources[0]?.id || "";
+        setEditingBufferId(null);
         setBufferDraft({
           title: "",
-          teamMemberId: selectedSlot?.resourceId || data.resources[0]?.id || "",
-          durationMins: "45",
-          endTime: defaultEnd,
+          teamMemberIds: defaultMemberId ? [defaultMemberId] : [],
+          durationMins: "",
+          startTime: defaultStart,
+          endTime: "",
         });
         setSlotBookingScreen("add-buffer");
         return;
       }
       const id = `planning-${Date.now()}`;
-      setBookingGuests((prev) => [
-        ...prev,
-        {
-          id,
-          name: "Planning",
-          services: [],
-          products: [],
-          participantType: "planning",
-          planningActivity: "Photoshoot",
-          planningDuration: "45 Mins",
-        },
-      ]);
+      setBookingGuests((prev) =>
+        sortCalendarGuestsByStartTime([
+          ...prev,
+          {
+            id,
+            name: "Planning",
+            services: [],
+            products: [],
+            participantType: "planning",
+            planningActivity: "Photoshoot",
+            planningDuration: "",
+            planningStartTime: defaultStart || undefined,
+            planningEndTime: undefined,
+          },
+        ]),
+      );
     },
-    [data.resources, selectedSlot?.end, selectedSlot?.resourceId, selectedSlot?.start],
+    [
+      bookingGuests,
+      data.resources,
+      selectedServices,
+      selectedSlot?.end,
+      selectedSlot?.resourceId,
+      selectedSlot?.start,
+    ],
   );
 
   const applyBufferDraft = React.useCallback(() => {
     const title = bufferDraft.title.trim() || "Buffer";
-    setBookingGuests((prev) => [
-      ...prev,
-      {
-        id: `buffer-${Date.now()}`,
-        name: title,
-        services: [],
-        products: [],
-        participantType: "buffer",
-        planningActivity: title,
-        planningDuration: bufferDraft.durationMins.trim()
-          ? `${bufferDraft.durationMins.trim()} Mins`
-          : "45 Mins",
-        bufferTeamMemberId: bufferDraft.teamMemberId || undefined,
-        bufferEndTime: bufferDraft.endTime.trim() || undefined,
-      },
-    ]);
+    const startTime = bufferDraft.startTime.trim();
+    const endTime = bufferDraft.endTime.trim();
+    const durationMins =
+      minutesBetweenTimes(startTime, endTime) ||
+      parseDurationMinsLabel(bufferDraft.durationMins);
+    const memberIds = bufferDraft.teamMemberIds.filter(Boolean);
+    if (!memberIds.length) return;
+    const makeBufferGuest = (
+      id: string,
+      memberId: string,
+    ): (typeof bookingGuests)[number] => ({
+      id,
+      name: title,
+      services: [] as BookingServiceLineItem[],
+      products: [] as BookingProductLineItem[],
+      participantType: "buffer",
+      planningActivity: title,
+      planningDuration: durationMins
+        ? formatDurationMinsLabel(durationMins)
+        : undefined,
+      planningStartTime: undefined,
+      planningEndTime: undefined,
+      bufferTeamMemberId: memberId,
+      bufferStartTime: startTime || undefined,
+      bufferEndTime: endTime || undefined,
+    });
+    const nextGuests = (() => {
+      if (!editingBufferId) {
+        const stamp = Date.now();
+        return [
+          ...bookingGuests,
+          ...memberIds.map((memberId) =>
+            makeBufferGuest(`buffer-${stamp}-${memberId}`, memberId),
+          ),
+        ];
+      }
+      const insertAt = bookingGuests.findIndex(
+        (item) => item.id === editingBufferId,
+      );
+      const stamp = Date.now();
+      const next = memberIds.map((memberId, index) =>
+        makeBufferGuest(
+          index === 0 && insertAt >= 0
+            ? editingBufferId
+            : `buffer-${stamp}-${memberId}`,
+          memberId,
+        ),
+      );
+      if (insertAt < 0) return [...bookingGuests, ...next];
+      const rest = bookingGuests.filter((item) => item.id !== editingBufferId);
+      return [...rest.slice(0, insertAt), ...next, ...rest.slice(insertAt)];
+    })();
+    setBookingGuests(sortCalendarGuestsByStartTime(nextGuests));
+    setSelectedSlot((prev) => {
+      if (!prev) return prev;
+      let startMin = minutesSinceMidnight(prev.start);
+      let endMin = minutesSinceMidnight(prev.end);
+      const bump = (start?: string, finish?: string) => {
+        if (start?.trim()) {
+          startMin = Math.min(startMin, minutesSinceMidnight(start));
+        }
+        if (finish?.trim()) {
+          endMin = Math.max(endMin, minutesSinceMidnight(finish));
+        }
+      };
+      for (const service of selectedServices) {
+        bump(service.startTime, service.endTime);
+      }
+      for (const guest of nextGuests) {
+        for (const service of guest.services) {
+          bump(service.startTime, service.endTime);
+        }
+        bump(guest.planningStartTime, guest.planningEndTime);
+        bump(guest.bufferStartTime, guest.bufferEndTime);
+      }
+      return {
+        ...prev,
+        start: fmtMinToTime(startMin),
+        end: fmtMinToTime(endMin),
+      };
+    });
+    setEditingBufferId(null);
     setSlotBookingScreen("new-booking");
-  }, [bufferDraft]);
+  }, [
+    bookingGuests,
+    bufferDraft,
+    editingBufferId,
+    selectedServices,
+  ]);
+
+  const beginEditBuffer = React.useCallback(
+    (guest: {
+      id: string;
+      name: string;
+      planningDuration?: string;
+      bufferTeamMemberId?: string;
+      bufferStartTime?: string;
+      bufferEndTime?: string;
+    }) => {
+      const durationMins =
+        parseDurationMinsLabel(guest.planningDuration) ??
+        (guest.bufferStartTime && guest.bufferEndTime
+          ? minutesSinceMidnight(guest.bufferEndTime) -
+            minutesSinceMidnight(guest.bufferStartTime)
+          : null);
+      setBufferDraft({
+        title: guest.name.trim() === "Buffer" ? "" : guest.name.trim(),
+        teamMemberIds: guest.bufferTeamMemberId
+          ? [guest.bufferTeamMemberId]
+          : [],
+        durationMins:
+          durationMins && durationMins > 0 ? String(durationMins) : "",
+        startTime: guest.bufferStartTime?.trim() || "",
+        endTime: guest.bufferEndTime?.trim() || "",
+      });
+      setEditingBufferId(guest.id);
+      setSlotSaveAttempted(false);
+      setSlotBookingScreen("add-buffer");
+    },
+    [],
+  );
 
   const handleProjectFilePick = React.useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -6621,6 +7458,10 @@ export default function ProfessionalFixedLocationCalendar({
   const hasProductDraftSelection = React.useMemo(
     () => Object.values(productSelectionDraft).some((item) => item.selected),
     [productSelectionDraft],
+  );
+  const hasUniqueItemDraftSelection = React.useMemo(
+    () => Object.values(uniqueItemSelectionDraft).some((item) => item.selected),
+    [uniqueItemSelectionDraft],
   );
 
   const onEmptyClick = React.useCallback(
@@ -6772,7 +7613,10 @@ export default function ProfessionalFixedLocationCalendar({
           lastEditedBy: "professional",
         });
         nextDetails.responseStatus = "suggestion_for_change";
-        Object.assign(nextDetails, buildResponseDeadline());
+        const responseDeadline = buildResponseDeadline(businessResponseWindowInput);
+        if (responseDeadline) {
+          Object.assign(nextDetails, responseDeadline);
+        }
         // Keep client project/people snapshot so client EBR view stays on Continue layout.
         if (existingEvent.details?.clientSnapshot) {
           nextDetails.clientSnapshot = existingEvent.details.clientSnapshot;
@@ -6813,9 +7657,18 @@ export default function ProfessionalFixedLocationCalendar({
             price: product.price,
             quantity: product.quantity,
             unitPrice: product.unitPrice ?? product.price,
+            guestId: null as string | null,
           })),
-          ...bookingUniqueItems,
-          ...bookingGuests.flatMap((guest) => guest.products),
+          ...bookingUniqueItems.map((product) => ({
+            ...product,
+            guestId: null as string | null,
+          })),
+          ...bookingGuests.flatMap((guest) =>
+            guest.products.map((product) => ({
+              ...product,
+              guestId: guest.id,
+            })),
+          ),
         ];
         const originalProductIds = new Set(
           (existingEvent.details?.products ?? []).map((product) => product.id),
@@ -6833,6 +7686,8 @@ export default function ProfessionalFixedLocationCalendar({
               name: service.name,
               price: service.price,
               durationMins: service.durationMins,
+              startTime: service.startTime,
+              endTime: service.endTime,
               guestId: service.guestId ?? null,
               teamMemberId: service.teamMemberId ?? service.staffResourceId ?? null,
             })),
@@ -6967,6 +7822,20 @@ export default function ProfessionalFixedLocationCalendar({
               end: (service.endTime || slotEnd).slice(0, 5),
             })),
           ),
+          ...bookingGuests
+            .filter(
+              (guest) =>
+                guest.participantType === "buffer" &&
+                Boolean(guest.bufferStartTime) &&
+                Boolean(guest.bufferEndTime),
+            )
+            .map((guest) => ({
+              id: guest.id,
+              name: guest.name || "Buffer",
+              staffId: guest.bufferTeamMemberId || selectedSlot.resourceId,
+              start: guest.bufferStartTime!.slice(0, 5),
+              end: guest.bufferEndTime!.slice(0, 5),
+            })),
         ];
         const internalOverlaps =
           findInternalStaffServiceOverlaps(staffIntervals);
@@ -7140,9 +8009,20 @@ export default function ProfessionalFixedLocationCalendar({
         ...guestServiceLines,
       ];
       details.products = [
-        ...selectedProducts,
-        ...bookingUniqueItems,
-        ...bookingGuests.flatMap((guest) => guest.products),
+        ...selectedProducts.map((product) => ({
+          ...product,
+          guestId: null as string | null,
+        })),
+        ...bookingUniqueItems.map((product) => ({
+          ...product,
+          guestId: null as string | null,
+        })),
+        ...bookingGuests.flatMap((guest) =>
+          guest.products.map((product) => ({
+            ...product,
+            guestId: guest.id,
+          })),
+        ),
       ];
 
       const existingClientSnapshot = existingEvent?.details?.clientSnapshot;
@@ -7270,7 +8150,10 @@ export default function ProfessionalFixedLocationCalendar({
                   ("guest" as const),
                 planningActivity: guest.planningActivity,
                 planningDuration: guest.planningDuration,
+                planningStartTime: guest.planningStartTime,
+                planningEndTime: guest.planningEndTime,
                 bufferTeamMemberId: guest.bufferTeamMemberId,
+                bufferStartTime: guest.bufferStartTime,
                 bufferEndTime: guest.bufferEndTime,
               };
             }),
@@ -7292,6 +8175,8 @@ export default function ProfessionalFixedLocationCalendar({
               name: service.name,
               price: service.price,
               durationMins: service.durationMins,
+              startTime: service.startTime,
+              endTime: service.endTime,
               guestId: service.guestId ?? null,
               teamMemberId,
               teamMemberName: teamMemberName || undefined,
@@ -8390,6 +9275,7 @@ export default function ProfessionalFixedLocationCalendar({
                               const eventAccent = statusAccentColor(
                                 event.status,
                               );
+                              const eventIsShared = isTeamSharedBooking(event);
 
                               return (
                                 <Box
@@ -8435,6 +9321,22 @@ export default function ProfessionalFixedLocationCalendar({
                                         "& .MuiChip-label": { px: 0.55 },
                                       }}
                                     />
+                                    {eventIsShared ? (
+                                      <Chip
+                                        size="small"
+                                        label="Shared"
+                                        sx={{
+                                          height: 15,
+                                          borderRadius: "4px",
+                                          fontSize: 8,
+                                          fontWeight: 900,
+                                          color: m.teal,
+                                          bgcolor: alpha(m.teal, 0.12),
+                                          border: `1px solid ${alpha(m.teal, 0.35)}`,
+                                          "& .MuiChip-label": { px: 0.55 },
+                                        }}
+                                      />
+                                    ) : null}
                                   </Stack>
                                   <BodyText
                                     sx={{
@@ -8709,7 +9611,8 @@ export default function ProfessionalFixedLocationCalendar({
                                 const isPastDay = date < todayIso;
                                 const showClosed =
                                   !isPastDay &&
-                                  getAvailabilityFor(res.id, date).length === 0;
+                                  getFilteredAvailabilityFor(res.id, date)
+                                    .length === 0;
                                 const closedNote = showClosed
                                   ? "No schedule availability"
                                   : null;
@@ -8861,6 +9764,22 @@ export default function ProfessionalFixedLocationCalendar({
                                 const laneEvents = eventsInRange.filter(
                                   (event) => {
                                     if (event.date !== date) return false;
+                                    if (event.id.includes("::segment-")) {
+                                      if (
+                                        String(event.resourceId) ===
+                                        String(resource.id)
+                                      ) {
+                                        return true;
+                                      }
+                                      const hasKnownTeam =
+                                        knownResourceIds.has(
+                                          String(event.resourceId),
+                                        );
+                                      return (
+                                        !hasKnownTeam &&
+                                        resource.id === fallbackTeamId
+                                      );
+                                    }
                                     if (viewMode === "day") {
                                       if (
                                         eventBelongsToTeamMember(
@@ -8894,11 +9813,22 @@ export default function ProfessionalFixedLocationCalendar({
                                     if (viewMode === "week") {
                                       if (date !== activeDateIso) return false;
                                       if (
-                                        !event.resourceId ||
-                                        !knownResourceIds.has(event.resourceId)
-                                      )
+                                        eventBelongsToTeamMember(
+                                          event,
+                                          resource.id,
+                                        )
+                                      ) {
                                         return true;
-                                      return event.resourceId === resource.id;
+                                      }
+                                      const hasKnownTeam =
+                                        eventHasKnownTeamAssignment(
+                                          event,
+                                          knownResourceIds,
+                                        );
+                                      return (
+                                        !hasKnownTeam &&
+                                        resource.id === fallbackTeamId
+                                      );
                                     }
                                     if (
                                       !event.resourceId ||
@@ -8939,7 +9869,7 @@ export default function ProfessionalFixedLocationCalendar({
                                 );
 
                                 // Availability comes from the team member's Schedule.
-                                const availability = getAvailabilityFor(
+                                const availability = getFilteredAvailabilityFor(
                                   resource.id,
                                   date,
                                 );
@@ -8951,7 +9881,19 @@ export default function ProfessionalFixedLocationCalendar({
                                     scheduleRows,
                                     dateOverrides ?? [],
                                     availability,
-                                  );
+                                  ).filter((band) => {
+                                    if (appliedFilters.locationAll) return true;
+                                    if (band.kind === "fixed") {
+                                      return Boolean(appliedFilters.locations.FL);
+                                    }
+                                    if (band.kind === "desired") {
+                                      return Boolean(appliedFilters.locations.DL);
+                                    }
+                                    return (
+                                      Boolean(appliedFilters.locations.FL) ||
+                                      Boolean(appliedFilters.locations.DL)
+                                    );
+                                  });
                                 const unavailableIntervals = subtractIntervals(
                                   [{ startMin, endMin }],
                                   availability,
@@ -9264,6 +10206,9 @@ export default function ProfessionalFixedLocationCalendar({
                                               top={top}
                                               rowPx={rowPx}
                                               slotHeight={height}
+                                              teamMemberNameById={
+                                                resourceNameById
+                                              }
                                               getServiceColor={
                                                 resolveServiceColor
                                               }
@@ -9284,6 +10229,9 @@ export default function ProfessionalFixedLocationCalendar({
                                             height={height}
                                             left={6}
                                             right={6}
+                                            teamMemberNameById={
+                                              resourceNameById
+                                            }
                                             serviceColor={resolveServiceColor(
                                               ev,
                                             )}
@@ -9516,14 +10464,14 @@ export default function ProfessionalFixedLocationCalendar({
                 ? "Edit service"
                 : slotBookingScreen === "select-products"
                   ? "Select Product"
-                  : slotBookingScreen === "add-unique-item"
-                    ? editingCatalogProductId
-                      ? "Edit Product"
-                      : uniqueItemOrigin === "products"
-                        ? "Add Product"
-                        : "Add Unique Item"
+                  : slotBookingScreen === "select-unique-items"
+                    ? "Select Unique Item"
+                    : slotBookingScreen === "add-unique-item"
+                      ? uniqueItemFlowTitle
                     : slotBookingScreen === "add-buffer"
-                      ? "Add Buffer"
+                      ? editingBufferId
+                        ? "Edit Buffer"
+                        : "Add Buffer"
                       : slotBookingScreen === "add-client-choice"
                         ? "Add Client"
                         : slotBookingScreen === "guest"
@@ -9545,16 +10493,22 @@ export default function ProfessionalFixedLocationCalendar({
             : activityDetailItem
             ? () => setActivityDetailItem(null)
             : isBookingDetailsSubScreen
-              ? () =>
+              ? () => {
+                  if (slotBookingScreen === "add-unique-item") {
+                    leaveUniqueItemScreen();
+                    return;
+                  }
+                  if (slotBookingScreen === "add-buffer") {
+                    setEditingBufferId(null);
+                    setSlotBookingScreen("new-booking");
+                    return;
+                  }
                   setSlotBookingScreen(
-                    slotBookingScreen === "add-unique-item"
-                      ? uniqueItemOrigin === "booking"
-                        ? "new-booking"
-                        : "select-products"
-                      : slotBookingScreen === "edit-service"
-                        ? serviceEditOrigin
-                        : "new-booking",
-                  )
+                    slotBookingScreen === "edit-service"
+                      ? serviceEditOrigin
+                      : "new-booking",
+                  );
+                }
               : undefined
         }
         footer={
@@ -9594,6 +10548,21 @@ export default function ProfessionalFixedLocationCalendar({
                           end: (service.endTime || slotEnd).slice(0, 5),
                         })),
                       ),
+                      ...bookingGuests
+                        .filter(
+                          (guest) =>
+                            guest.participantType === "buffer" &&
+                            Boolean(guest.bufferStartTime) &&
+                            Boolean(guest.bufferEndTime),
+                        )
+                        .map((guest) => ({
+                          id: guest.id,
+                          name: guest.name || "Buffer",
+                          staffId:
+                            guest.bufferTeamMemberId || selectedSlot.resourceId,
+                          start: guest.bufferStartTime!.slice(0, 5),
+                          end: guest.bufferEndTime!.slice(0, 5),
+                        })),
                     ];
                     const hasInternal =
                       findInternalStaffServiceOverlaps(staffIntervals).length >
@@ -9636,18 +10605,8 @@ export default function ProfessionalFixedLocationCalendar({
                     nameFieldOpen={
                       showInlineGuestField && !editingInlineGuestId
                     }
-                    onAddGuest={() => {
-                      setInlineGuestParticipantType("guest");
-                      setEditingInlineGuestId(null);
-                      setInlineGuestDraft(emptyInlineGuestDraft);
-                      setShowInlineGuestField(true);
-                    }}
-                    onAddModel={() => {
-                      setInlineGuestParticipantType("model");
-                      setEditingInlineGuestId(null);
-                      setInlineGuestDraft(emptyInlineGuestDraft);
-                      setShowInlineGuestField(true);
-                    }}
+                    onAddGuest={() => openInlineGuestForm("guest")}
+                    onAddModel={() => openInlineGuestForm("model")}
                     onAddPlanning={() => {
                       addDlParticipant("planning");
                     }}
@@ -9878,15 +10837,11 @@ export default function ProfessionalFixedLocationCalendar({
                     tone="secondary"
                     onClick={async () => {
                       if (slotBookingScreen === "add-unique-item") {
-                        setEditingCatalogProductId(null);
-                        setSlotBookingScreen(
-                          uniqueItemOrigin === "booking"
-                            ? "new-booking"
-                            : "select-products",
-                        );
+                        leaveUniqueItemScreen();
                         return;
                       }
                       if (slotBookingScreen === "add-buffer") {
+                        setEditingBufferId(null);
                         setSlotBookingScreen("new-booking");
                         return;
                       }
@@ -9896,7 +10851,8 @@ export default function ProfessionalFixedLocationCalendar({
                       }
                       if (
                         slotBookingScreen === "select-services" ||
-                        slotBookingScreen === "select-products"
+                        slotBookingScreen === "select-products" ||
+                        slotBookingScreen === "select-unique-items"
                       ) {
                         setSlotBookingScreen("new-booking");
                         return;
@@ -9928,6 +10884,7 @@ export default function ProfessionalFixedLocationCalendar({
                 ) : null}
                 {slotBookingScreen === "new-booking" &&
                 editingEventId &&
+                !isViewingBooking &&
                 !isCompletedBooking &&
                 !isCancelledOrInvalidBooking &&
                 !hideClientBookingEditButton ? (
@@ -9964,6 +10921,8 @@ export default function ProfessionalFixedLocationCalendar({
                               serviceSelectionDraft.length === 0
                             : slotBookingScreen === "select-products"
                               ? isViewingExisting || !hasProductDraftSelection
+                              : slotBookingScreen === "select-unique-items"
+                                ? isViewingExisting || !hasUniqueItemDraftSelection
                               : slotBookingScreen === "add-unique-item"
                                 ? isViewingExisting || !slotValidation.isValid
                                 : slotBookingScreen === "add-buffer"
@@ -10007,6 +10966,12 @@ export default function ProfessionalFixedLocationCalendar({
                           if (isViewingExisting || !hasProductDraftSelection)
                             return;
                           applyProductSelection();
+                          return;
+                        }
+                        if (slotBookingScreen === "select-unique-items") {
+                          if (isViewingExisting || !hasUniqueItemDraftSelection)
+                            return;
+                          applyUniqueItemSelection();
                           return;
                         }
                         if (slotBookingScreen === "add-unique-item") {
@@ -10234,7 +11199,6 @@ export default function ProfessionalFixedLocationCalendar({
                     onToggle={(service) =>
                       toggleServiceSelectionDraft(service.id)
                     }
-                    onEdit={(service) => openEditService(service)}
                     disabled={isViewingExisting}
                   />
                 ) : slotBookingScreen === "edit-service" ? (
@@ -10295,6 +11259,34 @@ export default function ProfessionalFixedLocationCalendar({
                     }
                     disabled={isViewingExisting}
                   />
+                ) : slotBookingScreen === "select-unique-items" ? (
+                  <BookingSelectProductsScreen
+                    draft={uniqueItemSelectionDraft}
+                    catalog={persistedUniqueCatalog}
+                    heading="Select Unique Item"
+                    searchPlaceholder="Search unique items..."
+                    addButtonLabel="Add new unique item"
+                    onToggle={(item) =>
+                      toggleUniqueItemSelectionDraft(item.id)
+                    }
+                    onQuantityChange={adjustUniqueItemQuantityDraft}
+                    onAddProduct={
+                      isViewingExisting
+                        ? undefined
+                        : () => openAddUniqueItem("unique")
+                    }
+                    onEdit={
+                      isViewingExisting
+                        ? undefined
+                        : (item) => openEditCatalogProduct(item, "unique")
+                    }
+                    onDelete={
+                      isViewingExisting
+                        ? undefined
+                        : (item) => setPendingCatalogDelete(item)
+                    }
+                    disabled={isViewingExisting}
+                  />
                 ) : slotBookingScreen === "add-unique-item" ? (
                   editingCatalogProductId ? (
                     <BookingEditCatalogItemScreen
@@ -10303,7 +11295,8 @@ export default function ProfessionalFixedLocationCalendar({
                         productName: slotErrors.uniqueItemProductName,
                         price: slotErrors.uniqueItemPrice,
                       }}
-                      heading="Edit Product"
+                      heading={uniqueItemFlowTitle}
+                      namePlaceholder={uniqueItemFlowNamePlaceholder}
                       onChange={(patch) =>
                         setUniqueItemDraft((prev) => ({ ...prev, ...patch }))
                       }
@@ -10316,16 +11309,8 @@ export default function ProfessionalFixedLocationCalendar({
                         productName: slotErrors.uniqueItemProductName,
                         price: slotErrors.uniqueItemPrice,
                       }}
-                      heading={
-                        uniqueItemOrigin === "products"
-                          ? "Add Product"
-                          : "Add Unique Item"
-                      }
-                      namePlaceholder={
-                        uniqueItemOrigin === "products"
-                          ? "Product Name"
-                          : "Unique Name"
-                      }
+                      heading={uniqueItemFlowTitle}
+                      namePlaceholder={uniqueItemFlowNamePlaceholder}
                       onChange={(patch) =>
                         setUniqueItemDraft((prev) => ({ ...prev, ...patch }))
                       }
@@ -10334,6 +11319,26 @@ export default function ProfessionalFixedLocationCalendar({
                   )
                 ) : slotBookingScreen === "add-buffer" ? (
                   <Stack spacing={1.5} sx={{ px: 0.25 }}>
+                    <Stack direction="row" alignItems="baseline" spacing={0.75}>
+                      <BodyText
+                        sx={{
+                          fontWeight: 900,
+                          color: alpha(m.navy, 0.88),
+                          fontSize: 15,
+                        }}
+                      >
+                        {editingBufferId ? "Edit Buffer" : "Buffer"}
+                      </BodyText>
+                      <BodyText
+                        sx={{
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: alpha(m.navy, 0.48),
+                        }}
+                      >
+                        (Internal only)
+                      </BodyText>
+                    </Stack>
                     <AppTextField
                       label="Title"
                       placeholder="Enter title"
@@ -10352,51 +11357,110 @@ export default function ProfessionalFixedLocationCalendar({
                     <AppDropdown
                       label="Team Member"
                       placeholder="Select team member"
-                      value={bufferDraft.teamMemberId}
-                      onChange={(value) =>
+                      multiple
+                      selectAll
+                      value={bufferDraft.teamMemberIds}
+                      renderValue={(selected) => {
+                        const ids = (selected as readonly string[]).filter(
+                          Boolean,
+                        );
+                        if (!ids.length) return "Select team member";
+                        if (
+                          data.resources.length > 0 &&
+                          ids.length === data.resources.length
+                        ) {
+                          return "All";
+                        }
+                        return ids
+                          .map(
+                            (id) =>
+                              data.resources.find(
+                                (resource) => resource.id === id,
+                              )?.name ?? id,
+                          )
+                          .join(", ");
+                      }}
+                      onChange={(value) => {
                         setBufferDraft((prev) => ({
                           ...prev,
-                          teamMemberId: String(value ?? ""),
-                        }))
-                      }
-                      options={[
-                        { label: "Select team member", value: "" },
-                        ...data.resources.map((resource) => ({
-                          label: resource.name,
-                          value: resource.id,
-                        })),
-                      ]}
+                          teamMemberIds: (value as string[]).filter(Boolean),
+                        }));
+                      }}
+                      options={data.resources.map((resource) => ({
+                        label: resource.name,
+                        value: resource.id,
+                      }))}
                       fullWidth
                       disabled={isViewingExisting}
+                      error={Boolean(slotErrors.bufferTeamMembers)}
+                      helperText={slotErrors.bufferTeamMembers}
                     />
+                    <Stack direction="row" spacing={1.25}>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <AppTimePicker
+                          label="Start Time"
+                          value={bufferDraft.startTime}
+                          onChange={(startTime) => {
+                            setBufferDraft((prev) => {
+                              const mins = minutesBetweenTimes(
+                                startTime,
+                                prev.endTime,
+                              );
+                              return {
+                                ...prev,
+                                startTime,
+                                durationMins: mins > 0 ? String(mins) : "",
+                              };
+                            });
+                          }}
+                          minuteStep={15}
+                          fullWidth
+                          disabled={isViewingExisting}
+                          error={Boolean(slotErrors.bufferStartTime)}
+                          helperText={slotErrors.bufferStartTime}
+                        />
+                      </Box>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <AppTimePicker
+                          label="End Time"
+                          value={bufferDraft.endTime}
+                          onChange={(endTime) => {
+                            setBufferDraft((prev) => {
+                              const mins = minutesBetweenTimes(
+                                prev.startTime,
+                                endTime,
+                              );
+                              return {
+                                ...prev,
+                                endTime,
+                                durationMins: mins > 0 ? String(mins) : "",
+                              };
+                            });
+                          }}
+                          minuteStep={15}
+                          fullWidth
+                          disabled={isViewingExisting}
+                          error={Boolean(slotErrors.bufferEndTime)}
+                          helperText={slotErrors.bufferEndTime}
+                        />
+                      </Box>
+                    </Stack>
                     <AppTextField
                       label="Duration"
-                      placeholder="45"
-                      value={bufferDraft.durationMins}
-                      onChange={(e) =>
-                        setBufferDraft((prev) => ({
-                          ...prev,
-                          durationMins: sanitizeDigitsInput(e.target.value),
-                        }))
+                      placeholder="—"
+                      value={
+                        formatDurationMinsLabel(
+                          minutesBetweenTimes(
+                            bufferDraft.startTime,
+                            bufferDraft.endTime,
+                          ) || Number.parseInt(bufferDraft.durationMins, 10),
+                        ) || ""
                       }
                       fullWidth
-                      disabled={isViewingExisting}
+                      disabled
                       error={Boolean(slotErrors.bufferDuration)}
                       helperText={slotErrors.bufferDuration}
-                      inputProps={{ inputMode: "numeric" }}
-                    />
-                    <AppTextField
-                      label="End Time"
-                      placeholder="HH:MM"
-                      value={bufferDraft.endTime}
-                      onChange={(e) =>
-                        setBufferDraft((prev) => ({
-                          ...prev,
-                          endTime: e.target.value,
-                        }))
-                      }
-                      fullWidth
-                      disabled={isViewingExisting}
+                      InputProps={{ readOnly: true }}
                     />
                   </Stack>
                 ) : slotBookingScreen === "add-client-choice" ? (
@@ -10435,6 +11499,9 @@ export default function ProfessionalFixedLocationCalendar({
                               item.key === "client-list" ||
                               item.key === "mollure-platform"
                             ) {
+                              if (item.key === "client-list") {
+                                setClientListSelectedEmail("");
+                              }
                               setAddClientSource((p) =>
                                 p === item.key ? "" : item.key,
                               );
@@ -11246,8 +12313,8 @@ export default function ProfessionalFixedLocationCalendar({
                           >
                             Booking Details
                           </BodyText>
-                          {viewingBookingEvent &&
-                          showProfessionalActionMenu(viewingBookingEvent) ? (
+                          {(() => {
+                            return showProfessionalActionMenu(viewingBookingEvent) ? (
                             <>
                               <AppButton
                                 onClick={(e) =>
@@ -11269,7 +12336,7 @@ export default function ProfessionalFixedLocationCalendar({
                                   "&:hover": { bgcolor: alpha(m.navy, 0.08) },
                                 }}
                               >
-                                Action
+                                Actions
                               </AppButton>
                               <Menu
                                 anchorEl={bookingActionAnchor}
@@ -11453,7 +12520,8 @@ export default function ProfessionalFixedLocationCalendar({
                                 })()}
                               </Menu>
                             </>
-                          ) : null}
+                            ) : null;
+                          })()}
                         </Stack>
 
                         <Stack spacing={1.25} sx={{ mt: 1.25 }}>
@@ -12203,9 +13271,9 @@ export default function ProfessionalFixedLocationCalendar({
                         <Box sx={{ mt: 1.5 }}>
                           <BodyText
                             sx={{
-                              fontSize: 11.5,
-                              fontWeight: 900,
-                              color: alpha(m.navy, 0.55),
+                              fontSize: 13,
+                              fontWeight: 800,
+                              color: "primary.light",
                               mb: 0.85,
                             }}
                           >
@@ -12215,6 +13283,7 @@ export default function ProfessionalFixedLocationCalendar({
                             <AppTimePanel
                               compact
                               hideHeader
+                              variant="clock"
                               value={
                                 selectedSlot?.start?.slice(0, 5) ||
                                 drawerSelectableTimes[0] ||
@@ -12589,7 +13658,10 @@ export default function ProfessionalFixedLocationCalendar({
                                         Boolean(selectedClient?.mollureUserId) ||
                                         addClientSource === "mollure-platform"
                                       }
-                                      clientKind={selectedClient?.clientKind}
+                                      clientKind={
+                                        resolvedSelectedClientKind ??
+                                        selectedClient?.clientKind
+                                      }
                                     />
                                   )}
                                 </Stack>
@@ -12697,6 +13769,8 @@ export default function ProfessionalFixedLocationCalendar({
                               }
                               resolveServiceEditTag={resolveServiceEditTag}
                               resolveProductEditTag={resolveProductEditTag}
+                              editTagSignpostTitle={ACTIVITY_COMPARISON_SIGNPOST}
+                              onEditTagSignpostClick={openDrawerLineTagComparison}
                               onRemoveService={(serviceId) => {
                                 setSelectedServices((prev) =>
                                   prev.filter((item) => item.id !== serviceId),
@@ -12725,6 +13799,21 @@ export default function ProfessionalFixedLocationCalendar({
                                   prev.filter((item) => item.id !== itemId),
                                 );
                               }}
+                              onEditProduct={
+                                !isViewingExisting || incomingRequestEditMode
+                                  ? (product) =>
+                                      openEditBookingProductLine(
+                                        product,
+                                        "client",
+                                      )
+                                  : undefined
+                              }
+                              onEditUniqueItem={
+                                !isViewingExisting || incomingRequestEditMode
+                                  ? (item) =>
+                                      openEditBookingUniqueLine(item, "client")
+                                  : undefined
+                              }
                               onEditService={
                                 !isViewingExisting || incomingRequestEditMode
                                   ? (service) =>
@@ -12746,6 +13835,7 @@ export default function ProfessionalFixedLocationCalendar({
                               }
                             />
 
+                            {/* Guest / model / buffer stay in the drawer footer, not beside Add. */}
                             <ButtonBase
                               ref={addMenuButtonRef}
                               disabled={
@@ -13003,7 +14093,7 @@ export default function ProfessionalFixedLocationCalendar({
                                   lineHeight: 1,
                                 }}
                               >
-                                Product/Items
+                                Product
                               </BodyText>
                             </ButtonBase>
                             <Box
@@ -13016,7 +14106,7 @@ export default function ProfessionalFixedLocationCalendar({
                             <ButtonBase
                               onClick={() => {
                                 setSlotAddMenuAnchor(null);
-                                openAddUniqueItem("booking");
+                                openSelectUniqueItems();
                               }}
                               sx={{
                                 width: "100%",
@@ -13036,7 +14126,7 @@ export default function ProfessionalFixedLocationCalendar({
                                   lineHeight: 1,
                                 }}
                               >
-                                Unique Items
+                                Unique item
                               </BodyText>
                             </ButtonBase>
                           </Stack>
@@ -13049,7 +14139,7 @@ export default function ProfessionalFixedLocationCalendar({
                           hiddenPersonIds={bookingGuests.map((guest) => guest.id)}
                         />
 
-                        {bookingGuests.map((guest) => {
+                        {chronologicalDrawerGuests.map((guest) => {
                           const participantKind =
                             guest.participantType ?? "guest";
                           const sectionLabel =
@@ -13081,6 +14171,14 @@ export default function ProfessionalFixedLocationCalendar({
                                 bgcolor: theme.palette.secondary.main,
                                 border: `1px solid ${alpha(m.teal, 0.22)}`,
                                 p: 1.5,
+                                ...(participantKind === "buffer"
+                                  ? {
+                                      "&:hover .booking-buffer-edit-btn": {
+                                        opacity: 1,
+                                        pointerEvents: "auto",
+                                      },
+                                    }
+                                  : {}),
                               }}
                             >
                               <Stack spacing={1.25}>
@@ -13121,6 +14219,17 @@ export default function ProfessionalFixedLocationCalendar({
                                         }}
                                       >
                                         {guest.name}
+                                      </Box>
+                                      <Box
+                                        component="span"
+                                        sx={{
+                                          ml: 0.75,
+                                          fontWeight: 700,
+                                          color: alpha(m.navy, 0.45),
+                                          fontSize: 11.5,
+                                        }}
+                                      >
+                                        (Internal only)
                                       </Box>
                                     </BodyText>
                                   ) : (
@@ -13198,6 +14307,54 @@ export default function ProfessionalFixedLocationCalendar({
                                         />
                                       </IconButton>
                                     </Stack>
+                                  ) : participantKind === "buffer" &&
+                                    (!isViewingExisting ||
+                                      showClientRemoveButton) ? (
+                                    <Stack direction="row" spacing={0.25}>
+                                      {!isViewingExisting ? (
+                                        <IconButton
+                                          className="booking-buffer-edit-btn"
+                                          size="small"
+                                          onClick={() => beginEditBuffer(guest)}
+                                          sx={{
+                                            color: alpha(m.navy, 0.42),
+                                            opacity: 0,
+                                            pointerEvents: "none",
+                                            transition:
+                                              "opacity 0.15s, color 0.15s, background-color 0.15s",
+                                            "&:hover": {
+                                              color: m.teal,
+                                              bgcolor: alpha(m.teal, 0.08),
+                                            },
+                                          }}
+                                          aria-label={`Edit ${guest.name || "buffer"}`}
+                                        >
+                                          <EditRoundedIcon
+                                            sx={{ fontSize: 17 }}
+                                          />
+                                        </IconButton>
+                                      ) : null}
+                                      {showClientRemoveButton ? (
+                                        <IconButton
+                                          size="small"
+                                          onClick={() => {
+                                            setBookingGuests((prev) =>
+                                              prev.filter(
+                                                (item) => item.id !== guest.id,
+                                              ),
+                                            );
+                                            if (addMenuTarget === guest.id)
+                                              setSlotAddMenuAnchor(null);
+                                          }}
+                                          sx={{ color: alpha(m.navy, 0.35) }}
+                                          aria-label={`Remove ${guest.name}`}
+                                        >
+                                          <CloseRoundedIcon
+                                            sx={{ fontSize: 17 }}
+                                          />
+                                        </IconButton>
+                                      ) : null}
+                                    </Stack>
                                   ) : showClientRemoveButton ? (
                                     <IconButton
                                       size="small"
@@ -13257,39 +14414,108 @@ export default function ProfessionalFixedLocationCalendar({
                                       disabled={isViewingExisting}
                                       sx={{ mb: 1.5 }}
                                     />
-                                    <BodyText
-                                      sx={{
-                                        fontSize: 11,
-                                        fontWeight: 800,
-                                        color: alpha(m.navy, 0.62),
-                                        mb: 0.5,
-                                      }}
+                                    <Stack
+                                      direction="row"
+                                      spacing={1.25}
+                                      sx={{ mb: 1.5 }}
                                     >
-                                      Duration
-                                    </BodyText>
+                                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                                        <AppTimePicker
+                                          label="Start Time"
+                                          value={guest.planningStartTime ?? ""}
+                                          onChange={(startTime) => {
+                                            setBookingGuests((prev) =>
+                                              sortCalendarGuestsByStartTime(
+                                                prev.map((item) => {
+                                                  if (item.id !== guest.id)
+                                                    return item;
+                                                  const endTime =
+                                                    item.planningEndTime ?? "";
+                                                  const mins =
+                                                    minutesBetweenTimes(
+                                                      startTime,
+                                                      endTime,
+                                                    );
+                                                  return {
+                                                    ...item,
+                                                    planningStartTime:
+                                                      startTime,
+                                                    planningDuration:
+                                                      mins > 0
+                                                        ? formatDurationMinsLabel(
+                                                            mins,
+                                                          )
+                                                        : "",
+                                                  };
+                                                }),
+                                              ),
+                                            );
+                                          }}
+                                          minuteStep={15}
+                                          fullWidth
+                                          disabled={isViewingExisting}
+                                        />
+                                      </Box>
+                                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                                        <AppTimePicker
+                                          label="End Time"
+                                          value={guest.planningEndTime ?? ""}
+                                          onChange={(endTime) => {
+                                            setBookingGuests((prev) =>
+                                              sortCalendarGuestsByStartTime(
+                                                prev.map((item) => {
+                                                  if (item.id !== guest.id)
+                                                    return item;
+                                                  const startTime =
+                                                    item.planningStartTime ?? "";
+                                                  const mins =
+                                                    minutesBetweenTimes(
+                                                      startTime,
+                                                      endTime,
+                                                    );
+                                                  return {
+                                                    ...item,
+                                                    planningEndTime: endTime,
+                                                    planningDuration:
+                                                      mins > 0
+                                                        ? formatDurationMinsLabel(
+                                                            mins,
+                                                          )
+                                                        : "",
+                                                  };
+                                                }),
+                                              ),
+                                            );
+                                          }}
+                                          minuteStep={15}
+                                          fullWidth
+                                          disabled={isViewingExisting}
+                                        />
+                                      </Box>
+                                    </Stack>
                                     <AppTextField
-                                      value={guest.planningDuration ?? ""}
-                                      onChange={(e) => {
-                                        const value = e.target.value;
-                                        setBookingGuests((prev) =>
-                                          prev.map((item) =>
-                                            item.id === guest.id
-                                              ? {
-                                                  ...item,
-                                                  planningDuration: value,
-                                                }
-                                              : item,
-                                          ),
-                                        );
-                                      }}
-                                      placeholder="45 Mins"
+                                      label="Duration"
+                                      placeholder="—"
+                                      value={
+                                        formatDurationMinsLabel(
+                                          minutesBetweenTimes(
+                                            guest.planningStartTime ?? "",
+                                            guest.planningEndTime ?? "",
+                                          ) ||
+                                            parseDurationMinsLabel(
+                                              guest.planningDuration,
+                                            ) ||
+                                            0,
+                                        ) || ""
+                                      }
                                       fullWidth
-                                      disabled={isViewingExisting}
+                                      disabled
+                                      InputProps={{ readOnly: true }}
                                     />
                                   </Box>
                                 ) : participantKind === "buffer" ? (
                                   <Stack spacing={0.75}>
-                                    {guest.planningDuration ? (
+                                    {guest.bufferStartTime ? (
                                       <BodyText
                                         sx={{
                                           fontSize: 12,
@@ -13297,7 +14523,7 @@ export default function ProfessionalFixedLocationCalendar({
                                           color: alpha(m.navy, 0.62),
                                         }}
                                       >
-                                        Duration: {guest.planningDuration}
+                                        Start Time: {guest.bufferStartTime}
                                       </BodyText>
                                     ) : null}
                                     {guest.bufferEndTime ? (
@@ -13309,6 +14535,35 @@ export default function ProfessionalFixedLocationCalendar({
                                         }}
                                       >
                                         End Time: {guest.bufferEndTime}
+                                      </BodyText>
+                                    ) : null}
+                                    {guest.planningDuration ? (
+                                      <BodyText
+                                        sx={{
+                                          fontSize: 12,
+                                          fontWeight: 800,
+                                          color: alpha(m.navy, 0.62),
+                                        }}
+                                      >
+                                        Duration:{" "}
+                                        {formatDurationMinsLabel(
+                                          parseDurationMinsLabel(
+                                            guest.planningDuration,
+                                          ) ?? 0,
+                                        ) || guest.planningDuration}
+                                      </BodyText>
+                                    ) : null}
+                                    {guest.bufferTeamMemberId ? (
+                                      <BodyText
+                                        sx={{
+                                          fontSize: 12,
+                                          fontWeight: 800,
+                                          color: alpha(m.navy, 0.62),
+                                        }}
+                                      >
+                                        {resourceNameById.get(
+                                          guest.bufferTeamMemberId,
+                                        ) ?? "Unassigned"}
                                       </BodyText>
                                     ) : null}
                                   </Stack>
@@ -13330,6 +14585,8 @@ export default function ProfessionalFixedLocationCalendar({
                                   }
                                   resolveServiceEditTag={resolveServiceEditTag}
                                   resolveProductEditTag={resolveProductEditTag}
+                                  editTagSignpostTitle={ACTIVITY_COMPARISON_SIGNPOST}
+                                  onEditTagSignpostClick={openDrawerLineTagComparison}
                                   onRemoveService={(serviceId) => {
                                     setBookingGuests((prev) =>
                                       prev.map((item) =>
@@ -13358,12 +14615,46 @@ export default function ProfessionalFixedLocationCalendar({
                                       ),
                                     );
                                   }}
+                                  onRemoveUniqueItem={(itemId) => {
+                                    setBookingGuests((prev) =>
+                                      prev.map((item) =>
+                                        item.id === guest.id
+                                          ? {
+                                              ...item,
+                                              products: item.products.filter(
+                                                (prd) => prd.id !== itemId,
+                                              ),
+                                            }
+                                          : item,
+                                      ),
+                                    );
+                                  }}
                                   onEditService={
                                     !isViewingExisting ||
                                     incomingRequestEditMode
                                       ? (service) =>
                                           openEditServiceFromLineItem(
                                             service,
+                                            guest.id,
+                                          )
+                                      : undefined
+                                  }
+                                  onEditProduct={
+                                    !isViewingExisting ||
+                                    incomingRequestEditMode
+                                      ? (product) =>
+                                          openEditBookingProductLine(
+                                            product,
+                                            guest.id,
+                                          )
+                                      : undefined
+                                  }
+                                  onEditUniqueItem={
+                                    !isViewingExisting ||
+                                    incomingRequestEditMode
+                                      ? (item) =>
+                                          openEditBookingUniqueLine(
+                                            item,
                                             guest.id,
                                           )
                                       : undefined
@@ -13995,81 +15286,6 @@ export default function ProfessionalFixedLocationCalendar({
                           </BodyText>
                         ) : null}
 
-                        {isViewingBooking &&
-                        canDiscardBookingRequest(viewingBookingEvent) ? (
-                          <ButtonBase
-                            onClick={() => setDiscardBrOpen(true)}
-                            sx={{
-                              width: "100%",
-                              borderRadius: "10px",
-                              border: `1px solid ${alpha(m.navy, 0.12)}`,
-                              bgcolor: alpha(m.navy, 0.04),
-                              minHeight: 44,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: 0.75,
-                              color: alpha(m.navy, 0.68),
-                              transition:
-                                "background-color 0.15s, border-color 0.15s",
-                              "&:hover": {
-                                bgcolor: alpha(m.navy, 0.07),
-                                borderColor: alpha(m.navy, 0.18),
-                              },
-                            }}
-                          >
-                            <CloseRoundedIcon
-                              sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }}
-                            />
-                            <BodyText
-                              sx={{
-                                fontSize: 13,
-                                fontWeight: 800,
-                                color: "inherit",
-                              }}
-                            >
-                              Discard BR
-                            </BodyText>
-                          </ButtonBase>
-                        ) : null}
-
-                        {isViewingBooking &&
-                        viewingBookingEvent &&
-                        resolveProfessionalBookingActions(viewingBookingEvent)
-                          .restart_response ? (
-                          <ButtonBase
-                            onClick={() => void handleRestartResponseTime()}
-                            sx={{
-                              width: "100%",
-                              borderRadius: "10px",
-                              border: `1px solid ${alpha(m.teal, 0.35)}`,
-                              bgcolor: alpha(m.teal, 0.06),
-                              minHeight: 44,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: 0.75,
-                              color: m.tealDark ?? m.teal,
-                              transition:
-                                "background-color 0.15s, border-color 0.15s",
-                              "&:hover": {
-                                bgcolor: alpha(m.teal, 0.12),
-                                borderColor: m.teal,
-                              },
-                            }}
-                          >
-                            <BodyText
-                              sx={{
-                                fontSize: 13,
-                                fontWeight: 800,
-                                color: "inherit",
-                              }}
-                            >
-                              Restart response time
-                            </BodyText>
-                          </ButtonBase>
-                        ) : null}
-
                         {showLateCancellation ? (
                           <Box
                             sx={{
@@ -14693,43 +15909,6 @@ export default function ProfessionalFixedLocationCalendar({
                           />
                         ) : null}
 
-                        {showDiscardEbr ? (
-                          <ButtonBase
-                            onClick={() => setDiscardEbrOpen(true)}
-                            sx={{
-                              width: "100%",
-                              borderRadius: "10px",
-                              border: `1px solid ${alpha(m.navy, 0.12)}`,
-                              bgcolor: alpha(m.navy, 0.04),
-                              minHeight: 44,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: 0.75,
-                              color: alpha(m.navy, 0.68),
-                              transition:
-                                "background-color 0.15s, border-color 0.15s",
-                              "&:hover": {
-                                bgcolor: alpha(m.navy, 0.07),
-                                borderColor: alpha(m.navy, 0.18),
-                              },
-                            }}
-                          >
-                            <CloseRoundedIcon
-                              sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }}
-                            />
-                            <BodyText
-                              sx={{
-                                fontSize: 13,
-                                fontWeight: 800,
-                                color: "inherit",
-                              }}
-                            >
-                              Discard EBR
-                            </BodyText>
-                          </ButtonBase>
-                        ) : null}
-
                         {showInternalNote ? (
                           <Box>
                             <Stack
@@ -14947,6 +16126,12 @@ export default function ProfessionalFixedLocationCalendar({
         setDraftFilters={setDraftFilters}
         onApply={(filters) => {
           applyFilters(filters);
+          if (
+            calendarFiltersAreNarrowing(filters, { locationFilterAvailable }) &&
+            filters.teamAll
+          ) {
+            setSplitScreen(null);
+          }
           setFiltersOpen(false);
         }}
       />
@@ -15207,12 +16392,17 @@ export default function ProfessionalFixedLocationCalendar({
         open={Boolean(pendingCatalogDelete)}
         itemName={pendingCatalogDelete?.name}
         onClose={() => setPendingCatalogDelete(null)}
-        onConfirm={confirmDeleteCatalogProduct}
+        onConfirm={confirmCatalogDelete}
       />
       <DiscardEbrDialog
         open={discardEbrOpen}
         onClose={() => setDiscardEbrOpen(false)}
         onConfirm={handleDiscardEbr}
+      />
+      <DiscardErDialog
+        open={discardErOpen}
+        onClose={() => setDiscardErOpen(false)}
+        onConfirm={handleDiscardConfirmedEr}
       />
       <BookingRequestConfirmDialog
         open={Boolean(incomingConfirmAction)}

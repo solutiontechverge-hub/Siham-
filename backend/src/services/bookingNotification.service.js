@@ -1,5 +1,6 @@
 import { query } from "../db/index.js";
 import { emitNotificationChanged } from "../messaging/messagingSocket.js";
+import { resolveResponseWindowMinutes } from "../utils/bookingResponseWindow.js";
 import {
   BOOKING_EMAIL_TYPES,
   sendInAppNotificationEmail,
@@ -776,7 +777,6 @@ export async function dispatchRespondRequestReminderNotification(bookingId) {
 
 const REMINDER_WINDOW_MINUTES = Number(process.env.BOOKING_REMINDER_WINDOW_MINUTES || 5);
 const REMINDER_HOURS_BEFORE = Number(process.env.BOOKING_REMINDER_HOURS_BEFORE || 2);
-const RESPOND_REMINDER_HOURS = Number(process.env.BOOKING_RESPOND_REMINDER_HOURS || 24);
 
 export async function processAppointmentReminderNotifications() {
   const windowMs = REMINDER_WINDOW_MINUTES * 60 * 1000;
@@ -853,13 +853,10 @@ export async function processRespondRequestReminderNotifications() {
     }
 
     if (dueMs == null) {
-      const hours = Number(row.response_time_hours);
-      const minutes = Number(row.response_time_minutes);
-      const windowMinutes =
-        (Number.isFinite(hours) && hours > 0 ? hours * 60 : 0) +
-        (Number.isFinite(minutes) && minutes > 0 ? minutes : 0);
-      const effectiveMinutes =
-        windowMinutes > 0 ? windowMinutes : RESPOND_REMINDER_HOURS * 60;
+      const effectiveMinutes = resolveResponseWindowMinutes(
+        row.response_time_hours,
+        row.response_time_minutes,
+      );
       const created = Date.parse(row.created_at);
       if (!Number.isFinite(created)) continue;
       dueMs = created + effectiveMinutes * 60_000;

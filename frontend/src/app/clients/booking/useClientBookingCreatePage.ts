@@ -40,6 +40,7 @@ import { useBusinessPublicProfile } from "../../../hooks/useBusinessPublicProfil
 import { extractUuidFromSyntheticId } from "./clientBookingApi.mapper";
 import { enrichClientBookingRecord } from "./clientBookingDraftCache";
 import { parsePrepaymentPercent } from "../../../components/common/client-booking/parsePrepaymentPercent";
+import { buildBookingSummarySections } from "../../../components/common/client-booking/buildBookingSummarySections";
 import { loadPublicProfileBookingSelection } from "../../../data/publicProfileBookingSelection";
 import { useAppSelector } from "../../../store/hooks";
 import {
@@ -394,6 +395,9 @@ export function useClientBookingCreatePage() {
   const [projectUploads, setProjectUploads] = React.useState<
     Array<{ id: string; name: string; previewUrl: string; file?: File }>
   >([]);
+  /** Desired + company project mode (from profile toggle or restored project draft). */
+  const [bookingProjectEnabled, setBookingProjectEnabled] =
+    React.useState(false);
   const [desiredVisitAddress, setDesiredVisitAddress] = React.useState({
     street: "",
     number: "",
@@ -416,7 +420,9 @@ export function useClientBookingCreatePage() {
   const isCompanyClient =
     user?.user_type === "company" ||
     profileQueryData?.data?.user_type === "company";
-  const showProjectDetails = isDesiredLocation && isCompanyClient;
+  const showProjectDetails =
+    isDesiredLocation && isCompanyClient && bookingProjectEnabled;
+  const canAddPlanningParticipant = showProjectDetails;
   const bookServicesAtSameTime = !isDesiredLocation && combineServices;
   const servicesDurationMins = React.useMemo(() => {
     if (!services.length) return 0;
@@ -432,7 +438,6 @@ export function useClientBookingCreatePage() {
       desiredVisitAddress.number,
       desiredVisitAddress.postalCode,
       desiredVisitAddress.municipality,
-      desiredVisitAddress.province,
     ]
       .map((part) => part.trim())
       .filter(Boolean)
@@ -1112,48 +1117,39 @@ export function useClientBookingCreatePage() {
   );
 
   const summarySections = React.useMemo(() => {
-    const sections: Array<{
-      key: string;
-      title: string;
-      roleLabel: string;
-      isRequester: boolean;
-      items: Service[];
-      planningItem?: { activity: string; duration: string };
-      teamMemberLabel?: string;
-    }> = [];
-    for (const p of people) {
-      const items = summaryGroups.get(p.id) ?? [];
-      const planningItem =
-        isPlanningPerson(p) && p.planningIsLocked
-          ? {
-              activity: p.planningActivity?.trim() ?? "",
-              duration: p.planningDuration?.trim() ?? "",
-            }
-          : undefined;
-      const hasPlanning = Boolean(
-        planningItem?.activity || planningItem?.duration,
-      );
-      if (isNotesPerson(p)) continue;
-      if (!items.length && !hasPlanning) continue;
-      const roleLabel = getParticipantLabel(p);
-      const teamMemberLabel = teamMemberChipLabelForItems(items);
-      sections.push({
-        key: p.id,
-        title: p.name,
-        roleLabel,
-        isRequester: Boolean(p.isRequester),
-        items,
-        ...(hasPlanning ? { planningItem } : {}),
-        ...(teamMemberLabel ? { teamMemberLabel } : {}),
-      });
-    }
-    return sections;
+    const draft = {
+      selectedDateISO: toISO(selectedDate),
+      selectedTime,
+      combineServices: bookServicesAtSameTime,
+      people,
+      services,
+      teamMembers: shopTeamMembers.map((member) => ({
+        id: String(member.id),
+        name: member.name,
+      })),
+      total,
+    };
+    return buildBookingSummarySections(draft).map((section) => ({
+      ...section,
+      roleLabel:
+        section.participantType === "requester"
+          ? "Client"
+          : section.participantType === "planning"
+            ? "Planning"
+            : section.participantType === "model"
+              ? "Model"
+              : section.participantType === "buffer"
+                ? "Buffer"
+                : "Guest",
+    }));
   }, [
-    getParticipantLabel,
+    bookServicesAtSameTime,
     people,
-    summaryGroups,
-    isPlanningPerson,
-    teamMemberChipLabelForItems,
+    selectedDate,
+    selectedTime,
+    services,
+    shopTeamMembers,
+    total,
   ]);
 
   React.useEffect(() => {
@@ -1303,8 +1299,11 @@ export function useClientBookingCreatePage() {
       setServiceTab(getPreferredServiceTab(profileServices));
       setSelectedServiceIds({});
 
-      if (isDesired && profileSelection.projectEnabled && isCompanyClient) {
+      if (isDesired && isCompanyClient && profileSelection.projectEnabled) {
+        setBookingProjectEnabled(true);
         setProjectDescription(profileSelection.projectInstructions);
+      } else {
+        setBookingProjectEnabled(false);
       }
 
       setShop((prev) => ({
@@ -1463,9 +1462,11 @@ export function useClientBookingCreatePage() {
         setCombineServices(existing.draft.combineServices);
       }
       if (existing.draft?.projectDetails) {
-        setProjectDescription(existing.draft.projectDetails.description ?? "");
+        const desc = existing.draft.projectDetails.description ?? "";
+        const uploads = existing.draft.projectDetails.uploads ?? [];
+        setProjectDescription(desc);
         setProjectUploads(
-          (existing.draft.projectDetails.uploads ?? []).map((u) => ({
+          uploads.map((u) => ({
             id: u.id,
             name: u.name,
             previewUrl:
@@ -1475,6 +1476,21 @@ export function useClientBookingCreatePage() {
               "",
           })),
         );
+        if (
+          existing.shop?.locationMode === "desired" &&
+          (desc.trim() || uploads.length > 0)
+        ) {
+          setBookingProjectEnabled(true);
+        }
+      }
+      // Restore project mode if draft already has a Planning participant.
+      if (
+        existing.shop?.locationMode === "desired" &&
+        (existing.draft?.people ?? []).some(
+          (p) => p.participantType === "planning" || p.name === "Planning",
+        )
+      ) {
+        setBookingProjectEnabled(true);
       }
       if (existing.draft?.clientNote) {
         setClientNote(existing.draft.clientNote);
@@ -1771,7 +1787,7 @@ export function useClientBookingCreatePage() {
     const isNotes = cardName === "Notes";
 
     if (isModel && !isCompanyClient) return;
-    if (isPlanning && !isCompanyClient) return;
+    if (isPlanning && (!isCompanyClient || !bookingProjectEnabled)) return;
     if (isGuest && isCompanyClient) return;
 
     if (isNotes) {
@@ -2465,6 +2481,7 @@ export function useClientBookingCreatePage() {
     minimumTimeslotNotice,
     isCompanyClient,
     showProjectDetails,
+    canAddPlanningParticipant,
     getParticipantLabel,
     catalogByTeamMemberId,
     isPlanningPerson,

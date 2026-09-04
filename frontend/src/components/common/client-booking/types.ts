@@ -3,6 +3,8 @@ export type ClientBookingDraftService = {
   name: string;
   durationMins: number;
   price: number;
+  startTime?: string;
+  endTime?: string;
   guestId?: string | null;
   teamMemberId?: string | null;
   teamMemberName?: string | null;
@@ -34,6 +36,10 @@ export type ClientBookingDraftPerson = {
   planningActivity?: string;
   planningDuration?: string;
   planningIsLocked?: boolean;
+  planningStartTime?: string;
+  planningEndTime?: string;
+  bufferStartTime?: string;
+  bufferEndTime?: string;
 };
 
 export type ClientBookingDraftTeamMember = {
@@ -92,5 +98,7 @@ export type ClientBookingSummarySection = {
   planningItem?: { activity: string; duration: string };
   teamMemberLabel?: string;
   isRequester?: boolean;
-  participantType?: "model" | "planning" | "guest" | "requester";
+  participantType?: "model" | "planning" | "guest" | "requester" | "buffer";
+  startTime?: string;
+  endTime?: string;
 };

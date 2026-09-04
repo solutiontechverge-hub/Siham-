@@ -10,7 +10,7 @@ import { mergeBookingTeamMembers } from "../../../components/common/client-booki
 import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
 import { inferProjectUploadKind, isProjectUploadImage } from "../../../lib/projectUploadMedia";
 import type { BusinessSetupListing, CalendarBooking, CreateBookingRequest } from "../../../store/services/businessApi";
-import { mapApiBookingStatusToClient } from "./clientBookingStatus";
+import { mapApiBookingStatusToClient, mapClientStatusToApi } from "./clientBookingStatus";
 import { effectiveServiceAmount } from "../../../data/bookingLinePricing";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -113,13 +113,7 @@ function buildDateTimeIso(dateIso: string, minutesFromMidnight: number) {
 }
 
 function mapApiStatus(status: ClientBookingStatus): CreateBookingRequest["status"] {
-  if (status === "confirmed") return "confirmed";
-  if (status === "completed") return "completed";
-  if (status === "cancelled") return "cancelled";
-  if (status === "no_show") return "no_show";
-  if (status === "invalid") return "invalid";
-  if (status === "in_progress") return "in_progress";
-  return "requested";
+  return mapClientStatusToApi(status) as CreateBookingRequest["status"];
 }
 
 export function hasProjectBookingContent(draft: {
@@ -208,12 +202,18 @@ export function buildClientBookingApiPayload(input: {
       planningActivity: p.planningActivity,
       planningDuration: p.planningDuration,
       planningIsLocked: p.planningIsLocked,
+      planningStartTime: p.planningStartTime,
+      planningEndTime: p.planningEndTime,
+      bufferStartTime: p.bufferStartTime,
+      bufferEndTime: p.bufferEndTime,
     })),
     services: services.map((s) => ({
       id: s.id,
       name: s.name,
       price: s.price,
       durationMins: s.durationMins,
+      startTime: s.startTime,
+      endTime: s.endTime,
       guestId: s.guestId ?? null,
       teamMemberId: s.teamMemberId ?? null,
       originalPrice: s.originalPrice,
@@ -243,12 +243,12 @@ export function buildClientBookingApiPayload(input: {
     teamMembers: input.draft.teamMembers ?? [],
   };
 
-  const responseDeadline = input.asBookingRequest
-    ? buildResponseDeadline({
-        hours: input.setup.responseTime?.hours,
-        minutes: input.setup.responseTime?.minutes,
-      })
-    : null;
+  const responseDeadline =
+    input.asBookingRequest &&
+    buildResponseDeadline({
+      hours: input.setup.responseTime?.hours,
+      minutes: input.setup.responseTime?.minutes,
+    });
 
   const prepaymentPercent = Math.max(0, Number(input.prepaymentPercent) || 0);
   const showPrepayment =
@@ -924,5 +924,8 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
           : undefined,
     incomingEditRequest,
     hiddenForCustomer: Boolean(notesDetails?.hiddenForCustomer),
+    needsOk: notesDetails?.needsOk,
+    ackRecipient: notesDetails?.ackRecipient,
+    ackScenario: notesDetails?.ackScenario,
   };
 }

@@ -3,13 +3,25 @@
 import AppButton from "./AppButton";
 import * as React from "react";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
-import { Box, ButtonBase, Popover, Stack, Typography } from "@mui/material";
+import {
+  Box,
+  ButtonBase,
+  Dialog,
+  FormHelperText,
+  Stack,
+  ThemeProvider,
+  Typography,
+} from "@mui/material";
 import {
   alpha,
+  createTheme,
   useTheme,
   type SxProps,
   type Theme,
 } from "@mui/material/styles";
+import { StaticTimePicker } from "@mui/x-date-pickers/StaticTimePicker";
+import { renderTimeViewClock } from "@mui/x-date-pickers/timeViewRenderers";
+import dayjs, { type Dayjs } from "dayjs";
 
 export type AppTimePickerProps = {
   value: string;
@@ -21,7 +33,11 @@ export type AppTimePickerProps = {
   minuteStep?: number;
   /** When set, only these `HH:MM` times can be selected. */
   allowedTimes?: readonly string[];
+  error?: boolean;
+  helperText?: React.ReactNode;
   sx?: SxProps<Theme>;
+  /** Analog MUI clock face. Use `wheel` for Availability / Block Time. */
+  variant?: "wheel" | "clock";
 };
 
 export type AppTimePanelProps = {
@@ -35,6 +51,8 @@ export type AppTimePanelProps = {
   /** Hide the teal header strip (useful when parent already has a label). */
   hideHeader?: boolean;
   disabled?: boolean;
+  /** Analog MUI clock face. Defaults to the analog clock. */
+  variant?: "wheel" | "clock";
 };
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, index) => index);
@@ -52,6 +70,159 @@ export function formatTimeDisplay(value: string): string {
   if (!value || !/^\d{2}:\d{2}$/.test(value)) return "";
   const [hours, minutes] = value.split(":").map(Number);
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function usePickerAccentTheme() {
+  const theme = useTheme();
+  return React.useMemo(
+    () =>
+      createTheme(theme, {
+        palette: {
+          primary: {
+            main: theme.palette.primary.light,
+            light: theme.palette.primary.light,
+            dark: theme.palette.primary.main,
+            contrastText: theme.palette.primary.contrastText,
+          },
+        },
+      }),
+    [theme],
+  );
+}
+
+function AnalogClockPanel({
+  value,
+  onChange,
+  minuteStep = 1,
+  allowedTimes,
+  disabled = false,
+  showActions = false,
+  onAccept,
+  onClose,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  minuteStep?: number;
+  allowedTimes?: readonly string[];
+  disabled?: boolean;
+  showActions?: boolean;
+  onAccept?: (value: string) => void;
+  onClose?: () => void;
+}) {
+  const pickerTheme = usePickerAccentTheme();
+  const allowedSet = React.useMemo(
+    () => (allowedTimes?.length ? new Set(allowedTimes) : null),
+    [allowedTimes],
+  );
+  const parsed =
+    toDayjsTime(value) ??
+    dayjs().hour(9).minute(0).second(0).millisecond(0);
+  const currentHhmm = parsed.format("HH:mm");
+  const currentHour = parsed.format("HH");
+
+  const shouldDisableTime = (
+    time: Dayjs,
+    view: "hours" | "minutes" | "seconds",
+  ) => {
+    if (!allowedSet) return false;
+    const hhmm = time.format("HH:mm");
+    if (hhmm === currentHhmm) return false;
+    if (view === "hours") {
+      const hour = time.format("HH");
+      if (hour === currentHour) return false;
+      for (const allowed of allowedSet) {
+        if (allowed.startsWith(`${hour}:`)) return false;
+      }
+      return true;
+    }
+    return !allowedSet.has(hhmm);
+  };
+
+  const commit = (next: Dayjs | null) => {
+    if (!next?.isValid()) return;
+    const hhmm = next.format("HH:mm");
+    if (allowedSet && !allowedSet.has(hhmm) && hhmm !== currentHhmm) return;
+    onChange(hhmm);
+  };
+
+  return (
+    <ThemeProvider theme={pickerTheme}>
+      <StaticTimePicker
+        ampm={false}
+        minutesStep={minuteStep}
+        value={parsed}
+        onChange={commit}
+        onAccept={(next) => {
+          if (!next?.isValid()) return;
+          const hhmm = next.format("HH:mm");
+          if (allowedSet && !allowedSet.has(hhmm) && hhmm !== currentHhmm) {
+            return;
+          }
+          onAccept?.(hhmm);
+        }}
+        onClose={onClose}
+        disabled={disabled}
+        shouldDisableTime={allowedSet ? shouldDisableTime : undefined}
+        displayStaticWrapperAs="mobile"
+        viewRenderers={{
+          hours: renderTimeViewClock,
+          minutes: renderTimeViewClock,
+          seconds: renderTimeViewClock,
+        }}
+        slotProps={{
+          actionBar: { actions: showActions ? ["cancel", "accept"] : [] },
+          toolbar: {
+            hidden: false,
+            sx: {
+              alignItems: "center",
+              px: 0,
+              "& .MuiPickersToolbar-content": {
+                justifyContent: "center",
+                width: "100%",
+              },
+              "& .MuiTimePickerToolbar-hourMinuteLabel": {
+                justifyContent: "center",
+                width: "100%",
+              },
+            },
+          },
+          layout: {
+            sx: {
+              minWidth: 0,
+              bgcolor: "#fff",
+              alignItems: "center",
+              "& .MuiPickersLayout-toolbar": {
+                gridColumn: "1 / -1",
+                justifyContent: "center",
+                alignItems: "center",
+                width: "100%",
+              },
+              "& .MuiPickersLayout-contentWrapper": {
+                gridColumn: "1 / -1",
+                justifyContent: "center",
+                alignItems: "center",
+                width: "100%",
+              },
+              "& .MuiTimeClock-root": {
+                mx: "auto",
+              },
+            },
+          },
+        }}
+      />
+    </ThemeProvider>
+  );
+}
+
+function toDayjsTime(value: string): Dayjs | null {
+  if (!value || !/^\d{2}:\d{2}$/.test(value)) return null;
+  const [hour, minute] = value.split(":").map(Number);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  return dayjs()
+    .hour(Math.min(23, Math.max(0, hour)))
+    .minute(Math.min(59, Math.max(0, minute)))
+    .second(0)
+    .millisecond(0);
 }
 
 function parseTimeValue(value: string) {
@@ -118,7 +289,9 @@ function TimeWheelColumn({
   onSelect: (value: number) => void;
   disabled?: boolean;
 }) {
-  const m = useTheme().palette.mollure;
+  const theme = useTheme();
+  const m = theme.palette.mollure;
+  const accent = theme.palette.primary.light;
   const itemH = 36;
   const listRef = React.useRef<HTMLDivElement>(null);
   const scrollFrameRef = React.useRef<number | null>(null);
@@ -174,8 +347,8 @@ function TimeWheelColumn({
         sx={{
           position: "relative",
           borderRadius: "12px",
-          border: `1px solid ${alpha(m.navy, 0.08)}`,
-          bgcolor: alpha(m.navy, 0.02),
+          border: `1px solid ${alpha(m.navy, 0.12)}`,
+          bgcolor: "#fff",
           overflow: "hidden",
           opacity: disabled ? 0.55 : 1,
         }}
@@ -189,8 +362,8 @@ function TimeWheelColumn({
             height: itemH,
             transform: "translateY(-50%)",
             borderRadius: "8px",
-            bgcolor: alpha(m.teal, 0.1),
-            border: `1px solid ${alpha(m.teal, 0.18)}`,
+            bgcolor: alpha(accent, 0.22),
+            border: `1px solid ${alpha(accent, 0.38)}`,
             pointerEvents: "none",
             zIndex: 1,
           }}
@@ -229,7 +402,7 @@ function TimeWheelColumn({
                   placeItems: "center",
                   fontSize: 14,
                   fontWeight: active ? 800 : 600,
-                  color: active ? m.teal : alpha(m.navy, 0.55),
+                  color: active ? accent : alpha(m.navy, 0.55),
                   cursor: disabled ? "default" : "pointer",
                   userSelect: "none",
                 }}
@@ -254,8 +427,39 @@ export function AppTimePanel({
   allowedTimes,
   hideHeader = false,
   disabled = false,
+  variant = "clock",
 }: AppTimePanelProps) {
-  const m = useTheme().palette.mollure;
+  const theme = useTheme();
+  const m = theme.palette.mollure;
+  const accent = theme.palette.primary.light;
+
+  if (variant === "clock") {
+    return (
+      <Box
+        sx={{
+          width: compact ? "100%" : 320,
+          bgcolor: "#fff",
+          pointerEvents: disabled ? "none" : "auto",
+          overflow: "hidden",
+          borderRadius: "16px",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+        }}
+      >
+        <AnalogClockPanel
+          value={value}
+          onChange={onChange}
+          minuteStep={minuteStep}
+          allowedTimes={allowedTimes}
+          disabled={disabled}
+          showActions={Boolean(onDone)}
+          onAccept={() => onDone?.()}
+          onClose={onDone}
+        />
+      </Box>
+    );
+  }
   const allowed = React.useMemo(
     () => parseAllowedTimes(allowedTimes),
     [allowedTimes],
@@ -313,20 +517,20 @@ export function AppTimePanel({
             px: 1.75,
             py: 1.25,
             borderBottom: `1px solid ${alpha(m.navy, 0.07)}`,
-            bgcolor: alpha(m.teal, 0.04),
+            bgcolor: alpha(accent, 0.08),
             gap: 0.75,
           }}
         >
-          <AccessTimeRoundedIcon sx={{ fontSize: 18, color: m.teal }} />
+          <AccessTimeRoundedIcon sx={{ fontSize: 18, color: accent }} />
           <Typography
             sx={{
               flex: 1,
               fontSize: 13,
               fontWeight: 800,
-              color: alpha(m.navy, 0.82),
+              color: accent,
             }}
           >
-            {formatTimeDisplay(toTimeValue(hour, minute)) || "Select time"}
+            Select time
           </Typography>
         </Box>
       ) : null}
@@ -379,16 +583,34 @@ export default function AppTimePicker({
   fullWidth = true,
   minuteStep = 1,
   allowedTimes,
+  error = false,
+  helperText,
   sx,
+  variant = "clock",
 }: AppTimePickerProps) {
-  const m = useTheme().palette.mollure;
-  const [anchor, setAnchor] = React.useState<HTMLElement | null>(null);
-  const open = Boolean(anchor);
+  const theme = useTheme();
+  const m = theme.palette.mollure;
+  const accent = theme.palette.primary.light;
+  const [open, setOpen] = React.useState(false);
+  const [draft, setDraft] = React.useState("");
+  const draftRef = React.useRef(draft);
+  draftRef.current = draft;
 
-  const closePicker = () => setAnchor(null);
+  const closePicker = () => setOpen(false);
+
+  const openPicker = () => {
+    if (disabled) return;
+    setDraft(value || "09:00");
+    setOpen(true);
+  };
+
+  const acceptPicker = (next: string) => {
+    if (next) onChange(next);
+    closePicker();
+  };
 
   return (
-    <>
+    <Box sx={{ width: fullWidth ? "100%" : "auto" }}>
       {label ? (
         <Typography
           component="label"
@@ -406,24 +628,37 @@ export default function AppTimePicker({
       ) : null}
       <ButtonBase
         disabled={disabled}
-        onClick={(e) => !disabled && setAnchor(e.currentTarget)}
+        onClick={openPicker}
         sx={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "flex-start",
-          width: fullWidth ? "100%" : "auto",
-          minHeight: 44,
+          justifyContent: "space-between",
+          gap: 1,
+          width: "100%",
+          minHeight: 40,
           px: 1.5,
-          py: 1.1,
-          borderRadius: "10px",
-          border: `1px solid ${alpha(m.navy, 0.14)}`,
+          py: 0.75,
+          borderRadius: "6px",
+          border: `1px solid ${
+            error
+              ? theme.palette.error.main
+              : open
+                ? accent
+                : m.inputBorder
+          }`,
           bgcolor: disabled ? alpha(m.navy, 0.04) : "#fff",
           cursor: disabled ? "not-allowed" : "pointer",
           textAlign: "left",
           transition: "border-color 0.15s",
-          "&:hover": { borderColor: disabled ? alpha(m.navy, 0.14) : m.teal },
+          "&:hover": {
+            borderColor: disabled
+              ? m.inputBorder
+              : error
+                ? theme.palette.error.main
+                : accent,
+          },
           "&:focus-visible": {
-            outline: `2px solid ${m.teal}`,
+            outline: `2px solid ${accent}`,
             outlineOffset: 2,
           },
           ...sx,
@@ -439,36 +674,51 @@ export default function AppTimePicker({
         >
           {value ? formatTimeDisplay(value) : placeholder}
         </Typography>
+        <AccessTimeRoundedIcon
+          sx={{ fontSize: 18, color: error ? theme.palette.error.main : accent }}
+        />
       </ButtonBase>
+      {helperText ? (
+        <FormHelperText error={error} sx={{ mx: 1.75, mt: 0.4 }}>
+          {helperText}
+        </FormHelperText>
+      ) : null}
 
-      <Popover
+      <Dialog
         open={open}
-        anchorEl={anchor}
         onClose={closePicker}
-        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-        transformOrigin={{ vertical: "top", horizontal: "left" }}
         PaperProps={{
-          elevation: 0,
+          elevation: 8,
           sx: {
-            mt: 0.75,
-            borderRadius: "14px",
-            border: `1px solid ${alpha(m.navy, 0.1)}`,
-            boxShadow: "0 16px 40px rgba(16, 35, 63, 0.13)",
+            borderRadius: "16px",
             overflow: "hidden",
-            bgcolor: "#fff",
+            m: 2,
           },
         }}
       >
-        <AppTimePanel
-          compact
-          value={value}
-          onChange={onChange}
-          onDone={closePicker}
-          minuteStep={minuteStep}
-          allowedTimes={allowedTimes}
-          disabled={disabled}
-        />
-      </Popover>
-    </>
+        {variant === "wheel" ? (
+          <AppTimePanel
+            variant="wheel"
+            value={draft}
+            onChange={setDraft}
+            onDone={() => acceptPicker(draftRef.current)}
+            minuteStep={minuteStep}
+            allowedTimes={allowedTimes}
+            disabled={disabled}
+          />
+        ) : (
+          <AnalogClockPanel
+            value={draft}
+            onChange={setDraft}
+            minuteStep={minuteStep}
+            allowedTimes={allowedTimes}
+            disabled={disabled}
+            showActions
+            onAccept={acceptPicker}
+            onClose={closePicker}
+          />
+        )}
+      </Dialog>
+    </Box>
   );
 }

@@ -118,6 +118,7 @@ export default function CalendarEditAvailabilityModal({
             >
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <AppTimePicker
+                  variant="wheel"
                   label="Start"
                   value={shift.start}
                   onChange={(val) =>
@@ -134,6 +135,7 @@ export default function CalendarEditAvailabilityModal({
               </Box>
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <AppTimePicker
+                  variant="wheel"
                   label="End"
                   value={shift.end}
                   onChange={(val) =>
