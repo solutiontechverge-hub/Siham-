@@ -199,7 +199,17 @@ export async function logBookingStatusActivity(
   const now = new Date().toISOString();
 
   if (status !== prev) {
-    if (status === "confirmed" && prev === "requested") {
+    if (status === "br_accepted" && prev === "requested") {
+      await appendBookingActivityEvent({
+        bookingId,
+        bookingCode,
+        kind: KIND.BOOKING_ACCEPTED,
+        title: "Booking Request Accepted",
+        actor: "professional",
+        actorLabel: "Professional",
+        occurredAt: now,
+      });
+    } else if (status === "confirmed" && prev === "requested") {
       await appendBookingActivityEvent({
         bookingId,
         bookingCode,
@@ -218,7 +228,17 @@ export async function logBookingStatusActivity(
         actorLabel: "Professional",
         occurredAt: now,
       });
-    } else if (status === "confirmed" && prev !== "confirmed" && prev !== "requested") {
+    } else if (status === "confirmed" && prev === "br_accepted") {
+      await appendBookingActivityEvent({
+        bookingId,
+        bookingCode,
+        kind: KIND.BOOKING_CONFIRMED,
+        title: "Confirmed",
+        actor: prepay === "paid" ? "client" : "professional",
+        actorLabel: prepay === "paid" ? clientLabel : "Professional",
+        occurredAt: now,
+      });
+    } else if (status === "confirmed" && prev !== "confirmed" && prev !== "requested" && prev !== "br_accepted") {
       await appendBookingActivityEvent({
         bookingId,
         bookingCode,

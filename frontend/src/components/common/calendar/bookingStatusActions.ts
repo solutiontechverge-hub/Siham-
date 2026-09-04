@@ -1,5 +1,6 @@
 import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { ClientBookingStatus } from "../../../app/clients/booking/clientBookingRecords";
+import { clientShouldAck, professionalShouldAck } from "./bookingAcknowledgment";
 import {
   canDiscardEbr,
   canRespondToIncomingRequest,
@@ -30,7 +31,8 @@ export type ClientBookingAction =
   | "suggest_change"
   | "reject"
   | "cancel"
-  | "delete";
+  | "delete"
+  | "ok";
 
 export type ProfessionalActionFlags = Record<ProfessionalBookingAction, boolean>;
 export type ClientActionFlags = Record<ClientBookingAction, boolean>;
@@ -59,6 +61,7 @@ const falseClientFlags = (): ClientActionFlags => ({
   reject: false,
   cancel: false,
   delete: false,
+  ok: false,
 });
 
 /**
@@ -77,10 +80,17 @@ export function resolveProfessionalBookingActions(
   const status = event.status;
   const feeCheckoutOk = Boolean(opts?.protectiveFeeCheckoutApplicable);
 
+  if (status === "BR Accepted") {
+    if (professionalShouldAck(event.details)) {
+      flags.ok = true;
+    }
+    return flags;
+  }
+
   if (status === "Confirmed") {
     const erPending = event.bookingScenario === "ER";
     flags.edit = true;
-    if (event.details?.needsOk) {
+    if (professionalShouldAck(event.details)) {
       flags.ok = true;
     }
     // While ER is pending, lock Cancel / In Progress / No Show.
@@ -121,7 +131,7 @@ export function resolveProfessionalBookingActions(
   if (status === "Completed") {
     flags.delete = true;
     flags.rebook = true;
-    if (event.details?.needsOk) flags.ok = true;
+    if (professionalShouldAck(event.details)) flags.ok = true;
     return flags;
   }
 
@@ -183,6 +193,8 @@ export function resolveClientBookingActions(input: {
   locationMode?: "fixed" | "desired";
   isEbrIncoming?: boolean;
   bookingRequestSent?: boolean;
+  needsOk?: boolean;
+  ackRecipient?: "client" | "professional";
 }): ClientActionFlags {
   const flags = falseClientFlags();
   const status = input.status;
@@ -198,6 +210,18 @@ export function resolveClientBookingActions(input: {
   }
 
   if (status === "in_progress") {
+    return flags;
+  }
+
+  if (status === "br_accepted") {
+    if (
+      clientShouldAck({
+        needsOk: input.needsOk,
+        ackRecipient: input.ackRecipient,
+      })
+    ) {
+      flags.ok = true;
+    }
     return flags;
   }
 
@@ -238,6 +262,7 @@ export function showProfessionalActionMenu(
   if (!event) return false;
   return (
     event.status === "Confirmed" ||
+    event.status === "BR Accepted" ||
     event.status === "In Progress" ||
     event.status === "Completed" ||
     event.status === "Cancelled" ||

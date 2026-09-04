@@ -26,6 +26,8 @@ export type AppDropdownOption = {
   tooltip?: string;
 };
 
+const SELECT_ALL_VALUE = "__select_all__";
+
 type AppDropdownProps = Omit<
   TextFieldProps,
   "select" | "onChange" | "children" | "value"
@@ -33,6 +35,9 @@ type AppDropdownProps = Omit<
   options: AppDropdownOption[];
   value: string | readonly string[];
   multiple?: boolean;
+  /** Add a Select All row at the top of a multi-select menu. */
+  selectAll?: boolean;
+  selectAllLabel?: string;
   /** Close the menu after each selection (useful for multi-select in modals). */
   closeOnSelect?: boolean;
   /** Show a search field at the top of the menu to filter options by label. */
@@ -41,7 +46,7 @@ type AppDropdownProps = Omit<
   renderValue?: (selected: string | readonly string[]) => React.ReactNode;
   onChange: (
     value: string | readonly string[],
-    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+    event?: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => void;
 };
 
@@ -62,22 +67,67 @@ export default function AppDropdown({
   options,
   value,
   multiple,
+  selectAll = false,
+  selectAllLabel = "Select All",
   closeOnSelect = false,
   searchable = false,
   searchPlaceholder = "Search...",
   renderValue,
   placeholder,
   SelectProps: callerSelectProps,
+  disabled,
   ...props
 }: AppDropdownProps) {
   const m = useTheme().palette.mollure;
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
 
+  const query = search.trim().toLowerCase();
+  const visibleOptions =
+    searchable && query
+      ? options.filter((option) => option.label.toLowerCase().includes(query))
+      : options;
+  const selectedValues = Array.isArray(value) ? value.map(String) : [];
+  const selectAllTargets = (
+    searchable && query ? visibleOptions : options
+  )
+    .filter((option) => !option.disabled)
+    .map((option) => option.value);
+  const allSelected =
+    selectAllTargets.length > 0 &&
+    selectAllTargets.every((id) => selectedValues.includes(id));
+  const someSelected = selectAllTargets.some((id) =>
+    selectedValues.includes(id),
+  );
+  const showSelectAll =
+    Boolean(multiple && selectAll) && selectAllTargets.length > 1;
+
+  const applySelectAll = (
+    event?: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    if (disabled) return;
+    if (allSelected) {
+      onChange(
+        selectedValues.filter((id) => !selectAllTargets.includes(id)),
+        event,
+      );
+      return;
+    }
+    onChange([...new Set([...selectedValues, ...selectAllTargets])], event);
+  };
+
   const handleChange = (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const next = normalizeSelectValue(event.target.value, multiple);
+    if (
+      multiple &&
+      Array.isArray(next) &&
+      next.includes(SELECT_ALL_VALUE)
+    ) {
+      applySelectAll(event);
+      return;
+    }
     if (
       !multiple &&
       typeof next === "string" &&
@@ -91,12 +141,6 @@ export default function AppDropdown({
     }
   };
 
-  const query = search.trim().toLowerCase();
-  const visibleOptions =
-    searchable && query
-      ? options.filter((option) => option.label.toLowerCase().includes(query))
-      : options;
-
   const { MenuProps: callerMenuProps, ...restCallerSelectProps } =
     callerSelectProps ?? {};
 
@@ -105,6 +149,7 @@ export default function AppDropdown({
       select
       value={value}
       onChange={handleChange}
+      disabled={disabled}
       SelectProps={{
         IconComponent: ExpandMoreRoundedIcon,
         multiple: Boolean(multiple),
@@ -123,19 +168,29 @@ export default function AppDropdown({
           (renderValue as any) ??
           ((selected: any) => {
             const isMulti = Array.isArray(selected);
+            const ids = isMulti
+              ? selected.filter((id: string) => id !== SELECT_ALL_VALUE)
+              : selected;
             const isEmpty = isMulti
-              ? selected.length === 0
-              : selected === "" || selected == null;
+              ? ids.length === 0
+              : ids === "" || ids == null;
             if (isEmpty)
               return (
                 <span style={{ opacity: 0.6 }}>{placeholder ?? "Select"}</span>
               );
-            const v = isMulti ? selected[0] : selected;
-            const option = options.find((o) => o.value === v);
+            if (isMulti) {
+              return ids
+                .map((id: string) => {
+                  const option = options.find((o) => o.value === String(id));
+                  return option?.label ?? String(id);
+                })
+                .join(", ");
+            }
+            const option = options.find((o) => o.value === ids);
             const label = option?.label;
             return (
               <span style={option?.color ? { color: option.color, fontWeight: 700 } : undefined}>
-                {label ?? String(v)}
+                {label ?? String(ids)}
               </span>
             );
           }),
@@ -164,6 +219,28 @@ export default function AppDropdown({
             }}
           />
         </ListSubheader>
+      ) : null}
+      {showSelectAll ? (
+        <MenuItem
+          value={SELECT_ALL_VALUE}
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            minHeight: 40,
+            py: 1,
+            lineHeight: 1.2,
+            fontWeight: 700,
+          }}
+        >
+          <Checkbox
+            size="small"
+            checked={allSelected}
+            indeterminate={someSelected && !allSelected}
+            sx={{ p: 0.5 }}
+          />
+          {selectAllLabel}
+        </MenuItem>
       ) : null}
       {visibleOptions.map((option) => {
         const selected = Array.isArray(value)

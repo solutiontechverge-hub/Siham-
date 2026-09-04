@@ -22,8 +22,15 @@ export function bookingClientOptionLabel(input: {
   return `${input.name} · ${tags.join(" · ")}`;
 }
 
-function TagPill({ label }: { label: string }) {
+function TagPill({
+  label,
+  tone = "muted",
+}: {
+  label: string;
+  tone?: "muted" | "type";
+}) {
   const m = useTheme().palette.mollure;
+  const isType = tone === "type";
   return (
     <Box
       component="span"
@@ -33,14 +40,16 @@ function TagPill({ label }: { label: string }) {
         justifyContent: "center",
         flexShrink: 0,
         height: 18,
-        px: 0.65,
+        px: 0.85,
         borderRadius: "999px",
-        bgcolor: alpha(m.navy, 0.06),
-        color: alpha(m.navy, 0.72),
-        border: `1px solid ${alpha(m.navy, 0.14)}`,
-        fontSize: 9.5,
-        fontWeight: 900,
-        lineHeight: 1,
+        bgcolor: isType ? alpha(m.teal, 0.12) : alpha(m.navy, 0.06),
+        color: isType ? m.teal : alpha(m.navy, 0.72),
+        border: `1px solid ${isType ? alpha(m.teal, 0.28) : alpha(m.navy, 0.14)}`,
+        fontSize: 10,
+        fontWeight: 800,
+        lineHeight: 1.2,
+        letterSpacing: isType ? "0.04em" : 0,
+        whiteSpace: "nowrap",
       }}
     >
       {label}
@@ -65,7 +74,7 @@ export default function BookingClientTags({
         type === "CC" ? (
           <CompanyClientTag variant="pill" />
         ) : (
-          <TagPill label="IC" />
+          <TagPill label="IC" tone="type" />
         )
       ) : null}
     </Stack>

@@ -24,7 +24,6 @@ import BookingIndicatorIcon, {
   type BookingIndicatorVariant,
 } from "../calendar/BookingIndicatorIcon";
 import BookingRequestBadge, {
-  type BookingRequestBadgeState,
   type BookingRequestDirection,
 } from "../calendar/BookingRequestBadge";
 import BookingRequestReceivedIcon from "../calendar/BookingRequestReceivedIcon";
@@ -47,6 +46,7 @@ export type BookingTimelineCardStatus = {
 
 export type BookingTimelineCardScenarioBadge = {
   label: React.ReactNode;
+  tooltip?: React.ReactNode;
   showAcceptedIcon?: boolean;
   showPaymentIcon?: boolean;
   prepaymentStatus?: PrepaymentStatusIconVariant;
@@ -210,15 +210,9 @@ function renderScenarioBadge(
   m: { navy: string; success: string },
   key: React.Key,
 ) {
-  if (badge.showRequestSentIcon && badge.label === "BR") {
-    const brState: BookingRequestBadgeState = badge.requestRejected
-      ? "rejected"
-      : badge.requestAccepted
-        ? "accepted"
-        : "sent";
-    return (
+  const node =
+    badge.showRequestSentIcon && badge.label === "BR" ? (
       <Box
-        key={key}
         sx={{
           display: "flex",
           alignItems: "center",
@@ -229,34 +223,36 @@ function renderScenarioBadge(
       >
         <BookingRequestBadge
           variant="compact"
-          state={brState}
+          state={
+            badge.requestRejected
+              ? "rejected"
+              : badge.requestAccepted
+                ? "accepted"
+                : "sent"
+          }
           direction={badge.requestDirection ?? "outgoing"}
           sx={badge.sx}
         />
       </Box>
-    );
-  }
-
-  return (
-    <Stack
-      key={key}
-      direction="row"
-      alignItems="center"
-      spacing={0.35}
-      sx={[
-        {
-          height: 20,
-          borderRadius: "999px",
-          border: `1px solid ${alpha(m.navy, 0.25)}`,
-          bgcolor: alpha("#fff", 0.72),
-          color: alpha(m.navy, 0.78),
-          px: 0.65,
-          pointerEvents: "auto",
-          flexShrink: 0,
-        },
-        ...(Array.isArray(badge.sx) ? badge.sx : [badge.sx]),
-      ]}
-    >
+    ) : (
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={0.35}
+        sx={[
+          {
+            height: 20,
+            borderRadius: "999px",
+            border: `1px solid ${alpha(m.navy, 0.25)}`,
+            bgcolor: alpha("#fff", 0.72),
+            color: alpha(m.navy, 0.78),
+            px: 0.65,
+            pointerEvents: "auto",
+            flexShrink: 0,
+          },
+          ...(Array.isArray(badge.sx) ? badge.sx : [badge.sx]),
+        ]}
+      >
       <BodyText
         sx={{
           fontSize: 9.5,
@@ -302,6 +298,22 @@ function renderScenarioBadge(
         <BookingRequestSentIcon size={10} />
       ) : null}
     </Stack>
+    );
+
+  if (!badge.tooltip) {
+    return <React.Fragment key={key}>{node}</React.Fragment>;
+  }
+
+  return (
+    <Tooltip
+      key={key}
+      title={badge.tooltip}
+      placement="top"
+      enterDelay={200}
+      describeChild
+    >
+      <Box sx={{ display: "flex", flexShrink: 0, cursor: "help" }}>{node}</Box>
+    </Tooltip>
   );
 }
 

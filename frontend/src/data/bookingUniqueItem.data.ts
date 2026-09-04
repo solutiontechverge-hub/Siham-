@@ -19,9 +19,12 @@ export type BookingUniqueItemDraft = {
   discountAmount: string;
 };
 
+/** Common local VAT rate — editable on the Unique Item form. */
+export const DEFAULT_UNIQUE_ITEM_VAT = "21";
+
 export const emptyBookingUniqueItemDraft = (): BookingUniqueItemDraft => ({
   productName: "",
-  vat: "",
+  vat: DEFAULT_UNIQUE_ITEM_VAT,
   price: "",
   unit: 1,
   discountType: "fixed",
@@ -34,9 +37,10 @@ export function buildUniqueItemDraftFromProduct(
     "name" | "price" | "vat" | "unit" | "discountType" | "discountAmount"
   >,
 ): BookingUniqueItemDraft {
+  const vat = product.vat?.trim().replace(/%$/, "") || DEFAULT_UNIQUE_ITEM_VAT;
   return {
     productName: product.name,
-    vat: product.vat ?? "",
+    vat,
     price: String(product.price),
     unit: Math.max(1, product.unit ?? 1),
     discountType: product.discountType ?? "fixed",
@@ -71,11 +75,18 @@ export type BookingUniqueItemLine = {
   price: number;
   quantity: number;
   unitPrice: number;
+  vat?: string;
+  /** Earliest chronological service block this line attaches to (Section 2.9). */
+  attachedStartTime?: string;
+  guestId?: string | null;
   originalPrice?: number;
   discount?: BookingLineDiscount | null;
 };
 
-export function buildUniqueItemLine(draft: BookingUniqueItemDraft): BookingUniqueItemLine | null {
+export function buildUniqueItemLine(
+  draft: BookingUniqueItemDraft,
+  id = `unique-${Date.now()}`,
+): BookingUniqueItemLine | null {
   const productName = draft.productName.trim();
   if (!productName) return null;
 
@@ -84,13 +95,15 @@ export function buildUniqueItemLine(draft: BookingUniqueItemDraft): BookingUniqu
   const subtotal = unitPrice * quantity;
   const discount = parseDiscountFields(draft.discountType, draft.discountAmount);
   const priced = applyLineDiscount(subtotal, discount);
+  const vat = draft.vat.trim() || undefined;
 
   return {
-    id: `unique-${Date.now()}`,
+    id,
     name: formatProductLineName(productName, quantity),
     unitPrice,
     quantity,
     price: priced.price,
+    vat,
     originalPrice: priced.discountAmount > 0 ? priced.original : undefined,
     discount: priced.discountAmount > 0 ? discount : null,
   };

@@ -244,7 +244,7 @@ export default function MessagingPageView({
             }
             peerReadAt={inbox.peerReadAt}
             emptyStateMessage={
-              inbox.visibleThreads.length === 0
+              !inbox.activeThread
                 ? audience === "professional"
                   ? inbox.search.trim()
                     ? "No client conversations match your search. Try a client name or booking ID."

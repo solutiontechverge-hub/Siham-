@@ -424,7 +424,18 @@ export function isAddressInOperatingArea(
   }
   const provinceKey = province.trim().toLowerCase();
   const municipalityKey = municipality.trim().toLowerCase();
-  if (!provinceKey || !municipalityKey) return false;
+  if (!municipalityKey) return false;
+
+  // Client Visit Address has no Province field — match municipality across areas.
+  if (!provinceKey) {
+    return desired.areas.some((area) => {
+      if (area.allMunicipalities || area.municipalities.length === 0) return true;
+      return area.municipalities.some(
+        (entry) => entry.trim().toLowerCase() === municipalityKey,
+      );
+    });
+  }
+
   return desired.areas.some((area) => {
     if (area.province.trim().toLowerCase() !== provinceKey) return false;
     if (area.allMunicipalities || area.municipalities.length === 0) return true;
@@ -635,8 +646,44 @@ export function buildDesiredLocationFromSetupFields(
 }
 
 /**
+ * Flat municipality options for client Visit Address (no Province field),
+ * scoped to what the professional offers.
+ */
+export function resolveDesiredVisitMunicipalityOptions(
+  desired: BusinessPublicProfileDesiredLocation | null | undefined,
+): string[] {
+  const fallbackMunicipalities = [...DESIRED_LOCATION_MUNICIPALITY_OPTIONS];
+  const isAllNetherlands =
+    !desired ||
+    desired.areaMode === "All Netherlands" ||
+    desired.areas.length === 0;
+
+  if (isAllNetherlands) {
+    return fallbackMunicipalities;
+  }
+
+  const municipalities = new Set<string>();
+  for (const area of desired.areas) {
+    if (area.allMunicipalities || area.municipalities.length === 0) {
+      const byProvince = PROVINCE_MUNICIPALITIES[area.province];
+      if (byProvince?.length) {
+        byProvince.forEach((entry) => municipalities.add(entry));
+      } else {
+        fallbackMunicipalities.forEach((entry) => municipalities.add(entry));
+      }
+      continue;
+    }
+    area.municipalities.filter(Boolean).forEach((entry) => municipalities.add(entry));
+  }
+
+  if (municipalities.size) return Array.from(municipalities);
+  return fallbackMunicipalities;
+}
+
+/**
  * Province / municipality options for Desired Location visit address,
  * scoped to what the professional offers.
+ * (Still used by pro calendar Visit Address which keeps Province.)
  */
 export function resolveDesiredVisitAddressOptions(
   desired: BusinessPublicProfileDesiredLocation | null | undefined,

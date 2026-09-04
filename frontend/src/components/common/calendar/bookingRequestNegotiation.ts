@@ -4,7 +4,13 @@ import type {
   CalendarEvent,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 
-export type BookingEditTagVariant = "edited" | "client_edited" | "added" | "cancelled" | "updated";
+export type BookingEditTagVariant =
+  | "edited"
+  | "client_edited"
+  | "added"
+  | "cancelled"
+  | "pending"
+  | "updated";
 
 export function isOutgoingBookingRequest(
   event: Pick<CalendarEvent, "status" | "bookingScenario" | "details"> | null | undefined,
@@ -61,6 +67,30 @@ type EditTagEbrSource = {
 
 function hasId(ids: readonly string[] | undefined, serviceId: string) {
   return Boolean(ids?.includes(serviceId));
+}
+
+/**
+ * Per-line tag for bundled edit changes.
+ * When awaiting approval, all changed lines show Pending.
+ * Otherwise: cancelled > added > edited.
+ */
+export function resolveServiceChangeTag(
+  serviceId: string,
+  options: {
+    editedIds?: readonly string[];
+    addedIds?: readonly string[];
+    cancelledIds?: readonly string[];
+    awaitingApproval?: boolean;
+  },
+): BookingEditTagVariant | null {
+  const isCancelled = hasId(options.cancelledIds, serviceId);
+  const isAdded = hasId(options.addedIds, serviceId);
+  const isEdited = hasId(options.editedIds, serviceId);
+  if (!isCancelled && !isAdded && !isEdited) return null;
+  if (options.awaitingApproval) return "pending";
+  if (isCancelled) return "cancelled";
+  if (isAdded) return "added";
+  return "edited";
 }
 
 /**

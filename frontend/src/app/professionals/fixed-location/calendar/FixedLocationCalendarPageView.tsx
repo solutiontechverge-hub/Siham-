@@ -23,6 +23,8 @@ export default function FixedLocationCalendarPageView() {
     prepaymentPercentDefault,
     cancellationBeforeHours,
     cancellationBeforeMinutes,
+    responseTimeHours,
+    responseTimeMinutes,
     desiredLocationSetup,
     isSaving,
     onCreateCalendarEntry,
@@ -55,6 +57,8 @@ export default function FixedLocationCalendarPageView() {
       prepaymentPercentDefault={prepaymentPercentDefault}
       cancellationBeforeHours={cancellationBeforeHours}
       cancellationBeforeMinutes={cancellationBeforeMinutes}
+      responseTimeHours={responseTimeHours}
+      responseTimeMinutes={responseTimeMinutes}
       desiredLocationSetup={desiredLocationSetup}
       isSaving={isSaving}
       onCreateCalendarEntry={onCreateCalendarEntry}

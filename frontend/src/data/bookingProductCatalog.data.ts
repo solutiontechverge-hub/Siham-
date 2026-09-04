@@ -21,6 +21,10 @@ export type BookingProductLineItem = {
   price: number;
   quantity: number;
   unitPrice: number;
+  vat?: string;
+  /** Earliest chronological service block this line attaches to (Section 2.9). */
+  attachedStartTime?: string;
+  guestId?: string | null;
   originalPrice?: number;
   discount?: BookingLineDiscount | null;
 };
@@ -97,6 +101,7 @@ export function buildBookingProductLine(
     unitPrice,
     quantity: qty,
     price: priced.price,
+    vat: product.vat,
     originalPrice: priced.discountAmount > 0 ? priced.original : undefined,
     discount: priced.discountAmount > 0 ? discount : null,
   };

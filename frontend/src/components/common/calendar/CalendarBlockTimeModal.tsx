@@ -285,6 +285,7 @@ export default function CalendarBlockTimeModal({
           <Stack direction="row" spacing={1.25}>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <AppTimePicker
+                variant="wheel"
                 label="Start Time"
                 value={draft.startTime}
                 onChange={(val) => setDraft((p) => ({ ...p, startTime: val }))}
@@ -294,6 +295,7 @@ export default function CalendarBlockTimeModal({
             </Box>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <AppTimePicker
+                variant="wheel"
                 label="End Time"
                 value={draft.endTime}
                 onChange={(val) => setDraft((p) => ({ ...p, endTime: val }))}

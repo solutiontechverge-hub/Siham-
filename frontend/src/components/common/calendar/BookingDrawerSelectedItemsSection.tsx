@@ -8,6 +8,7 @@ import { BodyText } from "../../ui/typography";
 import { ServiceSummaryMetaLine } from "../ServiceSummaryMetaLine";
 import {
   getEffectiveServicePrice,
+  formatServiceTimeRange,
   type BookingServiceLineItem,
 } from "../../../data/bookingServiceEdit.data";
 import {
@@ -40,12 +41,17 @@ type BookingDrawerSelectedItemsSectionProps = {
   resolveStaffName?: (staffResourceId?: string) => string | undefined;
   resolveServiceEditTag?: (serviceId: string) => BookingEditTagVariant | null;
   resolveProductEditTag?: (productId: string) => BookingEditTagVariant | null;
+  editTagSignpostTitle?: string;
+  onEditTagSignpostClick?: () => void;
   onRemoveService?: (serviceId: string) => void;
   onRemoveProduct?: (productId: string) => void;
   onRemoveUniqueItem?: (itemId: string) => void;
   onServiceClick?: (service: BookingServiceLineItem) => void;
   /** Hover edit icon → Edit Service screen (client + guest). */
   onEditService?: (service: BookingServiceLineItem) => void;
+  /** Booking-scoped edit (does not mutate the master catalog). */
+  onEditProduct?: (product: SelectedProductItem) => void;
+  onEditUniqueItem?: (item: SelectedProductItem) => void;
 };
 
 export default function BookingDrawerSelectedItemsSection({
@@ -58,11 +64,15 @@ export default function BookingDrawerSelectedItemsSection({
   resolveStaffName,
   resolveServiceEditTag,
   resolveProductEditTag,
+  editTagSignpostTitle,
+  onEditTagSignpostClick,
   onRemoveService,
   onRemoveProduct,
   onRemoveUniqueItem,
   onServiceClick,
   onEditService,
+  onEditProduct,
+  onEditUniqueItem,
 }: BookingDrawerSelectedItemsSectionProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -90,7 +100,9 @@ export default function BookingDrawerSelectedItemsSection({
           </BodyText>
           {services.map((service) => {
             const editTag = resolveServiceEditTag?.(service.id) ?? null;
-            const staffName = resolveStaffName?.(service.staffResourceId);
+            const staffName =
+              resolveStaffName?.(service.staffResourceId)?.trim() ||
+              "Unassigned";
 
             return (
               <Box
@@ -123,19 +135,20 @@ export default function BookingDrawerSelectedItemsSection({
                       {service.name}
                     </BodyText>
                     <ServiceSummaryMetaLine
-                      timeRange={
-                        service.startTime
-                          ? service.endTime
-                            ? `${service.startTime}–${service.endTime}`
-                            : service.startTime
-                          : undefined
-                      }
+                      timeRange={formatServiceTimeRange(
+                        service.startTime,
+                        service.endTime,
+                      )}
                       durationLabel={`${service.durationMins} Mins`}
                       staffName={staffName}
                     />
                     {editTag ? (
                       <Box sx={{ mt: 0.55 }}>
-                        <BookingEditedTag variant={editTag} />
+                        <BookingEditedTag
+                          variant={editTag}
+                          signpostTitle={editTagSignpostTitle}
+                          onSignpostClick={onEditTagSignpostClick}
+                        />
                       </Box>
                     ) : null}
                   </Box>
@@ -194,7 +207,9 @@ export default function BookingDrawerSelectedItemsSection({
             );
           })}
           {cancelledServices.map((service) => {
-            const staffName = resolveStaffName?.(service.staffResourceId);
+            const staffName =
+              resolveStaffName?.(service.staffResourceId)?.trim() ||
+              "Unassigned";
             return (
               <Box key={`cancelled-${service.id}`} sx={cardSx}>
                 <Stack
@@ -215,18 +230,19 @@ export default function BookingDrawerSelectedItemsSection({
                       {service.name}
                     </BodyText>
                     <ServiceSummaryMetaLine
-                      timeRange={
-                        service.startTime
-                          ? service.endTime
-                            ? `${service.startTime}–${service.endTime}`
-                            : service.startTime
-                          : undefined
-                      }
+                      timeRange={formatServiceTimeRange(
+                        service.startTime,
+                        service.endTime,
+                      )}
                       durationLabel={`${service.durationMins} Mins`}
                       staffName={staffName}
                     />
                     <Box sx={{ mt: 0.55 }}>
-                      <BookingEditedTag variant="cancelled" />
+                      <BookingEditedTag
+                        variant="cancelled"
+                        signpostTitle={editTagSignpostTitle}
+                        onSignpostClick={onEditTagSignpostClick}
+                      />
                     </Box>
                   </Box>
                   <BodyText
@@ -286,7 +302,11 @@ export default function BookingDrawerSelectedItemsSection({
                   </BodyText>
                   {editTag ? (
                     <Box sx={{ mt: 0.55 }}>
-                      <BookingEditedTag variant={editTag} />
+                      <BookingEditedTag
+                        variant={editTag}
+                        signpostTitle={editTagSignpostTitle}
+                        onSignpostClick={onEditTagSignpostClick}
+                      />
                     </Box>
                   ) : null}
                 </Box>
@@ -301,6 +321,22 @@ export default function BookingDrawerSelectedItemsSection({
                     originalAmount={product.originalPrice}
                     discountLabel={formatLineDiscountLabel(product.discount)}
                   />
+                  {onEditProduct ? (
+                    <IconButton
+                      size="small"
+                      onClick={() => onEditProduct(product)}
+                      sx={{
+                        color: alpha(m.navy, 0.35),
+                        "&:hover": {
+                          color: m.teal,
+                          bgcolor: alpha(m.teal, 0.08),
+                        },
+                      }}
+                      aria-label={`Edit ${product.name}`}
+                    >
+                      <EditRoundedIcon sx={{ fontSize: 17 }} />
+                    </IconButton>
+                  ) : null}
                   {showRemoveButtons ? (
                     <IconButton
                       size="small"
@@ -359,7 +395,11 @@ export default function BookingDrawerSelectedItemsSection({
                   </BodyText>
                   {editTag ? (
                     <Box sx={{ mt: 0.55 }}>
-                      <BookingEditedTag variant={editTag} />
+                      <BookingEditedTag
+                        variant={editTag}
+                        signpostTitle={editTagSignpostTitle}
+                        onSignpostClick={onEditTagSignpostClick}
+                      />
                     </Box>
                   ) : null}
                 </Box>
@@ -374,6 +414,22 @@ export default function BookingDrawerSelectedItemsSection({
                     originalAmount={item.originalPrice}
                     discountLabel={formatLineDiscountLabel(item.discount)}
                   />
+                  {onEditUniqueItem ? (
+                    <IconButton
+                      size="small"
+                      onClick={() => onEditUniqueItem(item)}
+                      sx={{
+                        color: alpha(m.navy, 0.35),
+                        "&:hover": {
+                          color: m.teal,
+                          bgcolor: alpha(m.teal, 0.08),
+                        },
+                      }}
+                      aria-label={`Edit ${item.name}`}
+                    >
+                      <EditRoundedIcon sx={{ fontSize: 17 }} />
+                    </IconButton>
+                  ) : null}
                   {showRemoveButtons ? (
                     <IconButton
                       size="small"

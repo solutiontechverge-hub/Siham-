@@ -14,6 +14,7 @@ import { buildMultiServiceBookingTitle } from "./calendar-overlap.utils";
 
 const statusFromApi: Record<string, CalendarBookingStatus> = {
   requested: "Requested",
+  br_accepted: "BR Accepted",
   cancelled: "Cancelled",
   canceled: "Cancelled",
   confirmed: "Confirmed",
@@ -418,6 +419,7 @@ export function mapCalendarBookingToEvent(
         ? { responseStatus: parsedNotes.responseStatus }
         : {}),
       ...(parsedNotes?.needsOk ? { needsOk: true, ackScenario: parsedNotes.ackScenario } : {}),
+      ...(parsedNotes?.ackRecipient ? { ackRecipient: parsedNotes.ackRecipient } : {}),
       ...(parsedNotes?.hiddenForProfessional ? { hiddenForProfessional: true } : {}),
       ...(parsedNotes?.hiddenForCustomer ? { hiddenForCustomer: true } : {}),
       ...(parsedNotes?.addedServiceIds?.length
@@ -520,6 +522,12 @@ export function mapCalendarBookingToEvent(
                           name: service.name,
                           price: Number(service.price) || 0,
                           durationMins: Math.max(15, Number(service.durationMins) || 15),
+                          ...(service.startTime
+                            ? { startTime: service.startTime }
+                            : {}),
+                          ...(service.endTime
+                            ? { endTime: service.endTime }
+                            : {}),
                           ...(service.teamMemberId
                             ? { staffResourceId: String(service.teamMemberId) }
                             : {}),

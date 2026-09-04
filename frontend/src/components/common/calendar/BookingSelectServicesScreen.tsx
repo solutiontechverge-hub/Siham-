@@ -1,8 +1,7 @@
 "use client";
 
 import * as React from "react";
-import EditRoundedIcon from "@mui/icons-material/EditRounded";
-import { Box, Checkbox, IconButton, Stack, Typography } from "@mui/material";
+import { Box, Checkbox, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppSearchField from "../AppSearchField";
 import { BodyText } from "../../ui/typography";
@@ -21,7 +20,6 @@ type BookingSelectServicesScreenProps = {
   catalog?: readonly BookingServiceCategory[];
   serviceOverrides?: Readonly<Record<string, Partial<BookingServiceLineItem>>>;
   onToggle: (service: BookingCatalogService) => void;
-  onEdit?: (service: BookingCatalogService) => void;
   disabled?: boolean;
 };
 
@@ -30,7 +28,6 @@ export default function BookingSelectServicesScreen({
   catalog = [],
   serviceOverrides = {},
   onToggle,
-  onEdit,
   disabled = false,
 }: BookingSelectServicesScreenProps) {
   const theme = useTheme();
@@ -195,27 +192,6 @@ export default function BookingSelectServicesScreen({
                           {getServiceMeta(service)}
                         </BodyText>
                       </Box>
-                      {onEdit ? (
-                        <IconButton
-                          size="small"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (disabled) return;
-                            onEdit(service);
-                          }}
-                          disabled={disabled}
-                          aria-label={`Edit ${service.name}`}
-                          sx={{
-                            color: alpha(m.navy, 0.42),
-                            "&:hover": {
-                              color: m.teal,
-                              bgcolor: alpha(m.teal, 0.08),
-                            },
-                          }}
-                        >
-                          <EditRoundedIcon sx={{ fontSize: 17 }} />
-                        </IconButton>
-                      ) : null}
                       <Checkbox
                         checked={checked}
                         tabIndex={-1}

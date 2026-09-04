@@ -14,16 +14,15 @@ import { alpha, useTheme } from "@mui/material/styles";
 import AppSearchField from "../AppSearchField";
 import AppSelect from "../AppSelect";
 import AppTextField from "../AppTextField";
+import AppTimePicker from "../AppTimePicker";
 import { BodyText } from "../../ui/typography";
 import {
   addMinutesToTime,
-  buildBookingTimeOptions,
+  formatDurationMinsLabel,
+  minutesBetweenTimes,
   type BookingServiceEditDraft,
 } from "../../../data/bookingServiceEdit.data";
-import {
-  sanitizeDecimalInput,
-  sanitizeDigitsInput,
-} from "../../../lib/field-input";
+import { sanitizeDecimalInput } from "../../../lib/field-input";
 
 export type BookingEditServiceStaffOption = {
   id: string;
@@ -47,7 +46,7 @@ type BookingEditServiceScreenProps = {
   >;
   onChange: (patch: Partial<BookingServiceEditDraft>) => void;
   disabled?: boolean;
-  /** Start Time + availability list only for manual booking add. */
+  /** Available/Occupied rows under Start Time — only for manual booking add. */
   showStartTime?: boolean;
   /** Optional Available/Occupied rows under Start Time. */
   startTimeSlots?: readonly BookingEditServiceTimeSlot[];
@@ -82,7 +81,6 @@ export default function BookingEditServiceScreen({
   const m = theme.palette.mollure;
   const [staffQuery, setStaffQuery] = React.useState("");
   const [staffMenuOpen, setStaffMenuOpen] = React.useState(false);
-  const timeOptions = React.useMemo(() => buildBookingTimeOptions(), []);
   const hasStaffSelected = Boolean(draft.staffResourceId);
   const selectedStaff = React.useMemo(
     () => staffOptions.find((staff) => staff.id === draft.staffResourceId),
@@ -106,24 +104,41 @@ export default function BookingEditServiceScreen({
     setStaffMenuOpen(false);
   };
 
-  const handleDurationChange = (value: string) => {
-    const durationValue = sanitizeDigitsInput(value);
-    const duration = Number.parseInt(durationValue, 10);
-    const next: Partial<BookingServiceEditDraft> = { durationMins: durationValue };
-    if (draft.startTime && Number.isFinite(duration) && duration > 0) {
-      next.endTime = addMinutesToTime(draft.startTime, duration);
+  const handleStartTimeChange = (value: string) => {
+    const next: Partial<BookingServiceEditDraft> = { startTime: value };
+    if (draft.endTime) {
+      const mins = minutesBetweenTimes(value, draft.endTime);
+      next.durationMins = mins > 0 ? String(mins) : "";
     }
     onChange(next);
   };
 
-  const handleStartTimeChange = (value: string) => {
+  const handleOccupancySlotClick = (value: string) => {
     const duration = Number.parseInt(draft.durationMins, 10);
     const next: Partial<BookingServiceEditDraft> = { startTime: value };
     if (Number.isFinite(duration) && duration > 0) {
       next.endTime = addMinutesToTime(value, duration);
+      next.durationMins = String(duration);
+    } else if (draft.endTime) {
+      const mins = minutesBetweenTimes(value, draft.endTime);
+      next.durationMins = mins > 0 ? String(mins) : "";
     }
     onChange(next);
   };
+
+  const handleEndTimeChange = (value: string) => {
+    const mins = draft.startTime ? minutesBetweenTimes(draft.startTime, value) : 0;
+    onChange({
+      endTime: value,
+      durationMins: mins > 0 ? String(mins) : "",
+    });
+  };
+
+  const durationMins = minutesBetweenTimes(draft.startTime, draft.endTime);
+  const durationDisplay =
+    durationMins > 0
+      ? formatDurationMinsLabel(durationMins)
+      : formatDurationMinsLabel(Number.parseInt(draft.durationMins, 10));
 
   return (
     <Stack spacing={1.6}>
@@ -144,103 +159,101 @@ export default function BookingEditServiceScreen({
         helperText={errors.name}
       />
 
-      <AppTextField
-        label="Time"
-        placeholder="Duration"
-        value={draft.durationMins}
-        onChange={(e) => handleDurationChange(e.target.value)}
-        fullWidth
-        disabled={disabled}
-        error={Boolean(errors.durationMins)}
-        helperText={errors.durationMins}
-        inputProps={{ inputMode: "numeric" }}
-      />
-
-      {showStartTime ? (
-        <Stack spacing={0.85}>
-          <AppSelect
+      <Stack direction="row" spacing={1.25}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <AppTimePicker
             label="Start Time"
             value={draft.startTime}
-            onChange={(e) => handleStartTimeChange(String(e.target.value))}
-            options={timeOptions}
+            onChange={handleStartTimeChange}
+            minuteStep={15}
             fullWidth
             disabled={disabled}
             error={Boolean(errors.startTime)}
             helperText={errors.startTime}
           />
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <AppTimePicker
+            label="End Time"
+            value={draft.endTime}
+            onChange={handleEndTimeChange}
+            minuteStep={15}
+            fullWidth
+            disabled={disabled}
+            error={Boolean(errors.endTime)}
+            helperText={errors.endTime}
+          />
+        </Box>
+      </Stack>
 
-          {startTimeSlots.length > 0 ? (
-            <Box
-              sx={{
-                borderRadius: "10px",
-                border: `1px solid ${alpha(m.navy, 0.1)}`,
-                bgcolor: "#fff",
-                overflow: "hidden",
-              }}
-            >
-              {startTimeSlots.map((slot, index) => {
-                const occupied = slot.status === "occupied";
-                const selected = draft.startTime === slot.time;
-                return (
-                  <ButtonBase
-                    key={slot.time}
-                    disabled={disabled || occupied}
-                    onClick={() => handleStartTimeChange(slot.time)}
-                    sx={{
-                      width: "100%",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      px: 1.5,
-                      py: 1.05,
-                      borderBottom:
-                        index < startTimeSlots.length - 1
-                          ? `1px solid ${alpha(m.navy, 0.06)}`
-                          : "none",
-                      bgcolor: selected ? alpha(m.teal, 0.06) : "#fff",
-                      "&.Mui-disabled": { opacity: 1 },
-                    }}
-                  >
-                    <BodyText
-                      component="span"
-                      sx={{
-                        fontSize: 13,
-                        fontWeight: 800,
-                        color: alpha(m.navy, occupied ? 0.42 : 0.78),
-                      }}
-                    >
-                      {slot.time}
-                    </BodyText>
-                    <BodyText
-                      component="span"
-                      sx={{
-                        fontSize: 12,
-                        fontWeight: 800,
-                        color: occupied ? "#E67E22" : "#2ECC71",
-                      }}
-                    >
-                      {occupied ? "Occupied" : "Available"}
-                    </BodyText>
-                  </ButtonBase>
-                );
-              })}
-            </Box>
-          ) : null}
-        </Stack>
+      {showStartTime && startTimeSlots.length > 0 ? (
+        <Box
+          sx={{
+            borderRadius: "10px",
+            border: `1px solid ${alpha(m.navy, 0.1)}`,
+            bgcolor: "#fff",
+            overflow: "hidden",
+          }}
+        >
+          {startTimeSlots.map((slot, index) => {
+            const occupied = slot.status === "occupied";
+            const selected = draft.startTime === slot.time;
+            return (
+              <ButtonBase
+                key={slot.time}
+                disabled={disabled || occupied}
+                onClick={() => handleOccupancySlotClick(slot.time)}
+                sx={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  px: 1.5,
+                  py: 1.05,
+                  borderBottom:
+                    index < startTimeSlots.length - 1
+                      ? `1px solid ${alpha(m.navy, 0.06)}`
+                      : "none",
+                  bgcolor: selected ? alpha(m.teal, 0.06) : "#fff",
+                  "&.Mui-disabled": { opacity: 1 },
+                }}
+              >
+                <BodyText
+                  component="span"
+                  sx={{
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: alpha(m.navy, occupied ? 0.42 : 0.78),
+                  }}
+                >
+                  {slot.time}
+                </BodyText>
+                <BodyText
+                  component="span"
+                  sx={{
+                    fontSize: 12,
+                    fontWeight: 800,
+                    color: occupied ? "#E67E22" : "#2ECC71",
+                  }}
+                >
+                  {occupied ? "Occupied" : "Available"}
+                </BodyText>
+              </ButtonBase>
+            );
+          })}
+        </Box>
       ) : null}
 
-      {showStartTime ? (
-        <AppTextField
-          label="End Time"
-          placeholder="HH:MM"
-          value={draft.endTime}
-          onChange={(e) => onChange({ endTime: e.target.value })}
-          fullWidth
-          disabled={disabled}
-          error={Boolean(errors.endTime)}
-          helperText={errors.endTime}
-        />
-      ) : null}
+      <AppTextField
+        label="Duration"
+        placeholder="—"
+        value={durationDisplay}
+        fullWidth
+        disabled
+        error={Boolean(errors.durationMins)}
+        helperText={errors.durationMins}
+        InputProps={{ readOnly: true }}
+      />
 
       <Stack direction="row" spacing={1} alignItems="center">
           <Box sx={{ flex: 1, minWidth: 0 }}>

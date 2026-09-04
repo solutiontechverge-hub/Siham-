@@ -41,6 +41,7 @@ import {
 } from "./messagingSocketClient";
 import {
   canProfessionalReply,
+  collectBookingNavigationThreadIds,
   findThreadIdByBookingRef,
   findThreadIdByBusinessSetupId,
   findThreadIdByClientName,
@@ -64,13 +65,14 @@ import {
   hideThreadsForAudience,
   isThreadHiddenForAudience,
   saveMessagingStore,
+  upsertThreadIntoStore,
 } from "./messagingStorage";
 import {
   CLIENT_PROFESSIONALS_PAGE_SIZE,
   mergeClientThreadsWithProfessionals,
   type MessagingProfessionalListItem,
 } from "./messagingProfessionals";
-import { isMockMessagingThreadId } from "./messagingMockData";
+import { createEmptyMessagingStore, isMockMessagingThreadId } from "./messagingMockData";
 import { threadPassesDrawerFilters } from "./messagingFilters";
 import type { MessagingAudience } from "./messagingRoutes";
 import type {
@@ -128,6 +130,7 @@ export type MessagingInboxNavigation = {
   threadId?: string;
   businessSetupId?: string;
   searchPrefill?: string;
+  seedThread?: MessagingThread;
 };
 
 export function useMessagingInbox(
@@ -305,9 +308,27 @@ export function useMessagingInbox(
       searchParams.get("client") ??
       searchParams.get("professional") ??
       "";
-    const byBooking = findThreadIdByBookingRef(store, bookingRef);
-    const bySetup = findThreadIdByBusinessSetupId(store, businessSetupId);
-    const byName = findThreadIdByClientName(store, searchPrefill);
+    const seedThread = navigation?.seedThread;
+
+    let workingStore = store;
+    if (seedThread) {
+      const existing = store.threads.find((item) => item.id === seedThread.id);
+      const needsUpsert =
+        !existing ||
+        existing.bookingId !== seedThread.bookingId ||
+        existing.bookingStatus !== seedThread.bookingStatus ||
+        Boolean(existing.unlinked) !== Boolean(seedThread.unlinked) ||
+        existing.bookingMeta !== seedThread.bookingMeta;
+      if (needsUpsert) {
+        workingStore = upsertThreadIntoStore(store, seedThread);
+        setStore(workingStore);
+        saveMessagingStore(workingStore);
+      }
+    }
+
+    const byBooking = findThreadIdByBookingRef(workingStore, bookingRef);
+    const bySetup = findThreadIdByBusinessSetupId(workingStore, businessSetupId);
+    const byName = findThreadIdByClientName(workingStore, searchPrefill);
     // Prefer the booking shop's current name when it uniquely identifies a thread.
     const resolvedThreadId =
       threadRef ||
@@ -315,16 +336,24 @@ export function useMessagingInbox(
       (byName && bySetup && byName === bySetup ? byName : "") ||
       bySetup ||
       byName ||
-      store.threads.find(
+      workingStore.threads.find(
         (thread) =>
           thread.name.toLowerCase() ===
           (searchParams.get("client") ?? "").toLowerCase(),
       )?.id ||
       "";
 
+    const openedFromBooking = Boolean(threadRef || bookingRef || seedThread);
+
     if (resolvedThreadId) {
       setActiveThreadId(resolvedThreadId);
-      const thread = store.threads.find((item) => item.id === resolvedThreadId);
+      // Booking/thread deep-links select the conversation directly — do not
+      // filter the sidebar by client name (that caused empty "no match" states).
+      if (openedFromBooking) {
+        setSearch("");
+        return;
+      }
+      const thread = workingStore.threads.find((item) => item.id === resolvedThreadId);
       if (thread) {
         setSearch(thread.name);
         return;
@@ -338,6 +367,7 @@ export function useMessagingInbox(
     navigation?.bookingRef,
     navigation?.businessSetupId,
     navigation?.searchPrefill,
+    navigation?.seedThread,
     navigation?.threadId,
     searchParams,
     store,
@@ -442,9 +472,15 @@ export function useMessagingInbox(
     });
   }, [isAuthed, store, threadIdsKey]);
 
+  const bookingNavigationThreadIds = React.useMemo(
+    () => collectBookingNavigationThreadIds(store ?? createEmptyMessagingStore(), navigation),
+    [navigation?.bookingRef, navigation?.seedThread, navigation?.threadId, store],
+  );
+
   const filteredThreads = React.useMemo(() => {
     if (!store) return [];
     return store.threads.filter((thread) => {
+      if (bookingNavigationThreadIds.has(thread.id)) return true;
       if (isThreadHiddenForAudience(store, audience, thread.id)) return false;
       if (store.blockedThreadIds.includes(thread.id)) return false;
       if (!threadMatchesSearch(thread, search)) return false;
@@ -461,7 +497,7 @@ export function useMessagingInbox(
       }
       return true;
     });
-  }, [store, audience, search, appliedDrawerFilters]);
+  }, [store, audience, search, appliedDrawerFilters, bookingNavigationThreadIds]);
 
   const visibleThreads = React.useMemo(() => {
     if (audience !== "client") return filteredThreads;
@@ -502,13 +538,22 @@ export function useMessagingInbox(
   ]);
 
   React.useEffect(() => {
+    const hasBookingNavigationTarget = bookingNavigationThreadIds.size > 0;
     if (!visibleThreads.length) {
+      if (hasBookingNavigationTarget && activeThreadId) return;
       if (activeThreadId) setActiveThreadId("");
       return;
     }
     if (visibleThreads.some((thread) => thread.id === activeThreadId)) return;
+    if (
+      hasBookingNavigationTarget &&
+      activeThreadId &&
+      store?.threads.some((thread) => thread.id === activeThreadId)
+    ) {
+      return;
+    }
     setActiveThreadId(visibleThreads[0].id);
-  }, [activeThreadId, visibleThreads]);
+  }, [activeThreadId, bookingNavigationThreadIds, store, visibleThreads]);
 
   React.useEffect(() => {
     if (!store || !activeThreadId) return;
@@ -526,11 +571,15 @@ export function useMessagingInbox(
   }, [activeThreadId, audience, isAuthed, markMessagingThreadRead, store]);
 
   const activeThread = React.useMemo(() => {
+    if (activeThreadId && store) {
+      const direct = store.threads.find((thread) => thread.id === activeThreadId);
+      if (direct) return direct;
+    }
     if (!visibleThreads.length) return undefined;
     return (
       visibleThreads.find((t) => t.id === activeThreadId) ?? visibleThreads[0]
     );
-  }, [activeThreadId, visibleThreads]);
+  }, [activeThreadId, store, visibleThreads]);
 
   const messages = React.useMemo(() => {
     if (!store || !activeThread) return [];

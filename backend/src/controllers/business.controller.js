@@ -247,6 +247,7 @@ const bookingDateSql = (alias) =>
 const makeCalendarCode = (prefix = "OF123") => `${prefix}${Date.now()}${Math.random().toString(16).slice(2, 6)}`;
 const calendarStatusSet = new Set([
   "requested",
+  "br_accepted",
   "cancelled",
   "completed",
   "confirmed",
@@ -257,6 +258,7 @@ const calendarStatusSet = new Set([
 ]);
 const bookingStatusSet = new Set([
   "requested",
+  "br_accepted",
   "cancelled",
   "completed",
   "confirmed",
@@ -2157,7 +2159,7 @@ const parseBookingsTabFilter = (tab, alias = "b") => {
   const normalized = String(tab ?? "").trim().toLowerCase();
   const waitingPrepaymentSql = `(
     LOWER(TRIM(COALESCE(${alias}.prepayment_status, ''))) IN ('pending', 'required')
-    AND ${alias}.status IN ('requested', 'confirmed')
+    AND ${alias}.status IN ('requested', 'br_accepted', 'confirmed')
   )`;
 
   if (normalized === "past") {
@@ -2168,7 +2170,7 @@ const parseBookingsTabFilter = (tab, alias = "b") => {
   }
   if (normalized === "upcoming") {
     return `AND (
-      ${alias}.status IN ('requested', 'confirmed', 'invalid')
+      ${alias}.status IN ('requested', 'br_accepted', 'confirmed', 'invalid')
       OR ${waitingPrepaymentSql}
     )`;
   }
@@ -2910,11 +2912,11 @@ export const updateMyBooking = async (req, res) => {
     let nextStatus = existing.status;
     if (hasStatus) {
       nextStatus = normalizeBookingStatus(req.body.status, existing.status);
-      const allowedCustomerStatuses = ["cancelled", "confirmed", "requested", "invalid"];
+      const allowedCustomerStatuses = ["cancelled", "confirmed", "requested", "br_accepted", "invalid"];
       if (!allowedCustomerStatuses.includes(nextStatus)) {
         return res.status(400).json({
           success: false,
-          message: "Customers may only set booking status to cancelled, confirmed, requested, or invalid.",
+          message: "Customers may only set booking status to cancelled, confirmed, requested, br_accepted, or invalid.",
           data: null,
         });
       }
@@ -2939,8 +2941,12 @@ export const updateMyBooking = async (req, res) => {
         });
       }
       nextPrepayment = normalizedPrepayment;
-      if (normalizedPrepayment === "paid" && nextStatus === "requested") {
-        nextStatus = "confirmed";
+      if (normalizedPrepayment === "paid") {
+        if (nextStatus === "requested") {
+          nextStatus = "confirmed";
+        } else if (nextStatus === "br_accepted") {
+          nextStatus = "confirmed";
+        }
       }
     }
 

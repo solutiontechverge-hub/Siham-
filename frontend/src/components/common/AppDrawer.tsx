@@ -118,9 +118,11 @@ export default function AppDrawer({
         sx={{
           width: "100%",
           height: "100%",
+          minHeight: 0,
           display: "flex",
           flexDirection: "column",
           bgcolor: panelBg,
+          overflow: "hidden",
         }}
       >
         <Stack
@@ -197,7 +199,9 @@ export default function AppDrawer({
 
         <Box
           sx={[
-            { flex: 1, overflowY: "auto", overflowX: "hidden" },
+            // minHeight: 0 lets this flex child shrink so the footer stays pinned
+            // instead of the whole column growing and scrolling with content.
+            { flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden" },
             ...(Array.isArray(mergedContentSx)
               ? mergedContentSx
               : mergedContentSx
@@ -208,7 +212,9 @@ export default function AppDrawer({
           {children}
         </Box>
 
-        {footer ? <Box sx={{ flexShrink: 0 }}>{footer}</Box> : null}
+        {footer ? (
+          <Box sx={{ flexShrink: 0, flexGrow: 0 }}>{footer}</Box>
+        ) : null}
       </Box>
     </Drawer>
   );

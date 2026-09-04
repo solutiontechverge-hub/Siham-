@@ -1,8 +1,8 @@
 import { query } from "../db/index.js";
 import { emitBookingChanged } from "../messaging/messagingSocket.js";
+import { resolveResponseWindowMinutes } from "../utils/bookingResponseWindow.js";
 
 const NOTES_META_PREFIX = "---mollure-meta---";
-const DEFAULT_WINDOW_MINUTES = Number(process.env.BOOKING_RESPOND_REMINDER_HOURS || 24) * 60;
 
 function splitNotes(raw) {
   const text = String(raw ?? "");
@@ -25,17 +25,6 @@ function joinNotes(human, meta) {
   return `${prefix}${NOTES_META_PREFIX}\n${JSON.stringify(meta)}`;
 }
 
-function resolveWindowMinutes(meta, setupHours, setupMinutes) {
-  const fromMeta = Number(meta?.responseWindowMinutes);
-  if (Number.isFinite(fromMeta) && fromMeta > 0) return fromMeta;
-
-  const hours = Number(setupHours);
-  const minutes = Number(setupMinutes);
-  const total =
-    (Number.isFinite(hours) && hours > 0 ? hours * 60 : 0) +
-    (Number.isFinite(minutes) && minutes > 0 ? minutes : 0);
-  return total > 0 ? total : DEFAULT_WINDOW_MINUTES;
-}
 
 function resolveRespondByMs(meta, createdAt, updatedAt, windowMinutes) {
   if (meta?.respondBy) {
@@ -99,10 +88,10 @@ export async function processOverdueResponseStatusUpdates() {
     if (!hasPendingNegotiation(row.status, meta)) continue;
     if (meta.responseStatus === "overdue_response") continue;
 
-    const windowMinutes = resolveWindowMinutes(
-      meta,
+    const windowMinutes = resolveResponseWindowMinutes(
       row.response_time_hours,
       row.response_time_minutes,
+      meta?.responseWindowMinutes,
     );
     const dueMs = resolveRespondByMs(
       meta,

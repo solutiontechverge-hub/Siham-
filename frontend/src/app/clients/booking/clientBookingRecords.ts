@@ -5,6 +5,7 @@ import type { BookingEditRequestPayload } from "../../../store/services/business
 export type ClientBookingStatus =
   | "draft"
   | "requested"
+  | "br_accepted"
   | "confirmed"
   | "in_progress"
   | "completed"
@@ -53,6 +54,10 @@ export type ClientBookingRecord = {
   incomingEditRequest?: BookingEditRequestRecord | null;
   /** Soft-delete from client list without changing status. */
   hiddenForCustomer?: boolean;
+  /** Counterparty action awaiting client OK acknowledgement. */
+  needsOk?: boolean;
+  ackRecipient?: "client" | "professional";
+  ackScenario?: "BR" | "EBR" | "ER" | "E";
 };
 
 export type BookingListTab = "past" | "ongoing" | "upcoming";
@@ -71,7 +76,11 @@ export function isClientListVisibleBooking(record: ClientBookingRecord): boolean
 
 function isWaitingForPrepayment(record: ClientBookingRecord): boolean {
   if (!record.requiresPrepayment || record.prepaid) return false;
-  return record.status === "requested" || record.status === "confirmed";
+  return (
+    record.status === "requested" ||
+    record.status === "br_accepted" ||
+    record.status === "confirmed"
+  );
 }
 
 function normalizeStatus(record: ClientBookingRecord): ClientBookingStatus {
@@ -82,6 +91,7 @@ function normalizeStatus(record: ClientBookingRecord): ClientBookingStatus {
   if (record.status === "completed") return "completed";
   if (record.status === "in_progress") return "in_progress";
   if (record.status === "requested") return "requested";
+  if (record.status === "br_accepted") return "br_accepted";
   if (record.status === "confirmed") return "confirmed";
   return "confirmed";
 }

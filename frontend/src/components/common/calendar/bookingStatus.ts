@@ -15,12 +15,15 @@ import type {
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import { isOutgoingBookingRequest } from "./bookingRequestNegotiation";
 import { parseStoredEbrFromNotes } from "./bookingEventDetails";
+import { prepayBlocksConfirmation } from "./bookingAcknowledgment";
+import { resolveCalendarPrepaymentStatus } from "./prepaymentStatus";
 
 export type BookingScenarioIndicator = "BR" | "EBR" | "ER" | "E";
 
 export const ONLINE_BOOKING_STATUSES: readonly CalendarBookingStatus[] = [
   "Confirmed",
   "Requested",
+  "BR Accepted",
   "In Progress",
   "Completed",
   "Cancelled",
@@ -65,6 +68,24 @@ export function calendarBookingStatusLabel(
   return event.status;
 }
 
+/** Professional calendar chip — BR Accepted with unpaid prepay reads as Requested. */
+export function professionalCalendarStatusLabel(
+  event: Pick<CalendarEvent, "status" | "details" | "bookingType" | "bookingScenario">,
+): string {
+  if (event.status !== "BR Accepted") return calendarBookingStatusLabel(event);
+  const prepayRequired = Boolean(event.details?.showPrepayment);
+  const prepayPaid = resolveCalendarPrepaymentStatus(event) === "confirmed";
+  if (
+    prepayBlocksConfirmation({
+      prepayRequired,
+      prepayPaid,
+    })
+  ) {
+    return "Requested";
+  }
+  return "BR Accepted";
+}
+
 type StatusTheme = {
   accent: string;
   cardBg: string;
@@ -82,6 +103,14 @@ export const BOOKING_STATUS_THEME: Record<CalendarBookingStatus, StatusTheme> = 
     chipBg: "#F97316",
     chipColor: "#FFFFFF",
     chipBorder: "#F97316",
+  },
+  "BR Accepted": {
+    accent: "#22B573",
+    cardBg: "#ECFFF4",
+    cardBorder: "#75D9A6",
+    chipBg: "#FFFFFF",
+    chipColor: "#22B573",
+    chipBorder: "#75D9A6",
   },
   Confirmed: {
     accent: "#22B573",
@@ -194,6 +223,7 @@ export function resolveBookingScenario(
     if (event.status !== "Requested") return undefined;
     return scenario;
   }
+  if (event.status === "BR Accepted") return undefined;
   // Confirmed Edit (E) — booking changed after ER/EBR accept.
   if (scenario === "E") {
     if (event.status !== "Confirmed") return undefined;
@@ -235,7 +265,9 @@ export function canDiscardBookingRequest(
 export function isBookingRequestAccepted(
   event: Pick<CalendarEvent, "status" | "bookingScenario"> | null | undefined,
 ) {
-  if (!event || event.bookingScenario !== "BR") return false;
+  if (!event) return false;
+  if (event.status === "BR Accepted") return true;
+  if (event.bookingScenario !== "BR") return false;
   return event.status === "Confirmed" || event.status === "Completed";
 }
 

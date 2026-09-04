@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import type { MessagingThread } from "./messagingTypes";
 
 export type MessagingOpenParams = {
   bookingRef?: string;
@@ -9,6 +10,8 @@ export type MessagingOpenParams = {
   businessSetupId?: string;
   /** Prefill inbox search (e.g. when opening from a booking). */
   searchPrefill?: string;
+  /** Seed the inbox with this thread so booking-open selects it immediately. */
+  seedThread?: MessagingThread;
 };
 
 /** @deprecated Use MessagingOpenParams */
