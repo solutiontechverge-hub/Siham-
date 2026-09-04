@@ -113,6 +113,7 @@ export default function MessagingFloatingWidget({
                 threadId: params.threadId,
                 businessSetupId: params.businessSetupId,
                 searchPrefill: params.searchPrefill,
+                seedThread: params.seedThread,
               }}
               onClose={closeMessaging}
             />

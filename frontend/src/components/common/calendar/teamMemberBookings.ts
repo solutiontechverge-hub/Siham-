@@ -3,6 +3,105 @@ import type {
   CalendarResource,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 
+function addAssignedTeamId(
+  ids: Set<string>,
+  value: string | null | undefined,
+) {
+  const id = String(value ?? "").trim();
+  if (id) ids.add(id);
+}
+
+/**
+ * Team members actually assigned on the booking (services / buffers),
+ * not the snapshot catalog of available members.
+ */
+export function collectEventTeamMemberIds(
+  event: Pick<CalendarEvent, "resourceId" | "details">,
+): string[] {
+  const ids = new Set<string>();
+  const details = event.details;
+
+  for (const service of details?.services ?? []) {
+    addAssignedTeamId(ids, service.teamMemberId);
+    addAssignedTeamId(ids, service.staffResourceId);
+  }
+
+  for (const guest of details?.guests ?? []) {
+    addAssignedTeamId(ids, guest.bufferTeamMemberId);
+    for (const service of guest.services ?? []) {
+      addAssignedTeamId(ids, service.teamMemberId);
+      addAssignedTeamId(ids, service.staffResourceId);
+    }
+  }
+
+  for (const service of details?.clientSnapshot?.services ?? []) {
+    addAssignedTeamId(ids, service.teamMemberId);
+  }
+
+  return [...ids];
+}
+
+export function isTeamSharedBooking(
+  event: Pick<
+    CalendarEvent,
+    "resourceId" | "details" | "teamShared" | "sharedTeamMemberNames"
+  >,
+): boolean {
+  if (event.teamShared) return true;
+  if ((event.sharedTeamMemberNames?.length ?? 0) > 1) return true;
+  return collectEventTeamMemberIds(event).length > 1;
+}
+
+function firstTeamName(value: string | undefined) {
+  const name = value?.trim();
+  if (!name) return "";
+  return name.split(/\s+/)[0] ?? "";
+}
+
+export function teamSharedBookingTooltip(
+  event: Pick<
+    CalendarEvent,
+    "resourceId" | "details" | "teamShared" | "sharedTeamMemberNames"
+  >,
+  options?: {
+    nameById?: ReadonlyMap<string, string>;
+    events?: readonly Pick<
+      CalendarEvent,
+      "resourceId" | "details" | "sharedTeamMemberNames"
+    >[];
+  },
+): string {
+  const rows = options?.events?.length ? options.events : [event];
+  const names = new Set<string>();
+  const ids = new Set<string>();
+
+  for (const row of rows) {
+    for (const name of row.sharedTeamMemberNames ?? []) {
+      const first = firstTeamName(name);
+      if (first) names.add(first);
+    }
+    addAssignedTeamId(ids, row.resourceId);
+    for (const id of collectEventTeamMemberIds(row)) ids.add(id);
+    for (const member of row.details?.clientSnapshot?.teamMembers ?? []) {
+      if (ids.has(String(member.id))) {
+        const first = firstTeamName(member.name);
+        if (first) names.add(first);
+      }
+    }
+  }
+
+  for (const id of ids) {
+    const first = firstTeamName(options?.nameById?.get(id));
+    if (first) names.add(first);
+  }
+
+  const listed = [...names];
+  if (listed.length) {
+    return `Shared across team members: ${listed.join(", ")}`;
+  }
+  return "One booking shared across these cards — not separate requests";
+}
+
 function knownTeamId(
   value: string | null | undefined,
   knownIds: ReadonlySet<string>,

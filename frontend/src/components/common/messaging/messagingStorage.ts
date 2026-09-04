@@ -53,6 +53,28 @@ export function loadMessagingPrefs() {
   return extractMessagingPrefs(createEmptyMessagingStore());
 }
 
+/** Insert or refresh a thread so booking-open can select it before inbox refetch. */
+export function upsertThreadIntoStore(
+  store: MessagingStore,
+  thread: MessagingThread,
+): MessagingStore {
+  const existingIdx = store.threads.findIndex((item) => item.id === thread.id);
+  const threads = [...store.threads];
+  if (existingIdx >= 0) {
+    threads[existingIdx] = { ...threads[existingIdx], ...thread };
+  } else {
+    threads.unshift(thread);
+  }
+  return {
+    ...store,
+    threads,
+    messagesByThreadId: {
+      ...store.messagesByThreadId,
+      [thread.id]: store.messagesByThreadId[thread.id] ?? [],
+    },
+  };
+}
+
 export function mergeApiInboxWithPrefs(
   api: Pick<MessagingStore, "threads" | "messagesByThreadId" | "peerLastReadAtByThreadId">,
   prefs: ReturnType<typeof extractMessagingPrefs>,
@@ -109,7 +131,18 @@ export function mergeApiInboxIntoStore(
         });
 
   const apiThreads = api.threads.filter((thread) => !isMockMessagingThreadId(thread.id));
-  const mergedThreads = [...apiThreads, ...keptDrafts];
+  const apiThreadIds = new Set(apiThreads.map((thread) => thread.id));
+  const localOnlyThreads =
+    audience === "professional"
+      ? current.threads.filter(
+          (thread) =>
+            !thread.id.startsWith("draft:") &&
+            !thread.isNewConversation &&
+            !isMockMessagingThreadId(thread.id) &&
+            !apiThreadIds.has(thread.id),
+        )
+      : [];
+  const mergedThreads = [...apiThreads, ...localOnlyThreads, ...keptDrafts];
   const messagesByThreadId: MessagingStore["messagesByThreadId"] = { ...current.messagesByThreadId };
 
   for (const apiThread of apiThreads) {
@@ -134,6 +167,12 @@ export function mergeApiInboxIntoStore(
   for (const draft of keptDrafts) {
     if (!(draft.id in messagesByThreadId)) {
       messagesByThreadId[draft.id] = current.messagesByThreadId[draft.id] ?? [];
+    }
+  }
+
+  for (const localThread of localOnlyThreads) {
+    if (!(localThread.id in messagesByThreadId)) {
+      messagesByThreadId[localThread.id] = current.messagesByThreadId[localThread.id] ?? [];
     }
   }
 

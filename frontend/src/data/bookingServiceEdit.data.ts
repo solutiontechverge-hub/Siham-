@@ -45,6 +45,19 @@ export function addMinutesToTime(start: string, mins: number) {
   return fmtTimeLabel(minutesSinceMidnight(start) + mins);
 }
 
+/** Positive minutes from start to end; 0 when either time is missing or end is not after start. */
+export function minutesBetweenTimes(start: string, end: string) {
+  if (!start.trim() || !end.trim()) return 0;
+  return minutesSinceMidnight(end) - minutesSinceMidnight(start);
+}
+
+export function formatServiceTimeRange(start?: string, end?: string) {
+  const startTime = start?.trim();
+  if (!startTime) return undefined;
+  const endTime = end?.trim();
+  return endTime ? `${startTime}–${endTime}` : startTime;
+}
+
 export function emptyBookingServiceEditDraft(serviceId = ""): BookingServiceEditDraft {
   return {
     serviceId,
@@ -69,9 +82,11 @@ export function buildServiceEditDraftFromCatalog(
   },
 ): BookingServiceEditDraft {
   const override = options?.override;
-  const durationMins = override?.durationMins ?? service.durationMins;
   const startTime = override?.startTime ?? options?.defaultStartTime ?? "10:00";
-  const endTime = override?.endTime ?? addMinutesToTime(startTime, durationMins);
+  const catalogDuration = override?.durationMins ?? service.durationMins;
+  const endTime = override?.endTime ?? addMinutesToTime(startTime, catalogDuration);
+  const windowMins = minutesBetweenTimes(startTime, endTime);
+  const durationMins = windowMins > 0 ? windowMins : catalogDuration;
 
   return {
     serviceId: service.id,
@@ -103,8 +118,15 @@ export function lineItemToOverride(item: BookingServiceLineItem): Partial<Bookin
 export function getBookingServiceEditErrors(draft: BookingServiceEditDraft) {
   const errors: Partial<Record<"name" | "durationMins" | "startTime" | "endTime" | "price", string>> = {};
   if (!draft.name.trim()) errors.name = "Service name is required.";
-  const duration = Number.parseInt(draft.durationMins, 10);
-  if (!Number.isFinite(duration) || duration <= 0) errors.durationMins = "Duration is required.";
+  if (!draft.startTime.trim()) errors.startTime = "Start time is required.";
+  if (!draft.endTime.trim()) {
+    errors.endTime = "End time is required.";
+  } else if (
+    draft.startTime.trim() &&
+    minutesBetweenTimes(draft.startTime, draft.endTime) <= 0
+  ) {
+    errors.endTime = "End time must be after start time.";
+  }
   const price = Number.parseFloat(draft.price.replace(",", "."));
   if (!Number.isFinite(price) || price < 0) errors.price = "Price is required.";
   return errors;
@@ -120,13 +142,22 @@ export function buildBookingServiceLineItem(
       ? { type: draft.discountType, amount: discountAmount }
       : null;
 
+  const startTime = draft.startTime.trim() || undefined;
+  const endTime = draft.endTime.trim() || undefined;
+  const windowMins =
+    startTime && endTime ? minutesBetweenTimes(startTime, endTime) : 0;
+  const durationMins =
+    windowMins > 0
+      ? windowMins
+      : Number.parseInt(draft.durationMins, 10) || catalogService.durationMins;
+
   return {
     id: catalogService.id,
     name: draft.name.trim(),
     price: Number.parseFloat(draft.price.replace(",", ".")) || 0,
-    durationMins: Number.parseInt(draft.durationMins, 10) || catalogService.durationMins,
-    startTime: draft.startTime,
-    endTime: draft.endTime,
+    durationMins,
+    startTime,
+    endTime,
     priceType: draft.priceType || "fixed",
     discount,
     staffResourceId: draft.staffResourceId || undefined,
@@ -152,10 +183,12 @@ export function getServiceDiscountAmount(service: BookingServiceLineItem) {
 }
 
 /** Fill missing per-service start/end so each line has its own window (sequential from booking start). */
-export function ensureServiceStartEndTimes(
-  services: readonly BookingServiceLineItem[],
+export function ensureServiceStartEndTimes<
+  T extends { durationMins: number; startTime?: string; endTime?: string },
+>(
+  services: readonly T[],
   bookingStart?: string,
-): BookingServiceLineItem[] {
+): T[] {
   if (!services.length) return [];
   let cursor =
     bookingStart?.trim() ||
@@ -166,6 +199,13 @@ export function ensureServiceStartEndTimes(
     const duration = service.durationMins > 0 ? service.durationMins : 60;
     if (service.startTime?.trim() && service.endTime?.trim()) {
       cursor = service.endTime.trim();
+      const windowMins = minutesBetweenTimes(
+        service.startTime,
+        service.endTime,
+      );
+      if (windowMins > 0 && windowMins !== service.durationMins) {
+        return { ...service, durationMins: windowMins };
+      }
       return service;
     }
     const startTime = service.startTime?.trim() || cursor;
@@ -174,6 +214,144 @@ export function ensureServiceStartEndTimes(
     cursor = endTime;
     return { ...service, startTime, endTime };
   });
+}
+
+/**
+ * Recalculate every service window sequentially from bookingStart.
+ * Use when the top-level booking start changes so nested lines stay in sync.
+ */
+export function recalculateServiceStartEndTimes<
+  T extends BookingServiceLineItem,
+>(services: readonly T[], bookingStart?: string): T[] {
+  if (!services.length) return [];
+  let cursor =
+    bookingStart?.trim() ||
+    services.find((service) => service.startTime?.trim())?.startTime ||
+    "08:00";
+
+  return services.map((service) => {
+    const duration = service.durationMins > 0 ? service.durationMins : 60;
+    const startTime = cursor;
+    const endTime = addMinutesToTime(startTime, duration);
+    cursor = endTime;
+    return { ...service, startTime, endTime };
+  });
+}
+
+function splitBackIntoGroups<T extends BookingServiceLineItem>(
+  groups: readonly (readonly T[])[],
+  flattened: readonly T[],
+): T[][] {
+  let index = 0;
+  return groups.map((group) => group.map(() => flattened[index++]));
+}
+
+/**
+ * Apply one sequential timeline across multiple service groups (e.g. client then guests).
+ */
+export function recalculateGroupedServiceStartEndTimes<
+  T extends BookingServiceLineItem,
+>(
+  groups: readonly (readonly T[])[],
+  bookingStart?: string,
+): T[][] {
+  const flat = groups.flat();
+  if (!flat.length) return groups.map(() => []);
+  return splitBackIntoGroups(
+    groups,
+    recalculateServiceStartEndTimes(flat, bookingStart),
+  );
+}
+
+/** Fill missing windows across groups on one shared cursor, keeping existing times. */
+export function ensureGroupedServiceStartEndTimes<
+  T extends BookingServiceLineItem,
+>(
+  groups: readonly (readonly T[])[],
+  bookingStart?: string,
+): T[][] {
+  const flat = groups.flat();
+  if (!flat.length) return groups.map(() => []);
+  return splitBackIntoGroups(
+    groups,
+    ensureServiceStartEndTimes(flat, bookingStart),
+  );
+}
+
+/** Place services sequentially from bookingStart, overwriting any prior times. */
+export function placeServicesSequentially(
+  services: readonly BookingServiceLineItem[],
+  bookingStart?: string,
+): BookingServiceLineItem[] {
+  return recalculateServiceStartEndTimes(services, bookingStart);
+}
+
+/** Chronological sort by start time; items without start stay at the end. */
+export function sortServicesByStartTime(
+  services: readonly BookingServiceLineItem[],
+): BookingServiceLineItem[] {
+  return [...services].sort((a, b) => {
+    const aStart = a.startTime?.trim();
+    const bStart = b.startTime?.trim();
+    if (!aStart && !bStart) return 0;
+    if (!aStart) return 1;
+    if (!bStart) return -1;
+    return minutesSinceMidnight(aStart) - minutesSinceMidnight(bStart);
+  });
+}
+
+/** Parse a duration string like "45", "45 Mins", "165 min", or "2 hr 45 min". */
+export function parseDurationMinsLabel(value?: string | null): number | null {
+  if (!value?.trim()) return null;
+  const text = value.trim().toLowerCase();
+  const hourMatch = text.match(/(\d+)\s*(h|hr|hrs|hour|hours)\b/);
+  const minMatch = text.match(/(\d+)\s*(m|min|mins|minute|minutes)\b/);
+  const hours = hourMatch ? Number.parseInt(hourMatch[1], 10) : 0;
+  let mins = 0;
+  if (minMatch) {
+    mins = Number.parseInt(minMatch[1], 10);
+  } else if (!hourMatch) {
+    mins = Number.parseInt(text.replace(/[^\d]/g, ""), 10);
+  }
+  const total =
+    (Number.isFinite(hours) ? hours : 0) * 60 +
+    (Number.isFinite(mins) ? mins : 0);
+  return total > 0 ? total : null;
+}
+
+/** 60 min = 1 hr. Short buffers stay in min; longer ones also show hours. */
+export function formatDurationMinsLabel(mins: number): string {
+  if (!Number.isFinite(mins) || mins <= 0) return "";
+  const hours = Math.floor(mins / 60);
+  const rest = mins % 60;
+  if (hours <= 0) return `${rest} min`;
+  if (rest <= 0) return hours === 1 ? "1 hr" : `${hours} hr`;
+  return `${hours} hr ${rest} min`;
+}
+
+/**
+ * Latest end time among timed booking lines (services / planning / buffer).
+ * Falls back to `fallbackStart` when nothing timed is present.
+ */
+export function getLatestTimedEnd(
+  items: readonly {
+    startTime?: string | null;
+    endTime?: string | null;
+  }[],
+  fallbackStart?: string,
+): string {
+  let latest = "";
+  let latestMin = -1;
+  for (const item of items) {
+    const end = item.endTime?.trim();
+    if (!end) continue;
+    const mins = minutesSinceMidnight(end);
+    if (mins >= latestMin) {
+      latestMin = mins;
+      latest = end;
+    }
+  }
+  return latest || fallbackStart?.trim() || "";
 }
 
 export function formatBookingServiceLineMeta(service: BookingServiceLineItem) {

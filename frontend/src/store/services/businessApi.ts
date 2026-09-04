@@ -349,6 +349,7 @@ export type CalendarEntry = {
   team_member_id: string | null;
   status:
     | "requested"
+    | "br_accepted"
     | "cancelled"
     | "completed"
     | "confirmed"
@@ -485,6 +486,7 @@ export type UpdateCalendarEntryStatusRequest = {
   id: string;
   status:
     | "requested"
+    | "br_accepted"
     | "cancelled"
     | "completed"
     | "confirmed"
@@ -514,6 +516,7 @@ export type UpdateBookingStatusRequest = {
   id: string;
   status:
     | "requested"
+    | "br_accepted"
     | "cancelled"
     | "completed"
     | "confirmed"
@@ -532,7 +535,7 @@ export type UpdateBookingStatusRequest = {
 
 export type UpdateMyBookingRequest = {
   id: string;
-  status?: "cancelled" | "confirmed" | "requested" | "invalid";
+  status?: "cancelled" | "confirmed" | "requested" | "br_accepted" | "invalid";
   prepayment_status?: "paid" | "pending" | "failed" | "required";
   notification_event?: BookingNotificationEvent;
   notify_incoming_er?: boolean;
@@ -563,6 +566,7 @@ export type CreateBookingRequest = {
   prepayment_status?: string | null;
   status?:
     | "requested"
+    | "br_accepted"
     | "cancelled"
     | "completed"
     | "confirmed"

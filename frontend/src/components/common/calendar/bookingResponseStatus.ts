@@ -1,5 +1,6 @@
 import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { BookingIndicatorVariant } from "./BookingIndicatorIcon";
+import { prepayBlocksConfirmation } from "./bookingAcknowledgment";
 import { isResponseWindowOverdue } from "./bookingResponseDeadline";
 import { resolveCalendarPrepaymentStatus } from "./prepaymentStatus";
 
@@ -11,6 +12,8 @@ export function resolveBookingResponseIndicators(
   const indicators: BookingIndicatorVariant[] = [];
   const details = event.details;
   const prepayment = resolveCalendarPrepaymentStatus(event);
+  const prepayRequired = Boolean(details?.showPrepayment);
+  const prepayPaid = prepayment === "confirmed";
   const pendingNegotiation =
     event.status === "Requested" ||
     event.bookingScenario === "BR" ||
@@ -21,20 +24,18 @@ export function resolveBookingResponseIndicators(
     indicators.push("suggestion_for_change");
   }
 
-  if (prepayment === "pending") {
-    indicators.push("waiting_for_prepayment");
-  }
+  const waitingPrepay =
+    prepayment === "pending" ||
+    (event.status === "BR Accepted" &&
+      prepayBlocksConfirmation({ prepayRequired, prepayPaid }));
 
-  if (prepayment === "confirmed") {
-    indicators.push("prepaid");
-  }
-
-  if (prepayment === "canceled" || prepayment === "invalid") {
-    indicators.push("refund_pending");
-  }
-
-  if (details?.refunded) {
-    indicators.push("refund_completed");
+  if (waitingPrepay) {
+    if (event.status === "BR Accepted" && prepayBlocksConfirmation({ prepayRequired, prepayPaid })) {
+      // Professional waits for the client to pay.
+      indicators.push("waiting_for_payment");
+    } else {
+      indicators.push("waiting_for_prepayment");
+    }
   }
 
   if (event.status === "Completed" && details?.waitingForPayment && !details?.refunded) {

@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+const path = require("path");
+
 const nextConfig = {
   // Monorepo + Vercel: eslint-config-next can fail to resolve ./parser.js during remote build.
   // Run `npm run lint:frontend` locally or in CI for lint coverage.
@@ -24,9 +26,18 @@ const nextConfig = {
     "@mui/material",
     "@mui/system",
     "@mui/icons-material",
+    "@mui/x-date-pickers",
     "@emotion/react",
     "@emotion/styled",
   ],
+  webpack: (config) => {
+    config.resolve.modules = [
+      path.resolve(__dirname, "node_modules"),
+      path.resolve(__dirname, "..", "node_modules"),
+      ...(config.resolve.modules || ["node_modules"]),
+    ];
+    return config;
+  },
   experimental: {
     serverComponentsExternalPackages: ["stripe"],
   },

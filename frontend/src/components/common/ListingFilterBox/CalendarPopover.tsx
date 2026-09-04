@@ -328,6 +328,7 @@ export default function CalendarPopover({
               >
                 <AppTimePanel
                   compact
+                  variant="clock"
                   value={draft.timeFrom}
                   onChange={(next) => setCustomTime("timeFrom", next)}
                   onDone={() => setActiveTimeField(null)}
@@ -374,6 +375,7 @@ export default function CalendarPopover({
               >
                 <AppTimePanel
                   compact
+                  variant="clock"
                   value={draft.timeTo}
                   onChange={(next) => setCustomTime("timeTo", next)}
                   onDone={() => setActiveTimeField(null)}

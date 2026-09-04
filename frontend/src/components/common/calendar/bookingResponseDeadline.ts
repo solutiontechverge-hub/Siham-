@@ -14,7 +14,8 @@ export type ResponseDeadlineFields = {
   responseStatus?: "suggestion_for_change" | "overdue_response";
 };
 
-const DEFAULT_RESPONSE_WINDOW_MINUTES = 24 * 60;
+/** Flat default when business template response time is unset. */
+export const DEFAULT_RESPONSE_WINDOW_MINUTES = 30;
 
 export function resolveResponseWindowMinutes(
   input?: ResponseWindowInput | null,
@@ -59,10 +60,7 @@ export function restartResponseDeadline(
     Number(fields?.responseWindowMinutes) > 0
       ? Number(fields?.responseWindowMinutes)
       : resolveResponseWindowMinutes(windowInput);
-  return buildResponseDeadline(
-    { hours: 0, minutes: windowMinutes },
-    startedAt,
-  );
+  return buildResponseDeadline({ hours: 0, minutes: windowMinutes }, startedAt);
 }
 
 export function isResponseWindowOverdue(

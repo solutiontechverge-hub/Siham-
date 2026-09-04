@@ -531,6 +531,8 @@ export function useFixedLocationCalendarPage() {
     prepaymentPercentDefault,
     cancellationBeforeHours: setupData?.data?.cancellation_before_hours ?? null,
     cancellationBeforeMinutes: setupData?.data?.cancellation_before_minutes ?? null,
+    responseTimeHours: setupData?.data?.response_time_hours ?? null,
+    responseTimeMinutes: setupData?.data?.response_time_minutes ?? null,
     desiredLocationSetup,
     isSaving,
     onCreateCalendarEntry,

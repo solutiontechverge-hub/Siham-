@@ -45,7 +45,7 @@ import AppDropdown from "../AppDropdown";
 import AppTextField from "../AppTextField";
 import {
   isAddressInOperatingArea,
-  resolveDesiredVisitAddressOptions,
+  resolveDesiredVisitMunicipalityOptions,
 } from "../../../data/businessPublicProfile.data";
 import {
   formatContactPhone,
@@ -226,11 +226,10 @@ export default function ClientBookingCreateSummaryView() {
   const addressLabel = React.useMemo(() => {
     if (isDesired) {
       const parts = [
-        address.number,
         address.street,
+        address.number,
         address.postalCode,
         address.municipality,
-        address.province,
       ]
         .map((p) => p.trim())
         .filter(Boolean);
@@ -335,7 +334,6 @@ export default function ClientBookingCreateSummaryView() {
         !address.street.trim() ||
         !address.number.trim() ||
         !address.postalCode.trim() ||
-        !address.province.trim() ||
         !address.municipality.trim();
       if (incomplete) {
         showSnackbar({
@@ -347,7 +345,7 @@ export default function ClientBookingCreateSummaryView() {
       if (
         !isAddressInOperatingArea(
           businessProfile?.desiredLocation,
-          address.province,
+          "",
           address.municipality,
         )
       ) {
@@ -382,7 +380,7 @@ export default function ClientBookingCreateSummaryView() {
                 street: address.street.trim(),
                 number: address.number.trim(),
                 postalCode: address.postalCode.trim(),
-                province: address.province.trim(),
+                province: "",
                 municipality: address.municipality.trim(),
               },
             }
@@ -669,13 +667,10 @@ export default function ClientBookingCreateSummaryView() {
     validateBeforeAction,
   ]);
 
-  const visitAddressOptions = React.useMemo(
+  const municipalityOptions = React.useMemo(
     () =>
-      resolveDesiredVisitAddressOptions(
-        businessProfile?.desiredLocation,
-        address.province,
-      ),
-    [address.province, businessProfile?.desiredLocation],
+      resolveDesiredVisitMunicipalityOptions(businessProfile?.desiredLocation),
+    [businessProfile?.desiredLocation],
   );
 
   if (!draft || !shop) {
@@ -1206,61 +1201,6 @@ export default function ClientBookingCreateSummaryView() {
                 }}
               >
                 <Box>
-                  <Typography sx={addressFieldLabelSx}>Province</Typography>
-                  <AppDropdown
-                    value={address.province}
-                    onChange={(val) =>
-                      setAddress((prev) => ({
-                        ...prev,
-                        province: String(val ?? ""),
-                        municipality: "",
-                      }))
-                    }
-                    options={visitAddressOptions.provinceOptions.map((p) => ({
-                      value: p,
-                      label: p,
-                    }))}
-                    placeholder="Province"
-                    fullWidth
-                    size="small"
-                    sx={addressFieldInputSx}
-                  />
-                </Box>
-                <Box>
-                  <Typography sx={addressFieldLabelSx}>Municipality</Typography>
-                  <AppDropdown
-                    value={address.municipality}
-                    onChange={(val) =>
-                      setAddress((prev) => ({
-                        ...prev,
-                        municipality: String(val ?? ""),
-                      }))
-                    }
-                    options={[
-                      ...(address.municipality &&
-                      !visitAddressOptions.municipalityOptions.includes(
-                        address.municipality,
-                      )
-                        ? [
-                            {
-                              value: address.municipality,
-                              label: address.municipality,
-                            },
-                          ]
-                        : []),
-                      ...visitAddressOptions.municipalityOptions.map((muni) => ({
-                        value: muni,
-                        label: muni,
-                      })),
-                    ]}
-                    placeholder="Municipality"
-                    fullWidth
-                    size="small"
-                    disabled={!address.province}
-                    sx={addressFieldInputSx}
-                  />
-                </Box>
-                <Box>
                   <Typography sx={addressFieldLabelSx}>Street Address</Typography>
                   <AppTextField
                     value={address.street}
@@ -1292,7 +1232,7 @@ export default function ClientBookingCreateSummaryView() {
                     sx={addressFieldInputSx}
                   />
                 </Box>
-                <Box sx={{ gridColumn: { xs: "1", sm: "1 / -1" } }}>
+                <Box>
                   <Typography sx={addressFieldLabelSx}>Postal Code</Typography>
                   <AppTextField
                     value={address.postalCode}
@@ -1303,6 +1243,38 @@ export default function ClientBookingCreateSummaryView() {
                       }))
                     }
                     placeholder="1234 AB"
+                    fullWidth
+                    size="small"
+                    sx={addressFieldInputSx}
+                  />
+                </Box>
+                <Box>
+                  <Typography sx={addressFieldLabelSx}>Municipality</Typography>
+                  <AppDropdown
+                    value={address.municipality}
+                    onChange={(val) =>
+                      setAddress((prev) => ({
+                        ...prev,
+                        municipality: String(val ?? ""),
+                        province: "",
+                      }))
+                    }
+                    options={[
+                      ...(address.municipality &&
+                      !municipalityOptions.includes(address.municipality)
+                        ? [
+                            {
+                              value: address.municipality,
+                              label: address.municipality,
+                            },
+                          ]
+                        : []),
+                      ...municipalityOptions.map((muni) => ({
+                        value: muni,
+                        label: muni,
+                      })),
+                    ]}
+                    placeholder="Municipality"
                     fullWidth
                     size="small"
                     sx={addressFieldInputSx}

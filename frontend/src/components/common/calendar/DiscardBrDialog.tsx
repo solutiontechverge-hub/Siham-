@@ -26,7 +26,7 @@ export default function DiscardBrDialog({
       contentSx={{ px: 2.5 }}
       footerVariant="actions"
       open={open}
-      title="Discard BR"
+      title="Discard booking request"
       onClose={onClose}
       maxWidth="sm"
       headerTone="danger"
@@ -56,7 +56,7 @@ export default function DiscardBrDialog({
             px: 1,
           }}
         >
-          This will end the BR. The client will no longer be able to respond.
+          This will end the booking request. The client will no longer be able to respond.
         </Typography>
       </Box>
     </AppModal>

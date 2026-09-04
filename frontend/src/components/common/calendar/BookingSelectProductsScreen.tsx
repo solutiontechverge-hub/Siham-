@@ -26,6 +26,9 @@ type BookingSelectProductsScreenProps = {
   onEdit?: (product: BookingCatalogProduct) => void;
   onDelete?: (product: BookingCatalogProduct) => void;
   disabled?: boolean;
+  heading?: string;
+  searchPlaceholder?: string;
+  addButtonLabel?: string;
 };
 
 function ProductRow({
@@ -106,12 +109,13 @@ function ProductRow({
       {onEdit ? (
         <IconButton
           size="small"
-          onClick={() => {
+          aria-label={`Edit ${product.name}`}
+          disabled={disabled}
+          onClick={(e) => {
+            e.stopPropagation();
             if (disabled) return;
             onEdit(product);
           }}
-          disabled={disabled}
-          aria-label={`Edit ${product.name}`}
           sx={{
             color: alpha(m.navy, 0.42),
             "&:hover": {
@@ -127,12 +131,13 @@ function ProductRow({
       {onDelete ? (
         <IconButton
           size="small"
-          onClick={() => {
+          aria-label={`Delete ${product.name}`}
+          disabled={disabled}
+          onClick={(e) => {
+            e.stopPropagation();
             if (disabled) return;
             onDelete(product);
           }}
-          disabled={disabled}
-          aria-label={`Delete ${product.name}`}
           sx={{
             color: alpha(m.navy, 0.42),
             "&:hover": {
@@ -220,6 +225,9 @@ export default function BookingSelectProductsScreen({
   onEdit,
   onDelete,
   disabled = false,
+  heading = "Select Product",
+  searchPlaceholder = "Search products...",
+  addButtonLabel = "Add Product",
 }: BookingSelectProductsScreenProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -243,12 +251,12 @@ export default function BookingSelectProductsScreen({
       <BodyText
         sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 15 }}
       >
-        Select Product
+        {heading}
       </BodyText>
 
       <AppSearchField
         fullWidth
-        placeholder="Search products..."
+        placeholder={searchPlaceholder}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         onClear={() => setQuery("")}
@@ -272,10 +280,12 @@ export default function BookingSelectProductsScreen({
             onDelete={onDelete}
           />
         ))}
+      </Stack>
 
+      {onAddProduct ? (
         <ButtonBase
+          disabled={disabled}
           onClick={onAddProduct}
-          disabled={disabled || !onAddProduct}
           sx={{
             alignSelf: "flex-start",
             border: `1px solid ${alpha(m.navy, 0.14)}`,
@@ -288,11 +298,8 @@ export default function BookingSelectProductsScreen({
             px: 1.5,
             bgcolor: "#fff",
             transition: "border-color 0.15s, background-color 0.15s",
-            "&:hover": { bgcolor: disabled ? "#fff" : alpha(m.navy, 0.02) },
-            "&.Mui-disabled": {
-              opacity: 0.55,
-              cursor: "not-allowed",
-            },
+            "&:hover": { bgcolor: alpha(m.navy, 0.02) },
+            "&.Mui-disabled": { opacity: 0.55 },
           }}
         >
           <Box
@@ -319,10 +326,10 @@ export default function BookingSelectProductsScreen({
               lineHeight: 1,
             }}
           >
-            Add Product
+            {addButtonLabel}
           </BodyText>
         </ButtonBase>
-      </Stack>
+      ) : null}
     </Stack>
   );
 }

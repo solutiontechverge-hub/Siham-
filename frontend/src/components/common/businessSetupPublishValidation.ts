@@ -143,10 +143,6 @@ export function validateBusinessSetupForPublish(
   }
 
   requireField(isBlank(input.notes), "Additional notes");
-  requireField(
-    !hasTimeValue(input.policyResponseHours, input.policyResponseMinutes),
-    "Response time",
-  );
   requireField(isBlank(input.policyInstructions), "Policy instructions");
   requireField(
     !hasTimeValue(

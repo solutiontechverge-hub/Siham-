@@ -8,6 +8,7 @@ import { BodyText } from "../../ui/typography";
 import { ServiceSummaryMetaLine } from "../ServiceSummaryMetaLine";
 import {
   getEffectiveServicePrice,
+  formatServiceTimeRange,
   type BookingServiceLineItem,
 } from "../../../data/bookingServiceEdit.data";
 import {
@@ -40,12 +41,17 @@ type BookingDrawerSelectedItemsSectionProps = {
   resolveStaffName?: (staffResourceId?: string) => string | undefined;
   resolveServiceEditTag?: (serviceId: string) => BookingEditTagVariant | null;
   resolveProductEditTag?: (productId: string) => BookingEditTagVariant | null;
+  editTagSignpostTitle?: string;
+  onEditTagSignpostClick?: () => void;
   onRemoveService?: (serviceId: string) => void;
   onRemoveProduct?: (productId: string) => void;
   onRemoveUniqueItem?: (itemId: string) => void;
   onServiceClick?: (service: BookingServiceLineItem) => void;
   /** Hover edit icon → Edit Service screen (client + guest). */
   onEditService?: (service: BookingServiceLineItem) => void;
+  /** Booking-scoped edit (does not mutate the master catalog). */
+  onEditProduct?: (product: SelectedProductItem) => void;
+  onEditUniqueItem?: (item: SelectedProductItem) => void;
 };
 
 export default function BookingDrawerSelectedItemsSection({
@@ -58,11 +64,15 @@ export default function BookingDrawerSelectedItemsSection({
   resolveStaffName,
   resolveServiceEditTag,
   resolveProductEditTag,
+  editTagSignpostTitle,
+  onEditTagSignpostClick,
   onRemoveService,
   onRemoveProduct,
   onRemoveUniqueItem,
   onServiceClick,
   onEditService,
+  onEditProduct,
+  onEditUniqueItem,
 }: BookingDrawerSelectedItemsSectionProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -79,20 +89,6 @@ export default function BookingDrawerSelectedItemsSection({
     bgcolor: nested ? "#fff" : primaryLight,
   };
 
-  const titleSx = {
-    fontSize: 13,
-    fontWeight: 900,
-    color: alpha(m.navy, 0.86),
-    lineHeight: 1.25,
-  };
-
-  const actionIconSx = {
-    width: 22,
-    height: 22,
-    minWidth: 22,
-    p: 0,
-  };
-
   return (
     <Stack spacing={nested ? 1 : 1.5}>
       {services.length > 0 || cancelledServices.length > 0 ? (
@@ -104,10 +100,11 @@ export default function BookingDrawerSelectedItemsSection({
           </BodyText>
           {services.map((service) => {
             const editTag = resolveServiceEditTag?.(service.id) ?? null;
-            const staffName = resolveStaffName?.(
-              service.staffResourceId ||
-                (service as { teamMemberId?: string }).teamMemberId,
-            );
+            const staffName =
+              resolveStaffName?.(
+                service.staffResourceId ||
+                  (service as { teamMemberId?: string }).teamMemberId,
+              )?.trim() || "Unassigned";
 
             return (
               <Box
@@ -122,131 +119,145 @@ export default function BookingDrawerSelectedItemsSection({
                   },
                 }}
               >
-                <Stack spacing={0}>
-                  <Stack
-                    direction="row"
-                    justifyContent="space-between"
-                    alignItems="flex-start"
-                    spacing={1.25}
-                  >
-                    <BodyText sx={{ ...titleSx, flex: 1, minWidth: 0 }}>
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  spacing={1.25}
+                >
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <BodyText
+                      sx={{
+                        fontSize: 13,
+                        fontWeight: 900,
+                        color: alpha(m.navy, 0.86),
+                        lineHeight: 1.25,
+                      }}
+                    >
                       {service.name}
                     </BodyText>
-                    <Stack
-                      direction="row"
-                      alignItems="center"
-                      spacing={0.35}
-                      sx={{ flexShrink: 0 }}
-                    >
-                      <BookingLineAmount
-                        amount={getEffectiveServicePrice(service)}
-                        originalAmount={
-                          service.discount?.amount ? service.price : undefined
-                        }
-                        discountLabel={formatLineDiscountLabel(service.discount)}
-                      />
-                      {onEditService ? (
-                        <IconButton
-                          className="booking-service-edit-btn"
-                          size="small"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onEditService(service);
-                          }}
-                          sx={{
-                            ...actionIconSx,
-                            color: alpha(m.navy, 0.42),
-                            opacity: 0,
-                            pointerEvents: "none",
-                            transition: "opacity 0.15s, color 0.15s, background-color 0.15s",
-                            "&:hover": {
-                              color: m.teal,
-                              bgcolor: alpha(m.teal, 0.08),
-                            },
-                          }}
-                          aria-label={`Edit ${service.name}`}
-                        >
-                          <EditRoundedIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      ) : null}
-                      {showRemoveButtons ? (
-                        <IconButton
-                          size="small"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onRemoveService?.(service.id);
-                          }}
-                          sx={{ ...actionIconSx, color: alpha(m.navy, 0.35) }}
-                          aria-label={`Remove ${service.name}`}
-                        >
-                          <CloseRoundedIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      ) : null}
-                    </Stack>
+                    <ServiceSummaryMetaLine
+                      timeRange={formatServiceTimeRange(
+                        service.startTime,
+                        service.endTime,
+                      )}
+                      durationLabel={`${service.durationMins} Mins`}
+                      staffName={staffName}
+                    />
+                    {editTag ? (
+                      <Box sx={{ mt: 0.55 }}>
+                        <BookingEditedTag
+                          variant={editTag}
+                          signpostTitle={editTagSignpostTitle}
+                          onSignpostClick={onEditTagSignpostClick}
+                        />
+                      </Box>
+                    ) : null}
+                  </Box>
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    spacing={0.35}
+                    sx={{ flexShrink: 0 }}
+                  >
+                    <BookingLineAmount
+                      amount={getEffectiveServicePrice(service)}
+                      originalAmount={
+                        service.discount?.amount ? service.price : undefined
+                      }
+                      discountLabel={formatLineDiscountLabel(service.discount)}
+                    />
+                    {onEditService ? (
+                      <IconButton
+                        className="booking-service-edit-btn"
+                        size="small"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onEditService(service);
+                        }}
+                        sx={{
+                          color: alpha(m.navy, 0.42),
+                          opacity: 0,
+                          pointerEvents: "none",
+                          transition: "opacity 0.15s, color 0.15s, background-color 0.15s",
+                          "&:hover": {
+                            color: m.teal,
+                            bgcolor: alpha(m.teal, 0.08),
+                          },
+                        }}
+                        aria-label={`Edit ${service.name}`}
+                      >
+                        <EditRoundedIcon sx={{ fontSize: 17 }} />
+                      </IconButton>
+                    ) : null}
+                    {showRemoveButtons ? (
+                      <IconButton
+                        size="small"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onRemoveService?.(service.id);
+                        }}
+                        sx={{ color: alpha(m.navy, 0.35) }}
+                        aria-label={`Remove ${service.name}`}
+                      >
+                        <CloseRoundedIcon sx={{ fontSize: 17 }} />
+                      </IconButton>
+                    ) : null}
                   </Stack>
-                  <ServiceSummaryMetaLine
-                    timeRange={
-                      service.startTime
-                        ? service.endTime
-                          ? `${service.startTime}–${service.endTime}`
-                          : service.startTime
-                        : undefined
-                    }
-                    durationLabel={`${service.durationMins} Mins`}
-                    staffName={staffName}
-                  />
-                  {editTag ? (
-                    <Box sx={{ mt: 0.55 }}>
-                      <BookingEditedTag variant={editTag} />
-                    </Box>
-                  ) : null}
                 </Stack>
               </Box>
             );
           })}
           {cancelledServices.map((service) => {
-            const staffName = resolveStaffName?.(
-              service.staffResourceId ||
-                (service as { teamMemberId?: string }).teamMemberId,
-            );
+            const staffName =
+              resolveStaffName?.(
+                service.staffResourceId ||
+                  (service as { teamMemberId?: string }).teamMemberId,
+              )?.trim() || "Unassigned";
             return (
               <Box key={`cancelled-${service.id}`} sx={cardSx}>
-                <Stack spacing={0}>
-                  <Stack
-                    direction="row"
-                    justifyContent="space-between"
-                    alignItems="flex-start"
-                    spacing={1.25}
-                  >
-                    <BodyText sx={{ ...titleSx, flex: 1, minWidth: 0 }}>
-                      {service.name}
-                    </BodyText>
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  spacing={1.25}
+                >
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
                     <BodyText
                       sx={{
                         fontSize: 13,
                         fontWeight: 900,
-                        color: alpha(m.navy, 0.82),
+                        color: alpha(m.navy, 0.86),
                         lineHeight: 1.25,
-                        flexShrink: 0,
                       }}
                     >
-                      €{getEffectiveServicePrice(service)}
+                      {service.name}
                     </BodyText>
-                  </Stack>
-                  <ServiceSummaryMetaLine
-                    timeRange={
-                      service.startTime
-                        ? service.endTime
-                          ? `${service.startTime}–${service.endTime}`
-                          : service.startTime
-                        : undefined
-                    }
-                    durationLabel={`${service.durationMins} Mins`}
-                    staffName={staffName}
-                  />
-                  <Box sx={{ mt: 0.55 }}>
-                    <BookingEditedTag variant="cancelled" />
+                    <ServiceSummaryMetaLine
+                      timeRange={formatServiceTimeRange(
+                        service.startTime,
+                        service.endTime,
+                      )}
+                      durationLabel={`${service.durationMins} Mins`}
+                      staffName={staffName}
+                    />
+                    <Box sx={{ mt: 0.55 }}>
+                      <BookingEditedTag
+                        variant="cancelled"
+                        signpostTitle={editTagSignpostTitle}
+                        onSignpostClick={onEditTagSignpostClick}
+                      />
+                    </Box>
                   </Box>
+                  <BodyText
+                    sx={{
+                      fontSize: 13,
+                      fontWeight: 900,
+                      color: alpha(m.navy, 0.82),
+                    }}
+                  >
+                    €{getEffectiveServicePrice(service)}
+                  </BodyText>
                 </Stack>
               </Box>
             );
@@ -265,54 +276,82 @@ export default function BookingDrawerSelectedItemsSection({
             const editTag = resolveProductEditTag?.(product.id) ?? null;
             return (
             <Box key={`product-${product.id}`} sx={cardSx}>
-              <Stack spacing={0}>
-                <Stack
-                  direction="row"
-                  justifyContent="space-between"
-                  alignItems="flex-start"
-                  spacing={1.25}
-                >
-                  <BodyText sx={{ ...titleSx, flex: 1, minWidth: 0 }}>
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center"
+                spacing={1.25}
+              >
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <BodyText
+                    sx={{
+                      fontSize: 13,
+                      fontWeight: 900,
+                      color: alpha(m.navy, 0.86),
+                      lineHeight: 1.25,
+                    }}
+                  >
                     {product.name}
                   </BodyText>
-                  <Stack
-                    direction="row"
-                    alignItems="center"
-                    spacing={0.35}
-                    sx={{ flexShrink: 0 }}
+                  <BodyText
+                    sx={{
+                      mt: 0.35,
+                      fontSize: 10.5,
+                      fontWeight: 700,
+                      color: alpha(m.navy, 0.48),
+                    }}
                   >
-                    <BookingLineAmount
-                      amount={product.price}
-                      originalAmount={product.originalPrice}
-                      discountLabel={formatLineDiscountLabel(product.discount)}
-                    />
-                    {showRemoveButtons ? (
-                      <IconButton
-                        size="small"
-                        onClick={() => onRemoveProduct?.(product.id)}
-                        sx={{ ...actionIconSx, color: alpha(m.navy, 0.35) }}
-                        aria-label={`Remove ${product.name}`}
-                      >
-                        <CloseRoundedIcon sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    ) : null}
-                  </Stack>
-                </Stack>
-                <BodyText
-                  sx={{
-                    mt: 0.35,
-                    fontSize: 10.5,
-                    fontWeight: 700,
-                    color: alpha(m.navy, 0.48),
-                  }}
+                    Qty {product.quantity} · €{product.unitPrice.toFixed(2)}{" "}
+                    each
+                  </BodyText>
+                  {editTag ? (
+                    <Box sx={{ mt: 0.55 }}>
+                      <BookingEditedTag
+                        variant={editTag}
+                        signpostTitle={editTagSignpostTitle}
+                        onSignpostClick={onEditTagSignpostClick}
+                      />
+                    </Box>
+                  ) : null}
+                </Box>
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  spacing={0.35}
+                  sx={{ flexShrink: 0 }}
                 >
-                  Qty {product.quantity} · €{product.unitPrice.toFixed(2)} each
-                </BodyText>
-                {editTag ? (
-                  <Box sx={{ mt: 0.55 }}>
-                    <BookingEditedTag variant={editTag} />
-                  </Box>
-                ) : null}
+                  <BookingLineAmount
+                    amount={product.price}
+                    originalAmount={product.originalPrice}
+                    discountLabel={formatLineDiscountLabel(product.discount)}
+                  />
+                  {onEditProduct ? (
+                    <IconButton
+                      size="small"
+                      onClick={() => onEditProduct(product)}
+                      sx={{
+                        color: alpha(m.navy, 0.35),
+                        "&:hover": {
+                          color: m.teal,
+                          bgcolor: alpha(m.teal, 0.08),
+                        },
+                      }}
+                      aria-label={`Edit ${product.name}`}
+                    >
+                      <EditRoundedIcon sx={{ fontSize: 17 }} />
+                    </IconButton>
+                  ) : null}
+                  {showRemoveButtons ? (
+                    <IconButton
+                      size="small"
+                      onClick={() => onRemoveProduct?.(product.id)}
+                      sx={{ color: alpha(m.navy, 0.35) }}
+                      aria-label={`Remove ${product.name}`}
+                    >
+                      <CloseRoundedIcon sx={{ fontSize: 17 }} />
+                    </IconButton>
+                  ) : null}
+                </Stack>
               </Stack>
             </Box>
             );
@@ -331,54 +370,81 @@ export default function BookingDrawerSelectedItemsSection({
             const editTag = resolveProductEditTag?.(item.id) ?? null;
             return (
             <Box key={`unique-${item.id}`} sx={cardSx}>
-              <Stack spacing={0}>
-                <Stack
-                  direction="row"
-                  justifyContent="space-between"
-                  alignItems="flex-start"
-                  spacing={1.25}
-                >
-                  <BodyText sx={{ ...titleSx, flex: 1, minWidth: 0 }}>
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center"
+                spacing={1.25}
+              >
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <BodyText
+                    sx={{
+                      fontSize: 13,
+                      fontWeight: 900,
+                      color: alpha(m.navy, 0.86),
+                      lineHeight: 1.25,
+                    }}
+                  >
                     {item.name}
                   </BodyText>
-                  <Stack
-                    direction="row"
-                    alignItems="center"
-                    spacing={0.35}
-                    sx={{ flexShrink: 0 }}
+                  <BodyText
+                    sx={{
+                      mt: 0.35,
+                      fontSize: 10.5,
+                      fontWeight: 700,
+                      color: alpha(m.navy, 0.48),
+                    }}
                   >
-                    <BookingLineAmount
-                      amount={item.price}
-                      originalAmount={item.originalPrice}
-                      discountLabel={formatLineDiscountLabel(item.discount)}
-                    />
-                    {showRemoveButtons ? (
-                      <IconButton
-                        size="small"
-                        onClick={() => onRemoveUniqueItem?.(item.id)}
-                        sx={{ ...actionIconSx, color: alpha(m.navy, 0.35) }}
-                        aria-label={`Remove ${item.name}`}
-                      >
-                        <CloseRoundedIcon sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    ) : null}
-                  </Stack>
-                </Stack>
-                <BodyText
-                  sx={{
-                    mt: 0.35,
-                    fontSize: 10.5,
-                    fontWeight: 700,
-                    color: alpha(m.navy, 0.48),
-                  }}
+                    Qty {item.quantity} · €{item.unitPrice.toFixed(2)} each
+                  </BodyText>
+                  {editTag ? (
+                    <Box sx={{ mt: 0.55 }}>
+                      <BookingEditedTag
+                        variant={editTag}
+                        signpostTitle={editTagSignpostTitle}
+                        onSignpostClick={onEditTagSignpostClick}
+                      />
+                    </Box>
+                  ) : null}
+                </Box>
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  spacing={0.35}
+                  sx={{ flexShrink: 0 }}
                 >
-                  Qty {item.quantity} · €{item.unitPrice.toFixed(2)} each
-                </BodyText>
-                {editTag ? (
-                  <Box sx={{ mt: 0.55 }}>
-                    <BookingEditedTag variant={editTag} />
-                  </Box>
-                ) : null}
+                  <BookingLineAmount
+                    amount={item.price}
+                    originalAmount={item.originalPrice}
+                    discountLabel={formatLineDiscountLabel(item.discount)}
+                  />
+                  {onEditUniqueItem ? (
+                    <IconButton
+                      size="small"
+                      onClick={() => onEditUniqueItem(item)}
+                      sx={{
+                        color: alpha(m.navy, 0.35),
+                        "&:hover": {
+                          color: m.teal,
+                          bgcolor: alpha(m.teal, 0.08),
+                        },
+                      }}
+                      aria-label={`Edit ${item.name}`}
+                    >
+                      <EditRoundedIcon sx={{ fontSize: 17 }} />
+                    </IconButton>
+                  ) : null}
+                  {showRemoveButtons ? (
+                    <IconButton
+                      size="small"
+                      onClick={() => onRemoveUniqueItem?.(item.id)}
+                      sx={{ color: alpha(m.navy, 0.35) }}
+                      aria-label={`Remove ${item.name}`}
+                    >
+                      <CloseRoundedIcon sx={{ fontSize: 17 }} />
+                    </IconButton>
+                  ) : null}
+                </Stack>
               </Stack>
             </Box>
             );

@@ -45,6 +45,7 @@ const locationModes = ["fixed", "desired", "both"];
 const locationTypes = ["fixed", "desired"];
 const calendarStatuses = [
   "requested",
+  "br_accepted",
   "cancelled",
   "completed",
   "confirmed",
@@ -55,6 +56,7 @@ const calendarStatuses = [
 ];
 const bookingStatuses = [
   "requested",
+  "br_accepted",
   "cancelled",
   "completed",
   "confirmed",
@@ -419,7 +421,7 @@ router.post(
       .optional({ values: "falsy" })
       .trim()
       .isIn(bookingStatuses)
-      .withMessage("status must be requested, cancelled, completed, confirmed, in_progress, no_show, or invalid."),
+      .withMessage("status must be requested, br_accepted, cancelled, completed, confirmed, in_progress, no_show, or invalid."),
   ],
   validateRequest,
   createBooking,
@@ -431,7 +433,7 @@ router.patch(
     body("status")
       .trim()
       .isIn(bookingStatuses)
-      .withMessage("status must be requested, cancelled, completed, confirmed, in_progress, no_show, or invalid."),
+      .withMessage("status must be requested, br_accepted, cancelled, completed, confirmed, in_progress, no_show, or invalid."),
     body("notes").optional({ values: "falsy" }).isString().withMessage("notes must be a string."),
     body("total_price")
       .optional({ values: "falsy" })
@@ -480,8 +482,8 @@ router.patch(
     body("status")
       .optional({ values: "falsy" })
       .trim()
-      .isIn(["cancelled", "confirmed", "requested", "invalid"])
-      .withMessage("status must be cancelled, confirmed, requested, or invalid."),
+      .isIn(["cancelled", "confirmed", "requested", "br_accepted", "invalid"])
+      .withMessage("status must be cancelled, confirmed, requested, br_accepted, or invalid."),
     body("prepayment_status")
       .optional({ values: "falsy" })
       .trim()

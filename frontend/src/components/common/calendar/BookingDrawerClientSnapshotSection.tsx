@@ -6,6 +6,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 import type { CalendarBookingClientSnapshot } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import { ServiceSummaryMetaLine } from "../ServiceSummaryMetaLine";
 import ProjectUploadThumb from "../client-booking/ProjectUploadThumb";
+import { formatServiceTimeRange } from "../../../data/bookingServiceEdit.data";
 
 type Props = {
   snapshot?: CalendarBookingClientSnapshot | null;
@@ -145,7 +146,12 @@ export default function BookingDrawerClientSnapshotSection({
         const hasPlanning =
           (isPlanning || isBuffer) &&
           Boolean(
-            person.planningActivity?.trim() || person.planningDuration?.trim(),
+            person.planningActivity?.trim() ||
+              person.planningDuration?.trim() ||
+              person.planningStartTime?.trim() ||
+              person.planningEndTime?.trim() ||
+              person.bufferStartTime?.trim() ||
+              person.bufferEndTime?.trim(),
           );
         if (!personServices.length && !hasPlanning) return null;
 
@@ -210,17 +216,16 @@ export default function BookingDrawerClientSnapshotSection({
                     {person.planningActivity}
                   </Typography>
                 ) : null}
-                {person.planningDuration?.trim() ? (
-                  <Typography
-                    sx={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: alpha(m.navy, 0.48),
-                      mt: 0.25,
-                    }}
-                  >
-                    {person.planningDuration}
-                  </Typography>
+                {person.planningDuration?.trim() ||
+                person.planningStartTime ||
+                person.bufferStartTime ? (
+                  <ServiceSummaryMetaLine
+                    timeRange={formatServiceTimeRange(
+                      person.planningStartTime || person.bufferStartTime,
+                      person.planningEndTime || person.bufferEndTime,
+                    )}
+                    durationLabel={person.planningDuration?.trim() || undefined}
+                  />
                 ) : null}
               </Box>
             ) : null}
@@ -259,20 +264,13 @@ export default function BookingDrawerClientSnapshotSection({
                           {service.name}
                         </Typography>
                         <ServiceSummaryMetaLine
+                          timeRange={formatServiceTimeRange(
+                            service.startTime,
+                            service.endTime,
+                          )}
                           durationLabel={`${service.durationMins} Mins`}
+                          staffName={staff?.trim() || "Unassigned"}
                         />
-                        {staff ? (
-                          <Typography
-                            sx={{
-                              fontSize: 10.5,
-                              fontWeight: 800,
-                              color: alpha(m.navy, 0.48),
-                              mt: 0.35,
-                            }}
-                          >
-                            By {staff}
-                          </Typography>
-                        ) : null}
                       </Box>
                       <Typography
                         sx={{

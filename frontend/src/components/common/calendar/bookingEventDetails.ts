@@ -1,9 +1,10 @@
 import type {
   CalendarBookingDetails,
+  CalendarBookingGuestItem,
   CalendarBookingServiceItem,
   CalendarEvent,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
-import { ensureServiceStartEndTimes } from "../../../data/bookingServiceEdit.data";
+import { ensureGroupedServiceStartEndTimes } from "../../../data/bookingServiceEdit.data";
 import { splitContactPhone } from "../../../lib/phone-validation";
 import type { ManualEntryDiscount } from "../../sections/finance/manualEntry.data";
 
@@ -114,6 +115,7 @@ type StoredBookingNoteMeta = Partial<
     | "originalServices"
     | "needsOk"
     | "ackScenario"
+    | "ackRecipient"
     | "hiddenForProfessional"
     | "hiddenForCustomer"
     | "addedServiceIds"
@@ -211,6 +213,7 @@ export function serializeCalendarEntryNotes(
     ...(details?.originalServices?.length ? { originalServices: details.originalServices } : {}),
     ...(details?.needsOk ? { needsOk: true } : {}),
     ...(details?.ackScenario ? { ackScenario: details.ackScenario } : {}),
+    ...(details?.ackRecipient ? { ackRecipient: details.ackRecipient } : {}),
     ...(details?.hiddenForProfessional ? { hiddenForProfessional: true } : {}),
     ...(details?.hiddenForCustomer ? { hiddenForCustomer: true } : {}),
     ...(details?.addedServiceIds?.length ? { addedServiceIds: details.addedServiceIds } : {}),
@@ -411,6 +414,57 @@ export function clearEbrSuggestionsFromNotes(
   return serializeCalendarEntryNotes(internalNote, nextDetails, null);
 }
 
+function normalizeAssignmentId(value: string | null | undefined): string {
+  return value != null ? String(value).trim() : "";
+}
+
+export function requesterPersonIds(
+  snapshot?: CalendarBookingDetails["clientSnapshot"],
+): Set<string> {
+  const ids = new Set<string>();
+  for (const person of snapshot?.people ?? []) {
+    if (!person.isRequester) continue;
+    const id = normalizeAssignmentId(person.id);
+    if (id) ids.add(id);
+  }
+  return ids;
+}
+
+/**
+ * Main-client lines are unassigned (`guestId` empty) or tagged to the requester.
+ * Any other person id is a guest/model assignment and must not leak onto Client.
+ */
+export function isMainClientAssignedLine(
+  guestId: string | null | undefined,
+  requesterIds: Set<string>,
+): boolean {
+  const id = normalizeAssignmentId(guestId);
+  if (!id) return true;
+  return requesterIds.has(id);
+}
+
+export function filterMainClientAssignedLines<T extends { guestId?: string | null }>(
+  lines: readonly T[] | null | undefined,
+  requesterIds: Set<string>,
+): T[] {
+  return (lines ?? []).filter((line) =>
+    isMainClientAssignedLine(line.guestId, requesterIds),
+  );
+}
+
+function assignedLinesForPerson<T extends { guestId?: string | null }>(
+  nested: readonly T[] | null | undefined,
+  flat: readonly T[] | null | undefined,
+  personId: string,
+): T[] {
+  if (nested?.length) return [...nested];
+  const id = normalizeAssignmentId(personId);
+  if (!id) return [];
+  return (flat ?? []).filter(
+    (line) => normalizeAssignmentId(line.guestId) === id,
+  );
+}
+
 /**
  * Client bookings store every line in `clientSnapshot.services`, while the API
  * booking row only keeps a single `service_id`. Map requester / unassigned lines
@@ -423,15 +477,8 @@ export function mainDrawerServicesFromClientSnapshot(
   const services = snapshot?.services;
   if (!services?.length) return undefined;
 
-  const nonRequesterIds = new Set(
-    (snapshot?.people ?? []).filter((person) => !person.isRequester).map((person) => person.id),
-  );
-
-  const mainServices = services.filter((service) => {
-    const guestId = service.guestId != null ? String(service.guestId) : "";
-    if (!guestId) return true;
-    return !nonRequesterIds.has(guestId);
-  });
+  const requesterIds = requesterPersonIds(snapshot);
+  const mainServices = filterMainClientAssignedLines(services, requesterIds);
 
   if (!mainServices.length) return undefined;
 
@@ -440,6 +487,8 @@ export function mainDrawerServicesFromClientSnapshot(
     name: service.name,
     price: Number(service.price) || 0,
     durationMins: Math.max(15, Number(service.durationMins) || 15),
+    ...(service.startTime ? { startTime: service.startTime } : {}),
+    ...(service.endTime ? { endTime: service.endTime } : {}),
     ...(service.teamMemberId ? { staffResourceId: String(service.teamMemberId) } : {}),
     ...(service.teamMemberName ? { teamMemberName: service.teamMemberName } : {}),
     ...(service.guestId != null ? { guestId: service.guestId } : {}),
@@ -554,6 +603,9 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
       ...(meta.originalServices?.length ? { originalServices: meta.originalServices } : {}),
       ...(meta.needsOk ? { needsOk: true } : {}),
       ...(meta.ackScenario ? { ackScenario: meta.ackScenario } : {}),
+      ...(meta.ackRecipient === "client" || meta.ackRecipient === "professional"
+        ? { ackRecipient: meta.ackRecipient }
+        : {}),
       ...(meta.hiddenForProfessional ? { hiddenForProfessional: true } : {}),
       ...(meta.hiddenForCustomer ? { hiddenForCustomer: true } : {}),
       ...(meta.addedServiceIds?.length ? { addedServiceIds: meta.addedServiceIds } : {}),
@@ -661,11 +713,6 @@ export function resolveBookingDetailsFromEvent(ev: CalendarEvent): CalendarBooki
 
 export function hydrateBookingDrawerFromEvent(ev: CalendarEvent): BookingDrawerHydration {
   const details = resolveBookingDetailsFromEvent(ev);
-  const rawServices =
-    details.services?.length
-      ? details.services
-      : (mainDrawerServicesFromClientSnapshot(details.clientSnapshot) ?? []);
-  const services = ensureServiceStartEndTimes(rawServices, ev.start);
 
   const splitPhone = splitContactPhone(
     details.phoneNumber ?? "",
@@ -675,15 +722,27 @@ export function hydrateBookingDrawerFromEvent(ev: CalendarEvent): BookingDrawerH
   const snapshotPeople = details.clientSnapshot?.people ?? [];
   const snapshotServices = details.clientSnapshot?.services ?? [];
   const guestsFromNotes = details.guests ?? [];
-  const guests =
+  const guests: CalendarBookingGuestItem[] =
     guestsFromNotes.length > 0
       ? guestsFromNotes.map((guest) => {
-          const person = snapshotPeople.find((p) => p.id === guest.id);
+          const person = snapshotPeople.find(
+            (p) => normalizeAssignmentId(p.id) === normalizeAssignmentId(guest.id),
+          );
           return {
             ...guest,
             email: guest.email || person?.email || "",
             phoneCode: guest.phoneCode || person?.phoneCode || "",
             phoneNumber: guest.phoneNumber || person?.phoneNumber || "",
+            services: assignedLinesForPerson(
+              guest.services,
+              details.services,
+              guest.id,
+            ),
+            products: assignedLinesForPerson(
+              guest.products,
+              details.products,
+              guest.id,
+            ),
           };
         })
       : snapshotPeople
@@ -699,28 +758,61 @@ export function hydrateBookingDrawerFromEvent(ev: CalendarEvent): BookingDrawerH
             email: person.email,
             phoneCode: person.phoneCode,
             phoneNumber: person.phoneNumber,
-            services: snapshotServices
-              .filter((service) => service.guestId === person.id)
-              .map((service) => ({
-                id: service.id,
-                name: service.name,
-                price: service.price,
-                durationMins: service.durationMins,
-                staffResourceId: service.teamMemberId ?? undefined,
-              })),
-            products: [],
+            services: assignedLinesForPerson<CalendarBookingServiceItem>(
+              snapshotServices
+                .filter(
+                  (service) =>
+                    normalizeAssignmentId(service.guestId) ===
+                    normalizeAssignmentId(person.id),
+                )
+                .map((service) => ({
+                  id: service.id,
+                  name: service.name,
+                  price: service.price,
+                  durationMins: service.durationMins,
+                  startTime: service.startTime,
+                  endTime: service.endTime,
+                  staffResourceId: service.teamMemberId ?? undefined,
+                  guestId: service.guestId ?? person.id,
+                })),
+              details.services,
+              person.id,
+            ),
+            products: assignedLinesForPerson([], details.products, person.id),
             participantType: person.participantType ?? ("guest" as const),
             planningActivity: person.planningActivity,
             planningDuration: person.planningDuration,
+            planningStartTime: person.planningStartTime,
+            planningEndTime: person.planningEndTime,
             bufferTeamMemberId: person.bufferTeamMemberId,
+            bufferStartTime: person.bufferStartTime,
             bufferEndTime: person.bufferEndTime,
           }));
+
+  const requesterIds = requesterPersonIds(details.clientSnapshot);
+  const rawServices = details.services?.length
+    ? filterMainClientAssignedLines(details.services, requesterIds)
+    : (mainDrawerServicesFromClientSnapshot(details.clientSnapshot) ?? []);
+  const rawProducts = filterMainClientAssignedLines(
+    details.products ?? [],
+    requesterIds,
+  );
+
+  // One shared timeline: client lines first, then each guest's lines.
+  const [services, ...guestServiceGroups] = ensureGroupedServiceStartEndTimes(
+    [rawServices, ...guests.map((guest) => guest.services)],
+    ev.start,
+  );
+  const guestsWithTimes = guests.map((guest, index) => ({
+    ...guest,
+    services: guestServiceGroups[index] ?? [],
+  }));
 
   return {
     clientEmail: details.clientEmail ?? "",
     services,
-    products: details.products ?? [],
-    guests,
+    products: rawProducts,
+    guests: guestsWithTimes,
     phoneCode: splitPhone.countryCode,
     phoneNumber: splitPhone.phone,
     desiredLocation: details.desiredLocation ?? emptyDesiredLocation(),

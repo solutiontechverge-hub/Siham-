@@ -22,6 +22,7 @@ import {
   useClientMessagingUnread,
   useMessagingWidgetOptional,
 } from "../messaging";
+import { prepareBookingMessagingOpen } from "../messaging/openBookingMessaging";
 import { useOpenMessagingForBookingMutation } from "../../../store/services/messagingApi";
 import type {
   BookingRequestDirection,
@@ -118,12 +119,7 @@ export default function ClientBookingDetailsHeader({
     if (!bookingRef) return;
     try {
       const result = await openMessagingForBooking({ bookingRef }).unwrap();
-      messagingWidget?.openMessaging({
-        threadId: result.threadId,
-        bookingRef: result.bookingRef,
-        businessSetupId: result.businessSetupId,
-        searchPrefill: result.thread?.name || undefined,
-      });
+      messagingWidget?.openMessaging(prepareBookingMessagingOpen(result));
     } catch (error) {
       showSnackbar({
         severity: "error",

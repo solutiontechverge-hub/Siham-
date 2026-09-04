@@ -45,6 +45,7 @@ import { ServiceSummaryMetaLine } from "../../../components/common/ServiceSummar
 import {
   CLIENT_BOOKING_MIN_LEAD_ERROR,
   fmtMinutesToTimeLabel,
+  parseTimeLabelToMinutes,
   serviceTimeRangeLabel,
 } from "./booking-time";
 
@@ -164,6 +165,7 @@ export default function ClientBookingCreateView() {
     minimumTimeslotNotice,
     isCompanyClient,
     showProjectDetails,
+    canAddPlanningParticipant,
     getParticipantLabel,
     isPlanningPerson,
     selectedPerson,
@@ -1191,7 +1193,8 @@ export default function ClientBookingCreateView() {
             borderRadius: "12px",
             border: `1px solid ${alpha(m.navy, 0.08)}`,
             bgcolor: "#fff",
-            overflow: "hidden",
+            // Keep visible so sticky participant actions can pin while scrolling.
+            overflow: "visible",
             boxShadow: "0 10px 22px rgba(16, 35, 63, 0.05)",
           }}
         >
@@ -1989,7 +1992,14 @@ export default function ClientBookingCreateView() {
                         direction="row"
                         alignItems="center"
                         justifyContent="flex-end"
-                        sx={{ mb: 1 }}
+                        sx={{
+                          mb: 1,
+                          position: "sticky",
+                          top: 0,
+                          zIndex: 2,
+                          py: 0.5,
+                          bgcolor: "#fff",
+                        }}
                       >
                         {isDesiredLocation || canAddFixedLocationGuest ? (
                         <Chip
@@ -2098,7 +2108,7 @@ export default function ClientBookingCreateView() {
                               Model
                             </MenuItem>
                           ) : null}
-                          {isCompanyClient ? (
+                          {isCompanyClient && canAddPlanningParticipant ? (
                             <MenuItem
                               onClick={() => addParticipant("Planning")}
                               sx={{
@@ -2521,6 +2531,7 @@ export default function ClientBookingCreateView() {
                             isRequester,
                             items,
                             planningItem,
+                            startTime,
                           },
                           sectionIndex,
                         ) => {
@@ -2616,15 +2627,20 @@ export default function ClientBookingCreateView() {
                                   </Box>
                                 ) : null}
                                 {items.map((s, index) => {
-                                  const startMin = bookServicesAtSameTime
-                                    ? bookingStartMinutes
-                                    : bookingStartMinutes +
-                                      items
-                                        .slice(0, index)
-                                        .reduce(
-                                          (sum, row) => sum + row.durationMins,
-                                          0,
-                                        );
+                                  const sectionStartMinutes = startTime
+                                    ? parseTimeLabelToMinutes(startTime)
+                                    : bookingStartMinutes;
+                                  const serviceOffset = items
+                                    .slice(0, index)
+                                    .reduce(
+                                      (sum, row) => sum + row.durationMins,
+                                      0,
+                                    );
+                                  const startMin = s.startTime
+                                    ? parseTimeLabelToMinutes(s.startTime)
+                                    : bookServicesAtSameTime
+                                      ? bookingStartMinutes
+                                      : sectionStartMinutes + serviceOffset;
                                   const staffName =
                                     !isDesiredLocation && isRequester
                                       ? resolveServiceTeamMemberName(s)

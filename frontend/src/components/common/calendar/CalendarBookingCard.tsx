@@ -31,6 +31,10 @@ import { useBookingPaymentDueMeta } from "./resolveBookingPaymentDueMeta";
 import { hasUnseenBookingUpdate } from "./bookingUpdateSeen";
 import { sanitizeInternalNoteText } from "./bookingEventDetails";
 import BookingIdTooltipLabel from "./BookingIdTooltipLabel";
+import {
+  isTeamSharedBooking,
+  teamSharedBookingTooltip,
+} from "./teamMemberBookings";
 
 export type CalendarBookingCardProps = {
   event: CalendarEvent;
@@ -43,6 +47,7 @@ export type CalendarBookingCardProps = {
   variant?: "default" | "ticket";
   positioned?: boolean;
   dense?: boolean;
+  teamMemberNameById?: ReadonlyMap<string, string>;
   containerSx?: SxProps<Theme>;
   onOpen: () => void;
   onOpenCalendar: () => void;
@@ -75,6 +80,7 @@ export default function CalendarBookingCard({
   variant = "default",
   positioned = true,
   dense = false,
+  teamMemberNameById,
   containerSx,
   onOpen,
   onOpenCalendar,
@@ -146,6 +152,10 @@ export default function CalendarBookingCard({
       updatedAt: event.updatedAt,
       lastEditedBy: event.details?.lastEditedBy ?? null,
     });
+  const teamShared = isTeamSharedBooking(event);
+  const teamSharedTooltip = teamShared
+    ? teamSharedBookingTooltip(event, { nameById: teamMemberNameById })
+    : "";
 
   return (
     <Box
@@ -215,6 +225,21 @@ export default function CalendarBookingCard({
         }
         pattern={cardPattern}
         scenarioBadges={[
+          ...(teamShared
+            ? [
+                {
+                  label: "Shared",
+                  tooltip: teamSharedTooltip,
+                  bold: true,
+                  sx: {
+                    border: `1px solid ${alpha(m.teal, 0.45)}`,
+                    bgcolor: alpha(m.teal, 0.16),
+                    color: m.teal,
+                    cursor: "help",
+                  },
+                },
+              ]
+            : []),
           ...(calendarEventIsGuest(event)
             ? [
                 {

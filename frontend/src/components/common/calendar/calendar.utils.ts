@@ -47,6 +47,7 @@ export const EMPTY_CALENDAR_STATUSES: Record<CalendarBookingStatus, boolean> = {
   Invalid: false,
   "No Show": false,
   Requested: false,
+  "BR Accepted": false,
   "In Progress": false,
 };
 
@@ -75,6 +76,47 @@ export function eventMatchesStatusFilter(
     return isOutgoingPlainBookingRequestRejected(event);
   }
   return Boolean(filters.statuses?.[event.status]);
+}
+
+export function eventMatchesLocationFilter(
+  event: Pick<CalendarEvent, "location">,
+  filters: Pick<CalendarFilters, "locationAll" | "locations">,
+) {
+  if (filters.locationAll) return true;
+  return Boolean(filters.locations[event.location]);
+}
+
+export function eventMatchesNonTeamCalendarFilters(
+  event: Pick<
+    CalendarEvent,
+    | "location"
+    | "bookingType"
+    | "status"
+    | "bookingScenario"
+    | "details"
+    | "notes"
+  >,
+  filters: CalendarFilters,
+) {
+  return (
+    eventMatchesLocationFilter(event, filters) &&
+    eventMatchesBookingTypeFilter(event, filters) &&
+    eventMatchesStatusFilter(event, filters)
+  );
+}
+
+/** True when the drawer is narrowing results (not the default All/All/All view). */
+export function calendarFiltersAreNarrowing(
+  filters: CalendarFilters,
+  options?: { locationFilterAvailable?: boolean },
+) {
+  const locationFilterAvailable = options?.locationFilterAvailable !== false;
+  return (
+    filters.teamAll === false ||
+    (locationFilterAvailable && filters.locationAll === false) ||
+    filters.bookingAll === false ||
+    filters.statusAll === false
+  );
 }
 
 export type BlockTimeTitle = "" | "Meeting" | "Training" | "Holiday" | "Custom";

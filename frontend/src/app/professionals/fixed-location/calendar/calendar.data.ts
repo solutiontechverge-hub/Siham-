@@ -3,6 +3,7 @@ export type CalendarViewMode = "day" | "week" | "month";
 
 export type CalendarBookingStatus =
   | "Requested"
+  | "BR Accepted"
   | "Cancelled"
   | "Confirmed"
   | "In Progress"
@@ -44,6 +45,13 @@ export type CalendarBookingProductItem = {
   price: number;
   quantity: number;
   unitPrice: number;
+  vat?: string;
+  /**
+   * Earliest chronological service start this product attaches to when a
+   * client's services split into multiple time-blocks (Section 2.9).
+   */
+  attachedStartTime?: string;
+  guestId?: string | null;
   originalPrice?: number;
   discount?: CalendarLineDiscount | null;
 };
@@ -59,7 +67,10 @@ export type CalendarBookingGuestItem = {
   participantType?: "model" | "planning" | "guest" | "buffer" | "notes";
   planningActivity?: string;
   planningDuration?: string;
+  planningStartTime?: string;
+  planningEndTime?: string;
   bufferTeamMemberId?: string;
+  bufferStartTime?: string;
   bufferEndTime?: string;
 };
 
@@ -75,7 +86,10 @@ export type CalendarBookingClientSnapshot = {
     planningActivity?: string;
     planningDuration?: string;
     planningIsLocked?: boolean;
+    planningStartTime?: string;
+    planningEndTime?: string;
     bufferTeamMemberId?: string;
+    bufferStartTime?: string;
     bufferEndTime?: string;
   }>;
   services?: Array<{
@@ -83,6 +97,8 @@ export type CalendarBookingClientSnapshot = {
     name: string;
     price: number;
     durationMins: number;
+    startTime?: string;
+    endTime?: string;
     guestId?: string | null;
     teamMemberId?: string | null;
     teamMemberName?: string | null;
@@ -183,6 +199,8 @@ export type CalendarBookingDetails = {
   needsOk?: boolean;
   /** Scenario to show while needsOk is true (status may already be Confirmed). */
   ackScenario?: CalendarBookingScenario;
+  /** Party that must tap OK to settle after the counterparty accepted. */
+  ackRecipient?: "client" | "professional";
   /** Soft-delete: hide from professional calendar without changing status. */
   hiddenForProfessional?: boolean;
   /** Soft-delete: hide from client booking list without changing status. */
@@ -250,6 +268,10 @@ export type CalendarEvent = {
   details?: CalendarBookingDetails;
   /** Company client (CC) vs individual — shown as CC tag on professional calendar. */
   clientKind?: "individual" | "company";
+  /** Same booking split across two or more team-member columns. */
+  teamShared?: boolean;
+  /** First names of team members this booking is shared with. */
+  sharedTeamMemberNames?: string[];
 };
 
 /** In-app chat is only available for linked Mollure clients. */

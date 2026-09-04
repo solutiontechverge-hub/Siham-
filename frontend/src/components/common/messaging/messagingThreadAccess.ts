@@ -1,4 +1,4 @@
-import type { MessagingStore } from "./messagingTypes";
+import type { MessagingStore, MessagingThread } from "./messagingTypes";
 import { isMessageFromClient } from "./messagingUnread";
 import { normalizeBookingIdQuery } from "./messagingStorage";
 
@@ -51,6 +51,33 @@ export function findThreadIdByClientName(store: MessagingStore, clientName?: str
 }
 
 /** Prefer an existing conversation with this business setup, else its draft thread. */
+/** Thread ids that must stay visible when opening chat from a booking deep-link. */
+export function collectBookingNavigationThreadIds(
+  store: MessagingStore,
+  navigation?: {
+    threadId?: string;
+    bookingRef?: string;
+    seedThread?: MessagingThread;
+  },
+): Set<string> {
+  const ids = new Set<string>();
+  if (!navigation) return ids;
+
+  const threadRef = navigation.threadId?.trim();
+  if (threadRef) ids.add(threadRef);
+
+  const seedId = navigation.seedThread?.id?.trim();
+  if (seedId) ids.add(seedId);
+
+  const bookingRef = navigation.bookingRef?.trim();
+  if (bookingRef) {
+    const byBooking = findThreadIdByBookingRef(store, bookingRef);
+    if (byBooking) ids.add(byBooking);
+  }
+
+  return ids;
+}
+
 export function findThreadIdByBusinessSetupId(
   store: MessagingStore,
   businessSetupId?: string,

@@ -12,6 +12,7 @@ import type { CalendarBookingDetails } from "../../../app/professionals/fixed-lo
 const statusToApi: Record<CalendarBookingStatus, CreateCalendarEntryRequest["status"]> = {
   Confirmed: "confirmed",
   Requested: "requested",
+  "BR Accepted": "br_accepted",
   "In Progress": "in_progress",
   Invalid: "invalid",
   "No Show": "no_show",
@@ -21,6 +22,7 @@ const statusToApi: Record<CalendarBookingStatus, CreateCalendarEntryRequest["sta
 
 const statusFromApi: Record<string, CalendarBookingStatus> = {
   requested: "Requested",
+  br_accepted: "BR Accepted",
   cancelled: "Cancelled",
   canceled: "Cancelled",
   confirmed: "Confirmed",
