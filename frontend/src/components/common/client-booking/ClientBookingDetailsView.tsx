@@ -79,7 +79,6 @@ import {
   clearBookingEditRequest,
   consumeConfirmedEditGrant,
   getBookingEditRequest,
-  isConfirmedEditGrantActive,
   professionalRejectEditRequest,
   professionalSuggestBookingChanges,
   professionalAcceptClientEditRequest,
@@ -2158,40 +2157,21 @@ export default function ClientBookingDetailsView({
 
   React.useEffect(() => {
     if (!pendingEbrSuggestSend || !bookingRef) return;
-    const { note, editedIds } = pendingEbrSuggestSend;
     setPendingEbrSuggestSend(null);
     void (async () => {
-      const grantActive =
-        isConfirmedEditGrantActive(bookingRef, "client") ||
-        (activeBooking?.editRequest?.status === "approved" &&
-          Boolean(activeBooking.editRequest.edit_grant_active) &&
-          activeBooking.editRequest.initiated_by === "client");
       try {
-        if (grantActive) {
-          await persistConfirmedGrantEdit();
-          return;
-        }
-        await persistClientEbrSuggestion(note, editedIds);
+        await persistConfirmedGrantEdit();
       } catch (error) {
         unlockEbrDraft();
         showSnackbar({
           severity: "error",
-          message: getApiErrorMessage(
-            error,
-            grantActive
-              ? "Unable to update booking."
-              : "Unable to send EBR to the professional.",
-          ),
+          message: getApiErrorMessage(error, "Unable to update booking."),
         });
       }
     })();
   }, [
-    activeBooking?.editRequest?.edit_grant_active,
-    activeBooking?.editRequest?.initiated_by,
-    activeBooking?.editRequest?.status,
     bookingRef,
     pendingEbrSuggestSend,
-    persistClientEbrSuggestion,
     persistConfirmedGrantEdit,
     showSnackbar,
   ]);
@@ -2598,34 +2578,6 @@ export default function ClientBookingDetailsView({
             onDeleteBooking={() => setDeleteDialogOpen(true)}
             onDiscardBookingRequest={() => setDiscardDialogOpen(true)}
             onOpenActivity={() => setActivityOpen(true)}
-            onDispatchBookingNotification={dispatchClientBookingNotification}
-            onSendConfirmedEditRequest={async (note) => {
-              if (!apiBookingId || !bookingRef) {
-                throw new Error("Booking id missing");
-              }
-              const result = await manageBookingEditRequest({
-                id: apiBookingId,
-                action: "send",
-                note,
-              }).unwrap();
-              syncEditRequestFromBookingApi(
-                bookingRef,
-                result.data?.edit_request,
-              );
-              await refreshActiveBooking();
-              editRequest.refresh();
-            }}
-            apiEditGrantActive={
-              activeBooking?.editRequest?.status === "approved" &&
-              Boolean(
-                activeBooking.editRequest.edit_grant_active ??
-                  (activeBooking.editRequest as { editGrantActive?: boolean })
-                    .editGrantActive,
-              ) &&
-              (activeBooking.editRequest.initiated_by ??
-                (activeBooking.editRequest as { initiatedBy?: string }).initiatedBy) !==
-                "professional"
-            }
             showUpdated={showStatusUpdated}
             updatedSignpostTitle={ACTIVITY_COMPARISON_SIGNPOST}
             onUpdatedClick={() => openActivityComparison("silent_updated")}

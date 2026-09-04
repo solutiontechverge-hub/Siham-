@@ -101,8 +101,10 @@ export default function BookingDrawerSelectedItemsSection({
           {services.map((service) => {
             const editTag = resolveServiceEditTag?.(service.id) ?? null;
             const staffName =
-              resolveStaffName?.(service.staffResourceId)?.trim() ||
-              "Unassigned";
+              resolveStaffName?.(
+                service.staffResourceId ||
+                  (service as { teamMemberId?: string }).teamMemberId,
+              )?.trim() || "Unassigned";
 
             return (
               <Box
@@ -208,8 +210,10 @@ export default function BookingDrawerSelectedItemsSection({
           })}
           {cancelledServices.map((service) => {
             const staffName =
-              resolveStaffName?.(service.staffResourceId)?.trim() ||
-              "Unassigned";
+              resolveStaffName?.(
+                service.staffResourceId ||
+                  (service as { teamMemberId?: string }).teamMemberId,
+              )?.trim() || "Unassigned";
             return (
               <Box key={`cancelled-${service.id}`} sx={cardSx}>
                 <Stack

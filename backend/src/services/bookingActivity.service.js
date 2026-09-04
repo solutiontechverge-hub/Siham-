@@ -121,7 +121,11 @@ export async function logBookingCreatedActivity(booking, { actorLabel, actor } =
   const status = String(booking.status ?? "").toLowerCase();
   const bookingType = String(booking.booking_type ?? "").toLowerCase();
   const prepay = String(booking.prepayment_status ?? "").toLowerCase();
-  const isOffline = bookingType === "offline" || String(bookingCode || "").startsWith("OF");
+  const isOffline =
+    bookingType === "offline" ||
+    String(bookingCode || "")
+      .toLowerCase()
+      .startsWith("of");
   const isRequestFlow = status === "requested";
   const clientLabel = actorLabel || "Client";
   const occurredAt = booking.created_at

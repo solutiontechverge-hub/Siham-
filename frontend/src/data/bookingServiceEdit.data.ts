@@ -14,6 +14,9 @@ export type BookingServiceLineItem = {
   priceType?: BookingServicePriceType;
   discount?: { type: BookingServiceDiscountType; amount: number } | null;
   staffResourceId?: string;
+  teamMemberId?: string | null;
+  teamMemberName?: string | null;
+  guestId?: string | null;
 };
 
 export type BookingServiceEditDraft = {

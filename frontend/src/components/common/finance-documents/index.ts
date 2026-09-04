@@ -18,3 +18,9 @@ export type {
   FinanceInvoiceProduct,
   FinanceInvoiceService,
 } from "./useFinanceInvoiceSettings";
+export {
+  resolveInvoiceTemplateType,
+  resolveInvoiceLineItemLayout,
+  toInvoiceDisplayLineItems,
+  getInvoiceLineItemColumns,
+} from "./financeDocumentUtils";

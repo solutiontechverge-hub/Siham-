@@ -1,5 +1,27 @@
 import { buildClientDraftChronologicalBlocks } from "../../../data/bookingChronologicalBlocks";
-import type { ClientBookingDraft, ClientBookingSummarySection } from "./types";
+import type {
+  ClientBookingDraft,
+  ClientBookingDraftTeamMember,
+  ClientBookingSummarySection,
+} from "./types";
+
+export function mergeBookingTeamMembers(
+  ...lists: Array<
+    ReadonlyArray<{ id?: string | null; name?: string | null }> | null | undefined
+  >
+): ClientBookingDraftTeamMember[] {
+  const map = new Map<string, string>();
+  for (const list of lists) {
+    for (const member of list ?? []) {
+      const id = String(member.id ?? "").trim();
+      if (!id) continue;
+      const name = String(member.name ?? "").trim();
+      if (name) map.set(id, name);
+      else if (!map.has(id)) map.set(id, "Team member");
+    }
+  }
+  return [...map.entries()].map(([id, name]) => ({ id, name }));
+}
 
 export function buildBookingSummarySections(
   draft: ClientBookingDraft | null,
@@ -49,9 +71,13 @@ export function buildBookingSummarySections(
 export function resolveTeamMemberFirstName(
   teamMemberId: string | null | undefined,
   teamMembers: ClientBookingDraft["teamMembers"],
+  fallbackName?: string | null,
 ): string | undefined {
-  if (!teamMemberId) return undefined;
-  const fullName = teamMembers?.find((tm) => tm.id === teamMemberId)?.name;
+  const id = String(teamMemberId ?? "").trim();
+  const fullName =
+    (id
+      ? teamMembers?.find((tm) => String(tm.id) === id)?.name
+      : undefined) || fallbackName?.trim() || undefined;
   if (!fullName) return undefined;
   return fullName.split(/\s+/)[0];
 }

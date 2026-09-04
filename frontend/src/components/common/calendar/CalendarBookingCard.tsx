@@ -6,7 +6,11 @@ import { alpha, useTheme } from "@mui/material/styles";
 import type { SxProps, Theme } from "@mui/material/styles";
 import BookingTimelineCard from "../BookingTimelineCard";
 import { useProfessionalMessagingUnread } from "../messaging/useProfessionalMessagingUnread";
-import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
+import {
+  calendarEventCanChat,
+  calendarEventIsGuest,
+  type CalendarEvent,
+} from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import { extractBookingId } from "./calendar.utils";
 import {
   getBookingScenarioIndicators,
@@ -236,20 +240,32 @@ export default function CalendarBookingCard({
                 },
               ]
             : []),
-          ...(event.clientKind === "company" ||
-          event.details?.clientKind === "company"
+          ...(calendarEventIsGuest(event)
             ? [
                 {
-                  label: "CC",
+                  label: "Guest",
                   bold: true,
                   sx: {
-                    border: `1px solid ${alpha(m.teal, 0.45)}`,
-                    bgcolor: alpha(m.teal, 0.16),
-                    color: m.teal,
+                    border: `1px solid ${alpha(m.navy, 0.18)}`,
+                    bgcolor: alpha(m.navy, 0.06),
+                    color: alpha(m.navy, 0.72),
                   },
                 },
               ]
-            : []),
+            : event.clientKind === "company" ||
+                event.details?.clientKind === "company"
+              ? [
+                  {
+                    label: "BC",
+                    bold: true,
+                    sx: {
+                      border: `1px solid ${alpha(m.teal, 0.45)}`,
+                      bgcolor: alpha(m.teal, 0.16),
+                      color: m.teal,
+                    },
+                  },
+                ]
+              : []),
           ...scenarioIndicators
             .filter((indicator) => indicator !== "E")
             .map((indicator) => ({
@@ -330,13 +346,13 @@ export default function CalendarBookingCard({
           count: hasNote ? 1 : undefined,
         }}
         profileAction={{
-          show: true,
+          show: !calendarEventIsGuest(event),
           name: event.showClientName ?? "Client",
           tooltip: `Open profile: ${event.showClientName ?? "Client"}`,
           onClick: (e) => onOpenClient(e.currentTarget as HTMLElement),
         }}
         messageAction={{
-          show: Boolean(event.details?.customerId),
+          show: calendarEventCanChat(event),
           count: unreadCount > 0 ? unreadCount : undefined,
           tooltip: `Messages: ${event.showClientName ?? "Client"}`,
           onClick: onOpenMessages,

@@ -19,6 +19,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 import MollureFormField from "../../../../components/common/MollureFormField";
 import type { ClientRecord } from "./data/clientList";
 import { isClientBlocked } from "./data/clientList";
+import ClientPlatformTag from "../../../../components/common/ClientPlatformTag";
 
 type InfoField = { label: string; value: string };
 
@@ -68,7 +69,6 @@ export default function ClientDetailsViewPanel({
 }: ClientDetailsViewPanelProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
-  const isMollure = client.tags.includes("Mollure");
   const blocked = isClientBlocked(client);
 
   const savedNote = client.technicalNote ?? "";
@@ -227,80 +227,10 @@ export default function ClientDetailsViewPanel({
                   }}
                 />
               ) : null}
-              {client.kind === "company" ? (
-                <Chip
-                  label="CC"
-                  size="small"
-                  sx={{
-                    height: 16,
-                    borderRadius: "999px",
-                    bgcolor: alpha(m.teal, 0.12),
-                    color: m.teal,
-                    fontWeight: 700,
-                    "& .MuiChip-label": {
-                      fontSize: 9,
-                      px: 0.65,
-                      py: 0,
-                      lineHeight: 1.2,
-                    },
-                  }}
-                />
-              ) : (
-                <Chip
-                  label="IC"
-                  size="small"
-                  sx={{
-                    height: 16,
-                    borderRadius: "999px",
-                    bgcolor: alpha(m.teal, 0.12),
-                    color: m.teal,
-                    fontWeight: 700,
-                    "& .MuiChip-label": {
-                      fontSize: 9,
-                      px: 0.65,
-                      py: 0,
-                      lineHeight: 1.2,
-                    },
-                  }}
-                />
-              )}
-              {!isMollure ? (
-                <Chip
-                  label="Non-Mollure"
-                  size="small"
-                  sx={{
-                    height: 16,
-                    borderRadius: "999px",
-                    bgcolor: alpha(m.teal, 0.14),
-                    color: m.teal,
-                    fontWeight: 700,
-                    "& .MuiChip-label": {
-                      fontSize: 9,
-                      px: 0.65,
-                      py: 0,
-                      lineHeight: 1.2,
-                    },
-                  }}
-                />
-              ) : (
-                <Chip
-                  label="Mollure"
-                  size="small"
-                  sx={{
-                    height: 16,
-                    borderRadius: "999px",
-                    bgcolor: alpha(m.teal, 0.14),
-                    color: m.teal,
-                    fontWeight: 700,
-                    "& .MuiChip-label": {
-                      fontSize: 9,
-                      px: 0.65,
-                      py: 0,
-                      lineHeight: 1.2,
-                    },
-                  }}
-                />
-              )}
+              <ClientPlatformTag
+                isMollure={client.tags.includes("Mollure")}
+                clientKind={client.kind}
+              />
             </Stack>
             <Typography
               sx={{

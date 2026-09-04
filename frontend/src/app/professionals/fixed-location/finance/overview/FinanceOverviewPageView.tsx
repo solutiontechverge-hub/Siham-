@@ -9,7 +9,10 @@ import RefundSalesDrawer from "../../../../../components/sections/finance/Refund
 import TransactionNoteModal from "../../../../../components/sections/finance/TransactionNoteModal";
 import FinanceFiltersDrawerView from "../../../../../components/sections/finance/FinanceFiltersDrawerView";
 import FinanceDocumentPreviewDrawer from "../../../../../components/sections/finance/FinanceDocumentPreviewDrawer";
-import { useProfessionalBusinessOverride } from "../../../../../components/common/finance-documents";
+import {
+  useProfessionalBusinessOverride,
+  resolveInvoiceTemplateType,
+} from "../../../../../components/common/finance-documents";
 import TransactionsHeader from "../../../../../components/sections/finance/TransactionsHeader";
 import TransactionsTable from "../../../../../components/sections/finance/TransactionsTable";
 import TransactionsToolbar from "../../../../../components/sections/finance/TransactionsToolbar";
@@ -279,7 +282,12 @@ export default function FinanceOverviewPageView() {
         open={Boolean(activeDocument)}
         onClose={() => setActiveDocument(null)}
         documentType={activeDocument?.documentType ?? "invoice"}
-        invoiceType={settings.defaultInvoiceType}
+        invoiceType={resolveInvoiceTemplateType({
+          clientType: activeDocument?.row?.clientType,
+          vatNumber: activeDocument?.row?.document?.client?.vatNumber,
+          cocNumber: activeDocument?.row?.document?.client?.cocNumber,
+          fallback: "individual",
+        })}
         settings={settings}
         row={activeDocument?.row ?? null}
         profileData={profileResponse?.data ?? null}

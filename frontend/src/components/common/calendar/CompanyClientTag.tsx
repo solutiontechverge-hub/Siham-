@@ -12,7 +12,7 @@ export default function CompanyClientTag(_props?: {
   return (
     <Box
       component="span"
-      aria-label="Company Client"
+      aria-label="Business Client"
       sx={{
         display: "inline-flex",
         alignItems: "center",
@@ -31,7 +31,7 @@ export default function CompanyClientTag(_props?: {
         whiteSpace: "nowrap",
       }}
     >
-      CC
+      BC
     </Box>
   );
 }

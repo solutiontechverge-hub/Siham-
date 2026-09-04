@@ -7,6 +7,7 @@ export type ClientBookingDraftService = {
   endTime?: string;
   guestId?: string | null;
   teamMemberId?: string | null;
+  teamMemberName?: string | null;
   assignedTo?: string | null;
   /** Services purchased after checkout appear under Add Ons in payment summary. */
   isAddOn?: boolean;

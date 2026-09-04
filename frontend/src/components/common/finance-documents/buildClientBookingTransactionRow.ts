@@ -16,8 +16,21 @@ function formatCurrencyEur(amount: number) {
   }).format(amount);
 }
 
-function resolveVatForService(serviceName: string, settings: FinanceInvoiceSettings): string {
-  const normalized = serviceName.trim().toLowerCase();
+function resolveVatForLabel(
+  name: string,
+  settings: FinanceInvoiceSettings,
+  kind: "service" | "product",
+): string {
+  const normalized = name.trim().toLowerCase();
+  if (kind === "product") {
+    const match = [...settings.products, ...(settings.uniqueItems ?? [])].find(
+      (row) => {
+        const label = row.name.trim().toLowerCase();
+        return label && (normalized.includes(label) || label.includes(normalized));
+      },
+    );
+    return match?.vat ?? "0%";
+  }
   const match = settings.services.find((row) => {
     const label = row.service.trim().toLowerCase();
     return label && (normalized.includes(label) || label.includes(normalized));
@@ -82,10 +95,24 @@ export function buildClientBookingTransactionRow({
   const serviceLineItems = draft.services.map((service) => ({
     description: service.name,
     quantity: "1",
-    vat: resolveVatForService(service.name, financeSettings),
+    vat: resolveVatForLabel(service.name, financeSettings, "service"),
     pricePerUnit: formatCurrencyEur(service.price),
     totalPrice: formatCurrencyEur(service.price),
   }));
+
+  const productLineItems = (draft.products ?? []).map((product) => {
+    const quantity = Math.max(1, Number(product.quantity) || 1);
+    const unitPrice =
+      product.unitPrice ??
+      (quantity > 0 ? product.price / quantity : product.price);
+    return {
+      description: product.name,
+      quantity: String(quantity),
+      vat: resolveVatForLabel(product.name, financeSettings, "product"),
+      pricePerUnit: formatCurrencyEur(unitPrice),
+      totalPrice: formatCurrencyEur(product.price),
+    };
+  });
 
   const prepaidLabel = formatCurrencyEur(prepaidValue);
   const lineItems =
@@ -99,17 +126,25 @@ export function buildClientBookingTransactionRow({
             totalPrice: prepaidLabel,
           },
         ]
-      : serviceLineItems;
+      : [...serviceLineItems, ...productLineItems];
 
   const bookingItems = (asPrepaymentReceipt && prepaidValue > 0
     ? [{ label: "Prepayment", value: prepaidLabel }]
-    : draft.services.map((service) => ({
-        label: service.name,
-        value: formatCurrencyEur(service.price),
-      }))
+    : [
+        ...draft.services.map((service) => ({
+          label: service.name,
+          value: formatCurrencyEur(service.price),
+        })),
+        ...(draft.products ?? []).map((product) => ({
+          label: product.name,
+          value: formatCurrencyEur(product.price),
+        })),
+      ]
   );
 
-  const totalFromServices = draft.services.reduce((sum, s) => sum + s.price, 0);
+  const totalFromServices =
+    draft.services.reduce((sum, s) => sum + s.price, 0) +
+    (draft.products ?? []).reduce((sum, product) => sum + product.price, 0);
   const totalAmount = documentAmount ?? draft.total ?? totalFromServices;
   const totalPriceLabel = formatCurrencyEur(totalAmount);
   const receiptNumber = `${bookingRef.replace(/[^a-zA-Z0-9]/g, "")}${String(Date.now()).slice(-4)}`;

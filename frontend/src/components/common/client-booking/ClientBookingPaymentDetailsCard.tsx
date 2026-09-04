@@ -382,6 +382,7 @@ export default function ClientBookingPaymentDetailsCard({
     const teamFirst = resolveTeamMemberFirstName(
       service.teamMemberId,
       draft?.teamMembers,
+      service.teamMemberName,
     );
     const sectionStartMinutes = section.startTime
       ? parseTimeLabelToMinutes(section.startTime)

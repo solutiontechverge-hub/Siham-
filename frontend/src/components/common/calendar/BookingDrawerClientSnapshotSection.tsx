@@ -231,9 +231,11 @@ export default function BookingDrawerClientSnapshotSection({
             ) : null}
             <Stack spacing={0.75}>
               {personServices.map((service) => {
-                const staff = service.teamMemberId
-                  ? teamNameById.get(service.teamMemberId)?.split(/\s+/)[0]
-                  : undefined;
+                const staffFull =
+                  (service.teamMemberId
+                    ? teamNameById.get(String(service.teamMemberId))
+                    : undefined) || service.teamMemberName?.trim();
+                const staff = staffFull?.split(/\s+/)[0];
                 return (
                   <Box
                     key={service.id}

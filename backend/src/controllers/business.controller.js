@@ -35,6 +35,10 @@ import {
   dispatchBookingUpdatedNotifications,
 } from "../services/bookingNotification.service.js";
 import {
+  extractCalendarClientEmail,
+  notifyNonMollureCalendarClient,
+} from "../services/bookingEmail.service.js";
+import {
   emitBookingChanged,
   emitBusinessChanged,
   emitBusinessChangedForProfile,
@@ -57,8 +61,6 @@ import {
   buildApprovedEditRequest,
   buildPendingEditRequest,
   buildRejectedClear,
-  consumeEditGrant,
-  isEditGrantActiveFor,
   isEditRequestPending,
   parseEditRequest,
 } from "../helpers/bookingEditRequest.js";
@@ -244,7 +246,20 @@ const calendarEntryInRangeSql = (alias, startParam, endParam) => `(
 const bookingDateSql = (alias) =>
   `substring(COALESCE(${alias}.booking_date::text, ${alias}.start_time::text) from 1 for 10)::date`;
 
-const makeCalendarCode = (prefix = "OF123") => `${prefix}${Date.now()}${Math.random().toString(16).slice(2, 6)}`;
+const BOOKING_CODE_PREFIX = {
+  online: "ol",
+  offline: "of",
+  blocked: "BLK",
+};
+
+const makeCalendarCode = (prefix = BOOKING_CODE_PREFIX.offline) =>
+  `${prefix}${Date.now()}${Math.random().toString(16).slice(2, 6)}`;
+
+const codeStartsWithPrefix = (code, prefix) =>
+  String(code ?? "")
+    .toLowerCase()
+    .startsWith(String(prefix ?? "").toLowerCase());
+
 const calendarStatusSet = new Set([
   "requested",
   "br_accepted",
@@ -267,19 +282,26 @@ const bookingStatusSet = new Set([
   "invalid",
 ]);
 
-const ensureUniqueBookingCode = async (preferredCode, prefix = "123") => {
+const uniqueCodeExists = async (code) => {
+  const existing = await query(
+    `SELECT 1 WHERE EXISTS (SELECT 1 FROM bookings WHERE unique_code = $1)
+        OR EXISTS (SELECT 1 FROM calendar_entries WHERE unique_code = $1)`,
+    [code],
+  );
+  return existing.rows.length > 0;
+};
+
+const ensureUniqueBookingCode = async (preferredCode, prefix = BOOKING_CODE_PREFIX.online) => {
   const trimmed = String(preferredCode ?? "").trim();
-  if (trimmed) {
-    const existing = await query(`SELECT 1 FROM bookings WHERE unique_code = $1 LIMIT 1`, [trimmed]);
-    if (!existing.rows.length) {
+  if (trimmed && codeStartsWithPrefix(trimmed, prefix)) {
+    if (!(await uniqueCodeExists(trimmed))) {
       return trimmed;
     }
   }
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const candidate = makeCalendarCode(prefix);
-    const existing = await query(`SELECT 1 FROM bookings WHERE unique_code = $1 LIMIT 1`, [candidate]);
-    if (!existing.rows.length) {
+    if (!(await uniqueCodeExists(candidate))) {
       return candidate;
     }
   }
@@ -299,7 +321,7 @@ const normalizeBookingStatus = (value, fallback = "requested") => {
   return bookingStatusSet.has(next) ? next : fallback;
 };
 
-/** Online / request / project channels mint non-OF codes; only true offline uses OF123. */
+/** Online / request / project channels mint ol codes; only true offline uses of. */
 const ONLINE_CHANNEL_BOOKING_TYPES = new Set(["online", "request", "project"]);
 const OFFLINE_DISALLOWED_STATUSES = new Set(["requested", "invalid"]);
 
@@ -317,10 +339,18 @@ const normalizeCalendarBookingType = (value, status) => {
 };
 
 const calendarCodePrefixFor = (status, bookingType) => {
-  if (String(status).toLowerCase() === "blocked") return "BLK";
-  if (ONLINE_CHANNEL_BOOKING_TYPES.has(String(bookingType).toLowerCase())) return "123";
-  if (String(status).toLowerCase() === "requested") return "123";
-  return "OF123";
+  if (String(status).toLowerCase() === "blocked") return BOOKING_CODE_PREFIX.blocked;
+  if (ONLINE_CHANNEL_BOOKING_TYPES.has(String(bookingType).toLowerCase())) {
+    return BOOKING_CODE_PREFIX.online;
+  }
+  if (String(status).toLowerCase() === "requested") return BOOKING_CODE_PREFIX.online;
+  return BOOKING_CODE_PREFIX.offline;
+};
+
+const fallbackUniqueCode = (booking) => {
+  if (booking?.unique_code) return booking.unique_code;
+  const prefix = calendarCodePrefixFor(booking?.status, booking?.booking_type);
+  return `${prefix}${booking?.id ?? ""}`;
 };
 
 const isOfflineBookingType = (bookingType) =>
@@ -1577,7 +1607,7 @@ export const createCalendarEntry = async (req, res) => {
         parseOptionalUuid(req.body.team_member_id),
         normalizedStatus,
         req.body.title || (normalizedStatus === "blocked" ? "Blocked time" : "Offline booking"),
-        req.body.unique_code || makeCalendarCode(codePrefix),
+        await ensureUniqueBookingCode(req.body.unique_code, codePrefix),
         req.body.start_time ?? null,
         req.body.end_time ?? null,
         req.body.start_date ?? null,
@@ -1602,6 +1632,10 @@ export const createCalendarEntry = async (req, res) => {
       } catch {
         // Client list mirror is best-effort; calendar entry still succeeds.
       }
+    } else if (entry && normalizedStatus !== "blocked") {
+      void notifyNonMollureCalendarClient(entry, { kind: "created" }).catch((error) => {
+        console.error("[booking-email] calendar create notify failed:", error.message || error);
+      });
     }
 
     // Offline / confirmed calendar bookings: register Activity with real timestamps.
@@ -1754,7 +1788,7 @@ export const getCalendarOverview = async (req, res) => {
             booking_date: bookingDate,
             booking_type:
               booking.booking_type || (normalizeBookingStatus(booking.status, "confirmed") === "requested" ? "request" : "online"),
-            unique_code: booking.unique_code || `123${booking.id}`,
+            unique_code: fallbackUniqueCode(booking),
             date: bookingDate,
             start: toTimeLabel(booking.start_time),
             end: toTimeLabel(booking.end_time),
@@ -1845,29 +1879,6 @@ export const upsertCalendarSettings = async (req, res) => {
       },
     });
   }
-};
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
-
-/** Pull client email from calendar notes meta or an email-shaped client_name. */
-const extractCalendarClientEmail = (clientName, notes) => {
-  const fromName = String(clientName ?? "").trim();
-  if (EMAIL_RE.test(fromName)) return fromName.toLowerCase();
-
-  const raw = String(notes ?? "");
-  const metaPart = raw.includes("---mollure-meta---")
-    ? raw.split("---mollure-meta---").slice(1).join("---mollure-meta---").trim()
-    : "";
-  if (metaPart) {
-    try {
-      const meta = JSON.parse(metaPart);
-      const fromMeta = String(meta?.clientEmail ?? "").trim();
-      if (EMAIL_RE.test(fromMeta)) return fromMeta.toLowerCase();
-    } catch {
-      // ignore malformed meta
-    }
-  }
-  return null;
 };
 
 /**
@@ -2198,7 +2209,7 @@ const mapBookingListRow = (booking) => {
     booking_type:
       booking.booking_type ||
       (normalizeBookingStatus(booking.status, "confirmed") === "requested" ? "request" : "online"),
-    unique_code: booking.unique_code || `123${booking.id}`,
+    unique_code: fallbackUniqueCode(booking),
   };
 };
 
@@ -2420,7 +2431,8 @@ export const createBooking = async (req, res) => {
     if (bookingType === "project" && req.user.user_type === "individual") {
       bookingType = req.body.location_type === "desired" ? "request" : "online";
     }
-    const generatedCodePrefix = bookingType === "offline" ? "OF123" : "123";
+    const generatedCodePrefix =
+      bookingType === "offline" ? BOOKING_CODE_PREFIX.offline : BOOKING_CODE_PREFIX.online;
     const uniqueCode = await ensureUniqueBookingCode(req.body.unique_code, generatedCodePrefix);
 
     let notes = req.body.notes ?? null;
@@ -2632,6 +2644,14 @@ export const updateCalendarEntryStatus = async (req, res) => {
       },
     );
 
+    void notifyNonMollureCalendarClient(entry, {
+      kind: "status",
+      previousStatus: previousEntry.status,
+      previousEntry,
+    }).catch((error) => {
+      console.error("[booking-email] calendar status notify failed:", error.message || error);
+    });
+
     emitBusinessChangedForProfile(professionalProfile.id, {
       action: "updated",
       scope: "calendar",
@@ -2763,6 +2783,13 @@ export const updateCalendarEntry = async (req, res) => {
       } catch {
         // best-effort mirror upsert
       }
+    } else if (entry) {
+      void notifyNonMollureCalendarClient(entry, {
+        kind: "updated",
+        previousEntry: existing,
+      }).catch((error) => {
+        console.error("[booking-email] calendar update notify failed:", error.message || error);
+      });
     }
 
     emitBusinessChangedForProfile(professionalProfile.id, {
@@ -2974,27 +3001,14 @@ export const updateMyBooking = async (req, res) => {
         req.body.total_price !== "" &&
         Number(req.body.total_price) !== Number(existing.total_price));
 
+    // Confirmed bookings can be edited directly — no ER grant required.
     let nextEditRequest = existing.edit_request ?? null;
     if (
       scheduleOrTotalChanged &&
       existing.status === "confirmed" &&
       nextStatus === "confirmed"
     ) {
-      if (isEditRequestPending(existing.edit_request)) {
-        return res.status(409).json({
-          success: false,
-          message: "Cannot change booking while an edit request is pending.",
-          data: null,
-        });
-      }
-      if (!isEditGrantActiveFor(existing.edit_request, "client")) {
-        return res.status(403).json({
-          success: false,
-          message: "An accepted edit request is required before changing this booking.",
-          data: null,
-        });
-      }
-      nextEditRequest = consumeEditGrant(existing.edit_request, "client").value;
+      nextEditRequest = null;
     }
 
     const result = await query(
@@ -3205,27 +3219,14 @@ export const updateBookingStatus = async (req, res) => {
         req.body.total_price !== "" &&
         Number(req.body.total_price) !== Number(existingBooking.total_price));
 
+    // Confirmed bookings can be edited directly — no ER grant required.
     let nextEditRequest = existingBooking.edit_request ?? null;
     if (
       scheduleOrTotalChanged &&
       previousStatus === "confirmed" &&
       status === "confirmed"
     ) {
-      if (isEditRequestPending(existingBooking.edit_request)) {
-        return res.status(409).json({
-          success: false,
-          message: "Cannot change booking while an edit request is pending.",
-          data: null,
-        });
-      }
-      if (!isEditGrantActiveFor(existingBooking.edit_request, "professional")) {
-        return res.status(403).json({
-          success: false,
-          message: "An accepted edit request is required before changing this booking.",
-          data: null,
-        });
-      }
-      nextEditRequest = consumeEditGrant(existingBooking.edit_request, "professional").value;
+      nextEditRequest = null;
     }
 
     const result = await query(

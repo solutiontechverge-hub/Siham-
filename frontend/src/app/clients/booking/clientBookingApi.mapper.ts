@@ -6,6 +6,7 @@ import { parseCalendarEntryNotes, parseStoredEbrFromNotes, resolveKilometerAllow
 import { summarizeClientBookingPrice } from "../../../components/common/calendar/bookingTotal";
 import { buildResponseDeadline } from "../../../components/common/calendar/bookingResponseDeadline";
 import { syncEditRequestFromBookingApi } from "../../../components/common/client-booking/syncEditRequestFromApi";
+import { mergeBookingTeamMembers } from "../../../components/common/client-booking/buildBookingSummarySections";
 import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
 import { inferProjectUploadKind, isProjectUploadImage } from "../../../lib/projectUploadMedia";
 import type { BusinessSetupListing, CalendarBooking, CreateBookingRequest } from "../../../store/services/businessApi";
@@ -419,6 +420,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
             durationMins: service.durationMins,
             price: service.price,
             teamMemberId: service.staffResourceId ?? null,
+            teamMemberName: service.teamMemberName || undefined,
             guestId: null as string | null,
             startTime: service.startTime,
             endTime: service.endTime,
@@ -592,6 +594,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
       ...withClientDiscountFields(service),
       guestId: guest.id,
       teamMemberId: service.staffResourceId ?? service.teamMemberId ?? null,
+      teamMemberName: service.teamMemberName ?? null,
     })),
   );
 
@@ -606,6 +609,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
         ...withClientDiscountFields(service),
         guestId: resolveGuestId(service.id, service.name, service.guestId ?? null),
         teamMemberId: service.staffResourceId ?? booking.team_member_id,
+        teamMemberName: service.teamMemberName ?? null,
       }));
     }
 
@@ -617,6 +621,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
       price: number;
       guestId?: string | null;
       teamMemberId?: string | null;
+      teamMemberName?: string | null;
       originalPrice?: number;
       discountPct?: number;
       discountType?: "fixed" | "percentage";
@@ -635,6 +640,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
         ...withClientDiscountFields(row),
         guestId,
         teamMemberId: row.teamMemberId ?? booking.team_member_id,
+        teamMemberName: row.teamMemberName ?? null,
       });
     };
 
@@ -647,6 +653,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
           price: service.price,
           guestId: resolveGuestId(service.id, service.name, service.guestId ?? null),
           teamMemberId: service.staffResourceId ?? service.teamMemberId ?? null,
+          teamMemberName: service.teamMemberName ?? null,
           originalPrice: service.originalPrice,
           discount: service.discount,
           discountPct: service.discountPct,
@@ -672,6 +679,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
             price: service.price,
             guestId,
             teamMemberId: service.teamMemberId ?? null,
+            teamMemberName: service.teamMemberName ?? null,
             originalPrice: service.originalPrice,
             discount: service.discount,
             discountPct: service.discountPct,
@@ -690,6 +698,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
           price: service.price,
           guestId: service.guestId ?? null,
           teamMemberId: service.teamMemberId ?? null,
+          teamMemberName: service.teamMemberName ?? null,
           originalPrice: service.originalPrice,
           discount: service.discount,
           discountPct: service.discountPct,
@@ -709,6 +718,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
       price: priceEach,
       guestId: null as string | null,
       teamMemberId: booking.team_member_id,
+      teamMemberName: booking.team_member_name || null,
     }));
   })();
 
@@ -786,6 +796,31 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
       ? draftPrice.breakdown.bookingTotal
       : Number(booking.total_price) || 0;
 
+  const draftTeamMembers = mergeBookingTeamMembers(
+    clientSnapshot?.teamMembers,
+    booking.team_member_id
+      ? [
+          {
+            id: booking.team_member_id,
+            name: booking.team_member_name || "Team member",
+          },
+        ]
+      : [],
+    draftServices.map((service) => ({
+      id: service.teamMemberId,
+      name: service.teamMemberName,
+    })),
+  );
+  const teamNameById = new Map(
+    draftTeamMembers.map((member) => [member.id, member.name]),
+  );
+  const servicesWithTeamNames = draftServices.map((service) => {
+    const id = String(service.teamMemberId ?? "").trim();
+    const name =
+      service.teamMemberName?.trim() || (id ? teamNameById.get(id) : undefined);
+    return name ? { ...service, teamMemberName: name } : service;
+  });
+
   return {
     id: booking.id,
     apiBookingId: booking.id,
@@ -817,13 +852,9 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
         planningDuration: p.planningDuration,
         planningIsLocked: p.planningIsLocked,
       })),
-      services: draftServices,
+      services: servicesWithTeamNames,
       products: draftProducts,
-      teamMembers: clientSnapshot?.teamMembers?.length
-        ? clientSnapshot.teamMembers
-        : booking.team_member_id
-          ? [{ id: booking.team_member_id, name: booking.team_member_name || "Team member" }]
-          : undefined,
+      teamMembers: draftTeamMembers.length ? draftTeamMembers : undefined,
       projectDetails:
         projectDescription || projectUploads.length
           ? {

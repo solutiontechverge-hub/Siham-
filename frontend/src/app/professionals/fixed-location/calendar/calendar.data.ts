@@ -32,6 +32,7 @@ export type CalendarBookingServiceItem = {
   staffResourceId?: string;
   guestId?: string | null;
   teamMemberId?: string | null;
+  teamMemberName?: string | null;
   priceType?: "fixed" | "starting_from";
   discount?: CalendarLineDiscount | null;
   originalPrice?: number;
@@ -100,6 +101,7 @@ export type CalendarBookingClientSnapshot = {
     endTime?: string;
     guestId?: string | null;
     teamMemberId?: string | null;
+    teamMemberName?: string | null;
     originalPrice?: number;
     discountPct?: number;
     discount?: CalendarLineDiscount | null;
@@ -205,6 +207,11 @@ export type CalendarBookingDetails = {
   hiddenForCustomer?: boolean;
   /** Company client (CC) vs individual — used for professional-end CC tag. */
   clientKind?: "individual" | "company";
+  /**
+   * Walk-in guest booking: name/phone live on the calendar entry only.
+   * Never upsert a professional_clients row for this person.
+   */
+  isGuest?: boolean;
   addedServiceIds?: string[];
   cancelledServiceIds?: string[];
   /** Guest name / contact-only change — tag Updated, do not start ER. */
@@ -266,6 +273,26 @@ export type CalendarEvent = {
   /** First names of team members this booking is shared with. */
   sharedTeamMemberNames?: string[];
 };
+
+/** In-app chat is only available for linked Mollure clients. */
+export function calendarEventCanChat(
+  event?: Pick<CalendarEvent, "details"> | null,
+): boolean {
+  return Boolean(String(event?.details?.customerId ?? "").trim());
+}
+
+/** Guest-only walk-in: no Client List record, even when an optional email is stored. */
+export function calendarEventIsGuest(
+  event?: Pick<CalendarEvent, "bookingType" | "details"> | null,
+): boolean {
+  if (!event) return false;
+  if (event.details?.isGuest) return true;
+  if (String(event.details?.customerId ?? "").trim()) return false;
+  return (
+    event.bookingType === "Offline" &&
+    !String(event.details?.clientEmail ?? "").trim()
+  );
+}
 
 export type CalendarBlock = {
   id: string;

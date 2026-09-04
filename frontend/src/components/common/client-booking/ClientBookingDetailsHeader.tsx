@@ -32,7 +32,6 @@ import { useLazyGetBookingReviewInviteQuery } from "../../../store/services/revi
 import BookingRequestStatusRow, {
   type BookingRequestRowMode,
 } from "./BookingRequestStatusRow";
-import EditRequestNoteDialog from "./EditRequestNoteDialog";
 import { useBookingEditRequest } from "./useBookingEditRequest";
 import { useRouter } from "next/navigation";
 
@@ -58,19 +57,7 @@ type Props = {
   onSendBookingRequest?: () => void | Promise<void>;
   onDeleteBooking?: () => void;
   onDiscardBookingRequest?: () => void;
-  onDispatchBookingNotification?: (
-    event:
-      | "edit_request_outgoing"
-      | "booking_date_changed"
-      | "time_changed"
-      | "service_edited"
-      | "unique_item_edited",
-  ) => void | Promise<void>;
   onOpenActivity?: () => void;
-  /** Persist Confirmed ER note to API (client → professional). */
-  onSendConfirmedEditRequest?: (note: string) => void | Promise<void>;
-  /** Backend edit_request grant (source of truth after professional Accept). */
-  apiEditGrantActive?: boolean;
   /** Show Updated next to Confirmed after post-accept edits. */
   showUpdated?: boolean;
   updatedSignpostTitle?: string;
@@ -105,10 +92,7 @@ export default function ClientBookingDetailsHeader({
   onSendBookingRequest,
   onDeleteBooking,
   onDiscardBookingRequest,
-  onDispatchBookingNotification,
   onOpenActivity,
-  onSendConfirmedEditRequest,
-  apiEditGrantActive = false,
   showUpdated = false,
   updatedSignpostTitle,
   onUpdatedClick,
@@ -152,38 +136,6 @@ export default function ClientBookingDetailsHeader({
       sx={{ fontSize: 24, color: alpha(m.navy, 0.42) }}
     />
   );
-
-  const handleSendEditRequest = () => {
-    setEditAnchor(null);
-    if (bookingStatus === "confirmed" && !editRequest.isEditGrantActive) {
-      setErNoteOpen(true);
-      return;
-    }
-    void onDispatchBookingNotification?.("edit_request_outgoing");
-    showSnackbar({
-      severity: "info",
-      message: "Use Request to edit on a confirmed booking.",
-    });
-  };
-
-  const handleConfirmErNote = (note: string) => {
-    void (async () => {
-      try {
-        await onSendConfirmedEditRequest?.(note);
-        editRequest.refresh();
-        showSnackbar({
-          severity: "success",
-          message:
-            "Edit request sent to the professional. You can edit after they approve.",
-        });
-      } catch (error) {
-        showSnackbar({
-          severity: "error",
-          message: getApiErrorMessage(error, "Unable to send edit request."),
-        });
-      }
-    })();
-  };
 
   const handleSendBookingRequestFromEdit = () => {
     setEditAnchor(null);
@@ -236,12 +188,10 @@ export default function ClientBookingDetailsHeader({
     !bookingRequestSent &&
     (isConfirmed || waitingForPayment);
   const editActionsDisabled = !showEdit;
-  /** Confirmed edits require an accepted ER grant — no direct FL/DL edit. */
+  /** Confirmed bookings can be edited directly (no ER grant). */
   const showConfirmedEditMenu =
     isConfirmed &&
-    (editRequest.isEditGrantActive || apiEditGrantActive) &&
     Boolean(onEditDateTime || onEditBookingDetails || onEditProject);
-  const [erNoteOpen, setErNoteOpen] = React.useState(false);
 
   const handleWriteReview = async () => {
     if (!apiBookingId) {
@@ -541,34 +491,12 @@ export default function ClientBookingDetailsHeader({
               ? "Booking request received — respond with Accept, Reject, or Suggest Changes"
               : "Booking request sent — awaiting professional approval"}
           </MenuItem>
-        ) : editRequest.isPending ? (
-          <MenuItem
-            disabled
-            sx={{ ...menuItemSx, whiteSpace: "normal", opacity: 1 }}
-          >
-            {editRequest.initiatedBy === "professional"
-              ? "Edit request received — respond with Accept, Reject, or Suggest Change"
-              : "Edit request sent — awaiting approval"}
-          </MenuItem>
-        ) : isConfirmed ? (
-          <MenuItem onClick={handleSendEditRequest} sx={menuItemSx}>
-            Request to edit booking
-          </MenuItem>
         ) : onSendBookingRequest ? (
           <MenuItem onClick={handleSendBookingRequestFromEdit} sx={menuItemSx}>
             Send booking request to professional
           </MenuItem>
-        ) : (
-          <MenuItem onClick={handleSendEditRequest} sx={menuItemSx}>
-            Send edit request to professional
-          </MenuItem>
-        )}
+        ) : null}
       </Menu>
-      <EditRequestNoteDialog
-        open={erNoteOpen}
-        onClose={() => setErNoteOpen(false)}
-        onConfirm={handleConfirmErNote}
-      />
     </>
   );
 }
