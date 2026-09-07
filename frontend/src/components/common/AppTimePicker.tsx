@@ -10,6 +10,7 @@ import {
   FormHelperText,
   Stack,
   ThemeProvider,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import {
@@ -33,6 +34,8 @@ export type AppTimePickerProps = {
   minuteStep?: number;
   /** When set, only these `HH:MM` times can be selected. */
   allowedTimes?: readonly string[];
+  /** Shown when hovering a disabled (unavailable) clock hour. */
+  unavailableTooltip?: string;
   error?: boolean;
   helperText?: React.ReactNode;
   sx?: SxProps<Theme>;
@@ -53,6 +56,8 @@ export type AppTimePanelProps = {
   disabled?: boolean;
   /** Analog MUI clock face. Defaults to the analog clock. */
   variant?: "wheel" | "clock";
+  /** Shown when hovering a disabled (unavailable) clock hour. */
+  unavailableTooltip?: string;
 };
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, index) => index);
@@ -66,10 +71,27 @@ function buildMinuteOptions(step = 1): number[] {
   return values;
 }
 
+function parseClockParts(
+  value: string,
+): { hour: number; minute: number } | null {
+  const match = value
+    .trim()
+    .match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(am|pm)?$/i);
+  if (!match) return null;
+  let hour = Number.parseInt(match[1], 10);
+  const minute = Number.parseInt(match[2], 10);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  const mer = match[3]?.toLowerCase();
+  if (mer === "pm" && hour < 12) hour += 12;
+  if (mer === "am" && hour === 12) hour = 0;
+  if (hour > 23 || minute > 59) return null;
+  return { hour, minute };
+}
+
 export function formatTimeDisplay(value: string): string {
-  if (!value || !/^\d{2}:\d{2}$/.test(value)) return "";
-  const [hours, minutes] = value.split(":").map(Number);
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  const parsed = parseClockParts(value);
+  if (!parsed) return "";
+  return `${String(parsed.hour).padStart(2, "0")}:${String(parsed.minute).padStart(2, "0")}`;
 }
 
 function usePickerAccentTheme() {
@@ -90,11 +112,43 @@ function usePickerAccentTheme() {
   );
 }
 
+function isDisabledClockNumber(node: Element) {
+  return (
+    node.classList.contains("Mui-disabled") ||
+    node.getAttribute("aria-disabled") === "true"
+  );
+}
+
+/** MUI clock numbers sit under a pointer mask and disabled ones ignore hover. */
+function isPointerOverUnavailableClockNumber(
+  root: Element,
+  clientX: number,
+  clientY: number,
+) {
+  const numbers = root.querySelectorAll(".MuiClockNumber-root");
+  for (let i = 0; i < numbers.length; i += 1) {
+    const node = numbers[i];
+    if (!isDisabledClockNumber(node)) continue;
+    const rect = node.getBoundingClientRect();
+    const pad = 6;
+    if (
+      clientX >= rect.left - pad &&
+      clientX <= rect.right + pad &&
+      clientY >= rect.top - pad &&
+      clientY <= rect.bottom + pad
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function AnalogClockPanel({
   value,
   onChange,
   minuteStep = 1,
   allowedTimes,
+  unavailableTooltip,
   disabled = false,
   showActions = false,
   onAccept,
@@ -104,12 +158,14 @@ function AnalogClockPanel({
   onChange: (value: string) => void;
   minuteStep?: number;
   allowedTimes?: readonly string[];
+  unavailableTooltip?: string;
   disabled?: boolean;
   showActions?: boolean;
   onAccept?: (value: string) => void;
   onClose?: () => void;
 }) {
   const pickerTheme = usePickerAccentTheme();
+  const clockRootRef = React.useRef<HTMLDivElement | null>(null);
   const allowedSet = React.useMemo(
     () => (allowedTimes?.length ? new Set(allowedTimes) : null),
     [allowedTimes],
@@ -119,6 +175,7 @@ function AnalogClockPanel({
     dayjs().hour(9).minute(0).second(0).millisecond(0);
   const currentHhmm = parsed.format("HH:mm");
   const currentHour = parsed.format("HH");
+  const [hoverUnavailable, setHoverUnavailable] = React.useState(false);
 
   const shouldDisableTime = (
     time: Dayjs,
@@ -140,13 +197,54 @@ function AnalogClockPanel({
 
   const commit = (next: Dayjs | null) => {
     if (!next?.isValid()) return;
-    const hhmm = next.format("HH:mm");
-    if (allowedSet && !allowedSet.has(hhmm) && hhmm !== currentHhmm) return;
-    onChange(hhmm);
+    let hhmm = next.format("HH:mm");
+    if (allowedSet && !allowedSet.has(hhmm)) {
+      const snapped = nearestAllowedTime(hhmm, allowedSet);
+      if (!snapped) return;
+      hhmm = snapped;
+    }
+    if (hhmm !== currentHhmm) onChange(hhmm);
+  };
+
+  const handleClockPointer = (event: React.MouseEvent) => {
+    if (!unavailableTooltip || !allowedSet) {
+      if (hoverUnavailable) setHoverUnavailable(false);
+      return;
+    }
+    const root = clockRootRef.current;
+    const next = root
+      ? isPointerOverUnavailableClockNumber(
+          root,
+          event.clientX,
+          event.clientY,
+        )
+      : false;
+    if (next !== hoverUnavailable) setHoverUnavailable(next);
   };
 
   return (
     <ThemeProvider theme={pickerTheme}>
+      <Tooltip
+        title={unavailableTooltip ?? ""}
+        open={Boolean(unavailableTooltip && hoverUnavailable)}
+        followCursor
+        arrow
+        placement="top"
+        disableInteractive
+        slotProps={{
+          popper: {
+            sx: { zIndex: 20000, pointerEvents: "none" },
+          },
+          tooltip: {
+            sx: { maxWidth: 280, fontSize: 12, fontWeight: 700 },
+          },
+        }}
+      >
+        <Box
+          ref={clockRootRef}
+          onMouseMove={handleClockPointer}
+          onMouseLeave={() => setHoverUnavailable(false)}
+        >
       <StaticTimePicker
         ampm={false}
         minutesStep={minuteStep}
@@ -154,9 +252,11 @@ function AnalogClockPanel({
         onChange={commit}
         onAccept={(next) => {
           if (!next?.isValid()) return;
-          const hhmm = next.format("HH:mm");
-          if (allowedSet && !allowedSet.has(hhmm) && hhmm !== currentHhmm) {
-            return;
+          let hhmm = next.format("HH:mm");
+          if (allowedSet && !allowedSet.has(hhmm)) {
+            const snapped = nearestAllowedTime(hhmm, allowedSet);
+            if (!snapped) return;
+            hhmm = snapped;
           }
           onAccept?.(hhmm);
         }}
@@ -206,34 +306,39 @@ function AnalogClockPanel({
               "& .MuiTimeClock-root": {
                 mx: "auto",
               },
+              "& .MuiClock-squareMask": {
+                cursor: "pointer",
+              },
+              "& .MuiClockNumber-root": {
+                zIndex: 2,
+              },
+              "& .MuiClockNumber-root.Mui-disabled": {
+                pointerEvents: "auto",
+                cursor: "not-allowed",
+                color: alpha("#344A66", 0.28),
+              },
             },
           },
         }}
       />
+        </Box>
+      </Tooltip>
     </ThemeProvider>
   );
 }
 
 function toDayjsTime(value: string): Dayjs | null {
-  if (!value || !/^\d{2}:\d{2}$/.test(value)) return null;
-  const [hour, minute] = value.split(":").map(Number);
-  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  const parsed = parseClockParts(value);
+  if (!parsed) return null;
   return dayjs()
-    .hour(Math.min(23, Math.max(0, hour)))
-    .minute(Math.min(59, Math.max(0, minute)))
+    .hour(parsed.hour)
+    .minute(parsed.minute)
     .second(0)
     .millisecond(0);
 }
 
 function parseTimeValue(value: string) {
-  if (!value || !/^\d{2}:\d{2}$/.test(value)) {
-    return { hour: 9, minute: 0 };
-  }
-  const [hour, minute] = value.split(":").map(Number);
-  return {
-    hour: Number.isFinite(hour) ? Math.min(23, Math.max(0, hour)) : 9,
-    minute: Number.isFinite(minute) ? Math.min(59, Math.max(0, minute)) : 0,
-  };
+  return parseClockParts(value) ?? { hour: 9, minute: 0 };
 }
 
 function toTimeValue(hour: number, minute: number) {
@@ -252,6 +357,29 @@ function nearestHourOption(hour: number, options: readonly number[]) {
   return options.reduce((closest, current) =>
     Math.abs(current - hour) < Math.abs(closest - hour) ? current : closest,
   );
+}
+
+function minutesFromHhmm(hhmm: string) {
+  const { hour, minute } = parseTimeValue(hhmm);
+  return hour * 60 + minute;
+}
+
+function nearestAllowedTime(
+  hhmm: string,
+  allowed: ReadonlySet<string>,
+): string | null {
+  if (allowed.has(hhmm)) return hhmm;
+  const target = minutesFromHhmm(hhmm);
+  let best: string | null = null;
+  let bestDist = Infinity;
+  for (const candidate of allowed) {
+    const dist = Math.abs(minutesFromHhmm(candidate) - target);
+    if (dist < bestDist) {
+      best = candidate;
+      bestDist = dist;
+    }
+  }
+  return best;
 }
 
 function parseAllowedTimes(allowedTimes: readonly string[] | undefined) {
@@ -425,6 +553,7 @@ export function AppTimePanel({
   compact = false,
   minuteStep = 1,
   allowedTimes,
+  unavailableTooltip,
   hideHeader = false,
   disabled = false,
   variant = "clock",
@@ -452,6 +581,7 @@ export function AppTimePanel({
           onChange={onChange}
           minuteStep={minuteStep}
           allowedTimes={allowedTimes}
+          unavailableTooltip={unavailableTooltip}
           disabled={disabled}
           showActions={Boolean(onDone)}
           onAccept={() => onDone?.()}
@@ -583,6 +713,7 @@ export default function AppTimePicker({
   fullWidth = true,
   minuteStep = 1,
   allowedTimes,
+  unavailableTooltip,
   error = false,
   helperText,
   sx,
@@ -704,6 +835,7 @@ export default function AppTimePicker({
             onDone={() => acceptPicker(draftRef.current)}
             minuteStep={minuteStep}
             allowedTimes={allowedTimes}
+            unavailableTooltip={unavailableTooltip}
             disabled={disabled}
           />
         ) : (
@@ -712,6 +844,7 @@ export default function AppTimePicker({
             onChange={setDraft}
             minuteStep={minuteStep}
             allowedTimes={allowedTimes}
+            unavailableTooltip={unavailableTooltip}
             disabled={disabled}
             showActions
             onAccept={acceptPicker}

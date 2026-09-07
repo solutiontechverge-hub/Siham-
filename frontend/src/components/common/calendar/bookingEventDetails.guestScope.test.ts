@@ -126,4 +126,34 @@ assert.deepEqual(
   ["Guest product"],
 );
 
+const planningEvent: CalendarEvent = {
+  ...event,
+  details: {
+    ...event.details,
+    guests: event.details?.guests,
+    clientSnapshot: {
+      people: [
+        ...(event.details?.clientSnapshot?.people ?? []),
+        {
+          id: "p-planning",
+          name: "Planning",
+          isRequester: false,
+          participantType: "planning",
+          planningActivity: "Prep",
+          planningDuration: "30 mins",
+          planningStartTime: "10:00 AM",
+          planningEndTime: "10:30 AM",
+        },
+      ],
+    },
+  },
+};
+
+const planningHydration = hydrateBookingDrawerFromEvent(planningEvent);
+assert.equal(planningHydration.guests.length, 2);
+assert.equal(
+  planningHydration.guests.some((guest) => guest.participantType === "planning"),
+  true,
+);
+
 console.log("bookingEventDetails.guestScope.test.ts: all assertions passed");

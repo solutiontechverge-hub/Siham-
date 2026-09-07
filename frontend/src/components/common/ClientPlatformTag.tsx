@@ -6,7 +6,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 
 type ClientKind = "individual" | "company";
 
-export type ClientPlatformTagState = "guest" | "mollure" | "business" | null;
+export type ClientPlatformTagState = "guest" | "mollure" | "ic" | "cc" | null;
 
 export type ClientPlatformTagInput = {
   isMollure?: boolean;
@@ -15,19 +15,19 @@ export type ClientPlatformTagInput = {
 };
 
 /**
- * Three-state client tag, derived at render time:
- * 1. Mollure platform → logo icon
- * 2. Business (company, not platform) → "BC"
- * 3. Individual offline → no tag
- *
- * Guest is a booking-only overlay, not a client-list type.
+ * Client tags:
+ * - Guest overlay → "Guest"
+ * - Individual → "IC"
+ * - Company → "CC"
+ * - Mollure logo only when there is no IC/CC type tag
  */
 export function resolveClientPlatformTag(
   input: ClientPlatformTagInput,
 ): ClientPlatformTagState {
   if (input.isGuest) return "guest";
+  if (input.clientKind === "company") return "cc";
+  if (input.clientKind === "individual") return "ic";
   if (input.isMollure) return "mollure";
-  if (input.clientKind === "company") return "business";
   return null;
 }
 
@@ -104,16 +104,18 @@ function TagPill({
         alignItems: "center",
         justifyContent: "center",
         flexShrink: 0,
-        height: 18,
-        minWidth: 22,
-        px: 0.65,
+        height: 20,
+        minWidth: 28,
+        px: 0.85,
         borderRadius: "999px",
         bgcolor: bg,
         color,
         border: `1px solid ${border}`,
-        fontSize: 9.5,
-        fontWeight: 900,
+        fontSize: 11,
+        fontWeight: 800,
+        letterSpacing: "0.04em",
         lineHeight: 1,
+        whiteSpace: "nowrap",
       }}
     >
       {label}
@@ -126,20 +128,30 @@ export default function ClientPlatformTag({
   isGuest,
   clientKind,
 }: ClientPlatformTagInput) {
-  const state = resolveClientPlatformTag({ isMollure, isGuest, clientKind });
-
-  if (!state) return null;
-
-  const mark =
-    state === "mollure" ? (
-      <MollureLogoMark size={16} />
-    ) : state === "business" ? (
-      <Box component="span" aria-label="Business Client">
-        <TagPill label="BC" tone="teal" />
+  if (isGuest) {
+    return (
+      <Box
+        component="span"
+        sx={{
+          display: "inline-flex",
+          alignItems: "center",
+          flexShrink: 0,
+          lineHeight: 0,
+        }}
+      >
+        <TagPill label="Guest" />
       </Box>
-    ) : (
-      <TagPill label="Guest" />
     );
+  }
+
+  const typeLabel =
+    clientKind === "company"
+      ? "CC"
+      : clientKind === "individual"
+        ? "IC"
+        : null;
+
+  if (!isMollure && !typeLabel) return null;
 
   return (
     <Box
@@ -147,11 +159,22 @@ export default function ClientPlatformTag({
       sx={{
         display: "inline-flex",
         alignItems: "center",
+        gap: 0.5,
         flexShrink: 0,
         lineHeight: 0,
       }}
     >
-      {mark}
+      {typeLabel ? null : isMollure ? <MollureLogoMark size={16} /> : null}
+      {typeLabel ? (
+        <Box
+          component="span"
+          aria-label={
+            typeLabel === "CC" ? "Company Client" : "Individual Client"
+          }
+        >
+          <TagPill label={typeLabel} tone="teal" />
+        </Box>
+      ) : null}
     </Box>
   );
 }

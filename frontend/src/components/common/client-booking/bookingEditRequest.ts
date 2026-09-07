@@ -28,6 +28,7 @@ export type BookingEditSuggestedProduct = {
   originalPrice?: number;
   discountType?: "fixed" | "percentage";
   discountAmount?: number;
+  guestId?: string | null;
 };
 
 export type BookingEditSuggestionPayload = {

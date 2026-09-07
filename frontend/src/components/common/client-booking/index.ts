@@ -9,7 +9,7 @@ export { default as StripePrepaymentDialog } from "./StripePrepaymentDialog";
 export { default as ClientBookingPoliciesAccordion } from "./ClientBookingPoliciesAccordion";
 export { default as ClientBookingCancelFeeDialog } from "./ClientBookingCancelFeeDialog";
 export { settleCancellationFee, isLateCancellation } from "./settleCancellationFee";
-export { buildBookingSummarySections, resolveTeamMemberFirstName } from "./buildBookingSummarySections";
+export { buildBookingSummarySections, bookingParticipantDisplayHeading, resolveTeamMemberFirstName } from "./buildBookingSummarySections";
 export { parsePrepaymentPercent } from "./parsePrepaymentPercent";
 export { useClientBookingDraft } from "./useClientBookingDraft";
 export { useClientRequesterProfile } from "./useClientRequesterProfile";

@@ -79,7 +79,9 @@ function isPlanningPerson(person: ChronologicalPerson) {
 }
 
 function isBufferPerson(person: ChronologicalPerson) {
-  return person.participantType === "buffer";
+  if (person.participantType === "buffer") return true;
+  const id = String(person.id ?? "").toLowerCase();
+  return id === "buffer" || id.startsWith("buffer-") || id.startsWith("p-buffer");
 }
 
 function resolveParticipantType(
@@ -126,7 +128,7 @@ function resolvePlanningWindow(person: ChronologicalPerson, fallbackStart?: stri
   const endTime =
     person.planningEndTime?.trim() ||
     person.bufferEndTime?.trim() ||
-    (durationMins > 0 ? addMinutesToTime(startTime, durationMins) : "");
+    addMinutesToTime(startTime, durationMins > 0 ? durationMins : 60);
   if (!endTime) return null;
   return { startTime, endTime };
 }
@@ -224,7 +226,9 @@ function groupTimedEntriesIntoBlocks<T extends ChronologicalServiceLine>(
         : {}),
       teamMemberLabel: entry.service
         ? teamMemberChipLabelForItems([entry.service], teamMemberNameById)
-        : undefined,
+        : entry.teamMemberId
+          ? teamMemberNameById.get(entry.teamMemberId)?.split(/\s+/)[0]
+          : undefined,
       teamMemberId: entry.service
         ? resolveLineTeamMemberId(entry.service)
         : entry.teamMemberId,
@@ -353,15 +357,26 @@ export type BuildClientDraftChronologicalBlocksInput = {
   people: readonly ChronologicalPerson[];
   services: readonly ClientBookingDraftService[];
   teamMembers?: ReadonlyArray<{ id: string; name: string }>;
+  productGuestIds?: ReadonlySet<string>;
 };
 
 /** Client booking drafts often lack explicit times — infer sequentially in people order. */
 export function buildClientDraftChronologicalBlocks(
   input: BuildClientDraftChronologicalBlocksInput,
 ): ChronologicalBlock<ClientBookingDraftService>[] {
-  const { bookingStart, combineServices = false, people, services, teamMembers = [] } =
-    input;
-  if (!services.length && !people.some((p) => isPlanningPerson(p) || isBufferPerson(p))) {
+  const {
+    bookingStart,
+    combineServices = false,
+    people,
+    services,
+    teamMembers = [],
+    productGuestIds = new Set<string>(),
+  } = input;
+  if (
+    !services.length &&
+    !people.some((p) => isPlanningPerson(p) || isBufferPerson(p)) &&
+    productGuestIds.size === 0
+  ) {
     return [];
   }
 
@@ -371,6 +386,25 @@ export function buildClientDraftChronologicalBlocks(
       name: "Client",
       isRequester: true,
     };
+
+  const peopleList: ChronologicalPerson[] = [...people];
+  const knownIds = new Set(peopleList.map((person) => person.id));
+  const addOrphanPerson = (id: string) => {
+    if (!id || id === "unassigned" || knownIds.has(id) || id === requesterPerson.id) {
+      return;
+    }
+    knownIds.add(id);
+    peopleList.push({ id, name: "Guest", participantType: "guest" });
+  };
+  for (const service of services) {
+    addOrphanPerson(String(service.guestId ?? service.assignedTo ?? "").trim());
+  }
+  for (const guestId of productGuestIds) {
+    addOrphanPerson(String(guestId).trim());
+  }
+  if (!peopleList.some((person) => person.id === requesterPerson.id)) {
+    peopleList.unshift(requesterPerson);
+  }
 
   const serviceGroups = new Map<string, ClientBookingDraftService[]>();
   for (const service of services) {
@@ -390,15 +424,11 @@ export function buildClientDraftChronologicalBlocks(
   let cursor = bookingStart?.trim() || "08:00";
   const entries: ChronologicalTimedEntry<ClientBookingDraftService>[] = [];
 
-  for (const person of people) {
+  for (const person of peopleList) {
     if (person.participantType === "notes" || person.id === "p-notes") continue;
 
     const participantType = resolveParticipantType(person);
     if (participantType === "planning" || participantType === "buffer") {
-      const hasPlanningMeta = Boolean(
-        person.planningActivity?.trim() || person.planningDuration?.trim(),
-      );
-      if (!hasPlanningMeta && !person.planningIsLocked) continue;
       const window = resolvePlanningWindow(person, cursor);
       if (window) {
         entries.push({
@@ -418,7 +448,22 @@ export function buildClientDraftChronologicalBlocks(
     }
 
     const items = serviceGroups.get(person.id) ?? [];
-    if (!items.length) continue;
+    const hasProducts = productGuestIds.has(person.id);
+    if (!items.length && !hasProducts) continue;
+
+    if (!items.length && hasProducts) {
+      const startTime = cursor;
+      const endTime = addMinutesToTime(startTime, 15);
+      entries.push({
+        id: `${person.id}::products`,
+        participantId: person.id,
+        participantType,
+        startTime,
+        endTime,
+        kind: "service",
+      });
+      continue;
+    }
 
     if (combineServices && person.isRequester) {
       const totalDuration = items.reduce(
@@ -461,7 +506,7 @@ export function buildClientDraftChronologicalBlocks(
     }
   }
 
-  const peopleById = new Map(people.map((person) => [person.id, person]));
+  const peopleById = new Map(peopleList.map((person) => [person.id, person]));
   const teamMemberNameById = new Map(
     teamMembers.map((member) => [member.id, member.name]),
   );

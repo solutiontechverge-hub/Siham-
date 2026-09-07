@@ -12,6 +12,7 @@ import { ServiceSummaryMetaLine } from "../ServiceSummaryMetaLine";
 import BookingEditedTag from "../calendar/BookingEditedTag";
 import BookingPriceBreakdown from "../booking-finance/BookingPriceBreakdown";
 import {
+  lineDiscountAmountFromItems,
   partitionBookingProducts,
   summarizeClientBookingPrice,
 } from "../calendar/bookingTotal";
@@ -20,6 +21,10 @@ import type { BookingEditTagVariant } from "../calendar/bookingRequestNegotiatio
 import { resolveServiceChangeTag } from "../calendar/bookingRequestNegotiation";
 import {
   buildBookingSummarySections,
+  bookingParticipantDisplayHeading,
+  participantHeadingOrdinal,
+  participantOrdinals,
+  planningScheduleMeta,
   resolveTeamMemberFirstName,
 } from "./buildBookingSummarySections";
 import ProjectUploadThumb from "./ProjectUploadThumb";
@@ -189,6 +194,8 @@ type Props = {
   lateCancellationFeePercent?: number | string;
   showLateRescheduling?: boolean;
   lateRescheduleFeePercent?: number | string;
+  showNoShowFee?: boolean;
+  noShowFeePercent?: number | string;
   editedServiceIds?: readonly string[];
   addedServiceIds?: readonly string[];
   cancelledServiceIds?: readonly string[];
@@ -225,6 +232,8 @@ export default function ClientBookingPaymentDetailsCard({
   lateCancellationFeePercent,
   showLateRescheduling = false,
   lateRescheduleFeePercent,
+  showNoShowFee = false,
+  noShowFeePercent,
   editedServiceIds = [],
   addedServiceIds = [],
   cancelledServiceIds = [],
@@ -308,11 +317,14 @@ export default function ClientBookingPaymentDetailsCard({
     people: draft?.people,
     products: listedProducts,
     extrasAmount,
+    extrasLabel: "Kilometer Allowance",
     discount,
     showLateCancellation,
     lateCancellationFeePercent,
     showLateRescheduling,
     lateRescheduleFeePercent,
+    showNoShowFee,
+    noShowFeePercent,
     showPrepayment,
     prepaymentPercent,
     prepaymentPaid,
@@ -320,6 +332,10 @@ export default function ClientBookingPaymentDetailsCard({
   });
   const prepaidAmount = priceSummary.breakdown.prepaymentAmount;
   const remaining = priceSummary.breakdown.remainingAfterPrepayment;
+  const lineDiscountAmount = lineDiscountAmountFromItems({
+    services: draft?.services,
+    products: listedProducts,
+  });
   const catalogHeadingSx = {
     fontWeight: 800,
     fontSize: 12,
@@ -336,13 +352,15 @@ export default function ClientBookingPaymentDetailsCard({
             items: draft!.services,
             isRequester: true,
             participantType: "requester",
+            participantId: "requester",
           },
         ]
       : [];
 
   const attachCancelled = React.useCallback(
     (section: ClientBookingSummarySection): ClientBookingSummarySection => {
-      const participantId = section.key.split("::")[0] ?? section.key;
+      const participantId =
+        section.participantId || section.key.split("::")[0] || section.key;
       const extra = cancelledServices.filter((s) => {
         if (section.isRequester || section.participantType === "requester") {
           return !s.guestId || s.guestId === participantId;
@@ -587,12 +605,23 @@ export default function ClientBookingPaymentDetailsCard({
     const isRequester = Boolean(
       section.isRequester || section.participantType === "requester",
     );
+    const participantId =
+      section.participantId ||
+      String(section.key).split("::")[0] ||
+      section.key;
+    const isFirstBlockForPerson =
+      chronologicalSections.find((row) => {
+        const rowId =
+          row.participantId || String(row.key).split("::")[0] || row.key;
+        return rowId === participantId;
+      })?.key === section.key;
+    if (!isFirstBlockForPerson) return [];
     return items.filter((item) => {
       const assigned = String(
         (item as { guestId?: string | null }).guestId ?? "",
       ).trim();
       if (!assigned) return isRequester || section.key === requesterSectionKey;
-      return assigned === section.key;
+      return assigned === participantId || assigned === section.key;
     });
   };
 
@@ -645,7 +674,23 @@ export default function ClientBookingPaymentDetailsCard({
         </Typography>
       ) : null}
       <Stack spacing={1.5}>
-      {section.planningItem ? (
+      {(() => {
+        const meta = planningScheduleMeta(section);
+        const rawActivity = section.planningItem?.activity?.trim() || "";
+        const activity =
+          rawActivity &&
+          rawActivity.toLowerCase() !== "buffer" &&
+          rawActivity !== heading
+            ? rawActivity
+            : "";
+        const showSchedule =
+          Boolean(activity) ||
+          Boolean(meta.timeRange) ||
+          Boolean(meta.durationLabel) ||
+          section.participantType === "buffer" ||
+          section.participantType === "planning";
+        if (!showSchedule) return null;
+        return (
         <Box
           sx={{
             borderRadius: "10px",
@@ -655,7 +700,7 @@ export default function ClientBookingPaymentDetailsCard({
             bgcolor: "#fff",
           }}
         >
-          {section.planningItem.activity ? (
+          {activity ? (
             <Typography
               sx={{
                 fontSize: 13,
@@ -664,18 +709,19 @@ export default function ClientBookingPaymentDetailsCard({
                 mb: 0.35,
               }}
             >
-              {section.planningItem.activity}
+              {activity}
             </Typography>
           ) : null}
-          {section.planningItem.duration ? (
-            <Typography
-              sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.48) }}
-            >
-              {section.planningItem.duration}
-            </Typography>
+          {meta.timeRange || meta.durationLabel || section.teamMemberLabel ? (
+            <ServiceSummaryMetaLine
+              timeRange={meta.timeRange}
+              durationLabel={meta.durationLabel}
+              staffName={section.teamMemberLabel}
+            />
           ) : null}
         </Box>
-      ) : null}
+        );
+      })()}
       {services.length ? (
         <Box>
           <Typography sx={catalogHeadingSx}>Service</Typography>
@@ -827,7 +873,9 @@ export default function ClientBookingPaymentDetailsCard({
         ) : null}
 
         <Stack spacing={2}>
-          {chronologicalSections.map((section) => {
+          {(() => {
+            const ordinals = participantOrdinals(chronologicalSections);
+            return chronologicalSections.map((section) => {
             const isRequester = Boolean(
               section.isRequester || section.participantType === "requester",
             );
@@ -842,17 +890,13 @@ export default function ClientBookingPaymentDetailsCard({
               section.participantType === "guest" ||
               section.participantType === "model" ||
               (isRequester && requesterAppearanceIndex > 0);
-            const heading = isRequester
-              ? section.title
-              : section.participantType === "guest"
-                ? section.title.trim().toLowerCase().startsWith("guest")
-                  ? section.title
-                  : `Guest: ${section.title}`
-                : section.participantType === "planning"
-                  ? "Planning Details"
-                  : section.title;
+            const heading = bookingParticipantDisplayHeading(
+              section,
+              participantHeadingOrdinal(section, ordinals),
+            );
             return renderSectionBlock(section, heading, asPersonCard);
-          })}
+          });
+          })()}
 
           {chronologicalSections.length === 0 ? (
             <>
@@ -866,7 +910,7 @@ export default function ClientBookingPaymentDetailsCard({
           <BookingPriceBreakdown
             totalPrice={priceSummary.breakdown.bookingTotal}
             originalPrice={priceSummary.originalPrice}
-            lineDiscountAmount={0}
+            lineDiscountAmount={lineDiscountAmount}
             bookingDiscountAmount={priceSummary.breakdown.discountAmount}
             bookingTotalDiscount={discount}
             lateCancellationFeeAmount={
@@ -875,12 +919,24 @@ export default function ClientBookingPaymentDetailsCard({
             lateRescheduleFeeAmount={
               priceSummary.breakdown.lateRescheduleFeeAmount
             }
+            noShowFeeAmount={priceSummary.breakdown.noShowFeeAmount}
             prepaidPercent={
               prepaymentState === "none" ? 0 : prepaymentPercent
             }
             prepaidAmount={prepaymentState === "none" ? 0 : prepaidAmount}
             remainingAmount={
               prepaymentState === "none" ? undefined : remaining
+            }
+            extraRows={
+              extrasAmount > 0
+                ? [
+                    {
+                      id: "kilometer-allowance",
+                      label: "Kilometer Allowance",
+                      amount: extrasAmount,
+                    },
+                  ]
+                : []
             }
             variant="plain"
             prepaidAction={

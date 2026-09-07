@@ -30,8 +30,8 @@ export function isCompanyClient(client: ClientRecord): boolean {
   return client.kind === "company";
 }
 
-export function clientTypeLabel(client: ClientRecord): "IC" | "BC" {
-  return client.kind === "company" ? "BC" : "IC";
+export function clientTypeLabel(client: ClientRecord): "IC" | "CC" {
+  return client.kind === "company" ? "CC" : "IC";
 }
 
 export function platformLabel(client: ClientRecord): "Mollure" | "Non-Mollure" {

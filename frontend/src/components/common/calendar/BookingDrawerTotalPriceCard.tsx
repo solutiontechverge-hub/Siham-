@@ -1,6 +1,7 @@
 "use client";
 
 import BookingPriceBreakdown from "../booking-finance/BookingPriceBreakdown";
+import type { BookingPriceBreakdownRow } from "../booking-finance/bookingFinance.types";
 import type { ManualEntryDiscount } from "../../sections/finance/manualEntry.data";
 
 type BookingDrawerTotalPriceCardProps = {
@@ -18,6 +19,7 @@ type BookingDrawerTotalPriceCardProps = {
   prepaymentPercent?: number;
   prepaymentAmount?: number;
   remainingAmount?: number;
+  extraRows?: readonly BookingPriceBreakdownRow[];
 };
 
 export default function BookingDrawerTotalPriceCard({
@@ -34,6 +36,7 @@ export default function BookingDrawerTotalPriceCard({
   prepaymentPercent = 0,
   prepaymentAmount = 0,
   remainingAmount,
+  extraRows = [],
 }: BookingDrawerTotalPriceCardProps) {
   return (
     <BookingPriceBreakdown
@@ -49,6 +52,7 @@ export default function BookingDrawerTotalPriceCard({
       prepaidAmount={showPrepayment ? prepaymentAmount : 0}
       remainingAmount={showPrepayment ? remainingAmount : undefined}
       prepaymentPaid={prepaymentPaid}
+      extraRows={extraRows}
     />
   );
 }

@@ -2,8 +2,6 @@
 
 import * as React from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
-import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
-import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import RemoveRoundedIcon from "@mui/icons-material/RemoveRounded";
 import { Box, ButtonBase, Checkbox, IconButton, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -23,8 +21,6 @@ type BookingSelectProductsScreenProps = {
   onToggle: (product: BookingCatalogProduct) => void;
   onQuantityChange: (productId: string, delta: number) => void;
   onAddProduct?: () => void;
-  onEdit?: (product: BookingCatalogProduct) => void;
-  onDelete?: (product: BookingCatalogProduct) => void;
   disabled?: boolean;
   heading?: string;
   searchPlaceholder?: string;
@@ -37,16 +33,12 @@ function ProductRow({
   disabled,
   onToggle,
   onQuantityChange,
-  onEdit,
-  onDelete,
 }: {
   product: BookingCatalogProduct;
   draft: BookingProductSelectionDraft;
   disabled: boolean;
   onToggle: (product: BookingCatalogProduct) => void;
   onQuantityChange: (productId: string, delta: number) => void;
-  onEdit?: (product: BookingCatalogProduct) => void;
-  onDelete?: (product: BookingCatalogProduct) => void;
 }) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -105,50 +97,6 @@ function ProductRow({
           {formatProductUnitPrice(product.price)}
         </BodyText>
       </Box>
-
-      {onEdit ? (
-        <IconButton
-          size="small"
-          aria-label={`Edit ${product.name}`}
-          disabled={disabled}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (disabled) return;
-            onEdit(product);
-          }}
-          sx={{
-            color: alpha(m.navy, 0.42),
-            "&:hover": {
-              color: m.teal,
-              bgcolor: alpha(m.teal, 0.08),
-            },
-          }}
-        >
-          <EditRoundedIcon sx={{ fontSize: 17 }} />
-        </IconButton>
-      ) : null}
-
-      {onDelete ? (
-        <IconButton
-          size="small"
-          aria-label={`Delete ${product.name}`}
-          disabled={disabled}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (disabled) return;
-            onDelete(product);
-          }}
-          sx={{
-            color: alpha(m.navy, 0.42),
-            "&:hover": {
-              color: "#E85D5D",
-              bgcolor: alpha("#E85D5D", 0.08),
-            },
-          }}
-        >
-          <DeleteOutlineRoundedIcon sx={{ fontSize: 18 }} />
-        </IconButton>
-      ) : null}
 
       <Stack
         direction="row"
@@ -222,8 +170,6 @@ export default function BookingSelectProductsScreen({
   onToggle,
   onQuantityChange,
   onAddProduct,
-  onEdit,
-  onDelete,
   disabled = false,
   heading = "Select Product",
   searchPlaceholder = "Search products...",
@@ -276,8 +222,6 @@ export default function BookingSelectProductsScreen({
             disabled={disabled}
             onToggle={onToggle}
             onQuantityChange={onQuantityChange}
-            onEdit={onEdit}
-            onDelete={onDelete}
           />
         ))}
       </Stack>

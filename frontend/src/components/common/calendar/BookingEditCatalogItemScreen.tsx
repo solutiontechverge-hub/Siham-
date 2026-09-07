@@ -6,7 +6,10 @@ import { alpha, useTheme } from "@mui/material/styles";
 import AppSelect from "../AppSelect";
 import AppTextField from "../AppTextField";
 import { BodyText } from "../../ui/typography";
-import type { BookingUniqueItemDraft } from "../../../data/bookingUniqueItem.data";
+import {
+  DEFAULT_UNIQUE_ITEM_VAT,
+  type BookingUniqueItemDraft,
+} from "../../../data/bookingUniqueItem.data";
 import { sanitizeDecimalInput } from "../../../lib/field-input";
 
 type BookingEditCatalogItemScreenProps = {
@@ -43,6 +46,13 @@ export default function BookingEditCatalogItemScreen({
     "fixed",
   );
 
+  React.useEffect(() => {
+    if (disabled || draft.vat.trim()) return;
+    onChange({ vat: DEFAULT_UNIQUE_ITEM_VAT });
+    // Parent passes an inline onChange; only fill when VAT is still empty.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fill once per empty VAT
+  }, [disabled, draft.vat]);
+
   return (
     <Stack spacing={1.6}>
       <BodyText
@@ -60,6 +70,18 @@ export default function BookingEditCatalogItemScreen({
         disabled={disabled}
         error={Boolean(errors.productName)}
         helperText={errors.productName}
+      />
+
+      <AppTextField
+        label="VAT"
+        placeholder="21"
+        value={draft.vat}
+        onChange={(e) =>
+          onChange({ vat: sanitizeDecimalInput(e.target.value) })
+        }
+        fullWidth
+        disabled={disabled}
+        inputProps={{ inputMode: "decimal" }}
       />
 
       <Stack direction="row" spacing={1} alignItems="flex-start">

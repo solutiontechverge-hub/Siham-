@@ -13,6 +13,7 @@ import {
   type Theme,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import useOverlayScrollLock from "../../hooks/useOverlayScrollLock";
 import { BodyText, SubHeading } from "../ui/typography";
 
 /** Canonical right-panel drawer width — shared across all app drawers. */
@@ -62,9 +63,15 @@ export default function AppDrawer({
   onClose,
   anchor = "right",
   PaperProps,
+  open = false,
+  variant = "temporary",
+  sx,
   ...props
 }: AppDrawerProps) {
   const resolvedWidth = panelWidth ?? MOLLURE_DRAWER_WIDTH;
+  useOverlayScrollLock(
+    Boolean(open) && variant !== "permanent" && variant !== "persistent",
+  );
   const theme = useTheme();
   const m = theme.palette.mollure;
   const useMuted = contentVariant === "muted";
@@ -94,6 +101,22 @@ export default function AppDrawer({
     <Drawer
       anchor={anchor}
       onClose={onClose}
+      open={open}
+      variant={variant}
+      sx={[
+        {
+          overflow: "hidden",
+          "& .MuiDrawer-paper": {
+            overflow: "hidden",
+            overflowY: "hidden",
+            height: "100%",
+            maxHeight: "100%",
+            flex: "1 1 auto",
+            minHeight: 0,
+          },
+        },
+        ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
+      ]}
       {...props}
       PaperProps={{
         ...PaperProps,
@@ -102,9 +125,15 @@ export default function AppDrawer({
             width: resolvedWidth,
             maxWidth: "100vw",
             height: "100%",
+            maxHeight: "100%",
             margin: 0,
             top: 0,
             overflow: "hidden",
+            overflowY: "hidden",
+            display: "flex",
+            flexDirection: "column",
+            flex: "1 1 auto",
+            minHeight: 0,
             // Soft left corners on right-anchored panels (right edge stays flush to screen)
             borderRadius:
               anchor === "left" ? "0 14px 14px 0" : "14px 0 0 14px",
@@ -201,7 +230,7 @@ export default function AppDrawer({
           sx={[
             // minHeight: 0 lets this flex child shrink so the footer stays pinned
             // instead of the whole column growing and scrolling with content.
-            { flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden" },
+            { flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", overscrollBehavior: "contain" },
             ...(Array.isArray(mergedContentSx)
               ? mergedContentSx
               : mergedContentSx
@@ -213,7 +242,18 @@ export default function AppDrawer({
         </Box>
 
         {footer ? (
-          <Box sx={{ flexShrink: 0, flexGrow: 0 }}>{footer}</Box>
+          <Box
+            sx={{
+              flexShrink: 0,
+              flexGrow: 0,
+              position: "sticky",
+              bottom: 0,
+              zIndex: 3,
+              bgcolor: panelBg,
+            }}
+          >
+            {footer}
+          </Box>
         ) : null}
       </Box>
     </Drawer>

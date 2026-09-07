@@ -13,6 +13,7 @@ import {
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText, SubHeading } from "../ui/typography";
+import useOverlayScrollLock from "../../hooks/useOverlayScrollLock";
 import AppButton from "./AppButton";
 import MessagingInsetOverlay from "./messaging/MessagingInsetOverlay";
 
@@ -63,6 +64,7 @@ export default function AppModal({
 }: AppModalProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
+  useOverlayScrollLock(Boolean(open) && !embedded);
   const { sx: paperSx, ...restPaperProps } = PaperProps ?? {};
   const isDanger = headerTone === "danger";
   const headerBg = isDanger ? alpha("#E85D5D", 0.14) : alpha(m.teal, 0.12);

@@ -15,8 +15,10 @@ export type {
 
 export function bookingClientTypeTag(
   clientKind?: "individual" | "company" | null,
-): "BC" | null {
-  return clientKind === "company" ? "BC" : null;
+): "IC" | "CC" | null {
+  if (clientKind === "company") return "CC";
+  if (clientKind === "individual") return "IC";
+  return null;
 }
 
 /** Searchable option text — tags render as a visual suffix, not in the label. */
@@ -36,7 +38,7 @@ export default function BookingClientTags({
   isMollure?: boolean;
   isGuest?: boolean;
   clientKind?: "individual" | "company" | null;
-  /** @deprecated Three-state tags no longer render IC. Kept for call-site compatibility. */
+  /** Kept for call-site compatibility. IC/CC now always render from clientKind. */
   showType?: boolean;
 }) {
   return (

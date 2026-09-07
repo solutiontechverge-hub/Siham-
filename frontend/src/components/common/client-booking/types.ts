@@ -26,6 +26,7 @@ export type ClientBookingDraftProduct = {
   originalPrice?: number;
   discountType?: "fixed" | "percentage";
   discountAmount?: number;
+  guestId?: string | null;
 };
 
 export type ClientBookingDraftPerson = {
@@ -40,6 +41,7 @@ export type ClientBookingDraftPerson = {
   planningEndTime?: string;
   bufferStartTime?: string;
   bufferEndTime?: string;
+  bufferTeamMemberId?: string;
 };
 
 export type ClientBookingDraftTeamMember = {
@@ -101,4 +103,5 @@ export type ClientBookingSummarySection = {
   participantType?: "model" | "planning" | "guest" | "requester" | "buffer";
   startTime?: string;
   endTime?: string;
+  participantId?: string;
 };
