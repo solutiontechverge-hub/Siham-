@@ -82,6 +82,11 @@ export function locationAvailabilityTooltip(kind: LocationAvailabilityKind) {
   return "Available for Both";
 }
 
+export function shopNotAcceptingBookingTooltip(shopName?: string | null) {
+  const name = String(shopName ?? "").trim() || "This shop";
+  return `${name} is not accepting booking at this time`;
+}
+
 export function locationAvailabilityKindAtMinute(
   bands: readonly LocationAvailabilityBand[],
   minute: number,

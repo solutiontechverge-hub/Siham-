@@ -52,7 +52,7 @@ import {
   getPhoneValidationErrors,
   splitContactPhone,
 } from "../../../lib/phone-validation";
-import { buildBookingSummarySections, resolveTeamMemberFirstName } from "./buildBookingSummarySections";
+import { buildBookingSummarySections, bookingParticipantDisplayHeading, participantHeadingOrdinal, participantOrdinals, planningScheduleMeta, resolveTeamMemberFirstName } from "./buildBookingSummarySections";
 import { locationModeChipSx } from "./locationModeChipSx";
 import BookingSummaryNote from "./BookingSummaryNote";
 import BookingTotalPriceCard from "../calendar/BookingTotalPriceCard";
@@ -66,6 +66,7 @@ import {
   resolveKilometerAllowanceAmount,
 } from "../calendar/bookingEventDetails";
 import BookingLineAmount from "../calendar/BookingLineAmount";
+import { ServiceSummaryMetaLine } from "../ServiceSummaryMetaLine";
 import { usePublicFinanceSettings } from "../finance-documents/usePublicFinanceSettings";
 import {
   checkoutPaymentMethodSupportsPayNow,
@@ -88,6 +89,7 @@ function roleLabelForSection(section: {
 }) {
   if (section.participantType === "planning") return "PLANNING";
   if (section.participantType === "model") return "MODEL";
+  if (section.participantType === "buffer") return "BUFFER";
   if (section.participantType === "guest") return "GUEST";
   if (section.isRequester) return "CLIENT";
   return "CLIENT";
@@ -292,6 +294,8 @@ export default function ClientBookingCreateSummaryView() {
     lateCancellationFeePercent: bookingNotesMeta?.lateCancellationFeePercent,
     showLateRescheduling: Boolean(bookingNotesMeta?.showLateRescheduling),
     lateRescheduleFeePercent: bookingNotesMeta?.lateRescheduleFeePercent,
+    showNoShowFee: Boolean(bookingNotesMeta?.showNoShowFee),
+    noShowFeePercent: bookingNotesMeta?.noShowFeePercent,
     showPrepayment:
       (showFixedPrepayRow || showDesiredPrepayNote) && prepaymentPercent > 0,
     prepaymentPercent,
@@ -854,6 +858,12 @@ export default function ClientBookingCreateSummaryView() {
             <Stack spacing={1.5} divider={<Divider sx={{ borderColor: alpha(m.navy, 0.08) }} />}>
               {summarySections.map((section) => {
                 const roleLabel = roleLabelForSection(section);
+                const ordinals = participantOrdinals(summarySections);
+                const heading = bookingParticipantDisplayHeading(
+                  section,
+                  participantHeadingOrdinal(section, ordinals),
+                );
+                const planningMeta = planningScheduleMeta(section);
                 return (
                   <Box key={section.key}>
                     <Stack
@@ -872,8 +882,10 @@ export default function ClientBookingCreateSummaryView() {
                           alignItems: "center",
                         }}
                       >
-                        {section.title}
+                        {heading}
                       </Typography>
+                      {section.isRequester ||
+                      section.participantType === "requester" ? (
                       <Typography
                         sx={{
                           fontWeight: 800,
@@ -888,10 +900,14 @@ export default function ClientBookingCreateSummaryView() {
                       >
                         {roleLabel}
                       </Typography>
+                      ) : null}
                     </Stack>
 
                     <Stack spacing={0.85}>
-                      {section.planningItem ? (
+                      {section.planningItem ||
+                      planningMeta.timeRange ||
+                      section.participantType === "buffer" ||
+                      section.participantType === "planning" ? (
                         <Box
                           sx={{
                             borderRadius: "10px",
@@ -908,7 +924,10 @@ export default function ClientBookingCreateSummaryView() {
                             spacing={1}
                           >
                             <Box sx={{ minWidth: 0, flex: 1 }}>
-                              {section.planningItem.activity ? (
+                              {section.planningItem?.activity &&
+                              section.planningItem.activity.toLowerCase() !==
+                                "buffer" &&
+                              section.planningItem.activity !== heading ? (
                                 <Typography
                                   sx={{
                                     fontSize: 13,
@@ -920,7 +939,14 @@ export default function ClientBookingCreateSummaryView() {
                                   {section.planningItem.activity}
                                 </Typography>
                               ) : null}
-                              {section.planningItem.duration ? (
+                              {planningMeta.timeRange ||
+                              planningMeta.durationLabel ? (
+                                <ServiceSummaryMetaLine
+                                  timeRange={planningMeta.timeRange}
+                                  durationLabel={planningMeta.durationLabel}
+                                  staffName={section.teamMemberLabel}
+                                />
+                              ) : section.planningItem?.duration ? (
                                 <Typography
                                   sx={{
                                     mt: section.planningItem.activity ? 0.3 : 0,

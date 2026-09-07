@@ -7,6 +7,10 @@ import type { CalendarBookingClientSnapshot } from "../../../app/professionals/f
 import { ServiceSummaryMetaLine } from "../ServiceSummaryMetaLine";
 import ProjectUploadThumb from "../client-booking/ProjectUploadThumb";
 import { formatServiceTimeRange } from "../../../data/bookingServiceEdit.data";
+import {
+  bookingParticipantDisplayHeading,
+  planningScheduleMeta,
+} from "../client-booking/buildBookingSummarySections";
 
 type Props = {
   snapshot?: CalendarBookingClientSnapshot | null;
@@ -52,7 +56,22 @@ export default function BookingDrawerClientSnapshotSection({
   });
   if (!hasProject && nonRequesterPeople.length === 0) return null;
 
+  const modelTotal = nonRequesterPeople.filter(
+    (person) => person.participantType === "model",
+  ).length;
+  const guestTotal = nonRequesterPeople.filter(
+    (person) =>
+      person.participantType !== "planning" &&
+      person.participantType !== "buffer" &&
+      person.participantType !== "model" &&
+      person.name !== "Planning",
+  ).length;
+  const bufferTotal = nonRequesterPeople.filter(
+    (person) => person.participantType === "buffer",
+  ).length;
   let modelOrdinal = 0;
+  let guestOrdinal = 0;
+  let bufferOrdinal = 0;
 
   return (
     <Stack spacing={1.75} sx={{ mt: 1.5 }}>
@@ -128,20 +147,28 @@ export default function BookingDrawerClientSnapshotSection({
         const isBuffer = person.participantType === "buffer";
         const isModel = person.participantType === "model";
         if (isModel) modelOrdinal += 1;
+        else if (isBuffer) bufferOrdinal += 1;
+        else if (!isPlanning) guestOrdinal += 1;
 
-        const title = isBuffer
-          ? person.name.trim()
-            ? `Buffer: ${person.name}`
-            : "Buffer"
-          : isPlanning
-            ? "Planning Details"
-            : isModel
-              ? person.name.trim() && person.name.trim().toLowerCase() !== "model"
-                ? person.name
-                : `Model ${modelOrdinal}`
-              : person.name.trim() && person.name.trim().toLowerCase() !== "guest"
-                ? `Guest: ${person.name}`
-                : "Guest";
+        const title = bookingParticipantDisplayHeading(
+          {
+            title: person.name,
+            participantType: isBuffer
+              ? "buffer"
+              : isPlanning
+                ? "planning"
+                : isModel
+                  ? "model"
+                  : "guest",
+          },
+          isBuffer
+            ? { index: bufferOrdinal, total: bufferTotal }
+            : isPlanning
+              ? undefined
+              : isModel
+                ? { index: modelOrdinal, total: modelTotal }
+                : { index: guestOrdinal, total: guestTotal },
+        );
 
         const hasPlanning =
           (isPlanning || isBuffer) &&
@@ -153,7 +180,9 @@ export default function BookingDrawerClientSnapshotSection({
               person.bufferStartTime?.trim() ||
               person.bufferEndTime?.trim(),
           );
-        if (!personServices.length && !hasPlanning) return null;
+        if (!personServices.length && !hasPlanning && !isPlanning && !isBuffer) {
+          return null;
+        }
 
         return (
           <Box
@@ -216,17 +245,24 @@ export default function BookingDrawerClientSnapshotSection({
                     {person.planningActivity}
                   </Typography>
                 ) : null}
-                {person.planningDuration?.trim() ||
-                person.planningStartTime ||
-                person.bufferStartTime ? (
-                  <ServiceSummaryMetaLine
-                    timeRange={formatServiceTimeRange(
+                {(() => {
+                  const meta = planningScheduleMeta({
+                    startTime:
                       person.planningStartTime || person.bufferStartTime,
-                      person.planningEndTime || person.bufferEndTime,
-                    )}
-                    durationLabel={person.planningDuration?.trim() || undefined}
-                  />
-                ) : null}
+                    endTime: person.planningEndTime || person.bufferEndTime,
+                    planningItem: {
+                      activity: person.planningActivity ?? "",
+                      duration: person.planningDuration ?? "",
+                    },
+                  });
+                  if (!meta.timeRange && !meta.durationLabel) return null;
+                  return (
+                    <ServiceSummaryMetaLine
+                      timeRange={meta.timeRange}
+                      durationLabel={meta.durationLabel}
+                    />
+                  );
+                })()}
               </Box>
             ) : null}
             <Stack spacing={0.75}>

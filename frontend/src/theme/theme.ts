@@ -229,6 +229,13 @@ const theme = createTheme({
           overflowX: "clip",
           maxWidth: "100%",
         },
+        "html.mollure-overlay-open": {
+          overflow: "hidden !important",
+          scrollbarGutter: "auto",
+        },
+        "html.mollure-overlay-open body": {
+          overflow: "hidden !important",
+        },
         body: {
           // Keep in sync with globals.css — blocks MUI scroll-lock layout jump
           paddingRight: "0 !important",

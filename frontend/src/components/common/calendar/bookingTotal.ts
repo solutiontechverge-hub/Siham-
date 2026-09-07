@@ -71,7 +71,22 @@ export type BookingPriceProduct = {
   id?: string;
   price: number;
   quantity?: number;
+  originalPrice?: number;
+  unitPrice?: number;
 };
+
+export function lineDiscountAmountFromItems(input: {
+  services?: readonly { price: number; originalPrice?: number }[] | null;
+  products?: readonly { price: number; originalPrice?: number }[] | null;
+}): number {
+  let amount = 0;
+  for (const item of [...(input.services ?? []), ...(input.products ?? [])]) {
+    const net = Number(item.price) || 0;
+    const original = Number(item.originalPrice ?? item.price) || 0;
+    if (original > net) amount += original - net;
+  }
+  return roundMoney(amount);
+}
 
 export function isUniqueItemId(id?: string | null): boolean {
   return Boolean(id && String(id).startsWith("unique-"));
@@ -110,7 +125,11 @@ function isRequesterPerson(person: BookingPricePerson): boolean {
 
 function isGuestOrModelPerson(person: BookingPricePerson): boolean {
   if (isRequesterPerson(person)) return false;
-  if (person.participantType === "planning" || person.participantType === "notes") {
+  if (
+    person.participantType === "planning" ||
+    person.participantType === "buffer" ||
+    person.participantType === "notes"
+  ) {
     return false;
   }
   return true;

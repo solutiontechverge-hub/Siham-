@@ -504,14 +504,12 @@ export function mapCalendarBookingToEvent(
               ? { guests: parsedNotes.guests }
               : (() => {
                   const snapshot = parsedNotes.clientSnapshot;
-                  if (!snapshot?.people?.length || !snapshot.services?.length) return {};
+                  if (!snapshot?.people?.length) return {};
                   const guests = snapshot.people
                     .filter(
                       (person) =>
                         !person.isRequester &&
-                        person.participantType !== "planning" &&
                         person.participantType !== "notes" &&
-                        person.name?.trim() !== "Planning" &&
                         person.name?.trim().toLowerCase() !== "notes",
                     )
                     .map((person) => {
@@ -532,28 +530,45 @@ export function mapCalendarBookingToEvent(
                           ...(service.teamMemberId
                             ? { staffResourceId: String(service.teamMemberId) }
                             : {}),
+                          guestId: personId,
                         }));
+                      const products = (parsedNotes.products ?? []).filter(
+                        (product) => String(product.guestId ?? "") === personId,
+                      );
+                      const participantType =
+                        person.participantType === "model"
+                          ? ("model" as const)
+                          : person.participantType === "planning"
+                            ? ("planning" as const)
+                            : person.participantType === "buffer"
+                              ? ("buffer" as const)
+                              : ("guest" as const);
                       return {
                         id: personId,
                         name: person.name,
                         email: person.email,
                         phoneCode: person.phoneCode,
                         phoneNumber: person.phoneNumber,
-                        participantType:
-                          person.participantType === "model"
-                            ? ("model" as const)
-                            : ("guest" as const),
+                        participantType,
+                        planningActivity: person.planningActivity,
+                        planningDuration: person.planningDuration,
+                        planningStartTime: person.planningStartTime,
+                        planningEndTime: person.planningEndTime,
+                        bufferTeamMemberId: person.bufferTeamMemberId,
+                        bufferStartTime: person.bufferStartTime,
+                        bufferEndTime: person.bufferEndTime,
                         services,
-                        products: [] as Array<{
-                          id: string;
-                          name: string;
-                          price: number;
-                          quantity: number;
-                          unitPrice: number;
-                        }>,
+                        products,
                       };
                     })
-                    .filter((guest) => guest.services.length > 0);
+                    .filter(
+                      (guest) =>
+                        guest.services.length > 0 ||
+                        guest.products.length > 0 ||
+                        guest.participantType === "planning" ||
+                        guest.participantType === "buffer" ||
+                        Boolean(guest.planningActivity?.trim()),
+                    );
                   return guests.length ? { guests } : {};
                 })()),
           }

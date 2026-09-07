@@ -22,6 +22,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 import { LogoOnDark } from "../../../images";
 import { AppButton } from "../common";
 import { useSnackbar } from "../common/AppSnackbar";
+import useOverlayScrollLock from "../../hooks/useOverlayScrollLock";
 import { clearPersistedAuthSession } from "../../lib/auth-storage";
 import { queueSnackbarFlash } from "../../lib/snackbarFlash";
 import { useAppDispatch } from "../../store/hooks";
@@ -341,6 +342,7 @@ export default function AdminSidebar({
 }: AdminSidebarProps) {
   const theme = useTheme();
   const tokens = theme.palette.mollure;
+  useOverlayScrollLock(Boolean(mobileOpen));
 
   const drawerSx = {
     width: DRAWER_WIDTH,

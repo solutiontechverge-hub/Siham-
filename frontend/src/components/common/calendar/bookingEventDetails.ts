@@ -465,6 +465,63 @@ function assignedLinesForPerson<T extends { guestId?: string | null }>(
   );
 }
 
+type SnapshotPerson = NonNullable<
+  NonNullable<CalendarBookingDetails["clientSnapshot"]>["people"]
+>[number];
+
+function isDisplayableSnapshotPerson(person: SnapshotPerson) {
+  return (
+    !person.isRequester &&
+    person.participantType !== "notes" &&
+    person.name?.trim().toLowerCase() !== "notes"
+  );
+}
+
+function guestFromSnapshotPerson(
+  person: SnapshotPerson,
+  snapshotServices: NonNullable<
+    NonNullable<CalendarBookingDetails["clientSnapshot"]>["services"]
+  >,
+  details: CalendarBookingDetails,
+): CalendarBookingGuestItem {
+  return {
+    id: person.id,
+    name: person.name,
+    email: person.email,
+    phoneCode: person.phoneCode,
+    phoneNumber: person.phoneNumber,
+    services: assignedLinesForPerson<CalendarBookingServiceItem>(
+      snapshotServices
+        .filter(
+          (service) =>
+            normalizeAssignmentId(service.guestId) ===
+            normalizeAssignmentId(person.id),
+        )
+        .map((service) => ({
+          id: service.id,
+          name: service.name,
+          price: service.price,
+          durationMins: service.durationMins,
+          startTime: service.startTime,
+          endTime: service.endTime,
+          staffResourceId: service.teamMemberId ?? undefined,
+          guestId: service.guestId ?? person.id,
+        })),
+      details.services,
+      person.id,
+    ),
+    products: assignedLinesForPerson([], details.products, person.id),
+    participantType: person.participantType ?? ("guest" as const),
+    planningActivity: person.planningActivity,
+    planningDuration: person.planningDuration,
+    planningStartTime: person.planningStartTime,
+    planningEndTime: person.planningEndTime,
+    bufferTeamMemberId: person.bufferTeamMemberId,
+    bufferStartTime: person.bufferStartTime,
+    bufferEndTime: person.bufferEndTime,
+  };
+}
+
 /**
  * Client bookings store every line in `clientSnapshot.services`, while the API
  * booking row only keeps a single `service_id`. Map requester / unassigned lines
@@ -733,6 +790,16 @@ export function hydrateBookingDrawerFromEvent(ev: CalendarEvent): BookingDrawerH
             email: guest.email || person?.email || "",
             phoneCode: guest.phoneCode || person?.phoneCode || "",
             phoneNumber: guest.phoneNumber || person?.phoneNumber || "",
+            participantType:
+              guest.participantType ?? person?.participantType ?? "guest",
+            planningActivity: guest.planningActivity || person?.planningActivity,
+            planningDuration: guest.planningDuration || person?.planningDuration,
+            planningStartTime: guest.planningStartTime || person?.planningStartTime,
+            planningEndTime: guest.planningEndTime || person?.planningEndTime,
+            bufferTeamMemberId:
+              guest.bufferTeamMemberId || person?.bufferTeamMemberId,
+            bufferStartTime: guest.bufferStartTime || person?.bufferStartTime,
+            bufferEndTime: guest.bufferEndTime || person?.bufferEndTime,
             services: assignedLinesForPerson(
               guest.services,
               details.services,
@@ -746,48 +813,21 @@ export function hydrateBookingDrawerFromEvent(ev: CalendarEvent): BookingDrawerH
           };
         })
       : snapshotPeople
-          .filter(
-            (person) =>
-              !person.isRequester &&
-              person.participantType !== "notes" &&
-              person.name?.trim().toLowerCase() !== "notes",
-          )
-          .map((person) => ({
-            id: person.id,
-            name: person.name,
-            email: person.email,
-            phoneCode: person.phoneCode,
-            phoneNumber: person.phoneNumber,
-            services: assignedLinesForPerson<CalendarBookingServiceItem>(
-              snapshotServices
-                .filter(
-                  (service) =>
-                    normalizeAssignmentId(service.guestId) ===
-                    normalizeAssignmentId(person.id),
-                )
-                .map((service) => ({
-                  id: service.id,
-                  name: service.name,
-                  price: service.price,
-                  durationMins: service.durationMins,
-                  startTime: service.startTime,
-                  endTime: service.endTime,
-                  staffResourceId: service.teamMemberId ?? undefined,
-                  guestId: service.guestId ?? person.id,
-                })),
-              details.services,
-              person.id,
-            ),
-            products: assignedLinesForPerson([], details.products, person.id),
-            participantType: person.participantType ?? ("guest" as const),
-            planningActivity: person.planningActivity,
-            planningDuration: person.planningDuration,
-            planningStartTime: person.planningStartTime,
-            planningEndTime: person.planningEndTime,
-            bufferTeamMemberId: person.bufferTeamMemberId,
-            bufferStartTime: person.bufferStartTime,
-            bufferEndTime: person.bufferEndTime,
-          }));
+          .filter(isDisplayableSnapshotPerson)
+          .map((person) =>
+            guestFromSnapshotPerson(person, snapshotServices, details),
+          );
+
+  if (guestsFromNotes.length > 0) {
+    const existingIds = new Set(
+      guests.map((guest) => normalizeAssignmentId(guest.id)),
+    );
+    for (const person of snapshotPeople) {
+      if (!isDisplayableSnapshotPerson(person)) continue;
+      if (existingIds.has(normalizeAssignmentId(person.id))) continue;
+      guests.push(guestFromSnapshotPerson(person, snapshotServices, details));
+    }
+  }
 
   const requesterIds = requesterPersonIds(details.clientSnapshot);
   const rawServices = details.services?.length

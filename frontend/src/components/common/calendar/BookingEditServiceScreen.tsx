@@ -18,8 +18,8 @@ import AppTimePicker from "../AppTimePicker";
 import { BodyText } from "../../ui/typography";
 import {
   addMinutesToTime,
-  formatDurationMinsLabel,
-  minutesBetweenTimes,
+  formatTimeWindowDurationLabel,
+  positiveMinutesBetweenTimes,
   type BookingServiceEditDraft,
 } from "../../../data/bookingServiceEdit.data";
 import { sanitizeDecimalInput } from "../../../lib/field-input";
@@ -107,7 +107,7 @@ export default function BookingEditServiceScreen({
   const handleStartTimeChange = (value: string) => {
     const next: Partial<BookingServiceEditDraft> = { startTime: value };
     if (draft.endTime) {
-      const mins = minutesBetweenTimes(value, draft.endTime);
+      const mins = positiveMinutesBetweenTimes(value, draft.endTime);
       next.durationMins = mins > 0 ? String(mins) : "";
     }
     onChange(next);
@@ -120,25 +120,27 @@ export default function BookingEditServiceScreen({
       next.endTime = addMinutesToTime(value, duration);
       next.durationMins = String(duration);
     } else if (draft.endTime) {
-      const mins = minutesBetweenTimes(value, draft.endTime);
+      const mins = positiveMinutesBetweenTimes(value, draft.endTime);
       next.durationMins = mins > 0 ? String(mins) : "";
     }
     onChange(next);
   };
 
   const handleEndTimeChange = (value: string) => {
-    const mins = draft.startTime ? minutesBetweenTimes(draft.startTime, value) : 0;
+    const mins = draft.startTime
+      ? positiveMinutesBetweenTimes(draft.startTime, value)
+      : 0;
     onChange({
       endTime: value,
       durationMins: mins > 0 ? String(mins) : "",
     });
   };
 
-  const durationMins = minutesBetweenTimes(draft.startTime, draft.endTime);
-  const durationDisplay =
-    durationMins > 0
-      ? formatDurationMinsLabel(durationMins)
-      : formatDurationMinsLabel(Number.parseInt(draft.durationMins, 10));
+  const durationDisplay = formatTimeWindowDurationLabel(
+    draft.startTime,
+    draft.endTime,
+    draft.durationMins,
+  );
 
   return (
     <Stack spacing={1.6}>
