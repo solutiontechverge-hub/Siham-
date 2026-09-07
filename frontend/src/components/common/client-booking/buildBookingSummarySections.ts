@@ -1,4 +1,7 @@
 import { buildClientDraftChronologicalBlocks } from "../../../data/bookingChronologicalBlocks";
+import { parseDurationMinsLabel } from "../../../data/bookingServiceEdit.data";
+import { fmtMinutesToTimeLabel } from "../../../app/clients/booking/booking-time";
+import { parseClockToMinutes } from "../calendar/calendar.utils";
 import type {
   ClientBookingDraft,
   ClientBookingDraftTeamMember,
@@ -26,16 +29,28 @@ export function mergeBookingTeamMembers(
 export function buildBookingSummarySections(
   draft: ClientBookingDraft | null,
 ): ClientBookingSummarySection[] {
-  if (!draft?.services?.length && !draft?.people?.some(
+  const people = (draft?.people ?? []).filter(
     (person) =>
-      person.participantType === "planning" ||
-      person.participantType === "buffer" ||
-      Boolean(person.planningActivity?.trim() || person.planningDuration?.trim()),
-  )) {
+      person.participantType !== "notes" &&
+      person.id !== "p-notes",
+  );
+  const productGuestIds = new Set(
+    (draft?.products ?? [])
+      .map((product) => String(product.guestId ?? "").trim())
+      .filter(Boolean),
+  );
+  if (
+    !draft?.services?.length &&
+    !people.some(
+      (person) =>
+        person.participantType === "planning" ||
+        Boolean(person.planningActivity?.trim() || person.planningDuration?.trim()),
+    ) &&
+    productGuestIds.size === 0
+  ) {
     return [];
   }
 
-  const people = draft.people ?? [];
   const requesterPerson =
     people.find((person) => person.isRequester) ??
     people[0] ?? {
@@ -45,13 +60,14 @@ export function buildBookingSummarySections(
     };
 
   const blocks = buildClientDraftChronologicalBlocks({
-    bookingStart: draft.selectedTime,
-    combineServices: draft.combineServices,
+    bookingStart: draft?.selectedTime,
+    combineServices: draft?.combineServices,
     people: people.length
       ? people
       : [{ ...requesterPerson, isRequester: true }],
-    services: draft.services ?? [],
-    teamMembers: draft.teamMembers,
+    services: draft?.services ?? [],
+    teamMembers: draft?.teamMembers,
+    productGuestIds,
   });
 
   return blocks.map((block) => ({
@@ -65,6 +81,7 @@ export function buildBookingSummarySections(
       block.participantType === "requester" ? "requester" : block.participantType,
     startTime: block.startTime,
     endTime: block.endTime,
+    participantId: block.participantId,
   }));
 }
 
@@ -80,4 +97,119 @@ export function resolveTeamMemberFirstName(
       : undefined) || fallbackName?.trim() || undefined;
   if (!fullName) return undefined;
   return fullName.split(/\s+/)[0];
+}
+
+/** Guest / Model / Planning headings on booking details (dynamic ordinals). */
+export function bookingParticipantDisplayHeading(
+  section: Pick<
+    ClientBookingSummarySection,
+    "participantType" | "isRequester" | "title"
+  >,
+  ordinal?: { index?: number; total?: number },
+): string {
+  if (section.isRequester || section.participantType === "requester") {
+    return section.title;
+  }
+  if (section.participantType === "planning") return "Planning Details";
+  if (section.participantType === "buffer") {
+    return (ordinal?.total ?? 1) > 1 && ordinal?.index
+      ? `Buffer ${ordinal.index}`
+      : "Buffer";
+  }
+  if (section.participantType === "guest") {
+    return (ordinal?.total ?? 1) > 1 && ordinal?.index
+      ? `Guest ${ordinal.index}`
+      : "Guest";
+  }
+  if (section.participantType === "model") {
+    return (ordinal?.total ?? 1) > 1 && ordinal?.index
+      ? `Model ${ordinal.index}`
+      : "Model";
+  }
+  return section.title;
+}
+
+export function planningScheduleMeta(section: {
+  startTime?: string;
+  endTime?: string;
+  planningItem?: { activity: string; duration: string };
+}): { timeRange?: string; durationLabel?: string } {
+  const startMins = section.startTime
+    ? parseClockToMinutes(section.startTime)
+    : null;
+  const endMins = section.endTime ? parseClockToMinutes(section.endTime) : null;
+  const timeRange =
+    startMins == null
+      ? undefined
+      : endMins == null
+        ? fmtMinutesToTimeLabel(startMins)
+        : `${fmtMinutesToTimeLabel(startMins)}–${fmtMinutesToTimeLabel(endMins)}`;
+  const durationMins =
+    parseDurationMinsLabel(section.planningItem?.duration) ??
+    (startMins != null && endMins != null && endMins > startMins
+      ? endMins - startMins
+      : null);
+  const durationLabel =
+    durationMins && durationMins > 0
+      ? `${durationMins} Mins`
+      : section.planningItem?.duration?.trim() || undefined;
+  return { timeRange, durationLabel };
+}
+
+export function participantOrdinals(
+  sections: ReadonlyArray<
+    Pick<ClientBookingSummarySection, "participantType" | "participantId" | "key">
+  >,
+) {
+  const guestIds: string[] = [];
+  const modelIds: string[] = [];
+  const bufferIds: string[] = [];
+  for (const section of sections) {
+    const id = section.participantId || section.key;
+    if (section.participantType === "guest" && !guestIds.includes(id)) {
+      guestIds.push(id);
+    }
+    if (section.participantType === "model" && !modelIds.includes(id)) {
+      modelIds.push(id);
+    }
+    if (section.participantType === "buffer" && !bufferIds.includes(id)) {
+      bufferIds.push(id);
+    }
+  }
+  return {
+    guestTotal: guestIds.length,
+    modelTotal: modelIds.length,
+    bufferTotal: bufferIds.length,
+    guestIndex: (section: (typeof sections)[number]) => {
+      const id = section.participantId || section.key;
+      return guestIds.indexOf(id) + 1;
+    },
+    modelIndex: (section: (typeof sections)[number]) => {
+      const id = section.participantId || section.key;
+      return modelIds.indexOf(id) + 1;
+    },
+    bufferIndex: (section: (typeof sections)[number]) => {
+      const id = section.participantId || section.key;
+      return bufferIds.indexOf(id) + 1;
+    },
+  };
+}
+
+export function participantHeadingOrdinal(
+  section: Pick<
+    ClientBookingSummarySection,
+    "participantType" | "participantId" | "key"
+  >,
+  ordinals: ReturnType<typeof participantOrdinals>,
+) {
+  if (section.participantType === "guest") {
+    return { index: ordinals.guestIndex(section), total: ordinals.guestTotal };
+  }
+  if (section.participantType === "model") {
+    return { index: ordinals.modelIndex(section), total: ordinals.modelTotal };
+  }
+  if (section.participantType === "buffer") {
+    return { index: ordinals.bufferIndex(section), total: ordinals.bufferTotal };
+  }
+  return undefined;
 }

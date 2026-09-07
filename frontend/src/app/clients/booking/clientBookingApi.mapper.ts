@@ -1,4 +1,11 @@
-import type { ClientBookingDraft } from "../../../components/common/client-booking/types";
+import type {
+  ClientBookingDraft,
+  ClientBookingDraftPerson,
+} from "../../../components/common/client-booking/types";
+import type {
+  CalendarBookingGuestItem,
+  CalendarBookingClientSnapshot,
+} from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { ClientBookingRecord, ClientBookingStatus } from "./clientBookingRecords";
 import { fmtMinutesToTimeLabel, parseTimeLabelToMinutes, buildWallClockDateTimeIso } from "./booking-time";
 import { wallClockDateFromDateTime, wallClockTimeFromDateTime } from "../../../components/common/calendar/calendar.utils";
@@ -36,6 +43,70 @@ function withClientDiscountFields(service: {
     discountType: service.discount?.type,
     discountAmount: service.discount?.amount,
   };
+}
+
+type SnapshotPerson = NonNullable<CalendarBookingClientSnapshot["people"]>[number];
+type StoredGuest = CalendarBookingGuestItem;
+
+function mapDraftPerson(
+  person: SnapshotPerson | StoredGuest,
+  extras?: Partial<ClientBookingDraftPerson>,
+): ClientBookingDraftPerson {
+  const snapshot = person as SnapshotPerson;
+  const guest = person as StoredGuest;
+  return {
+    id: person.id,
+    name: person.name,
+    isRequester: Boolean(snapshot.isRequester),
+    participantType: person.participantType,
+    planningActivity: person.planningActivity,
+    planningDuration: person.planningDuration,
+    planningIsLocked: snapshot.planningIsLocked,
+    planningStartTime: person.planningStartTime,
+    planningEndTime: person.planningEndTime,
+    bufferStartTime: person.bufferStartTime ?? guest.bufferStartTime,
+    bufferEndTime: person.bufferEndTime ?? guest.bufferEndTime,
+    bufferTeamMemberId:
+      snapshot.bufferTeamMemberId ?? guest.bufferTeamMemberId,
+    ...extras,
+  };
+}
+
+function mergeDraftPeople(
+  snapshotPeople: SnapshotPerson[] | undefined,
+  guests: StoredGuest[] | undefined,
+): ClientBookingDraftPerson[] | undefined {
+  const people = (snapshotPeople ?? [])
+    .filter(
+      (person) =>
+        person.participantType !== "notes" &&
+        person.id !== "p-notes",
+    )
+    .map((person) => mapDraftPerson(person));
+  const byId = new Map(people.map((person) => [String(person.id), person]));
+  for (const guest of guests ?? []) {
+    if (guest.participantType === "notes" || guest.id === "p-notes") {
+      continue;
+    }
+    const existing = byId.get(String(guest.id));
+    if (existing) {
+      existing.participantType = existing.participantType ?? guest.participantType;
+      existing.planningActivity = existing.planningActivity || guest.planningActivity;
+      existing.planningDuration = existing.planningDuration || guest.planningDuration;
+      existing.planningStartTime = existing.planningStartTime || guest.planningStartTime;
+      existing.planningEndTime = existing.planningEndTime || guest.planningEndTime;
+      existing.bufferStartTime = existing.bufferStartTime || guest.bufferStartTime;
+      existing.bufferEndTime = existing.bufferEndTime || guest.bufferEndTime;
+      existing.bufferTeamMemberId =
+        existing.bufferTeamMemberId || guest.bufferTeamMemberId;
+      if (!existing.name?.trim() && guest.name?.trim()) existing.name = guest.name;
+      continue;
+    }
+    const mapped = mapDraftPerson(guest, { isRequester: false });
+    people.push(mapped);
+    byId.set(String(mapped.id), mapped);
+  }
+  return people.length ? people : undefined;
 }
 
 /** Pull a UUID out of synthetic cart ids like `profile-svc-<uuid>-0`. */
@@ -733,6 +804,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
         originalPrice: product.originalPrice,
         discountType: product.discount?.type,
         discountAmount: product.discount?.amount,
+        guestId: product.guestId ?? null,
       }));
     }
     const noteProducts = notesDetails?.products ?? [];
@@ -743,6 +815,10 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
         price: product.price,
         quantity: product.quantity || 1,
         unitPrice: product.unitPrice ?? product.price,
+        guestId: guest.id,
+        originalPrice: product.originalPrice,
+        discountType: product.discount?.type,
+        discountAmount: product.discount?.amount,
       })),
     );
     const mergedProducts = [...noteProducts];
@@ -761,6 +837,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
         originalPrice: product.originalPrice,
         discountType: product.discount?.type,
         discountAmount: product.discount?.amount,
+        guestId: product.guestId ?? null,
       }));
     }
     return [];
@@ -779,7 +856,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
   const mappedPrepaymentPercent = Number(notesDetails?.prepaymentPercent) || 0;
   const draftPrice = summarizeClientBookingPrice({
     services: draftServices,
-    people: clientSnapshot?.people,
+    people: mergeDraftPeople(clientSnapshot?.people, notesDetails?.guests),
     products: draftProducts,
     extrasAmount,
     discount: notesDetails?.totalDiscount ?? null,
@@ -787,6 +864,8 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
     lateCancellationFeePercent: notesDetails?.lateCancellationFeePercent,
     showLateRescheduling: Boolean(notesDetails?.showLateRescheduling),
     lateRescheduleFeePercent: notesDetails?.lateRescheduleFeePercent,
+    showNoShowFee: Boolean(notesDetails?.showNoShowFee),
+    noShowFeePercent: notesDetails?.noShowFeePercent,
     showPrepayment:
       Boolean(notesDetails?.showPrepayment) && mappedPrepaymentPercent > 0,
     prepaymentPercent: mappedPrepaymentPercent,
@@ -843,15 +922,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
         hhmmToTimeLabel(activeEbr?.suggestedStart) ||
         startLabel,
       combineServices: names.length > 1,
-      people: clientSnapshot?.people?.map((p) => ({
-        id: p.id,
-        name: p.name,
-        isRequester: p.isRequester,
-        participantType: p.participantType,
-        planningActivity: p.planningActivity,
-        planningDuration: p.planningDuration,
-        planningIsLocked: p.planningIsLocked,
-      })),
+      people: mergeDraftPeople(clientSnapshot?.people, notesDetails?.guests),
       services: servicesWithTeamNames,
       products: draftProducts,
       teamMembers: draftTeamMembers.length ? draftTeamMembers : undefined,

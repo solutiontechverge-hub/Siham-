@@ -106,6 +106,7 @@ import {
 } from "../finance-documents";
 import { usePublicFinanceSettings } from "../finance-documents/usePublicFinanceSettings";
 import type { ClientBookingDraft } from "./types";
+import { summarizeClientBookingPrice } from "../calendar/bookingTotal";
 import {
   useCreateBookingMutation,
   useDispatchBookingNotificationMutation,
@@ -2204,11 +2205,6 @@ export default function ClientBookingDetailsView({
   const isFullyCompleted =
     isCompleted && activeBooking?.paid === true && !isPaymentDue;
   const pageBackground = isFullyCompleted ? "#EAECF0" : m.pageBg;
-  const displayTotal = displayDraft?.total ?? draft?.total ?? 0;
-  const displayPrepaidAmount =
-    Math.round(
-      ((displayTotal * prepaymentPercent) / 100 + Number.EPSILON) * 100,
-    ) / 100;
   const bookingNotesMeta = React.useMemo(
     () => parseCalendarEntryNotes(activeBooking?.notes),
     [activeBooking?.notes],
@@ -2421,9 +2417,11 @@ export default function ClientBookingDetailsView({
     () => resolveKilometerAllowanceAmount(bookingNotesMeta?.kilometerAllowance),
     [bookingNotesMeta?.kilometerAllowance],
   );
-  /** Only for desired-location bookings when a kilometer amount was set. */
+  /** Only for desired-location bookings when the professional enabled it. */
   const showKilometerAllowance =
-    locationMode === "desired" && kilometerAllowanceAmount > 0;
+    locationMode === "desired" &&
+    Boolean(bookingNotesMeta?.showKilometerAllowance) &&
+    kilometerAllowanceAmount > 0;
   /** Prepayment breakdown when the professional has a % set. */
   const effectivePrepayPercent =
     Number(activeBooking?.prepaymentPercent ?? prepaymentPercent) || 0;
@@ -2431,6 +2429,71 @@ export default function ClientBookingDetailsView({
     effectivePrepayPercent > 0 && !isCancelled
       ? prepaymentState
       : ("none" as const);
+  const paymentProducts = React.useMemo(() => {
+    if (isEbrIncoming || editRequest.isPending) {
+      return editRequest.suggestedProducts ?? [];
+    }
+    return (
+      (displayDraft?.products ?? draft?.products)?.map((product) => ({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        quantity: product.quantity || 1,
+        originalPrice: product.originalPrice,
+        discountType: product.discountType,
+        discountAmount: product.discountAmount,
+        guestId: product.guestId ?? null,
+      })) ?? []
+    );
+  }, [
+    displayDraft?.products,
+    draft?.products,
+    editRequest.isPending,
+    editRequest.suggestedProducts,
+    isEbrIncoming,
+  ]);
+  const detailsPrice = React.useMemo(
+    () =>
+      summarizeClientBookingPrice({
+        services: displayDraft?.services ?? draft?.services,
+        people: displayDraft?.people ?? draft?.people,
+        products: paymentProducts,
+        extrasAmount: showKilometerAllowance ? kilometerAllowanceAmount : 0,
+        discount: bookingNotesMeta?.totalDiscount ?? null,
+        showLateCancellation: Boolean(bookingNotesMeta?.showLateCancellation),
+        lateCancellationFeePercent: bookingNotesMeta?.lateCancellationFeePercent,
+        showLateRescheduling: Boolean(bookingNotesMeta?.showLateRescheduling),
+        lateRescheduleFeePercent: bookingNotesMeta?.lateRescheduleFeePercent,
+        showNoShowFee: Boolean(bookingNotesMeta?.showNoShowFee),
+        noShowFeePercent: bookingNotesMeta?.noShowFeePercent,
+        showPrepayment:
+          paymentCardPrepaymentState !== "none" && effectivePrepayPercent > 0,
+        prepaymentPercent: effectivePrepayPercent,
+        prepaymentPaid: paymentCardPrepaymentState === "paid",
+        prepaymentOffline: isOfflinePay,
+      }),
+    [
+      bookingNotesMeta?.lateCancellationFeePercent,
+      bookingNotesMeta?.lateRescheduleFeePercent,
+      bookingNotesMeta?.noShowFeePercent,
+      bookingNotesMeta?.showLateCancellation,
+      bookingNotesMeta?.showLateRescheduling,
+      bookingNotesMeta?.showNoShowFee,
+      bookingNotesMeta?.totalDiscount,
+      displayDraft?.people,
+      displayDraft?.services,
+      draft?.people,
+      draft?.services,
+      effectivePrepayPercent,
+      isOfflinePay,
+      kilometerAllowanceAmount,
+      paymentCardPrepaymentState,
+      paymentProducts,
+      showKilometerAllowance,
+    ],
+  );
+  const displayTotal = detailsPrice.breakdown.bookingTotal;
+  const displayPrepaidAmount = detailsPrice.breakdown.prepaymentAmount;
 
   const paymentSummarySections = React.useMemo(
     () =>
@@ -2635,6 +2698,8 @@ export default function ClientBookingDetailsView({
                   lateRescheduleFeePercent={
                     bookingNotesMeta?.lateRescheduleFeePercent
                   }
+                  showNoShowFee={Boolean(bookingNotesMeta?.showNoShowFee)}
+                  noShowFeePercent={bookingNotesMeta?.noShowFeePercent}
                   editedServiceIds={clientVisibleEditedServiceIds}
                   addedServiceIds={clientVisibleAddedServiceIds}
                   cancelledServiceIds={clientVisibleCancelledServiceIds}
@@ -2684,6 +2749,8 @@ export default function ClientBookingDetailsView({
                   lateRescheduleFeePercent={
                     bookingNotesMeta?.lateRescheduleFeePercent
                   }
+                  showNoShowFee={Boolean(bookingNotesMeta?.showNoShowFee)}
+                  noShowFeePercent={bookingNotesMeta?.noShowFeePercent}
                   rejectedChangesNote={rejectedChangesNote}
                   acceptedChangesNote={acceptedChangesNote}
                   prepaymentOffline={isOfflinePay}
@@ -2691,21 +2758,7 @@ export default function ClientBookingDetailsView({
                   addedServiceIds={clientVisibleAddedServiceIds}
                   cancelledServiceIds={clientVisibleCancelledServiceIds}
                   cancelledServices={cancelledServicesForDisplay}
-                  products={
-                    isEbrIncoming || editRequest.isPending
-                      ? editRequest.suggestedProducts
-                      : (displayDraft?.products ?? draft?.products)?.map(
-                          (product) => ({
-                            id: product.id,
-                            name: product.name,
-                            price: product.price,
-                            quantity: product.quantity || 1,
-                            originalPrice: product.originalPrice,
-                            discountType: product.discountType,
-                            discountAmount: product.discountAmount,
-                          }),
-                        )
-                  }
+                  products={paymentProducts}
                   editedProductIds={clientVisibleEditedProductIds}
                   onPayNow={
                     paymentCardPrepaymentState === "required" && canActOnPayment

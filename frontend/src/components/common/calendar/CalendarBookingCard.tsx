@@ -256,7 +256,7 @@ export default function CalendarBookingCard({
                 event.details?.clientKind === "company"
               ? [
                   {
-                    label: "BC",
+                    label: "CC",
                     bold: true,
                     sx: {
                       border: `1px solid ${alpha(m.teal, 0.45)}`,
@@ -265,7 +265,17 @@ export default function CalendarBookingCard({
                     },
                   },
                 ]
-              : []),
+              : [
+                  {
+                    label: "IC",
+                    bold: true,
+                    sx: {
+                      border: `1px solid ${alpha(m.teal, 0.45)}`,
+                      bgcolor: alpha(m.teal, 0.16),
+                      color: m.teal,
+                    },
+                  },
+                ]),
           ...scenarioIndicators
             .filter((indicator) => indicator !== "E")
             .map((indicator) => ({

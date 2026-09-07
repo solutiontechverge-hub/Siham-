@@ -41,6 +41,12 @@ import { AppDropdown, AppTextField } from "../../../components/common";
 import AppModal from "../../../components/common/AppModal";
 import BookingSummaryNote from "../../../components/common/client-booking/BookingSummaryNote";
 import { locationModeChipSx } from "../../../components/common/client-booking/locationModeChipSx";
+import {
+  bookingParticipantDisplayHeading,
+  participantHeadingOrdinal,
+  participantOrdinals,
+  planningScheduleMeta,
+} from "../../../components/common/client-booking/buildBookingSummarySections";
 import { ServiceSummaryMetaLine } from "../../../components/common/ServiceSummaryMetaLine";
 import {
   CLIENT_BOOKING_MIN_LEAD_ERROR,
@@ -2524,24 +2530,23 @@ export default function ClientBookingCreateView() {
                       ) : null}
                       {summarySections.map(
                         (
-                          {
+                          section,
+                          sectionIndex,
+                        ) => {
+                          const {
                             key,
-                            title,
-                            roleLabel,
                             isRequester,
                             items,
                             planningItem,
                             startTime,
-                          },
-                          sectionIndex,
-                        ) => {
-                          const heading =
-                            isRequester
-                              ? title
-                              : roleLabel === "Guest" &&
-                                  !title.toLowerCase().startsWith("guest")
-                                ? `Guest ${title}`
-                                : title;
+                            participantType,
+                          } = section;
+                          const ordinals = participantOrdinals(summarySections);
+                          const heading = bookingParticipantDisplayHeading(
+                            section,
+                            participantHeadingOrdinal(section, ordinals),
+                          );
+                          const planningMeta = planningScheduleMeta(section);
                           const useGuestCardStyle =
                             !isRequester || isDesiredLocation;
                           return (
@@ -2582,7 +2587,10 @@ export default function ClientBookingCreateView() {
                                 ) : null}
                               </Stack>
                               <Stack spacing={0.75}>
-                                {planningItem ? (
+                                {planningItem ||
+                                planningMeta.timeRange ||
+                                participantType === "buffer" ||
+                                participantType === "planning" ? (
                                   <Box
                                     sx={{
                                       borderRadius: "10px",
@@ -2597,7 +2605,10 @@ export default function ClientBookingCreateView() {
                                     }}
                                   >
                                     <Box sx={{ minWidth: 0 }}>
-                                      {planningItem.activity ? (
+                                      {planningItem?.activity &&
+                                      planningItem.activity.toLowerCase() !==
+                                        "buffer" &&
+                                      planningItem.activity !== heading ? (
                                         <Typography
                                           sx={{
                                             fontSize: 12,
@@ -2609,7 +2620,16 @@ export default function ClientBookingCreateView() {
                                           {planningItem.activity}
                                         </Typography>
                                       ) : null}
-                                      {planningItem.duration ? (
+                                      {planningMeta.timeRange ||
+                                      planningMeta.durationLabel ? (
+                                        <ServiceSummaryMetaLine
+                                          timeRange={planningMeta.timeRange}
+                                          durationLabel={
+                                            planningMeta.durationLabel
+                                          }
+                                          staffName={section.teamMemberLabel}
+                                        />
+                                      ) : planningItem?.duration ? (
                                         <Typography
                                           sx={{
                                             mt: planningItem.activity

@@ -5,7 +5,11 @@ import type {
   CalendarEvent,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { CalendarEntry, CreateCalendarEntryRequest } from "../../../store/services/businessApi";
-import type { SelectedSlot } from "./calendar.utils";
+import {
+  type SelectedSlot,
+  wallClockDateFromDateTime,
+  wallClockTimeFromDateTime,
+} from "./calendar.utils";
 import { parseCalendarEntryNotes, serializeCalendarEntryNotes } from "./bookingEventDetails";
 import type { CalendarBookingDetails } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 
@@ -60,23 +64,16 @@ export function filterUuidServiceIds(ids: readonly string[]): string[] {
   return ids.filter((id) => UUID_RE.test(id));
 }
 
-const toDateTimeInput = (date: string, time: string) => `${date}T${time}:00`;
-
-const timeFromIso = (value?: string | null) => {
-  if (!value) return "08:00";
-  if (/^\d{2}:\d{2}/.test(value)) return value.slice(0, 5);
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "08:00";
-  return parsed.toISOString().slice(11, 16);
+const toDateTimeInput = (date: string, time: string) => {
+  const hhmm = wallClockTimeFromDateTime(time) ?? time.slice(0, 5);
+  return `${date}T${hhmm}:00`;
 };
 
-const dateFromValue = (value?: string | null) => {
-  if (!value) return new Date().toISOString().slice(0, 10);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return new Date().toISOString().slice(0, 10);
-  return parsed.toISOString().slice(0, 10);
-};
+const timeFromIso = (value?: string | null) =>
+  wallClockTimeFromDateTime(value) ?? "08:00";
+
+const dateFromValue = (value?: string | null) =>
+  wallClockDateFromDateTime(value) ?? new Date().toISOString().slice(0, 10);
 
 export function buildCreateCalendarEntryPayload(input: {
   selectedSlot: SelectedSlot;

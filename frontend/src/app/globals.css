@@ -33,6 +33,21 @@ body {
   padding-right: 0 !important;
 }
 
+/*
+  MUI only sets overflow:hidden on body. With scrollbar-gutter on html the
+  page scrollbar stays visible behind drawers/modals. Hide it while overlays
+  are open so only the panel itself can scroll.
+*/
+html.mollure-overlay-open,
+html.mollure-overlay-open body {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
+html.mollure-overlay-open {
+  scrollbar-gutter: auto;
+}
+
 .mui-fixed {
   padding-right: 0 !important;
 }

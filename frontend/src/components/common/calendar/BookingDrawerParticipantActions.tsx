@@ -1,13 +1,14 @@
 "use client";
 
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
-import { Box, ButtonBase, Stack } from "@mui/material";
+import { Box, ButtonBase, Stack, Tooltip } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../../ui/typography";
 
 export type BookingDrawerParticipantKind =
   | "guest"
   | "model"
+  | "guestModel"
   | "planning"
   | "buffer";
 
@@ -19,6 +20,7 @@ type BookingDrawerParticipantActionsProps = {
   variant?: "panel" | "inline";
   onAddGuest?: () => void;
   onAddModel?: () => void;
+  onAddGuestModel?: () => void;
   onAddPlanning?: () => void;
   onAddBuffer?: () => void;
 };
@@ -26,24 +28,33 @@ type BookingDrawerParticipantActionsProps = {
 const LABELS: Record<BookingDrawerParticipantKind, string> = {
   guest: "Add Guest",
   model: "Add Model",
+  guestModel: "Add Guest/Model",
   planning: "Add Planning",
   buffer: "Add Buffer",
 };
 
+const HINTS: Partial<Record<BookingDrawerParticipantKind, string>> = {
+  planning: "Client-facing",
+  buffer: "Internal-only",
+};
+
 function AddPersonButton({
   label,
+  hint,
   onClick,
   disabled,
 }: {
   label: string;
+  hint?: string;
   onClick: () => void;
   disabled?: boolean;
 }) {
   const m = useTheme().palette.mollure;
-  return (
+  const button = (
     <ButtonBase
       onClick={onClick}
       disabled={disabled}
+      aria-label={hint ? `${label} (${hint})` : label}
       sx={{
         border: `1px solid ${alpha(m.navy, 0.14)}`,
         borderRadius: "10px",
@@ -90,6 +101,15 @@ function AddPersonButton({
       </BodyText>
     </ButtonBase>
   );
+
+  if (!hint) return button;
+  return (
+    <Tooltip title={hint} enterDelay={400}>
+      <Box component="span" sx={{ display: "inline-flex", flexShrink: 0 }}>
+        {button}
+      </Box>
+    </Tooltip>
+  );
 }
 
 export default function BookingDrawerParticipantActions({
@@ -99,6 +119,7 @@ export default function BookingDrawerParticipantActions({
   variant = "panel",
   onAddGuest,
   onAddModel,
+  onAddGuestModel,
   onAddPlanning,
   onAddBuffer,
 }: BookingDrawerParticipantActionsProps) {
@@ -111,18 +132,31 @@ export default function BookingDrawerParticipantActions({
   > = {
     guest: onAddGuest,
     model: onAddModel,
+    guestModel: onAddGuestModel ?? onAddGuest ?? onAddModel,
     planning: onAddPlanning,
     buffer: onAddBuffer,
   };
 
   const buttons = (
-    <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+    <Stack
+      direction="row"
+      spacing={1}
+      useFlexGap
+      sx={{
+        flexWrap: "nowrap",
+        overflowX: "auto",
+        WebkitOverflowScrolling: "touch",
+        "&::-webkit-scrollbar": { height: 0 },
+      }}
+    >
       {kinds.map((kind) => {
-        const needsNameField = kind === "guest" || kind === "model";
+        const needsNameField =
+          kind === "guest" || kind === "model" || kind === "guestModel";
         return (
           <AddPersonButton
             key={kind}
             label={LABELS[kind]}
+            hint={HINTS[kind]}
             onClick={() => handlers[kind]?.()}
             disabled={disabled || (needsNameField && nameFieldOpen)}
           />

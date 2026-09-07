@@ -45,10 +45,33 @@ export function addMinutesToTime(start: string, mins: number) {
   return fmtTimeLabel(minutesSinceMidnight(start) + mins);
 }
 
-/** Positive minutes from start to end; 0 when either time is missing or end is not after start. */
+/** Minutes from start to end; 0 when either time is missing. May be negative if end is earlier. */
 export function minutesBetweenTimes(start: string, end: string) {
   if (!start.trim() || !end.trim()) return 0;
-  return minutesSinceMidnight(end) - minutesSinceMidnight(start);
+  const diff = minutesSinceMidnight(end) - minutesSinceMidnight(start);
+  return Number.isFinite(diff) ? diff : 0;
+}
+
+/**
+ * Duration between two clock times for display.
+ * If end is earlier on the clock, treat it as the next day.
+ */
+export function positiveMinutesBetweenTimes(start: string, end: string) {
+  const diff = minutesBetweenTimes(start, end);
+  if (diff > 0) return diff;
+  if (diff === 0 || !Number.isFinite(diff)) return 0;
+  return diff + 24 * 60;
+}
+
+export function formatTimeWindowDurationLabel(
+  start?: string | null,
+  end?: string | null,
+  fallbackLabel?: string | null,
+) {
+  const fromTimes = positiveMinutesBetweenTimes(start ?? "", end ?? "");
+  if (fromTimes > 0) return formatDurationMinsLabel(fromTimes);
+  const fromFallback = parseDurationMinsLabel(fallbackLabel);
+  return fromFallback ? formatDurationMinsLabel(fromFallback) : "";
 }
 
 export function formatServiceTimeRange(start?: string, end?: string) {
@@ -365,4 +388,84 @@ export function formatBookingServiceLineMeta(service: BookingServiceLineItem) {
     );
   }
   return parts.join(" • ");
+}
+
+export function reorderById<T extends { id: string }>(
+  list: readonly T[],
+  fromId: string,
+  toId: string,
+): T[] {
+  if (fromId === toId) return [...list];
+  const from = list.findIndex((item) => item.id === fromId);
+  const to = list.findIndex((item) => item.id === toId);
+  if (from < 0 || to < 0) return [...list];
+  const next = [...list];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
+}
+
+export function reorderMatchingItems<T extends { id: string }>(
+  list: readonly T[],
+  fromId: string,
+  toId: string,
+  match: (item: T) => boolean,
+): T[] {
+  const subset = list.filter(match);
+  const reordered = reorderById(subset, fromId, toId);
+  let index = 0;
+  return list.map((item) => (match(item) ? reordered[index++]! : item));
+}
+
+/** Reorder a service container and keep windows sequential from the original first start. */
+export function reorderServicesInContainer(
+  services: readonly BookingServiceLineItem[],
+  fromId: string,
+  toId: string,
+): BookingServiceLineItem[] {
+  const next = reorderById(services, fromId, toId);
+  const anchor =
+    services[0]?.startTime?.trim() ||
+    next.find((service) => service.startTime?.trim())?.startTime;
+  return recalculateServiceStartEndTimes(next, anchor);
+}
+
+export type PlanningWindowItem = {
+  planningStartTime?: string;
+  planningEndTime?: string;
+  planningDuration?: string;
+};
+
+/** Lay planning rows out sequentially from `bookingStart` using each row's duration. */
+export function resequencePlanningWindows<T extends PlanningWindowItem>(
+  items: readonly T[],
+  bookingStart?: string,
+): T[] {
+  const anchor =
+    bookingStart?.trim() ||
+    items.find((item) => item.planningStartTime?.trim())?.planningStartTime?.trim() ||
+    "";
+  if (!anchor) return [...items];
+  let cursor = anchor;
+  return items.map((item) => {
+    const duration =
+      parseDurationMinsLabel(item.planningDuration) ||
+      positiveMinutesBetweenTimes(
+        item.planningStartTime ?? "",
+        item.planningEndTime ?? "",
+      ) ||
+      0;
+    const startTime = cursor;
+    const endTime = duration > 0 ? addMinutesToTime(startTime, duration) : "";
+    if (endTime) cursor = endTime;
+    return {
+      ...item,
+      planningStartTime: startTime,
+      planningEndTime: endTime || undefined,
+      planningDuration:
+        duration > 0
+          ? formatDurationMinsLabel(duration)
+          : item.planningDuration,
+    };
+  });
 }

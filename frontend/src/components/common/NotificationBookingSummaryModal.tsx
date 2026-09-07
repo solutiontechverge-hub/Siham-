@@ -25,7 +25,7 @@ import {
   setActiveBookingSession,
 } from "../../app/clients/booking/clientBookingSession";
 import { markBookingUpdateSeen } from "./calendar/bookingUpdateSeen";
-import { buildBookingSummarySections } from "./client-booking/buildBookingSummarySections";
+import { buildBookingSummarySections, bookingParticipantDisplayHeading, participantHeadingOrdinal, participantOrdinals, planningScheduleMeta } from "./client-booking/buildBookingSummarySections";
 
 export const FOCUS_BOOKING_REF_KEY = "mollure:focus_booking_ref";
 export const FOCUS_BOOKING_ID_KEY = "mollure:focus_booking_id";
@@ -415,7 +415,13 @@ export default function NotificationBookingSummaryModal({
                             : 0,
                       }}
                     >
-                      {section.title}
+                      {bookingParticipantDisplayHeading(
+                        section,
+                        participantHeadingOrdinal(
+                          section,
+                          participantOrdinals(summarySections),
+                        ),
+                      )}
                       {section.teamMemberLabel
                         ? ` · ${section.teamMemberLabel}`
                         : ""}
@@ -462,7 +468,8 @@ export default function NotificationBookingSummaryModal({
                         >
                           {[
                             section.planningItem.activity,
-                            section.planningItem.duration,
+                            planningScheduleMeta(section).timeRange,
+                            planningScheduleMeta(section).durationLabel,
                           ]
                             .filter(Boolean)
                             .join(" · ") || "Planning"}
