@@ -240,6 +240,84 @@ function serviceLineKey(service: CalendarBookingServiceItem) {
   return `${service.guestId ?? ""}:${service.id}`;
 }
 
+function phonePart(value?: string | null) {
+  return String(value ?? "").replace(/[\s-]/g, "").trim();
+}
+
+/**
+ * Notes store client+guest lines in `services`; the drawer keeps guests separate.
+ * Flatten so silent/ER diffs do not mix those shapes.
+ */
+export function flattenBookingServices(input: {
+  services?: readonly CalendarBookingServiceItem[];
+  guests?: readonly CalendarBookingGuestItem[];
+}): CalendarBookingServiceItem[] {
+  const guestLinesFromGuests = (input.guests ?? []).flatMap((guest) =>
+    (guest.services ?? []).map((service) => ({
+      ...service,
+      guestId: service.guestId ?? guest.id,
+    })),
+  );
+  const clientLines = (input.services ?? []).filter(
+    (service) => !String(service.guestId ?? "").trim(),
+  );
+  const guestLinesFromServices = (input.services ?? []).filter((service) =>
+    Boolean(String(service.guestId ?? "").trim()),
+  );
+  const guestLines = guestLinesFromGuests.length
+    ? guestLinesFromGuests
+    : guestLinesFromServices;
+  return [...clientLines, ...guestLines];
+}
+
+type IdentityPerson = {
+  id?: string;
+  name?: string;
+  email?: string;
+  phoneCode?: string;
+  phoneNumber?: string;
+  isRequester?: boolean;
+  participantType?: CalendarBookingGuestItem["participantType"];
+};
+
+function productLineKey(product: {
+  id: string;
+  guestId?: string | null;
+}) {
+  return `${product.guestId ?? ""}:${product.id}`;
+}
+
+/** Notes store client+guest products flat; drawer keeps guest products nested. */
+export function flattenBookingProducts(input: {
+  products?: readonly CalendarBookingProductItem[];
+  guests?: readonly CalendarBookingGuestItem[];
+}): CalendarBookingProductItem[] {
+  const guestLinesFromGuests = (input.guests ?? []).flatMap((guest) =>
+    (guest.products ?? []).map((product) => ({
+      ...product,
+      guestId: product.guestId ?? guest.id,
+    })),
+  );
+  const clientLines = (input.products ?? []).filter(
+    (product) => !String(product.guestId ?? "").trim(),
+  );
+  const guestLinesFromProducts = (input.products ?? []).filter((product) =>
+    Boolean(String(product.guestId ?? "").trim()),
+  );
+  const guestLines = guestLinesFromGuests.length
+    ? guestLinesFromGuests
+    : guestLinesFromProducts;
+  const seen = new Set<string>();
+  const next: CalendarBookingProductItem[] = [];
+  for (const product of [...clientLines, ...guestLines]) {
+    const key = productLineKey(product);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    next.push(product);
+  }
+  return next;
+}
+
 /** Name/price/duration/staff — ignores start/end so reorder is not treated as Edited. */
 function serviceContentSignature(service: CalendarBookingServiceItem) {
   return JSON.stringify({
@@ -330,6 +408,67 @@ function guestsById(guests: readonly CalendarBookingGuestItem[]) {
   return new Map(guests.map((guest) => [guestKey(guest), guest]));
 }
 
+function peopleAsIdentityGuests(
+  people?: readonly IdentityPerson[],
+): CalendarBookingGuestItem[] {
+  return (people ?? [])
+    .filter((person) => !person.isRequester && person.id)
+    .filter((person) =>
+      isIdentityGuest({
+        id: String(person.id),
+        name: person.name ?? "",
+        participantType: person.participantType,
+        services: [],
+        products: [],
+      }),
+    )
+    .map((person) => ({
+      id: String(person.id),
+      name: person.name ?? "",
+      email: person.email,
+      phoneCode: person.phoneCode,
+      phoneNumber: person.phoneNumber,
+      participantType: person.participantType ?? "guest",
+      services: [],
+      products: [],
+    }));
+}
+
+/** Prefer drawer/notes guests; fall back to clientSnapshot people (DL models). */
+export function resolveIdentityGuests(
+  guests?: readonly CalendarBookingGuestItem[],
+  people?: readonly IdentityPerson[],
+): CalendarBookingGuestItem[] {
+  const fromGuests = identityGuests(guests);
+  if (fromGuests.length) return [...fromGuests];
+  return peopleAsIdentityGuests(people);
+}
+
+function attachGuestServiceLines(
+  guests: readonly CalendarBookingGuestItem[],
+  services: readonly CalendarBookingServiceItem[],
+): CalendarBookingGuestItem[] {
+  return guests.map((guest) => {
+    if (guest.services?.length) return guest;
+    const attached = services.filter(
+      (service) => String(service.guestId ?? "") === guestKey(guest),
+    );
+    return attached.length ? { ...guest, services: attached } : guest;
+  });
+}
+
+function guestIdentityFieldsChanged(
+  original: CalendarBookingGuestItem,
+  guest: CalendarBookingGuestItem,
+) {
+  return (
+    (original.name ?? "").trim() !== (guest.name ?? "").trim() ||
+    (original.email ?? "").trim() !== (guest.email ?? "").trim() ||
+    phonePart(original.phoneCode) !== phonePart(guest.phoneCode) ||
+    phonePart(original.phoneNumber) !== phonePart(guest.phoneNumber)
+  );
+}
+
 /** Guest/model name, email, or phone — same people, no add/remove. */
 function guestIdentityChangedOnly(
   previous: readonly CalendarBookingGuestItem[] | undefined,
@@ -342,14 +481,106 @@ function guestIdentityChangedOnly(
   const prevById = guestsById(prev);
   return curr.some((guest) => {
     const original = prevById.get(guestKey(guest));
-    if (!original) return false;
-    return (
-      (original.name ?? "").trim() !== (guest.name ?? "").trim() ||
-      (original.email ?? "").trim() !== (guest.email ?? "").trim() ||
-      (original.phoneCode ?? "") !== (guest.phoneCode ?? "") ||
-      (original.phoneNumber ?? "").trim() !== (guest.phoneNumber ?? "").trim()
-    );
+    return original ? guestIdentityFieldsChanged(original, guest) : false;
   });
+}
+
+function reorderedServiceIds(
+  previous: readonly CalendarBookingServiceItem[],
+  current: readonly CalendarBookingServiceItem[],
+): string[] {
+  if (!isServiceReorderOnly(previous, current)) return [];
+  const ids: string[] = [];
+  for (let i = 0; i < current.length; i += 1) {
+    if (serviceLineKey(current[i]) !== serviceLineKey(previous[i])) {
+      ids.push(current[i].id);
+    }
+  }
+  return [...new Set(ids)];
+}
+
+export type SilentUpdatedFields = {
+  phoneUpdated: boolean;
+  guestIds: string[];
+  serviceIds: string[];
+};
+
+const EMPTY_SILENT_UPDATED_FIELDS: SilentUpdatedFields = {
+  phoneUpdated: false,
+  guestIds: [],
+  serviceIds: [],
+};
+
+export type SilentUpdateSnapshotInput = {
+  phoneCode?: string | null;
+  phoneNumber?: string | null;
+  guests?: readonly CalendarBookingGuestItem[] | null;
+  services?: readonly CalendarBookingServiceItem[] | null;
+  people?: readonly IdentityPerson[] | null;
+};
+
+/**
+ * Which silent-safe fields changed vs the saved snapshot.
+ * Used for first-visit Updated chips on the changed item only.
+ */
+export function detectSilentUpdatedFields(input: {
+  snapshot?: SilentUpdateSnapshotInput | null;
+  currentPhoneCode?: string | null;
+  currentPhoneNumber?: string | null;
+  currentGuests?: readonly CalendarBookingGuestItem[] | null;
+  currentPeople?: readonly IdentityPerson[] | null;
+  currentServices?: readonly CalendarBookingServiceItem[] | null;
+}): SilentUpdatedFields {
+  const snapshot = input.snapshot;
+  if (!snapshot) return { ...EMPTY_SILENT_UPDATED_FIELDS };
+
+  const phoneUpdated =
+    phonePart(snapshot.phoneCode) !== phonePart(input.currentPhoneCode) ||
+    phonePart(snapshot.phoneNumber) !== phonePart(input.currentPhoneNumber);
+
+  const previousGuests = resolveIdentityGuests(
+    snapshot.guests ?? undefined,
+    snapshot.people ?? undefined,
+  );
+  const currentGuests = resolveIdentityGuests(
+    input.currentGuests ?? undefined,
+    input.currentPeople ?? undefined,
+  );
+  const prevById = guestsById(previousGuests);
+  const guestIds = currentGuests
+    .filter((guest) => {
+      const original = prevById.get(guestKey(guest));
+      return original ? guestIdentityFieldsChanged(original, guest) : false;
+    })
+    .map((guest) => guestKey(guest))
+    .filter(Boolean);
+
+  const previousServices = flattenBookingServices({
+    services: snapshot.services ?? undefined,
+    guests: snapshot.guests ?? undefined,
+  });
+  const currentServices = flattenBookingServices({
+    services: input.currentServices ?? undefined,
+    guests: input.currentGuests ?? undefined,
+  });
+  const nestedReorderIds = identityGuests(snapshot.guests ?? undefined).flatMap(
+    (guest) => {
+      const updated = guestsById(currentGuests).get(guestKey(guest));
+      if (!updated) return [];
+      return reorderedServiceIds(guest.services ?? [], updated.services ?? []);
+    },
+  );
+
+  return {
+    phoneUpdated,
+    guestIds: [...new Set(guestIds)],
+    serviceIds: [
+      ...new Set([
+        ...reorderedServiceIds(previousServices, currentServices),
+        ...nestedReorderIds,
+      ]),
+    ],
+  };
 }
 
 export function guestsHaveServiceReorderOnly(
@@ -396,17 +627,20 @@ function guestsHaveApprovalRequiredServiceChanges(
   previous: readonly CalendarBookingGuestItem[] | undefined,
   next: readonly CalendarBookingGuestItem[] | undefined,
 ) {
-  const prev = previous ?? [];
-  const curr = next ?? [];
-  if (guestIdsKey(prev) !== guestIdsKey(curr)) return true;
+  const prev = identityGuests(previous);
+  const curr = identityGuests(next);
+  if (identityGuestIdsKey(prev) !== identityGuestIdsKey(curr)) return true;
   const currById = guestsById(curr);
   for (const guest of prev) {
     const updated = currById.get(guestKey(guest));
     if (!updated) return true;
-    if (listHasContentChanges(guest.services ?? [], updated.services ?? [])) {
+    const previousLines = guest.services ?? [];
+    const currentLines = updated.services ?? [];
+    if (!previousLines.length || !currentLines.length) continue;
+    if (listHasContentChanges(previousLines, currentLines)) {
       return true;
     }
-    if (listHasTimeOnlyEdits(guest.services ?? [], updated.services ?? [])) {
+    if (listHasTimeOnlyEdits(previousLines, currentLines)) {
       return true;
     }
   }
@@ -422,6 +656,8 @@ export function isSilentSafeBookingChange(input: {
   currentServices?: readonly CalendarBookingServiceItem[];
   previousGuests?: readonly CalendarBookingGuestItem[];
   currentGuests?: readonly CalendarBookingGuestItem[];
+  previousPeople?: readonly IdentityPerson[];
+  currentPeople?: readonly IdentityPerson[];
   previousPhoneCode?: string;
   currentPhoneCode?: string;
   previousPhoneNumber?: string;
@@ -430,28 +666,62 @@ export function isSilentSafeBookingChange(input: {
   currentProducts?: readonly CalendarBookingProductItem[];
   scheduleChanged: boolean;
 }): boolean {
-  const previousServices = input.previousServices ?? [];
-  const currentServices = input.currentServices ?? [];
-  const phoneChanged =
-    (input.previousPhoneCode ?? "") !== (input.currentPhoneCode ?? "") ||
-    (input.previousPhoneNumber ?? "") !== (input.currentPhoneNumber ?? "");
-  const namesChanged = guestIdentityChangedOnly(
+  const previousGuests = resolveIdentityGuests(
     input.previousGuests,
-    input.currentGuests,
+    input.previousPeople,
   );
+  const currentGuests = resolveIdentityGuests(
+    input.currentGuests,
+    input.currentPeople,
+  );
+  const previousServices = flattenBookingServices({
+    services: input.previousServices,
+    guests: input.previousGuests,
+  });
+  const currentServices = flattenBookingServices({
+    services: input.currentServices,
+    guests: input.currentGuests,
+  });
+  const previousProducts = flattenBookingProducts({
+    products: input.previousProducts,
+    guests: input.previousGuests,
+  });
+  const currentProducts = flattenBookingProducts({
+    products: input.currentProducts,
+    guests: input.currentGuests,
+  });
+  const catalogProducts = (products: readonly CalendarBookingProductItem[]) =>
+    products.filter((product) => !String(product.guestId ?? "").trim());
+  const guestProducts = (products: readonly CalendarBookingProductItem[]) =>
+    products.filter((product) => Boolean(String(product.guestId ?? "").trim()));
+  const currentHasNestedGuestProducts = (input.currentGuests ?? []).some(
+    (guest) => (guest.products ?? []).length > 0,
+  );
+  const phoneChanged =
+    phonePart(input.previousPhoneCode) !== phonePart(input.currentPhoneCode) ||
+    phonePart(input.previousPhoneNumber) !== phonePart(input.currentPhoneNumber);
+  const namesChanged = guestIdentityChangedOnly(previousGuests, currentGuests);
   const servicesReordered = hasServiceReorderOnly({
     previousServices,
     currentServices,
-    previousGuests: input.previousGuests,
-    currentGuests: input.currentGuests,
+    previousGuests,
+    currentGuests,
   });
   const hasSilentSafe = phoneChanged || namesChanged || servicesReordered;
   if (!hasSilentSafe) return false;
 
-  const productChanged = detectEditedProductIds(
-    input.previousProducts ?? [],
-    input.currentProducts ?? [],
-  ).length > 0;
+  const catalogChanged =
+    detectEditedProductIds(
+      catalogProducts(previousProducts),
+      catalogProducts(currentProducts),
+    ).length > 0;
+  const guestProductChanged = currentHasNestedGuestProducts
+    ? detectEditedProductIds(
+        guestProducts(previousProducts),
+        guestProducts(currentProducts),
+      ).length > 0
+    : false;
+  const productChanged = catalogChanged || guestProductChanged;
   const clientContentChanged = listHasContentChanges(
     previousServices,
     currentServices,
@@ -461,12 +731,12 @@ export function isSilentSafeBookingChange(input: {
     currentServices,
   );
   const guestSetChanged =
-    guestIdsKey(input.previousGuests) !== guestIdsKey(input.currentGuests);
+    identityGuestIdsKey(previousGuests) !== identityGuestIdsKey(currentGuests);
   const guestServiceApprovalRequired =
     !guestSetChanged &&
     guestsHaveApprovalRequiredServiceChanges(
-      input.previousGuests,
-      input.currentGuests,
+      attachGuestServiceLines(previousGuests, previousServices),
+      attachGuestServiceLines(currentGuests, currentServices),
     );
 
   return !(

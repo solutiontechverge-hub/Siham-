@@ -153,6 +153,10 @@ export type BookingActivityBuildInput = {
       guests?: Array<{
         id?: string;
         name?: string | null;
+        email?: string | null;
+        phoneCode?: string | null;
+        phoneNumber?: string | null;
+        participantType?: "guest" | "model" | "planning" | "buffer";
         services?: Array<{
           id: string;
           name: string;
@@ -171,6 +175,15 @@ export type BookingActivityBuildInput = {
         startTime?: string;
         endTime?: string;
         guestId?: string | null;
+      }> | null;
+      people?: Array<{
+        id?: string;
+        name?: string;
+        email?: string;
+        phoneCode?: string;
+        phoneNumber?: string;
+        isRequester?: boolean;
+        participantType?: "guest" | "model" | "planning" | "buffer";
       }> | null;
       desiredLocation?: string | {
         street?: string;

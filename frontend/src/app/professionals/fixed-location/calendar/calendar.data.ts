@@ -227,6 +227,15 @@ export type CalendarBookingDetails = {
     phoneNumber?: string;
     guests?: CalendarBookingGuestItem[];
     services?: CalendarBookingServiceItem[];
+    people?: Array<{
+      id?: string;
+      name?: string;
+      email?: string;
+      phoneCode?: string;
+      phoneNumber?: string;
+      isRequester?: boolean;
+      participantType?: CalendarBookingGuestItem["participantType"];
+    }>;
     desiredLocation?: {
       street: string;
       number: string;

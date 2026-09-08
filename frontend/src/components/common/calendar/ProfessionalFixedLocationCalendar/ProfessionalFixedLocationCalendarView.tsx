@@ -124,6 +124,7 @@ import {
   detectEditedServiceIds,
   detectServiceLineChanges,
   detectProductLineChanges,
+  detectSilentUpdatedFields,
   isSilentSafeBookingChange,
   hasServiceReorderOnly,
   resolveLineChangeTags,
@@ -146,7 +147,10 @@ import {
 } from "../../client-booking/buildBookingSummarySections";
 import { syncEditRequestFromBookingApi } from "../../client-booking/syncEditRequestFromApi";
 import EditRequestIncomingNote from "../../client-booking/EditRequestIncomingNote";
-import { markBookingUpdateSeen } from "../bookingUpdateSeen";
+import {
+  markBookingUpdateSeen,
+  shouldShowSilentUpdatedTag,
+} from "../bookingUpdateSeen";
 import CalendarBlockTimeModal from "../CalendarBlockTimeModal";
 import CalendarDesignModal, {
   type CalendarDesignDraft,
@@ -1475,6 +1479,7 @@ export default function ProfessionalFixedLocationCalendar({
     React.useState(false);
   const [designOpen, setDesignOpen] = React.useState(false);
   const [slotDrawerOpen, setSlotDrawerOpen] = React.useState(false);
+  const [showSilentFieldTags, setShowSilentFieldTags] = React.useState(false);
   const [selectedSlot, setSelectedSlot] = React.useState<null | SelectedSlot>(
     null,
   );
@@ -2046,6 +2051,32 @@ export default function ProfessionalFixedLocationCalendar({
     const ebr = parseStoredEbrFromNotes(drawerEbrNotes);
     return isAwaitingClientChangeApproval(negotiationDetails, ebr);
   }, [drawerEbrNotes, negotiationDetails]);
+  const silentFieldUpdates = React.useMemo(() => {
+    if (!showSilentFieldTags || awaitingClientChangeApproval) {
+      return {
+        phoneUpdated: false,
+        guestIds: [] as string[],
+        serviceIds: [] as string[],
+      };
+    }
+    return detectSilentUpdatedFields({
+      snapshot: viewingBookingEvent?.details?.silentUpdateSnapshot,
+      currentPhoneCode: bookingPhoneDraft.phoneCode,
+      currentPhoneNumber: bookingPhoneDraft.phoneNumber,
+      currentGuests: bookingGuests,
+      currentPeople: viewingBookingEvent?.details?.clientSnapshot?.people,
+      currentServices: selectedServices,
+    });
+  }, [
+    awaitingClientChangeApproval,
+    bookingGuests,
+    bookingPhoneDraft.phoneCode,
+    bookingPhoneDraft.phoneNumber,
+    selectedServices,
+    showSilentFieldTags,
+    viewingBookingEvent?.details?.clientSnapshot?.people,
+    viewingBookingEvent?.details?.silentUpdateSnapshot,
+  ]);
   const drawerLineChangeSets = React.useMemo(() => {
     const ebr = parseStoredEbrFromNotes(drawerEbrNotes);
     const original =
@@ -2119,14 +2150,23 @@ export default function ProfessionalFixedLocationCalendar({
   ]);
   /** Per-item Edited / Added / Cancelled, plus Pending while client approval is outstanding. */
   const resolveServiceEditTag = React.useCallback(
-    (serviceId: string) =>
-      resolveLineChangeTags(serviceId, {
+    (serviceId: string) => {
+      const erTags = resolveLineChangeTags(serviceId, {
         editedIds: drawerLineChangeSets.edited,
         addedIds: drawerLineChangeSets.added,
         cancelledIds: drawerLineChangeSets.cancelled,
         awaitingApproval: awaitingClientChangeApproval,
-      }),
-    [awaitingClientChangeApproval, drawerLineChangeSets],
+      });
+      if (erTags.length) return erTags;
+      return silentFieldUpdates.serviceIds.includes(serviceId)
+        ? (["updated"] as const)
+        : [];
+    },
+    [
+      awaitingClientChangeApproval,
+      drawerLineChangeSets,
+      silentFieldUpdates.serviceIds,
+    ],
   );
 
   const cancelledServicesForDrawer = React.useMemo(() => {
@@ -5768,6 +5808,15 @@ export default function ProfessionalFixedLocationCalendar({
     ) {
       setBookingCheckoutOpen(false);
     }
+    setShowSilentFieldTags(
+      shouldShowSilentUpdatedTag({
+        silentUpdated: resolved.details?.silentUpdated,
+        viewer: "professional",
+        bookingRef: resolved.bookingCode ?? extractBookingId(resolved.id),
+        updatedAt: resolved.updatedAt,
+        lastEditedBy: resolved.details?.lastEditedBy ?? null,
+      }),
+    );
     markBookingUpdateSeen(
       "professional",
       resolved.bookingCode ?? extractBookingId(resolved.id),
@@ -5778,6 +5827,7 @@ export default function ProfessionalFixedLocationCalendar({
   React.useEffect(() => {
     if (!slotDrawerOpen) {
       lastLiveHydratedEventKeyRef.current = "";
+      setShowSilentFieldTags(false);
       return;
     }
     if (
@@ -9042,28 +9092,37 @@ export default function ProfessionalFixedLocationCalendar({
           previousGuests:
             silentBaseline?.guests ?? existingEvent.details?.guests,
           currentGuests: guestsForPersist,
+          previousPeople: existingEvent.details?.clientSnapshot?.people,
+          currentPeople: existingEvent.details?.clientSnapshot?.people,
           previousPhoneCode:
             silentBaseline?.phoneCode ?? existingEvent.details?.phoneCode,
           currentPhoneCode: details.phoneCode,
           previousPhoneNumber:
             silentBaseline?.phoneNumber ?? existingEvent.details?.phoneNumber,
           currentPhoneNumber: details.phoneNumber,
-          previousProducts: [
-            ...(silentBaseline?.products ?? originalProducts),
-            ...(silentBaseline?.uniqueItems ?? []),
+          previousProducts:
+            silentBaseline
+              ? [...silentBaseline.products, ...silentBaseline.uniqueItems]
+              : (existingEvent.details?.products ?? originalProducts),
+          currentProducts: details.products ?? [
+            ...selectedProducts,
+            ...bookingUniqueItems,
           ],
-          currentProducts: [...selectedProducts, ...bookingUniqueItems],
           scheduleChanged,
         });
         if (silentSafeOnly) {
           details.silentUpdated = true;
           details.lastEditedBy = "professional";
           details.silentUpdateSnapshot = {
-            phoneCode: existingEvent.details?.phoneCode,
-            phoneNumber: existingEvent.details?.phoneNumber,
-            guests: existingEvent.details?.guests,
+            phoneCode:
+              silentBaseline?.phoneCode ?? existingEvent.details?.phoneCode,
+            phoneNumber:
+              silentBaseline?.phoneNumber ?? existingEvent.details?.phoneNumber,
+            guests: silentBaseline?.guests ?? existingEvent.details?.guests,
+            services:
+              silentBaseline?.services ?? existingEvent.details?.services,
+            people: existingEvent.details?.clientSnapshot?.people,
             desiredLocation: existingEvent.details?.desiredLocation,
-            services: existingEvent.details?.services,
           };
         } else {
           if (lineChanges.edited.length) {
@@ -9236,23 +9295,25 @@ export default function ProfessionalFixedLocationCalendar({
             const bookingRef =
               existingEvent.bookingCode ?? extractBookingId(editingEventId);
             consumeConfirmedEditGrant(bookingRef);
-            setEvents((prev) =>
-              prev.map((event) =>
-                event.id === editingEventId
-                  ? {
-                      ...event,
-                      bookingScenario:
-                        event.bookingScenario === "ER" ||
-                        event.bookingScenario === "E" ||
-                        nextEvent.bookingScenario === "E"
-                          ? "E"
-                          : event.bookingScenario,
-                    }
-                  : event,
-              ),
-            );
+            if (!details.silentUpdated) {
+              setEvents((prev) =>
+                prev.map((event) =>
+                  event.id === editingEventId
+                    ? {
+                        ...event,
+                        bookingScenario:
+                          event.bookingScenario === "ER" ||
+                          event.bookingScenario === "E" ||
+                          nextEvent.bookingScenario === "E"
+                            ? "E"
+                            : event.bookingScenario,
+                      }
+                    : event,
+                ),
+              );
+            }
           }
-          if (existingEvent && selectedSlot) {
+          if (existingEvent && selectedSlot && !details.silentUpdated) {
             if (existingEvent.date !== selectedSlot.date) {
               void dispatchBookingEventIfApi(
                 editingEventId,
@@ -15262,6 +15323,14 @@ export default function ProfessionalFixedLocationCalendar({
                                       >
                                         {guest.name || sectionLabel}
                                       </BodyText>
+                                      {isFirstGuestBlock &&
+                                      (participantKind === "guest" ||
+                                        participantKind === "model") &&
+                                      silentFieldUpdates.guestIds.includes(
+                                        guest.id,
+                                      ) ? (
+                                        <BookingEditedTag variant="updated" />
+                                      ) : null}
                                     </Stack>
                                   )}
                                   {isFirstGuestBlock &&
@@ -15939,6 +16008,11 @@ export default function ProfessionalFixedLocationCalendar({
                             addClientSource === "guest"
                               ? "Contact Number"
                               : "Contact Number (optional)"
+                          }
+                          labelAdornment={
+                            silentFieldUpdates.phoneUpdated ? (
+                              <BookingEditedTag variant="updated" />
+                            ) : null
                           }
                           phonePlaceholder="+316xxxxxxxx"
                           required={addClientSource === "guest"}

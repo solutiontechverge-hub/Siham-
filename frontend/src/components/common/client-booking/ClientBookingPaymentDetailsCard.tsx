@@ -9,7 +9,7 @@ import {
   serviceTimeRangeLabel,
 } from "../../../app/clients/booking/booking-time";
 import { ServiceSummaryMetaLine } from "../ServiceSummaryMetaLine";
-import { BookingChangeTags } from "../calendar/BookingEditedTag";
+import BookingEditedTag, { BookingChangeTags } from "../calendar/BookingEditedTag";
 import BookingPriceBreakdown from "../booking-finance/BookingPriceBreakdown";
 import {
   lineDiscountAmountFromItems,
@@ -212,6 +212,9 @@ type Props = {
   editedServiceIds?: readonly string[];
   addedServiceIds?: readonly string[];
   cancelledServiceIds?: readonly string[];
+  /** First-visit silent Updated chips — never mixed with ER Edited/Added/Cancelled. */
+  updatedGuestIds?: readonly string[];
+  updatedServiceIds?: readonly string[];
   cancelledServices?: ReadonlyArray<ClientBookingDraft["services"][number]>;
   products?: readonly BookingEditSuggestedProduct[];
   editedProductIds?: readonly string[];
@@ -254,6 +257,8 @@ export default function ClientBookingPaymentDetailsCard({
   editedServiceIds = [],
   addedServiceIds = [],
   cancelledServiceIds = [],
+  updatedGuestIds = [],
+  updatedServiceIds = [],
   cancelledServices = [],
   products = [],
   editedProductIds = [],
@@ -281,18 +286,22 @@ export default function ClientBookingPaymentDetailsCard({
   );
 
   const serviceChangeTags = React.useCallback(
-    (serviceId: string) =>
-      resolveLineChangeTags(serviceId, {
+    (serviceId: string) => {
+      const erTags = resolveLineChangeTags(serviceId, {
         editedIds: editedServiceIds,
         addedIds: addedServiceIds,
         cancelledIds: cancelledServiceIds,
         awaitingApproval: changesAwaitingApproval,
-      }),
+      });
+      if (erTags.length) return erTags;
+      return updatedServiceIds.includes(serviceId) ? ["updated" as const] : [];
+    },
     [
       addedServiceIds,
       cancelledServiceIds,
       changesAwaitingApproval,
       editedServiceIds,
+      updatedServiceIds,
     ],
   );
 
@@ -571,7 +580,7 @@ export default function ClientBookingPaymentDetailsCard({
     </Box>
   );
 
-  const renderPersonHeader = (name: string) => (
+  const renderPersonHeader = (name: string, showUpdated?: boolean) => (
     <Stack
       direction="row"
       alignItems="center"
@@ -600,6 +609,7 @@ export default function ClientBookingPaymentDetailsCard({
       >
         {name}
       </BodyText>
+      {showUpdated ? <BookingEditedTag variant="updated" /> : null}
     </Stack>
   );
 
@@ -687,6 +697,23 @@ export default function ClientBookingPaymentDetailsCard({
     const personName = section.title?.trim() || "";
     const roleHeading = heading?.trim() || "";
     const showInnerName = asPersonCard && Boolean(personName || roleHeading);
+    const participantId =
+      section.participantId ||
+      String(section.key).split("::")[0] ||
+      section.key;
+    const isFirstPersonBlock =
+      chronologicalSections.find((row) => {
+        const rowId =
+          row.participantId || String(row.key).split("::")[0] || row.key;
+        return rowId === participantId;
+      })?.key === section.key;
+    const isIdentityPerson =
+      section.participantType === "guest" ||
+      section.participantType === "model";
+    const showGuestUpdated =
+      isFirstPersonBlock &&
+      isIdentityPerson &&
+      updatedGuestIds.includes(String(participantId));
     return (
     <Box key={section.key}>
       {asPersonCard && roleHeading && !hideRoleHeading ? (
@@ -715,7 +742,9 @@ export default function ClientBookingPaymentDetailsCard({
         </BodyText>
       ) : null}
     <Box sx={asPersonCard ? nestedCardSx : undefined}>
-      {showInnerName ? renderPersonHeader(personName || roleHeading) : null}
+      {showInnerName
+        ? renderPersonHeader(personName || roleHeading, showGuestUpdated)
+        : null}
       <Stack spacing={1.5}>
       {(() => {
         const meta = planningScheduleMeta(section);

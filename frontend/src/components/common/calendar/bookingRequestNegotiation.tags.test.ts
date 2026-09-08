@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import {
   detectProductLineChanges,
   detectServiceLineChanges,
+  detectSilentUpdatedFields,
   hasServiceReorderOnly,
   isAwaitingClientChangeApproval,
   isSilentSafeBookingChange,
@@ -263,6 +264,185 @@ assert.equal(
     currentGuests: guestReorderNext,
   }),
   true,
+);
+
+// Drawer compares client-only selectedServices vs notes.services that already
+// include guest lines — that must still count as a silent phone change.
+assert.equal(
+  isSilentSafeBookingChange({
+    previousServices: [...original, { ...guestA.services[0] }],
+    currentServices: original,
+    previousGuests: [guestA],
+    currentGuests: [guestA],
+    previousPhoneCode: "+31",
+    currentPhoneCode: "+31",
+    previousPhoneNumber: "600000000",
+    currentPhoneNumber: "611111111",
+    previousProducts: [],
+    currentProducts: [],
+    scheduleChanged: false,
+  }),
+  true,
+);
+
+// Approval-required content + phone → Edit Request lane, not Updated.
+assert.equal(
+  isSilentSafeBookingChange({
+    previousServices: original,
+    currentServices: [{ ...original[0], price: 55 }],
+    previousGuests: [guestA],
+    currentGuests: [guestA],
+    previousPhoneCode: "+31",
+    currentPhoneCode: "+31",
+    previousPhoneNumber: "600000000",
+    currentPhoneNumber: "611111111",
+    previousProducts: [],
+    currentProducts: [],
+    scheduleChanged: false,
+  }),
+  false,
+);
+
+assert.deepEqual(
+  resolveLineChangeTags("cut", {
+    editedIds: ["cut"],
+    awaitingApproval: true,
+  }),
+  ["edited", "pending"],
+);
+
+// Guest name only must stay silent even when notes products are flattened
+// (client + unique + guest) and the drawer sends catalog + unique only.
+assert.equal(
+  isSilentSafeBookingChange({
+    previousServices: [...original, { ...guestA.services[0] }],
+    currentServices: original,
+    previousGuests: [guestA],
+    currentGuests: [{ ...guestA, name: "ali khan" }],
+    previousPhoneCode: "+31",
+    currentPhoneCode: "+31",
+    previousPhoneNumber: "600000000",
+    currentPhoneNumber: "600000000",
+    previousProducts: [
+      { id: "oil", name: "Oil", price: 10, quantity: 1, unitPrice: 10 },
+      {
+        id: "oil",
+        name: "Oil",
+        price: 10,
+        quantity: 1,
+        unitPrice: 10,
+        guestId: "g-model",
+      },
+    ],
+    currentProducts: [
+      { id: "oil", name: "Oil", price: 10, quantity: 1, unitPrice: 10 },
+    ],
+    scheduleChanged: false,
+  }),
+  true,
+);
+
+// Desired-location model lives in clientSnapshot.people, not notes.guests.
+assert.equal(
+  isSilentSafeBookingChange({
+    previousServices: [...original, { ...guestA.services[0] }],
+    currentServices: original,
+    previousGuests: [],
+    currentGuests: [{ ...guestA, name: "ali khan" }],
+    previousPeople: [
+      { id: "g-model", name: "ali", participantType: "model" },
+    ],
+    currentPeople: [
+      { id: "g-model", name: "ali khan", participantType: "model" },
+    ],
+    previousPhoneCode: "+31",
+    currentPhoneCode: "+31",
+    previousPhoneNumber: "600000000",
+    currentPhoneNumber: "600000000",
+    previousProducts: [],
+    currentProducts: [],
+    scheduleChanged: false,
+  }),
+  true,
+);
+
+assert.deepEqual(
+  detectSilentUpdatedFields({
+    snapshot: {
+      phoneCode: "+31",
+      phoneNumber: "600000000",
+      guests: [guestA],
+      services: original,
+    },
+    currentPhoneCode: "+31",
+    currentPhoneNumber: "600000000",
+    currentGuests: [{ ...guestA, name: "ali khan" }],
+    currentServices: original,
+  }),
+  { phoneUpdated: false, guestIds: ["g-model"], serviceIds: [] },
+);
+
+assert.deepEqual(
+  detectSilentUpdatedFields({
+    snapshot: {
+      phoneCode: "+31",
+      phoneNumber: "600000000",
+      guests: [guestA],
+      services: original,
+    },
+    currentPhoneCode: "+31",
+    currentPhoneNumber: "611111111",
+    currentGuests: [guestA],
+    currentServices: original,
+  }),
+  { phoneUpdated: true, guestIds: [], serviceIds: [] },
+);
+
+assert.deepEqual(
+  detectSilentUpdatedFields({
+    snapshot: {
+      phoneCode: "+31",
+      phoneNumber: "600000000",
+      guests: guestReorderPrev,
+      services: original,
+    },
+    currentPhoneCode: "+31",
+    currentPhoneNumber: "600000000",
+    currentGuests: guestReorderNext,
+    currentServices: original,
+  }).serviceIds.sort(),
+  ["brow", "eyelash"],
+);
+
+assert.deepEqual(
+  detectSilentUpdatedFields({
+    snapshot: {
+      phoneCode: "+31",
+      phoneNumber: "600000000",
+      guests: [],
+      people: [{ id: "g-model", name: "ali", participantType: "model" }],
+      services: original,
+    },
+    currentPhoneCode: "+31",
+    currentPhoneNumber: "600000000",
+    currentGuests: [{ ...guestA, name: "umerarshad" }],
+    currentPeople: [
+      { id: "g-model", name: "umerarshad", participantType: "model" },
+    ],
+    currentServices: original,
+  }),
+  { phoneUpdated: false, guestIds: ["g-model"], serviceIds: [] },
+);
+
+assert.deepEqual(
+  detectSilentUpdatedFields({
+    snapshot: null,
+    currentPhoneCode: "+31",
+    currentPhoneNumber: "611111111",
+    currentGuests: [{ ...guestA, name: "ali khan" }],
+    currentServices: original,
+  }),
+  { phoneUpdated: false, guestIds: [], serviceIds: [] },
 );
 
 console.log("bookingRequestNegotiation.tags.test.ts passed");

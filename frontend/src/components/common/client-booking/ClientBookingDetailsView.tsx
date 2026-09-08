@@ -32,7 +32,10 @@ import {
   setActiveBookingSession,
   unlockEbrDraft,
 } from "../../../app/clients/booking/clientBookingSession";
-import { markBookingUpdateSeen } from "../calendar/bookingUpdateSeen";
+import {
+  hasUnseenBookingUpdate,
+  markBookingUpdateSeen,
+} from "../calendar/bookingUpdateSeen";
 import { enrichClientBookingRecord } from "../../../app/clients/booking/clientBookingDraftCache";
 import { clearPublicProfileBookingSelection } from "../../../data/publicProfileBookingSelection";
 import ClientBookingCancelDialog from "./ClientBookingCancelDialog";
@@ -95,6 +98,7 @@ import {
   detectEditedServiceIds,
   detectServiceLineChanges,
   detectProductLineChanges,
+  detectSilentUpdatedFields,
   isSilentSafeBookingChange,
 } from "../calendar/bookingRequestNegotiation";
 import { splitContactPhone } from "../../../lib/phone-validation";
@@ -423,11 +427,46 @@ export default function ClientBookingDetailsView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeBooking?.editRequest, bookingRef]);
 
-  // Opening the booking clears the list/calendar "Updated" tag — no approval click.
+  // First open: show Updated next to Confirmed (not Confirmed Edited).
+  // Mark seen so the list tag is gone when they leave — no approval click.
+  const [showStatusUpdated, setShowStatusUpdated] = React.useState(false);
+  React.useEffect(() => {
+    setShowStatusUpdated(false);
+  }, [bookingRef]);
   React.useEffect(() => {
     if (!bookingRef) return;
-    markBookingUpdateSeen("client", bookingRef, activeBooking?.updatedAt);
-  }, [bookingRef, activeBooking?.updatedAt]);
+    const silentUpdated =
+      Boolean(activeBooking?.silentUpdated) ||
+      Boolean(parseCalendarEntryNotes(activeBooking?.notes)?.silentUpdated);
+    if (
+      isEbrIncoming ||
+      editRequest.isPending ||
+      bookingStatus !== "confirmed" ||
+      !silentUpdated
+    ) {
+      return;
+    }
+    if (
+      hasUnseenBookingUpdate({
+        viewer: "client",
+        bookingRef,
+        updatedAt: activeBooking?.updatedAt,
+        lastEditedBy: activeBooking?.lastEditedBy ?? null,
+      })
+    ) {
+      setShowStatusUpdated(true);
+      markBookingUpdateSeen("client", bookingRef, activeBooking?.updatedAt);
+    }
+  }, [
+    bookingRef,
+    bookingStatus,
+    isEbrIncoming,
+    editRequest.isPending,
+    activeBooking?.silentUpdated,
+    activeBooking?.updatedAt,
+    activeBooking?.lastEditedBy,
+    activeBooking?.notes,
+  ]);
 
   // After editing services for an EBR suggestion, auto-send once booking session is ready.
   const [pendingEbrSuggestSend, setPendingEbrSuggestSend] = React.useState<{
@@ -2126,6 +2165,8 @@ export default function ClientBookingDetailsView({
       currentServices: comparableServiceLines,
       previousGuests,
       currentGuests,
+      previousPeople: priorNotes?.clientSnapshot?.people,
+      currentPeople: sessionDraft.people,
       previousPhoneCode: priorNotes?.phoneCode,
       currentPhoneCode: currentPhone.countryCode,
       previousPhoneNumber: priorNotes?.phoneNumber,
@@ -2159,6 +2200,7 @@ export default function ClientBookingDetailsView({
               phoneNumber: priorNotes?.phoneNumber,
               guests: priorNotes?.guests ?? previousGuests,
               services: priorNotes?.services,
+              people: priorNotes?.clientSnapshot?.people,
               desiredLocation: priorNotes?.desiredLocation,
             },
             originalServices: originalServices.length
@@ -2343,6 +2385,28 @@ export default function ClientBookingDetailsView({
     editRequest.isPending,
     requesterName,
     user?.email,
+  ]);
+
+  const silentFieldUpdates = React.useMemo(() => {
+    if (!showStatusUpdated) {
+      return { phoneUpdated: false, guestIds: [] as string[], serviceIds: [] as string[] };
+    }
+    return detectSilentUpdatedFields({
+      snapshot: bookingNotesMeta?.silentUpdateSnapshot,
+      currentPhoneCode: bookingNotesMeta?.phoneCode,
+      currentPhoneNumber: bookingNotesMeta?.phoneNumber,
+      currentGuests: bookingNotesMeta?.guests,
+      currentPeople: displayDraft?.people,
+      currentServices: displayDraft?.services,
+    });
+  }, [
+    bookingNotesMeta?.guests,
+    bookingNotesMeta?.phoneCode,
+    bookingNotesMeta?.phoneNumber,
+    bookingNotesMeta?.silentUpdateSnapshot,
+    displayDraft?.people,
+    displayDraft?.services,
+    showStatusUpdated,
   ]);
 
   const openActivityComparison = React.useCallback(
@@ -2795,6 +2859,9 @@ export default function ClientBookingDetailsView({
             onDeleteBooking={() => setDeleteDialogOpen(true)}
             onDiscardBookingRequest={() => setDiscardDialogOpen(true)}
             onOpenActivity={() => setActivityOpen(true)}
+            showUpdated={showStatusUpdated}
+            updatedSignpostTitle={ACTIVITY_COMPARISON_SIGNPOST}
+            onUpdatedClick={() => openActivityComparison("silent_updated")}
             showEditScenario={
               bookingStatus === "confirmed" &&
               !editRequest.isPending &&
@@ -2855,6 +2922,8 @@ export default function ClientBookingDetailsView({
                   editedServiceIds={clientVisibleEditedServiceIds}
                   addedServiceIds={clientVisibleAddedServiceIds}
                   cancelledServiceIds={clientVisibleCancelledServiceIds}
+                  updatedGuestIds={silentFieldUpdates.guestIds}
+                  updatedServiceIds={silentFieldUpdates.serviceIds}
                   cancelledServices={cancelledServicesForDisplay}
                   products={editRequest.suggestedProducts}
                   editedProductIds={clientVisibleEditedProductIds}
@@ -2917,6 +2986,8 @@ export default function ClientBookingDetailsView({
                   editedServiceIds={clientVisibleEditedServiceIds}
                   addedServiceIds={clientVisibleAddedServiceIds}
                   cancelledServiceIds={clientVisibleCancelledServiceIds}
+                  updatedGuestIds={silentFieldUpdates.guestIds}
+                  updatedServiceIds={silentFieldUpdates.serviceIds}
                   cancelledServices={cancelledServicesForDisplay}
                   products={paymentProducts}
                   editedProductIds={clientVisibleEditedProductIds}
