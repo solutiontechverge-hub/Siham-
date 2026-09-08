@@ -117,7 +117,6 @@ import {
   restartResponseDeadline,
   buildResponseDeadline,
   shouldShowExpiredResponseBanner,
-  isResponseTimeConfigured,
 } from "../bookingResponseDeadline";
 import {
   canDiscardEbr,
@@ -688,9 +687,8 @@ export default function ProfessionalFixedLocationCalendar({
     }),
     [responseTimeHours, responseTimeMinutes],
   );
-  const responseTimeConfigured = isResponseTimeConfigured(
-    businessResponseWindowInput,
-  );
+  // Flat 30-minute default always applies for new requests.
+  const responseTimeConfigured = true;
   const { settings: financeSettings, setSettings: setFinanceSettings } =
     useFinanceInvoiceSettings();
   const professionalBusinessOverride = useProfessionalBusinessOverride();
@@ -6134,13 +6132,6 @@ export default function ProfessionalFixedLocationCalendar({
       details,
       businessResponseWindowInput,
     );
-    if (!deadline) {
-      showSnackbar({
-        severity: "info",
-        message: "No response time is configured for this business.",
-      });
-      return;
-    }
     const nextDetails = {
       ...details,
       ...deadline,

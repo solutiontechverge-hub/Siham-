@@ -74,6 +74,10 @@ import {
 } from "../calendar/serviceOrder.utils";
 import { buildServiceOrderFromTemplate } from "../../../lib/businessTemplateCatalog";
 import { toIsoLocalDate } from "../calendar/calendar.utils";
+import {
+  DEFAULT_RESPONSE_WINDOW_MINUTES,
+  isResponseTimeConfigured,
+} from "../calendar/bookingResponseDeadline";
 import { useSnackbar } from "../AppSnackbar";
 import AppMultiSelect from "../AppMultiSelect";
 import MollureFormField from "../MollureFormField";
@@ -2471,13 +2475,20 @@ export default function ProfessionalFixedLocationSetup({
     );
     setTemplateSyncSettings(nextSyncSettings);
     setTemplateSyncDraft(nextSyncSettings);
-    setField(
-      "policyResponseHours",
-      toDisplayNumber(businessSetupData.response_time_hours),
+    const responseHours = toDisplayNumber(businessSetupData.response_time_hours);
+    const responseMinutes = toDisplayNumber(
+      businessSetupData.response_time_minutes,
     );
+    const hasResponseTime = isResponseTimeConfigured({
+      hours: businessSetupData.response_time_hours,
+      minutes: businessSetupData.response_time_minutes,
+    });
+    setField("policyResponseHours", hasResponseTime ? responseHours : "");
     setField(
       "policyResponseMinutes",
-      toDisplayNumber(businessSetupData.response_time_minutes),
+      hasResponseTime
+        ? responseMinutes
+        : String(DEFAULT_RESPONSE_WINDOW_MINUTES),
     );
     setField(
       "policyInstructions",

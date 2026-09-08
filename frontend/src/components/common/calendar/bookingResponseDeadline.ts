@@ -60,12 +60,22 @@ export function resolveResponseWindowMinutes(
   return configuredResponseWindowMinutes(input) ?? DEFAULT_RESPONSE_WINDOW_MINUTES;
 }
 
+/** Notes already carry a response window — do not invent one for older bookings. */
+export function hasStoredResponseDeadline(
+  fields?: ResponseDeadlineFields | null,
+): boolean {
+  if (!fields) return false;
+  if (fields.respondBy) return true;
+  if (fields.responseStartedAt) return true;
+  if (Number(fields.responseWindowMinutes) > 0) return true;
+  return fields.responseStatus === "overdue_response";
+}
+
 export function buildResponseDeadline(
   windowInput?: ResponseWindowInput | null,
   startedAt: Date = new Date(),
-): ResponseDeadline | null {
-  const windowMinutes = configuredResponseWindowMinutes(windowInput);
-  if (!windowMinutes) return null;
+): ResponseDeadline {
+  const windowMinutes = resolveResponseWindowMinutes(windowInput);
   const startMs = startedAt.getTime();
   return {
     responseStartedAt: startedAt.toISOString(),
@@ -78,12 +88,12 @@ export function restartResponseDeadline(
   fields?: ResponseDeadlineFields | null,
   windowInput?: ResponseWindowInput | null,
   startedAt: Date = new Date(),
-): ResponseDeadline | null {
+): ResponseDeadline {
   const configured = configuredResponseWindowMinutes(windowInput);
   const fieldMinutes = Number(fields?.responseWindowMinutes);
   const fromFields = fieldMinutes > 0 ? fieldMinutes : null;
-  const windowMinutes = configured ?? fromFields;
-  if (!windowMinutes) return null;
+  const windowMinutes =
+    configured ?? fromFields ?? DEFAULT_RESPONSE_WINDOW_MINUTES;
   return buildResponseDeadline({ hours: 0, minutes: windowMinutes }, startedAt);
 }
 
@@ -96,14 +106,14 @@ export function isPendingResponseNegotiation(
   return event.status === "Confirmed" && event.bookingScenario === "ER";
 }
 
-/** Expiry banner: configured window + pending BR/EBR/ER + elapsed deadline. */
+/** Expiry banner: pending BR/EBR/ER with a stored deadline that has elapsed. */
 export function shouldShowExpiredResponseBanner(
   event: PendingNegotiationEvent,
-  responseTimeInput?: ResponseWindowInput | null,
+  _responseTimeInput?: ResponseWindowInput | null,
   now: Date = new Date(),
 ): boolean {
-  if (!isResponseTimeConfigured(responseTimeInput)) return false;
   if (!isPendingResponseNegotiation(event)) return false;
+  if (!hasStoredResponseDeadline(event?.details)) return false;
   return isResponseWindowOverdue(event?.details, now);
 }
 

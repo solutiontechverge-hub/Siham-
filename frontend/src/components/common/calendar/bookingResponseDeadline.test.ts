@@ -3,6 +3,7 @@
  */
 import assert from "node:assert/strict";
 import {
+  DEFAULT_RESPONSE_WINDOW_MINUTES,
   buildResponseDeadline,
   isResponseTimeConfigured,
   shouldShowExpiredResponseBanner,
@@ -15,9 +16,20 @@ assert.equal(isResponseTimeConfigured({ hours: 0, minutes: 0 }), false);
 assert.equal(isResponseTimeConfigured({ hours: 1, minutes: 0 }), true);
 assert.equal(isResponseTimeConfigured({ hours: 0, minutes: 30 }), true);
 
-assert.equal(buildResponseDeadline({ hours: null, minutes: null }), null);
-assert.equal(buildResponseDeadline({ hours: 0, minutes: 0 }), null);
-assert.ok(buildResponseDeadline({ hours: 0, minutes: 30 }));
+const blankDeadline = buildResponseDeadline({ hours: null, minutes: null });
+assert.equal(blankDeadline.responseWindowMinutes, DEFAULT_RESPONSE_WINDOW_MINUTES);
+assert.equal(
+  buildResponseDeadline({ hours: 0, minutes: 0 }).responseWindowMinutes,
+  DEFAULT_RESPONSE_WINDOW_MINUTES,
+);
+assert.equal(
+  buildResponseDeadline({ hours: 0, minutes: 15 }).responseWindowMinutes,
+  15,
+);
+assert.equal(
+  buildResponseDeadline({ hours: 1, minutes: 0 }).responseWindowMinutes,
+  60,
+);
 
 const overdueDetails = {
   responseStatus: "overdue_response" as const,
@@ -44,9 +56,9 @@ const expiredEr = {
 const configured = { hours: 0, minutes: 30 };
 const blank = { hours: null, minutes: null };
 
-assert.equal(shouldShowExpiredResponseBanner(expiredBr, blank), false);
-assert.equal(shouldShowExpiredResponseBanner(expiredEbr, blank), false);
-assert.equal(shouldShowExpiredResponseBanner(expiredEr, blank), false);
+assert.equal(shouldShowExpiredResponseBanner(expiredBr, blank), true);
+assert.equal(shouldShowExpiredResponseBanner(expiredEbr, blank), true);
+assert.equal(shouldShowExpiredResponseBanner(expiredEr, blank), true);
 assert.equal(shouldShowExpiredResponseBanner(expiredBr, configured), true);
 assert.equal(shouldShowExpiredResponseBanner(expiredEbr, configured), true);
 assert.equal(shouldShowExpiredResponseBanner(expiredEr, configured), true);
@@ -54,6 +66,17 @@ assert.equal(
   shouldShowExpiredResponseBanner(
     { status: "Confirmed", bookingScenario: undefined, details: overdueDetails },
     configured,
+  ),
+  false,
+);
+assert.equal(
+  shouldShowExpiredResponseBanner(
+    {
+      status: "Requested",
+      bookingScenario: "BR",
+      details: { requestDirection: "outgoing" },
+    },
+    blank,
   ),
   false,
 );
@@ -100,6 +123,6 @@ const staleOverdueIncoming = {
 const staleFlags = resolveProfessionalBookingActions(staleOverdueIncoming, {
   responseTime: blank,
 });
-assert.equal(staleFlags.restart_response, false);
+assert.equal(staleFlags.restart_response, true);
 
 console.log("bookingResponseDeadline.test.ts passed");
