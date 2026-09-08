@@ -71,6 +71,8 @@ type Props = {
   onErClick?: () => void;
   /** Date/time field tags after a confirmed-booking change. */
   scheduleChangeTags?: readonly import("../calendar/bookingRequestNegotiation").BookingEditTagVariant[];
+  editTagSignpostTitle?: string;
+  onEditTagSignpostClick?: () => void;
   /** BR/EBR/ER response window elapsed. */
   responseOverdue?: boolean;
   messagingHref?: string;
@@ -97,14 +99,14 @@ export default function ClientBookingDetailsHeader({
   onDiscardBookingRequest,
   onOpenActivity,
   showUpdated = false,
-  updatedSignpostTitle,
-  onUpdatedClick,
   showEditScenario = false,
   ebrSignpostTitle,
   onEbrClick,
   erSignpostTitle,
   onErClick,
   scheduleChangeTags = [],
+  editTagSignpostTitle,
+  onEditTagSignpostClick,
   responseOverdue = false,
   messagingHref,
 }: Props) {
@@ -304,7 +306,11 @@ export default function ClientBookingDetailsHeader({
                   ) : null}
                 </BodyText>
                 {scheduleChangeTags.length ? (
-                  <BookingChangeTags variants={scheduleChangeTags} />
+                  <BookingChangeTags
+                    variants={scheduleChangeTags}
+                    signpostTitle={editTagSignpostTitle}
+                    onSignpostClick={onEditTagSignpostClick}
+                  />
                 ) : null}
                 <IconButton
                   size="small"
@@ -424,8 +430,6 @@ export default function ClientBookingDetailsHeader({
               }
               rowMode={requestRowMode}
               showUpdated={showUpdated}
-              updatedSignpostTitle={updatedSignpostTitle}
-              onUpdatedClick={onUpdatedClick}
               showEditScenario={showEditScenario}
               ebrSignpostTitle={ebrSignpostTitle}
               onEbrClick={onEbrClick}

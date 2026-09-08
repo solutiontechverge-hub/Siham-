@@ -8,6 +8,7 @@ import {
   detectSilentUpdatedFields,
   hasServiceReorderOnly,
   isAwaitingClientChangeApproval,
+  isAwaitingIncomingClientEdit,
   isSilentSafeBookingChange,
   resolveLineChangeTags,
 } from "./bookingRequestNegotiation";
@@ -104,6 +105,39 @@ assert.equal(
     { lastEditedBy: "professional" },
     { lastEditedBy: "client", status: "suggested" },
   ),
+  false,
+);
+
+assert.equal(
+  isAwaitingIncomingClientEdit({
+    status: "Requested",
+    bookingScenario: "EBR",
+    details: { lastEditedBy: "client" },
+  }),
+  true,
+);
+assert.equal(
+  isAwaitingIncomingClientEdit({
+    status: "Confirmed",
+    bookingScenario: "ER",
+    details: { requestDirection: "incoming" },
+  }),
+  true,
+);
+assert.equal(
+  isAwaitingIncomingClientEdit({
+    status: "Requested",
+    bookingScenario: "BR",
+    details: { lastEditedBy: "client" },
+  }),
+  false,
+);
+assert.equal(
+  isAwaitingIncomingClientEdit({
+    status: "Requested",
+    bookingScenario: "EBR",
+    details: { lastEditedBy: "professional" },
+  }),
   false,
 );
 

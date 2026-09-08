@@ -1,9 +1,17 @@
 import { getBookingEditRequest } from "../client-booking/bookingEditRequest";
 import { getBookingCancellationReason } from "../client-booking/bookingCancellationReason";
+import type {
+  CalendarBookingGuestItem,
+  CalendarBookingServiceItem,
+} from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import {
   parseCalendarEntryNotes,
   parseStoredEbrFromNotes,
 } from "./bookingEventDetails";
+import {
+  flattenBookingServices,
+  resolveIdentityGuests,
+} from "./bookingRequestNegotiation";
 import {
   buildActivityComparison,
   type ActivityComparison,
@@ -110,15 +118,10 @@ function mapApiKind(kind: string): BookingActivityKind {
   return "booking_created";
 }
 
-function guestNames(
-  guests?: Array<{ name?: string | null }> | null,
-): string[] {
-  return (guests ?? [])
-    .map((guest) => (guest.name ?? "").trim())
-    .filter(Boolean);
-}
-
-function flattenServices(
+type ActivityGuestLike = {
+  id?: string;
+  name?: string | null;
+  participantType?: CalendarBookingGuestItem["participantType"];
   services?: Array<{
     id: string;
     name: string;
@@ -127,28 +130,134 @@ function flattenServices(
     startTime?: string;
     endTime?: string;
     guestId?: string | null;
-  }> | null,
-  guests?: Array<{
-    id?: string;
-    services?: Array<{
-      id: string;
-      name: string;
-      price: number;
-      durationMins?: number;
-      startTime?: string;
-      endTime?: string;
-      guestId?: string | null;
-    }> | null;
-  }> | null,
-) {
-  const client = [...(services ?? [])];
-  const fromGuests = (guests ?? []).flatMap((guest) =>
-    (guest.services ?? []).map((service) => ({
-      ...service,
+  }> | null;
+};
+
+type ActivityServiceLike = {
+  id: string;
+  name: string;
+  price: number;
+  durationMins?: number;
+  startTime?: string;
+  endTime?: string;
+  teamMemberName?: string | null;
+  staffResourceId?: string | null;
+  guestId?: string | null;
+};
+
+type ActivityPersonLike = {
+  id?: string;
+  name?: string;
+  email?: string;
+  phoneCode?: string;
+  phoneNumber?: string;
+  isRequester?: boolean;
+  participantType?: CalendarBookingGuestItem["participantType"];
+};
+
+function asGuestItems(
+  guests?: readonly ActivityGuestLike[] | null,
+): CalendarBookingGuestItem[] {
+  return (guests ?? []).map((guest) => ({
+    id: String(guest.id ?? "").trim() || (guest.name ?? "").trim(),
+    name: (guest.name ?? "").trim(),
+    participantType: guest.participantType,
+    services: (guest.services ?? []).map((service) => ({
+      id: service.id,
+      name: service.name,
+      price: service.price,
+      durationMins: service.durationMins ?? 0,
+      startTime: service.startTime,
+      endTime: service.endTime,
       guestId: service.guestId ?? guest.id ?? null,
     })),
+    products: [],
+  }));
+}
+
+function asServiceLines(
+  services?: readonly ActivityServiceLike[] | null,
+): CalendarBookingServiceItem[] {
+  return (services ?? []).map((service) => ({
+    id: service.id,
+    name: service.name,
+    price: service.price,
+    durationMins: service.durationMins ?? 0,
+    startTime: service.startTime,
+    endTime: service.endTime,
+    teamMemberName: service.teamMemberName,
+    staffResourceId: service.staffResourceId ?? undefined,
+    guestId: service.guestId ?? null,
+  }));
+}
+
+function identityGuestNameList(
+  guests?: readonly ActivityGuestLike[] | null,
+  people?: readonly ActivityPersonLike[] | null,
+): string[] {
+  return resolveIdentityGuests(asGuestItems(guests), people ?? undefined)
+    .map((guest) => guest.name.trim())
+    .filter(Boolean);
+}
+
+function namesKey(names: readonly string[]) {
+  return [...names].map((name) => name.trim()).filter(Boolean).join("\0");
+}
+
+function firstGuestList(
+  ...lists: Array<readonly ActivityGuestLike[] | null | undefined>
+): ActivityGuestLike[] {
+  for (const list of lists) {
+    if (list && list.length) return [...list];
+  }
+  return [];
+}
+
+function resolveGuestNameSides(input: {
+  mode: ActivityComparisonMode;
+  originalGuests?: readonly ActivityGuestLike[] | null;
+  snapshotGuests?: readonly ActivityGuestLike[] | null;
+  snapshotPeople?: readonly ActivityPersonLike[] | null;
+  liveGuests?: readonly ActivityGuestLike[] | null;
+  livePeople?: readonly ActivityPersonLike[] | null;
+}): { original: string[]; next: string[] } {
+  const persistedOriginal = identityGuestNameList(
+    input.originalGuests,
+    undefined,
   );
-  return [...client, ...fromGuests];
+  const snapshotNames = identityGuestNameList(
+    input.snapshotGuests,
+    input.snapshotPeople,
+  );
+  const liveGuestNames = identityGuestNameList(input.liveGuests, undefined);
+  const livePeopleNames = identityGuestNameList(undefined, input.livePeople);
+  const liveNames = identityGuestNameList(input.liveGuests, input.livePeople);
+
+  if (input.mode === "silent_updated") {
+    return {
+      original: snapshotNames.length ? snapshotNames : persistedOriginal,
+      next: liveNames,
+    };
+  }
+
+  if (persistedOriginal.length) {
+    return { original: persistedOriginal, next: liveNames };
+  }
+
+  if (snapshotNames.length) {
+    return { original: snapshotNames, next: liveNames };
+  }
+
+  // FL guests vs DL people: one side may still hold the pre-edit names.
+  if (
+    liveGuestNames.length &&
+    livePeopleNames.length &&
+    namesKey(liveGuestNames) !== namesKey(livePeopleNames)
+  ) {
+    return { original: livePeopleNames, next: liveGuestNames };
+  }
+
+  return { original: snapshotNames, next: liveNames };
 }
 
 function resolveComparisonForBooking(input: {
@@ -184,35 +293,62 @@ function resolveComparisonForBooking(input: {
         ? editReq.suggestedServices
         : null;
 
-  const liveServices = flattenServices(
-    details?.services ?? notesDetails?.services,
-    details?.guests ?? notesDetails?.guests,
-  );
-  const snapshotServices = flattenServices(
-    snapshot?.services,
+  const liveGuests = details?.guests ?? notesDetails?.guests;
+  const livePeople =
+    details?.clientSnapshot?.people ?? notesDetails?.clientSnapshot?.people;
+  const originalGuests = firstGuestList(
+    details?.originalGuests,
+    notesDetails?.originalGuests,
     snapshot?.guests,
+  );
+  const liveServices = flattenBookingServices({
+    services: asServiceLines(details?.services ?? notesDetails?.services),
+    guests: asGuestItems(liveGuests),
+  });
+  const snapshotServices = flattenBookingServices({
+    services: asServiceLines(snapshot?.services),
+    guests: asGuestItems(snapshot?.guests),
+  });
+  const baselineServices = asServiceLines(
+    details?.originalServices?.length
+      ? details.originalServices
+      : notesDetails?.originalServices?.length
+        ? notesDetails.originalServices
+        : snapshot?.services,
   );
   const originalServices =
     mode === "silent_updated"
       ? snapshotServices.length
         ? snapshotServices
         : liveServices
-      : details?.originalServices?.length
-        ? details.originalServices
-        : notesDetails?.originalServices?.length
-          ? notesDetails.originalServices
-          : null;
+      : flattenBookingServices({
+          services: baselineServices,
+          guests: asGuestItems(originalGuests),
+        });
 
+  const proposedServices = asServiceLines(
+    suggestedServices?.length
+      ? suggestedServices
+      : details?.services?.length
+        ? details.services
+        : notesDetails?.services,
+  );
   const currentServices =
     mode === "silent_updated"
       ? liveServices
-      : suggestedServices?.length
-        ? suggestedServices
-        : details?.services?.length
-          ? details.services
-          : notesDetails?.services?.length
-            ? notesDetails.services
-            : null;
+      : flattenBookingServices({
+          services: proposedServices,
+          guests: asGuestItems(liveGuests),
+        });
+
+  const guestNames = resolveGuestNameSides({
+    mode,
+    originalGuests,
+    snapshotGuests: snapshot?.guests,
+    snapshotPeople: snapshot?.people,
+    liveGuests,
+    livePeople,
+  });
 
   return buildActivityComparison({
     mode,
@@ -220,9 +356,12 @@ function resolveComparisonForBooking(input: {
     currentServices,
     editedServiceIds:
       details?.editedServiceIds ??
+      details?.clientEditedServiceIds ??
       ebr?.editedServiceIds ??
+      ebr?.clientEditedServiceIds ??
       editReq.editedServiceIds ??
-      notesDetails?.editedServiceIds,
+      notesDetails?.editedServiceIds ??
+      notesDetails?.clientEditedServiceIds,
     addedServiceIds:
       details?.addedServiceIds ??
       ebr?.addedServiceIds ??
@@ -233,7 +372,7 @@ function resolveComparisonForBooking(input: {
       ebr?.cancelledServiceIds ??
       editReq.cancelledServiceIds ??
       notesDetails?.cancelledServiceIds,
-    originalProducts: notesDetails?.products,
+    originalProducts: snapshot?.products,
     currentProducts:
       ebr?.suggestedProducts ??
       editReq.suggestedProducts ??
@@ -270,8 +409,8 @@ function resolveComparisonForBooking(input: {
     originalPhoneNumber: snapshot?.phoneNumber,
     newPhoneCode: details?.phoneCode ?? notesDetails?.phoneCode,
     newPhoneNumber: details?.phoneNumber ?? notesDetails?.phoneNumber,
-    originalGuestNames: guestNames(snapshot?.guests),
-    newGuestNames: guestNames(details?.guests ?? notesDetails?.guests),
+    originalGuestNames: guestNames.original,
+    newGuestNames: guestNames.next,
     originalDesiredLocation: snapshot?.desiredLocation,
     newDesiredLocation:
       details?.desiredLocation ?? notesDetails?.desiredLocation,
@@ -281,6 +420,67 @@ function resolveComparisonForBooking(input: {
 /**
  * Attach before/after comparison payloads to edit/update activity rows.
  */
+function sortActivityNewestFirst(items: BookingActivityItem[]) {
+  return items.sort((a, b) => {
+    const at = parseDate(a.occurredAt)?.getTime() ?? 0;
+    const bt = parseDate(b.occurredAt)?.getTime() ?? 0;
+    return bt - at;
+  });
+}
+
+function hasComparisonMode(
+  items: readonly BookingActivityItem[],
+  mode: ActivityComparisonMode,
+) {
+  return items.some(
+    (item) =>
+      item.comparison?.mode === mode && (item.comparison.rows.length ?? 0) > 0,
+  );
+}
+
+function injectMissingComparisonItem(
+  items: BookingActivityItem[],
+  comparison: ActivityComparison | null,
+  input: {
+    bookingId: string;
+    bookingCode: string;
+    occurredAt: string;
+    lastEditedBy?: "professional" | "client" | null;
+    clientName?: string | null;
+  },
+) {
+  if (!comparison?.rows.length) return items;
+  if (hasComparisonMode(items, comparison.mode)) return items;
+
+  const actor =
+    input.lastEditedBy === "client" ? "client" : "professional";
+  const isSilent = comparison.mode === "silent_updated";
+  const next = [...items];
+  pushItem(next, {
+    id: `${input.bookingId}-${comparison.mode}-comparison`,
+    bookingId: String(input.bookingId),
+    bookingCode: input.bookingCode || undefined,
+    kind: isSilent ? "booking_updated" : "edit_request_sent",
+    actor,
+    actorLabel:
+      actor === "client" ? input.clientName?.trim() || "Client" : "Professional",
+    title:
+      comparison.mode === "ebr"
+        ? "Edited Booking Request sent"
+        : comparison.mode === "er"
+          ? "Edit Request sent"
+          : "Updated",
+    subtitle: isSilent
+      ? comparison.rows.map((row) => row.label).join(", ")
+      : undefined,
+    occurredAt: input.occurredAt,
+    hasDetailArrow: true,
+    detailType: "comparison",
+    comparison,
+  });
+  return sortActivityNewestFirst(next);
+}
+
 function enrichItemsWithComparison(
   items: BookingActivityItem[],
   input: BookingActivityBuildInput,
@@ -315,6 +515,21 @@ function enrichItemsWithComparison(
   const effectiveStatus = input.currentStatus
     ? normalizeStatus(input.currentStatus)
     : normalizeStatus(booking?.status ?? "");
+  const lastEditedBy =
+    input.currentDetails?.lastEditedBy ?? notesDetails?.lastEditedBy ?? null;
+  const hasProfessionalLineEdits =
+    lastEditedBy === "professional" &&
+    Boolean(
+      input.currentDetails?.editedServiceIds?.length ||
+        input.currentDetails?.addedServiceIds?.length ||
+        input.currentDetails?.cancelledServiceIds?.length ||
+        input.currentDetails?.editedProductIds?.length ||
+        input.currentDetails?.scheduleEdited ||
+        notesDetails?.editedServiceIds?.length ||
+        notesDetails?.addedServiceIds?.length ||
+        notesDetails?.cancelledServiceIds?.length ||
+        notesDetails?.scheduleEdited,
+    );
 
   const comparisonMode: ActivityComparisonMode =
     scenario === "ER" ||
@@ -322,7 +537,8 @@ function enrichItemsWithComparison(
       (editReq.status === "pending" ||
         editReq.status === "suggested" ||
         editReq.status === "approved" ||
-        editReq.status === "rejected") &&
+        editReq.status === "rejected" ||
+        hasProfessionalLineEdits) &&
       scenario !== "EBR")
       ? "er"
       : "ebr";
@@ -388,48 +604,21 @@ function enrichItemsWithComparison(
     return item;
   });
 
-  const hasSilentItem = next.some((item) => item.kind === "booking_updated");
-  if (
-    silentComparison &&
-    !hasSilentItem &&
-    scenario !== "EBR" &&
-    scenario !== "ER"
-  ) {
-    const bookingId =
-      input.currentBookingId ||
-      (booking ? String(booking.id) : "booking");
-    const actor =
-      input.currentDetails?.lastEditedBy === "client" ? "client" : "professional";
-    const occurredAt =
-      parseDate(booking?.updated_at)?.toISOString() || new Date().toISOString();
-    pushItem(next, {
-      id: `${bookingId}-updated`,
-      bookingId: String(bookingId),
-      bookingCode: code || undefined,
-      kind: "booking_updated",
-      actor,
-      actorLabel:
-        actor === "client" ? input.clientName?.trim() || "Client" : "Professional",
-      title: "Updated",
-      subtitle: silentComparison.rows.map((row) => row.label).join(", "),
-      occurredAt,
-      hasDetailArrow: true,
-      detailType: "comparison",
-      comparison: silentComparison,
-      detailLines: [
-        {
-          label: "Booking code",
-          value: String(code).startsWith("#") ? String(code) : `#${code}`,
-        },
-        { label: "Status", value: "Updated" },
-      ],
-    });
-    next = next.sort((a, b) => {
-      const at = parseDate(a.occurredAt)?.getTime() ?? 0;
-      const bt = parseDate(b.occurredAt)?.getTime() ?? 0;
-      return bt - at;
-    });
-  }
+  const bookingId =
+    next[0]?.bookingId ||
+    input.currentBookingId ||
+    (booking ? String(booking.id) : "booking");
+  const occurredAt =
+    parseDate(booking?.updated_at)?.toISOString() || new Date().toISOString();
+  const injectInput = {
+    bookingId: String(bookingId),
+    bookingCode: String(code),
+    occurredAt,
+    lastEditedBy,
+    clientName: input.clientName,
+  };
+  next = injectMissingComparisonItem(next, editComparison, injectInput);
+  next = injectMissingComparisonItem(next, silentComparison, injectInput);
 
   return next;
 }

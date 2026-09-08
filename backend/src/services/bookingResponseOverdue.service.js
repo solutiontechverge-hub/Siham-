@@ -1,6 +1,9 @@
 import { query } from "../db/index.js";
 import { emitBookingChanged } from "../messaging/messagingSocket.js";
-import { resolveResponseWindowMinutes } from "../utils/bookingResponseWindow.js";
+import {
+  isResponseTimeConfigured,
+  resolveResponseWindowMinutes,
+} from "../utils/bookingResponseWindow.js";
 
 const NOTES_META_PREFIX = "---mollure-meta---";
 
@@ -87,6 +90,16 @@ export async function processOverdueResponseStatusUpdates() {
     const { human, meta } = splitNotes(row.notes);
     if (!hasPendingNegotiation(row.status, meta)) continue;
     if (meta.responseStatus === "overdue_response") continue;
+    // Blank business response time must not expire a request (email reminders
+    // still use the env/default window via resolveResponseWindowMinutes).
+    if (
+      !isResponseTimeConfigured(
+        row.response_time_hours,
+        row.response_time_minutes,
+      )
+    ) {
+      continue;
+    }
 
     const windowMinutes = resolveResponseWindowMinutes(
       row.response_time_hours,

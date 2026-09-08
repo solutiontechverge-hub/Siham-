@@ -50,9 +50,9 @@ function copyFor(
   }
   if (action === "suggest") {
     return {
-      title: "Suggest change",
-      body: "By choosing “Suggest Change”, you can send an edited booking request to the client.",
-      confirmLabel: "Suggest Change",
+      title: "Suggest changes",
+      body: "By choosing “Suggest changes”, you can communicate through the messaging tool.",
+      confirmLabel: "Suggest changes",
     };
   }
   return {

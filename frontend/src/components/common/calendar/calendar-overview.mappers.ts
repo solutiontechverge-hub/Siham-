@@ -523,6 +523,12 @@ export function mapCalendarBookingToEvent(
               : {}),
             ...(parsedNotes.cancellationReason ? { cancellationReason: parsedNotes.cancellationReason } : {}),
             ...(parsedNotes.clientSnapshot ? { clientSnapshot: parsedNotes.clientSnapshot } : {}),
+            ...(parsedNotes.originalServices?.length
+              ? { originalServices: parsedNotes.originalServices }
+              : {}),
+            ...(parsedNotes.originalGuests?.length
+              ? { originalGuests: parsedNotes.originalGuests }
+              : {}),
             ...(parsedNotes.guests?.length
               ? { guests: parsedNotes.guests }
               : (() => {

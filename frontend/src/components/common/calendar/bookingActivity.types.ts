@@ -103,32 +103,12 @@ export type BookingActivityBuildInput = {
       endTime?: string;
       teamMemberName?: string | null;
       staffResourceId?: string | null;
+      guestId?: string | null;
     }> | null;
-    services?: Array<{
-      id: string;
-      name: string;
-      price: number;
-      durationMins?: number;
-      startTime?: string;
-      endTime?: string;
-      teamMemberName?: string | null;
-      staffResourceId?: string | null;
-    }> | null;
-    products?: Array<{
-      id: string;
-      name: string;
-      price: number;
-      quantity?: number;
-    }> | null;
-    editedServiceIds?: string[] | null;
-    editedProductIds?: string[] | null;
-    addedServiceIds?: string[] | null;
-    cancelledServiceIds?: string[] | null;
-    phoneCode?: string | null;
-    phoneNumber?: string | null;
-    guests?: Array<{
+    originalGuests?: Array<{
       id?: string;
       name?: string | null;
+      participantType?: "guest" | "model" | "planning" | "buffer" | "notes";
       services?: Array<{
         id: string;
         name: string;
@@ -139,6 +119,65 @@ export type BookingActivityBuildInput = {
         guestId?: string | null;
       }> | null;
     }> | null;
+    services?: Array<{
+      id: string;
+      name: string;
+      price: number;
+      durationMins?: number;
+      startTime?: string;
+      endTime?: string;
+      teamMemberName?: string | null;
+      staffResourceId?: string | null;
+      guestId?: string | null;
+    }> | null;
+    products?: Array<{
+      id: string;
+      name: string;
+      price: number;
+      quantity?: number;
+    }> | null;
+    editedServiceIds?: string[] | null;
+    clientEditedServiceIds?: string[] | null;
+    editedProductIds?: string[] | null;
+    addedServiceIds?: string[] | null;
+    cancelledServiceIds?: string[] | null;
+    phoneCode?: string | null;
+    phoneNumber?: string | null;
+    guests?: Array<{
+      id?: string;
+      name?: string | null;
+      participantType?: "guest" | "model" | "planning" | "buffer" | "notes";
+      services?: Array<{
+        id: string;
+        name: string;
+        price: number;
+        durationMins?: number;
+        startTime?: string;
+        endTime?: string;
+        guestId?: string | null;
+      }> | null;
+    }> | null;
+    clientSnapshot?: {
+      people?: Array<{
+        id?: string;
+        name?: string;
+        email?: string;
+        phoneCode?: string;
+        phoneNumber?: string;
+        isRequester?: boolean;
+        participantType?: "guest" | "model" | "planning" | "buffer" | "notes";
+      }> | null;
+      services?: Array<{
+        id: string;
+        name: string;
+        price: number;
+        durationMins?: number;
+        startTime?: string;
+        endTime?: string;
+        guestId?: string | null;
+        teamMemberName?: string | null;
+      }> | null;
+    } | null;
     desiredLocation?: string | {
       street?: string;
       number?: string;
@@ -156,7 +195,7 @@ export type BookingActivityBuildInput = {
         email?: string | null;
         phoneCode?: string | null;
         phoneNumber?: string | null;
-        participantType?: "guest" | "model" | "planning" | "buffer";
+        participantType?: "guest" | "model" | "planning" | "buffer" | "notes";
         services?: Array<{
           id: string;
           name: string;
@@ -176,6 +215,12 @@ export type BookingActivityBuildInput = {
         endTime?: string;
         guestId?: string | null;
       }> | null;
+      products?: Array<{
+        id: string;
+        name: string;
+        price: number;
+        quantity?: number;
+      }> | null;
       people?: Array<{
         id?: string;
         name?: string;
@@ -183,7 +228,7 @@ export type BookingActivityBuildInput = {
         phoneCode?: string;
         phoneNumber?: string;
         isRequester?: boolean;
-        participantType?: "guest" | "model" | "planning" | "buffer";
+        participantType?: "guest" | "model" | "planning" | "buffer" | "notes";
       }> | null;
       desiredLocation?: string | {
         street?: string;
@@ -194,6 +239,7 @@ export type BookingActivityBuildInput = {
       } | null;
     } | null;
     lastEditedBy?: "professional" | "client" | null;
+    scheduleEdited?: boolean;
   } | null;
   currentDateISO?: string | null;
   currentStart?: string | null;

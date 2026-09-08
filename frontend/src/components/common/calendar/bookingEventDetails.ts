@@ -118,6 +118,7 @@ type StoredBookingNoteMeta = Partial<
     | "desiredLocation"
     | "totalDiscount"
     | "originalServices"
+    | "originalGuests"
     | "needsOk"
     | "ackScenario"
     | "ackRecipient"
@@ -257,6 +258,7 @@ export function serializeCalendarEntryNotes(
     ...(details?.desiredLocation ? { desiredLocation: details.desiredLocation } : {}),
     ...(details?.totalDiscount ? { totalDiscount: details.totalDiscount } : {}),
     ...(details?.originalServices?.length ? { originalServices: details.originalServices } : {}),
+    ...(details?.originalGuests?.length ? { originalGuests: details.originalGuests } : {}),
     ...(details?.needsOk ? { needsOk: true } : {}),
     ...(details?.ackScenario ? { ackScenario: details.ackScenario } : {}),
     ...(details?.ackRecipient ? { ackRecipient: details.ackRecipient } : {}),
@@ -422,6 +424,7 @@ export function markClientEbrAcceptedInNotes(
       addedServiceIds: applied?.addedServiceIds,
       cancelledServiceIds: applied?.cancelledServiceIds,
       originalServices: applied?.originalServices ?? details?.originalServices,
+      originalGuests: applied?.originalGuests ?? details?.originalGuests,
       ...(applied?.services ? { services: applied.services } : {}),
       ...(applied?.products ? { products: applied.products } : {}),
     },
@@ -711,6 +714,7 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
       ...(meta.desiredLocation ? { desiredLocation: meta.desiredLocation } : {}),
       ...(meta.totalDiscount ? { totalDiscount: meta.totalDiscount } : {}),
       ...(meta.originalServices?.length ? { originalServices: meta.originalServices } : {}),
+      ...(meta.originalGuests?.length ? { originalGuests: meta.originalGuests } : {}),
       ...(meta.needsOk ? { needsOk: true } : {}),
       ...(meta.ackScenario ? { ackScenario: meta.ackScenario } : {}),
       ...(meta.ackRecipient === "client" || meta.ackRecipient === "professional"
@@ -1027,6 +1031,7 @@ export function buildBookingDetailsSnapshot(input: {
   kilometerAllowanceDraft: BookingDrawerHydration["kilometerAllowance"];
   requestDirection?: CalendarBookingDetails["requestDirection"];
   originalServices?: CalendarBookingDetails["originalServices"];
+  originalGuests?: CalendarBookingDetails["originalGuests"];
   editedServiceIds?: CalendarBookingDetails["editedServiceIds"];
   addedServiceIds?: CalendarBookingDetails["addedServiceIds"];
   cancelledServiceIds?: CalendarBookingDetails["cancelledServiceIds"];
@@ -1093,6 +1098,7 @@ export function buildBookingDetailsSnapshot(input: {
     kilometerAllowance: input.kilometerAllowanceDraft,
     ...(input.requestDirection ? { requestDirection: input.requestDirection } : {}),
     ...(input.originalServices ? { originalServices: input.originalServices } : {}),
+    ...(input.originalGuests?.length ? { originalGuests: input.originalGuests } : {}),
     ...(input.editedServiceIds ? { editedServiceIds: input.editedServiceIds } : {}),
     ...(input.addedServiceIds?.length ? { addedServiceIds: input.addedServiceIds } : {}),
     ...(input.cancelledServiceIds?.length

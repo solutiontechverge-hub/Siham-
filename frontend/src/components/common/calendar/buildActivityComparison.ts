@@ -25,7 +25,7 @@ export type ActivityComparison = {
   rows: ActivityComparisonRow[];
 };
 
-/** Tooltip / signpost copy that deep-links into Activity comparison. */
+/** Visible signpost / link copy that deep-links into Activity comparison. */
 export const ACTIVITY_COMPARISON_SIGNPOST = "View comparison in Activity";
 
 type ServiceLike = {
@@ -105,6 +105,15 @@ function formatSchedule(dateISO?: string | null, time?: string | null): string {
 function formatGuestNames(names?: readonly string[] | null): string {
   const cleaned = (names ?? []).map((n) => n.trim()).filter(Boolean);
   return cleaned.length ? cleaned.join(", ") : "—";
+}
+
+function itemRowLabel(
+  preferred?: string | null,
+  fallback?: string | null,
+  generic = "Service",
+): string {
+  const name = (preferred ?? "").trim() || (fallback ?? "").trim();
+  return name || generic;
 }
 
 function formatLocationValue(
@@ -245,18 +254,13 @@ export function buildActivityComparison(
     } else {
       const lineChanges = detectServiceLineChanges(originalServices, currentServices);
       const added = new Set(
-        (input.addedServiceIds?.length ? input.addedServiceIds : lineChanges.added).map(String),
+        [...(input.addedServiceIds ?? []), ...lineChanges.added].map(String),
       );
       const cancelled = new Set(
-        (input.cancelledServiceIds?.length
-          ? input.cancelledServiceIds
-          : lineChanges.cancelled
-        ).map(String),
+        [...(input.cancelledServiceIds ?? []), ...lineChanges.cancelled].map(String),
       );
       const edited = new Set(
-        (input.editedServiceIds?.length ? input.editedServiceIds : lineChanges.edited).map(
-          String,
-        ),
+        [...(input.editedServiceIds ?? []), ...lineChanges.edited].map(String),
       );
       const originalById = new Map(originalServices.map((s) => [s.id, s]));
       const currentById = new Map(currentServices.map((s) => [s.id, s]));
@@ -266,9 +270,9 @@ export function buildActivityComparison(
         if (!original) continue;
         rows.push({
           id: `service-removed-${id}`,
-          label: "Service",
+          label: itemRowLabel(original.name, undefined, "Service"),
           originalValue: formatServiceLine(original),
-          newValue: "Removed",
+          newValue: "—",
           changeKind: "removed",
         });
       }
@@ -278,7 +282,7 @@ export function buildActivityComparison(
         if (!current) continue;
         rows.push({
           id: `service-added-${id}`,
-          label: "Service",
+          label: itemRowLabel(current.name, undefined, "Service"),
           originalValue: "—",
           newValue: formatServiceLine(current),
           changeKind: "added",
@@ -289,11 +293,31 @@ export function buildActivityComparison(
         if (added.has(id) || cancelled.has(id)) continue;
         const original = originalById.get(id);
         const current = currentById.get(id);
+        if (!original && current) {
+          rows.push({
+            id: `service-added-${id}`,
+            label: itemRowLabel(current.name, undefined, "Service"),
+            originalValue: "—",
+            newValue: formatServiceLine(current),
+            changeKind: "added",
+          });
+          continue;
+        }
+        if (original && !current) {
+          rows.push({
+            id: `service-removed-${id}`,
+            label: itemRowLabel(original.name, undefined, "Service"),
+            originalValue: formatServiceLine(original),
+            newValue: "—",
+            changeKind: "removed",
+          });
+          continue;
+        }
         if (!original || !current) continue;
         if (formatServiceLine(original) === formatServiceLine(current)) continue;
         rows.push({
           id: `service-edited-${id}`,
-          label: "Service",
+          label: itemRowLabel(current.name, original.name, "Service"),
           originalValue: formatServiceLine(original),
           newValue: formatServiceLine(current),
           changeKind: "changed",
@@ -314,7 +338,7 @@ export function buildActivityComparison(
       if (!original && current) {
         rows.push({
           id: `product-added-${id}`,
-          label: "Product",
+          label: itemRowLabel(current.name, undefined, "Product"),
           originalValue: "—",
           newValue: formatProductLine(current),
           changeKind: "added",
@@ -324,17 +348,18 @@ export function buildActivityComparison(
       if (original && !current) {
         rows.push({
           id: `product-removed-${id}`,
-          label: "Product",
+          label: itemRowLabel(original.name, undefined, "Product"),
           originalValue: formatProductLine(original),
-          newValue: "Removed",
+          newValue: "—",
           changeKind: "removed",
         });
         continue;
       }
       if (original && current) {
+        if (formatProductLine(original) === formatProductLine(current)) continue;
         rows.push({
           id: `product-edited-${id}`,
-          label: "Product",
+          label: itemRowLabel(current.name, original.name, "Product"),
           originalValue: formatProductLine(original),
           newValue: formatProductLine(current),
           changeKind: "changed",
@@ -357,7 +382,7 @@ export function buildActivityComparison(
       label: "Phone number",
       originalValue: originalPhone,
       newValue: newPhone,
-      changeKind: "updated",
+      changeKind: mode === "silent_updated" ? "updated" : "changed",
     });
   }
 
@@ -368,12 +393,20 @@ export function buildActivityComparison(
       (input.newGuestNames?.length ?? 0) > 0) &&
     originalGuests !== newGuests
   ) {
+    const guestKind: ActivityComparisonChangeKind =
+      mode === "silent_updated"
+        ? "updated"
+        : (input.originalGuestNames?.length ?? 0) === 0
+          ? "added"
+          : (input.newGuestNames?.length ?? 0) === 0
+            ? "removed"
+            : "changed";
     rows.push({
       id: "guests",
       label: "Guest names",
       originalValue: originalGuests,
       newValue: newGuests,
-      changeKind: "updated",
+      changeKind: guestKind,
     });
   }
 

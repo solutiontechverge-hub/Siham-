@@ -184,6 +184,11 @@ export type CalendarBookingDetails = {
   requestDirection?: "incoming" | "outgoing";
   /** Baseline services from the client — used to detect professional edits */
   originalServices?: CalendarBookingServiceItem[];
+  /**
+   * Baseline guests from the original confirmed booking / BR,
+   * captured when ER or EBR is first saved so Activity can show Before.
+   */
+  originalGuests?: CalendarBookingGuestItem[];
   /** Service ids edited by the professional before sending EBR */
   editedServiceIds?: string[];
   /** Product ids edited by the professional (BR update / EBR) */
@@ -227,6 +232,7 @@ export type CalendarBookingDetails = {
     phoneNumber?: string;
     guests?: CalendarBookingGuestItem[];
     services?: CalendarBookingServiceItem[];
+    products?: CalendarBookingProductItem[];
     people?: Array<{
       id?: string;
       name?: string;

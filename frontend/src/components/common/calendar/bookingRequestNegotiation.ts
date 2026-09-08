@@ -58,6 +58,18 @@ export function canRespondToConfirmedEr(
   return event.details?.requestDirection !== "outgoing";
 }
 
+/** Client sent EBR or confirmed ER — professional still needs to respond. */
+export function isAwaitingIncomingClientEdit(
+  event: Pick<CalendarEvent, "status" | "bookingScenario" | "details"> | null | undefined,
+) {
+  if (canRespondToConfirmedEr(event)) return true;
+  if (!event || event.status !== "Requested" || event.bookingScenario !== "EBR") {
+    return false;
+  }
+  if (event.details?.requestDirection === "outgoing") return false;
+  return event.details?.lastEditedBy !== "professional";
+}
+
 type EditTagEbrSource = {
   lastEditedBy?: "professional" | "client";
   status?: string;
@@ -385,6 +397,14 @@ function guestKey(guest: CalendarBookingGuestItem) {
 
 function isIdentityGuest(guest: CalendarBookingGuestItem) {
   const kind = guest.participantType ?? "guest";
+  if (
+    kind === "planning" ||
+    kind === "buffer" ||
+    kind === "notes" ||
+    (guest.name ?? "").trim() === "Planning"
+  ) {
+    return false;
+  }
   return kind === "guest" || kind === "model";
 }
 

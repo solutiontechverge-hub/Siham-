@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Box, Container, Paper } from "@mui/material";
+import { Box, Container, Paper, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import {
   AppButton,
@@ -1551,18 +1551,11 @@ export default function ClientBookingDetailsView({
   const handleConfirmEbrSuggest = React.useCallback(async () => {
     setEbrAction(null);
     setEbrSuggestDrawerOpen(false);
-    setResponseActionsDismissed(true);
-    setActionFeedback({
-      severity: "success",
-      message: "You can now suggest a change.",
-    });
     if (!bookingRef) return;
     try {
       const result = await openMessagingForBooking({ bookingRef }).unwrap();
       messagingWidget?.openMessaging(prepareBookingMessagingOpen(result));
     } catch (error) {
-      setResponseActionsDismissed(false);
-      setActionFeedback(null);
       showSnackbar({
         severity: "error",
         message: getApiErrorMessage(
@@ -1845,6 +1838,22 @@ export default function ClientBookingDetailsView({
       const priorNotes = parseCalendarEntryNotes(
         sessionRecord?.notes ?? activeBooking?.notes,
       );
+      const ebrPreviousGuests = guestsFromPeopleAndServices(
+        priorNotes?.clientSnapshot?.people,
+        priorNotes?.services ?? priorNotes?.originalServices ?? [],
+        priorNotes?.guests,
+      );
+      const ebrCurrentGuests = guestsFromPeopleAndServices(
+        sessionDraft?.people ?? draft?.people,
+        services,
+        priorNotes?.guests,
+      );
+      const ebrOriginalGuests =
+        priorNotes?.originalGuests?.length
+          ? priorNotes.originalGuests
+          : priorNotes?.guests?.length
+            ? priorNotes.guests
+            : ebrPreviousGuests;
       const clientSnapshot = {
         people: (
           sessionDraft?.people ??
@@ -1902,6 +1911,22 @@ export default function ClientBookingDetailsView({
           cancellationReason: priorNotes?.cancellationReason,
           requestDirection: "incoming",
           clientSnapshot,
+          guests: ebrCurrentGuests,
+          originalGuests: ebrOriginalGuests,
+          originalServices:
+            priorNotes?.originalServices?.length
+              ? priorNotes.originalServices
+              : priorNotes?.services,
+          services: priorNotes?.services,
+          silentUpdateSnapshot: priorNotes?.silentUpdateSnapshot ?? {
+            guests: ebrPreviousGuests,
+            people: priorNotes?.clientSnapshot?.people,
+            services: priorNotes?.services,
+            products: priorNotes?.products,
+            phoneCode: priorNotes?.phoneCode,
+            phoneNumber: priorNotes?.phoneNumber,
+            desiredLocation: priorNotes?.desiredLocation,
+          },
         },
         {
           status: "pending",
@@ -2160,6 +2185,15 @@ export default function ClientBookingDetailsView({
       comparableServiceLines,
       priorNotes?.guests,
     );
+    const baselineGuests =
+      priorNotes?.originalGuests?.length
+        ? priorNotes.originalGuests
+        : priorNotes?.guests?.length
+          ? priorNotes.guests
+          : previousGuests;
+    const snapshotGuests = priorNotes?.guests?.length
+      ? priorNotes.guests
+      : previousGuests;
     const silentSafeOnly = isSilentSafeBookingChange({
       previousServices: priorNotes?.services ?? originalServices,
       currentServices: comparableServiceLines,
@@ -2198,14 +2232,16 @@ export default function ClientBookingDetailsView({
             silentUpdateSnapshot: {
               phoneCode: priorNotes?.phoneCode,
               phoneNumber: priorNotes?.phoneNumber,
-              guests: priorNotes?.guests ?? previousGuests,
+              guests: snapshotGuests,
               services: priorNotes?.services,
+              products: priorNotes?.products,
               people: priorNotes?.clientSnapshot?.people,
               desiredLocation: priorNotes?.desiredLocation,
             },
             originalServices: originalServices.length
               ? originalServices
               : serviceLines,
+            originalGuests: baselineGuests,
           }
         : {
             ...priorNotes,
@@ -2215,11 +2251,20 @@ export default function ClientBookingDetailsView({
             guests: currentGuests,
             lastEditedBy: "client",
             silentUpdated: undefined,
-            silentUpdateSnapshot: undefined,
+            silentUpdateSnapshot: {
+              phoneCode: priorNotes?.phoneCode,
+              phoneNumber: priorNotes?.phoneNumber,
+              guests: snapshotGuests,
+              services: priorNotes?.services,
+              products: priorNotes?.products,
+              people: priorNotes?.clientSnapshot?.people,
+              desiredLocation: priorNotes?.desiredLocation,
+            },
             ...(scheduleEdited ? { scheduleEdited: true } : {}),
             originalServices: originalServices.length
               ? originalServices
               : serviceLines,
+            originalGuests: baselineGuests,
             editedServiceIds: detectEditedServiceIds(
               originalServices,
               serviceLines,
@@ -2354,6 +2399,7 @@ export default function ClientBookingDetailsView({
       currentBookingType: null,
       currentDetails: {
         originalServices: bookingNotesMeta?.originalServices,
+        originalGuests: bookingNotesMeta?.originalGuests,
         services: displayDraft?.services,
         products: displayDraft?.products,
         editedServiceIds: bookingNotesMeta?.editedServiceIds,
@@ -2363,10 +2409,12 @@ export default function ClientBookingDetailsView({
         phoneCode: bookingNotesMeta?.phoneCode,
         phoneNumber: bookingNotesMeta?.phoneNumber,
         guests: bookingNotesMeta?.guests,
+        clientSnapshot: bookingNotesMeta?.clientSnapshot,
         desiredLocation: bookingNotesMeta?.desiredLocation,
         silentUpdated: bookingNotesMeta?.silentUpdated,
         silentUpdateSnapshot: bookingNotesMeta?.silentUpdateSnapshot,
         lastEditedBy: bookingNotesMeta?.lastEditedBy,
+        scheduleEdited: bookingNotesMeta?.scheduleEdited,
       },
       apiEvents: bookingActivityResponse?.data ?? null,
       mode: "activity",
@@ -2411,10 +2459,15 @@ export default function ClientBookingDetailsView({
 
   const openActivityComparison = React.useCallback(
     (mode?: "ebr" | "er" | "silent_updated") => {
-      const target = findActivityComparisonItem(activityTimelineItems, {
-        bookingRef,
-        mode,
-      });
+      const target =
+        findActivityComparisonItem(activityTimelineItems, {
+          bookingRef,
+          mode,
+        }) ??
+        activityTimelineItems.find(
+          (item) => (item.comparison?.rows.length ?? 0) > 0,
+        ) ??
+        null;
       setActivityOpen(true);
       setActivityDetailItem(target);
     },
@@ -2426,8 +2479,38 @@ export default function ClientBookingDetailsView({
    * While a professional-sent edit awaits client approval, each changed line
    * keeps Edited/Added/Cancelled and also shows Pending.
    */
+  const hasProfessionalSuggestedEdits = React.useMemo(() => {
+    if (isCancelled || bookingNotesMeta?.silentUpdated) return false;
+    if (editRequest.isAccepted || editRequest.isRejected) return false;
+    if (isEbrIncoming || isIncomingConfirmedEr || editRequest.isSuggested) {
+      return true;
+    }
+    if (bookingNotesMeta?.lastEditedBy !== "professional") return false;
+    return Boolean(
+      bookingNotesMeta?.editedServiceIds?.length ||
+        bookingNotesMeta?.addedServiceIds?.length ||
+        bookingNotesMeta?.cancelledServiceIds?.length ||
+        bookingNotesMeta?.editedProductIds?.length ||
+        bookingNotesMeta?.scheduleEdited,
+    );
+  }, [
+    bookingNotesMeta?.addedServiceIds,
+    bookingNotesMeta?.cancelledServiceIds,
+    bookingNotesMeta?.editedProductIds,
+    bookingNotesMeta?.editedServiceIds,
+    bookingNotesMeta?.lastEditedBy,
+    bookingNotesMeta?.scheduleEdited,
+    bookingNotesMeta?.silentUpdated,
+    editRequest.isAccepted,
+    editRequest.isRejected,
+    editRequest.isSuggested,
+    isCancelled,
+    isEbrIncoming,
+    isIncomingConfirmedEr,
+  ]);
+
   const clientChangesAwaitingApproval =
-    editRequest.isSuggested || isEbrIncoming;
+    hasProfessionalSuggestedEdits || editRequest.isSuggested || isEbrIncoming;
 
   const pendingServiceChangeSets = React.useMemo(() => {
     if (!clientChangesAwaitingApproval) return null;
@@ -2809,7 +2892,7 @@ export default function ClientBookingDetailsView({
         />
       </Container>
 
-      <Container maxWidth="lg" sx={{ pb: 4, pt: 1.5 }}>
+      <Container maxWidth="lg" sx={{ pb: hasProfessionalSuggestedEdits && !isIncomingBr ? { xs: 22, sm: 12 } : 4, pt: 1.5 }}>
         <Paper
           elevation={0}
           sx={{
@@ -2834,6 +2917,10 @@ export default function ClientBookingDetailsView({
             prepaymentPaid={isPrepaymentPaid}
             paymentDue={isPaymentDue}
             scheduleChangeTags={clientScheduleChangeTags}
+            editTagSignpostTitle={ACTIVITY_COMPARISON_SIGNPOST}
+            onEditTagSignpostClick={() =>
+              openActivityComparison(lineTagComparisonMode)
+            }
             onEditDateTime={
               bookingStatus === "confirmed"
                 ? () => openConfirmedEbrEditor("datetime")
@@ -2860,8 +2947,6 @@ export default function ClientBookingDetailsView({
             onDiscardBookingRequest={() => setDiscardDialogOpen(true)}
             onOpenActivity={() => setActivityOpen(true)}
             showUpdated={showStatusUpdated}
-            updatedSignpostTitle={ACTIVITY_COMPARISON_SIGNPOST}
-            onUpdatedClick={() => openActivityComparison("silent_updated")}
             showEditScenario={
               bookingStatus === "confirmed" &&
               !editRequest.isPending &&
@@ -3037,7 +3122,7 @@ export default function ClientBookingDetailsView({
                   />
                 ) : null}
 
-                {showRequestResponseActions ? (
+                {showRequestResponseActions && isIncomingBr ? (
                   <ClientEbrResponseActions
                     onAccept={() => setEbrAction("accept")}
                     onSuggestChange={() => void handleConfirmEbrSuggest()}
@@ -3159,6 +3244,10 @@ export default function ClientBookingDetailsView({
             (Number(activeBooking?.prepaymentPercent ?? prepaymentPercent) ||
               0) > 0 &&
             !isPrepaymentPaid;
+          if (action === "suggest") {
+            void handleConfirmEbrSuggest();
+            return;
+          }
           if (!acceptNeedsPrepay) {
             setResponseActionsDismissed(true);
             setActionFeedback({
@@ -3170,18 +3259,15 @@ export default function ClientBookingDetailsView({
                     : isIncomingBr
                       ? "Booking request accepted."
                       : "Changes accepted."
-                  : action === "reject"
-                    ? isIncomingConfirmedEr
-                      ? "Edit request rejected. Booking stays confirmed."
-                      : isIncomingBr
-                        ? "Booking request rejected."
-                        : "Edit request rejected. Booking stays confirmed."
-                    : "You can now suggest a change.",
+                  : isIncomingConfirmedEr
+                    ? "Edit request rejected. Booking stays confirmed."
+                    : isIncomingBr
+                      ? "Booking request rejected."
+                      : "Edit request rejected. Booking stays confirmed.",
             });
           }
           if (ebrAction === "accept") handleConfirmEbrAccept();
           else if (ebrAction === "reject") void handleConfirmEbrReject();
-          else if (ebrAction === "suggest") void handleConfirmEbrSuggest();
         }}
       />
 
@@ -3229,6 +3315,53 @@ export default function ClientBookingDetailsView({
         }
         professionalBusinessOverride={professionalBusinessOverride}
       />
+
+      {hasProfessionalSuggestedEdits && !isIncomingBr ? (
+        <Box
+          sx={{
+            position: "fixed",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 30,
+            bgcolor: m.white,
+            borderTop: `1px solid ${alpha(m.navy, 0.1)}`,
+            boxShadow: "0 -8px 24px rgba(16, 35, 63, 0.08)",
+            px: { xs: 2, md: 3 },
+            py: 1.5,
+            pb: "calc(12px + env(safe-area-inset-bottom))",
+          }}
+        >
+          <Container maxWidth="lg" disableGutters>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.15}>
+              <AppButton
+                fullWidth
+                tone="primary"
+                onClick={() => setEbrAction("accept")}
+                sx={{ minHeight: 44 }}
+              >
+                Accept suggested changes
+              </AppButton>
+              <AppButton
+                fullWidth
+                tone="secondary"
+                onClick={() => setEbrAction("suggest")}
+                sx={{ minHeight: 44 }}
+              >
+                Suggest changes
+              </AppButton>
+              <AppButton
+                fullWidth
+                tone="danger"
+                onClick={() => setEbrAction("reject")}
+                sx={{ minHeight: 44 }}
+              >
+                Reject
+              </AppButton>
+            </Stack>
+          </Container>
+        </Box>
+      ) : null}
 
       <MarketingSiteFooter
         columns={marketingShellFooter.columns.map((col) => ({

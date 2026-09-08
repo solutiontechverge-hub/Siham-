@@ -13,9 +13,16 @@ const TAG_LABELS: Record<BookingEditTagVariant, string> = {
   updated: "Updated",
 };
 
+function canShowComparisonSignpost(
+  variant: BookingEditTagVariant,
+  signpostTitle?: string,
+) {
+  return Boolean(signpostTitle) && variant !== "updated";
+}
+
 type BookingEditedTagProps = {
   variant: BookingEditTagVariant;
-  /** Lightweight signpost tooltip — e.g. "View comparison in Activity". */
+  /** Shown on hover — e.g. "View comparison in Activity". */
   signpostTitle?: string;
   onSignpostClick?: () => void;
 };
@@ -28,10 +35,11 @@ export default function BookingEditedTag({
   const m = useTheme().palette.mollure;
   const isCancelled = variant === "cancelled";
   const isPending = variant === "pending";
+  const showSignpost = canShowComparisonSignpost(variant, signpostTitle);
 
   const tag = (
     <Box
-      onClick={onSignpostClick}
+      onClick={variant === "updated" ? undefined : onSignpostClick}
       sx={{
         display: "inline-flex",
         alignItems: "center",
@@ -49,7 +57,8 @@ export default function BookingEditedTag({
             ? "#C67A00"
             : m.teal,
         flexShrink: 0,
-        cursor: onSignpostClick ? "pointer" : "default",
+        cursor:
+          variant !== "updated" && onSignpostClick ? "pointer" : "default",
       }}
     >
       <Typography
@@ -65,15 +74,13 @@ export default function BookingEditedTag({
     </Box>
   );
 
-  if (signpostTitle && variant !== "updated") {
-    return (
-      <Tooltip title={signpostTitle} placement="top">
-        {tag}
-      </Tooltip>
-    );
-  }
+  if (!showSignpost) return tag;
 
-  return tag;
+  return (
+    <Tooltip title={signpostTitle} placement="top">
+      {tag}
+    </Tooltip>
+  );
 }
 
 type BookingChangeTagsProps = {
@@ -94,6 +101,7 @@ export function BookingChangeTags({
       spacing={0.5}
       useFlexGap
       flexWrap="wrap"
+      alignItems="center"
       sx={{ mt: 0.55 }}
     >
       {variants.map((variant) => (

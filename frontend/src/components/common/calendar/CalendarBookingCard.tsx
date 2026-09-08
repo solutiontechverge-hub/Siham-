@@ -57,6 +57,7 @@ export type CalendarBookingCardProps = {
   onOpenNotes: () => void;
   onOpenClient: (anchorEl: HTMLElement) => void;
   onOpenMessages: () => void;
+  responseTimeConfigured?: boolean;
 };
 
 function scenarioBadgeResponseIndicators(
@@ -90,6 +91,7 @@ export default function CalendarBookingCard({
   onOpenNotes,
   onOpenClient,
   onOpenMessages,
+  responseTimeConfigured,
 }: CalendarBookingCardProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -113,7 +115,9 @@ export default function CalendarBookingCard({
   const unreadCount = useProfessionalMessagingUnread(bookingRef);
   const accent = statusCardAccent(event.status, statusColor);
   const scenarioIndicators = getBookingScenarioIndicators(event);
-  const responseIndicators = resolveBookingResponseIndicators(event);
+  const responseIndicators = resolveBookingResponseIndicators(event, {
+    responseTimeConfigured,
+  });
   const prepaymentStatus = resolveCalendarPrepaymentStatus(event);
   const prepaymentIconVariant = prepaymentStatus
     ? toPrepaymentIconVariant(prepaymentStatus)

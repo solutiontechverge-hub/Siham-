@@ -74,6 +74,7 @@ export type CalendarBookingTicketStackProps = {
   onOpenNotes: (event: CalendarEvent) => void;
   onOpenClient: (event: CalendarEvent, anchorEl: HTMLElement) => void;
   onOpenMessages: (event: CalendarEvent) => void;
+  responseTimeConfigured?: boolean;
 };
 
 export default function CalendarBookingTicketStack({
@@ -89,6 +90,7 @@ export default function CalendarBookingTicketStack({
   onOpenNotes,
   onOpenClient,
   onOpenMessages,
+  responseTimeConfigured,
 }: CalendarBookingTicketStackProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -179,6 +181,7 @@ export default function CalendarBookingTicketStack({
                 onOpenNotes={() => onOpenNotes(event)}
                 onOpenClient={(anchorEl) => onOpenClient(event, anchorEl)}
                 onOpenMessages={() => onOpenMessages(event)}
+                responseTimeConfigured={responseTimeConfigured}
               />
             </Box>
             {index < events.length - 1 ? (
