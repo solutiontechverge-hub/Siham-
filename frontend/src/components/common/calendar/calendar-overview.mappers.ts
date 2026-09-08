@@ -512,6 +512,15 @@ export function mapCalendarBookingToEvent(
                 : {}),
             paymentMethod: parsedNotes.paymentMethod,
             showKilometerAllowance: parsedNotes.showKilometerAllowance,
+            ...(parsedNotes.kilometerAllowance
+              ? {
+                  kilometerAllowance: {
+                    eurPerKm: parsedNotes.kilometerAllowance.eurPerKm ?? "",
+                    totalKilometer:
+                      parsedNotes.kilometerAllowance.totalKilometer ?? "",
+                  },
+                }
+              : {}),
             ...(parsedNotes.cancellationReason ? { cancellationReason: parsedNotes.cancellationReason } : {}),
             ...(parsedNotes.clientSnapshot ? { clientSnapshot: parsedNotes.clientSnapshot } : {}),
             ...(parsedNotes.guests?.length

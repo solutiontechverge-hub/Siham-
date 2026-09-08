@@ -30,7 +30,10 @@ import BookingRequestSentIcon from "../../../components/common/calendar/BookingR
 import { AppPagination, AppSearchField } from "../../../components/common";
 import { getBookingEditRequest } from "../../../components/common/client-booking/bookingEditRequest";
 import { syncEditRequestFromBookingApi } from "../../../components/common/client-booking/syncEditRequestFromApi";
-import { hasUnseenBookingUpdate } from "../../../components/common/calendar/bookingUpdateSeen";
+import {
+  shouldShowSilentUpdatedTag,
+  useBookingUpdateSeenVersion,
+} from "../../../components/common/calendar/bookingUpdateSeen";
 import {
   getCheckoutPath,
   setActiveBookingSession,
@@ -63,6 +66,7 @@ export default function ClientBookingListView({ listTab }: Props) {
   const [page, setPage] = React.useState(1);
   const [searchInput, setSearchInput] = React.useState("");
   const [searchQuery, setSearchQuery] = React.useState("");
+  useBookingUpdateSeenVersion();
 
   React.useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -274,8 +278,8 @@ export default function ClientBookingListView({ listTab }: Props) {
                 const showUpdated =
                   !pendingEr &&
                   displayStatus === "confirmed" &&
-                  isSilentUpdated &&
-                  hasUnseenBookingUpdate({
+                  shouldShowSilentUpdatedTag({
+                    silentUpdated: isSilentUpdated,
                     viewer: "client",
                     bookingRef: b.bookingRef,
                     updatedAt: b.updatedAt,

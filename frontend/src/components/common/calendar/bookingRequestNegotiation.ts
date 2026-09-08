@@ -352,7 +352,7 @@ function guestIdentityChangedOnly(
   });
 }
 
-function guestsHaveServiceReorderOnly(
+export function guestsHaveServiceReorderOnly(
   previous: readonly CalendarBookingGuestItem[] | undefined,
   next: readonly CalendarBookingGuestItem[] | undefined,
 ) {
@@ -375,6 +375,21 @@ function guestsHaveServiceReorderOnly(
     }
   }
   return reordered;
+}
+
+/** Client or guest service order changed, with no add/remove/content edits. */
+export function hasServiceReorderOnly(input: {
+  previousServices?: readonly CalendarBookingServiceItem[];
+  currentServices?: readonly CalendarBookingServiceItem[];
+  previousGuests?: readonly CalendarBookingGuestItem[];
+  currentGuests?: readonly CalendarBookingGuestItem[];
+}): boolean {
+  return (
+    isServiceReorderOnly(
+      input.previousServices ?? [],
+      input.currentServices ?? [],
+    ) || guestsHaveServiceReorderOnly(input.previousGuests, input.currentGuests)
+  );
 }
 
 function guestsHaveApprovalRequiredServiceChanges(
@@ -424,9 +439,12 @@ export function isSilentSafeBookingChange(input: {
     input.previousGuests,
     input.currentGuests,
   );
-  const servicesReordered =
-    isServiceReorderOnly(previousServices, currentServices) ||
-    guestsHaveServiceReorderOnly(input.previousGuests, input.currentGuests);
+  const servicesReordered = hasServiceReorderOnly({
+    previousServices,
+    currentServices,
+    previousGuests: input.previousGuests,
+    currentGuests: input.currentGuests,
+  });
   const hasSilentSafe = phoneChanged || namesChanged || servicesReordered;
   if (!hasSilentSafe) return false;
 

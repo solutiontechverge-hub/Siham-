@@ -125,7 +125,7 @@ import {
   detectServiceLineChanges,
   detectProductLineChanges,
   isSilentSafeBookingChange,
-  isServiceReorderOnly,
+  hasServiceReorderOnly,
   resolveLineChangeTags,
   isAwaitingClientChangeApproval,
   cancelledOriginalServicesForDisplay,
@@ -269,9 +269,11 @@ import {
   calendarEventToDisplaySegments,
   expandCalendarEventToChronologicalSegments,
   getBookingTimedSpanMins,
+  isExtraBookingParticipant,
   resolveParentCalendarEventId,
   sortCalendarGuestsByCanonicalOrder,
 } from "../../../../data/bookingChronologicalBlocks";
+import { persistLinePricing } from "../../../../data/bookingLinePricing";
 import {
   buildBookingProductLine,
   createEmptyProductSelectionDraft,
@@ -1089,13 +1091,6 @@ export default function ProfessionalFixedLocationCalendar({
     eurPerKm: "",
     totalKilometer: "",
   }));
-  React.useEffect(() => {
-    // Kilometer allowance is only applicable for Desired Location bookings.
-    if (slotLocation !== "DL") {
-      setShowKilometerAllowance(false);
-      setKilometerAllowanceDraft({ eurPerKm: "", totalKilometer: "" });
-    }
-  }, [slotLocation]);
   const applyDesiredLocationKilometerDefaults = React.useCallback(() => {
     setShowKilometerAllowance(true);
     setKilometerAllowanceDraft((prev) => ({
@@ -1303,12 +1298,21 @@ export default function ProfessionalFixedLocationCalendar({
     return servicesActual + productsActual + uniqueActual + guestsActual;
   }, [bookingGuests, bookingUniqueItems, selectedProducts, selectedServices]);
   const lineDiscountAmount = Math.max(0, lineActualAmount - subtotalPrice);
+  const openBookingLocation = editingEventId
+    ? events.find((event) => event.id === editingEventId)?.location
+    : undefined;
+  const isDesiredLocationBooking =
+    slotLocation === "DL" || openBookingLocation === "DL";
   const kilometerAllowanceAmount = React.useMemo(
     () =>
-      slotLocation === "DL" && showKilometerAllowance
+      isDesiredLocationBooking && showKilometerAllowance
         ? resolveKilometerAllowanceAmount(kilometerAllowanceDraft)
         : 0,
-    [kilometerAllowanceDraft, showKilometerAllowance, slotLocation],
+    [
+      isDesiredLocationBooking,
+      kilometerAllowanceDraft,
+      showKilometerAllowance,
+    ],
   );
   const bookingPrice = React.useMemo(
     () =>
@@ -1494,6 +1498,13 @@ export default function ProfessionalFixedLocationCalendar({
         : null,
     [editingEventId, events],
   );
+
+  React.useEffect(() => {
+    if (slotLocation === "DL") return;
+    if (viewingBookingEvent?.location === "DL") return;
+    setShowKilometerAllowance(false);
+    setKilometerAllowanceDraft({ eurPerKm: "", totalKilometer: "" });
+  }, [slotLocation, viewingBookingEvent?.location]);
 
   const viewingBookingOverlapsBlockTime = React.useMemo(
     () =>
@@ -2500,6 +2511,11 @@ export default function ProfessionalFixedLocationCalendar({
   >(null);
   const staffConflictAckRef = React.useRef(false);
   const inlineGuestFormRef = React.useRef<HTMLDivElement | null>(null);
+  const bookingDrawerBodyRef = React.useRef<HTMLDivElement | null>(null);
+  const bookingDrawerScreenRef = React.useRef(slotBookingScreen);
+  const savedBookingDrawerScrollTopRef = React.useRef(0);
+  const pendingBookingDrawerFocusRef = React.useRef<string | null>(null);
+  const restoreBookingDrawerScrollRef = React.useRef(false);
   const silentEditBaselineRef = React.useRef<{
     services: typeof selectedServices;
     guests: typeof bookingGuests;
@@ -2520,12 +2536,66 @@ export default function ProfessionalFixedLocationCalendar({
   );
 
   React.useEffect(() => {
+    const previousScreen = bookingDrawerScreenRef.current;
+    bookingDrawerScreenRef.current = slotBookingScreen;
+    if (previousScreen === "new-booking" && slotBookingScreen !== "new-booking") {
+      savedBookingDrawerScrollTopRef.current =
+        bookingDrawerBodyRef.current?.scrollTop ?? 0;
+      restoreBookingDrawerScrollRef.current = true;
+      if (!pendingBookingDrawerFocusRef.current) {
+        pendingBookingDrawerFocusRef.current = addMenuTarget;
+      }
+    }
+  }, [addMenuTarget, slotBookingScreen]);
+
+  const focusBookingDrawerSection = React.useCallback((sectionId: string) => {
+    pendingBookingDrawerFocusRef.current = sectionId;
+    restoreBookingDrawerScrollRef.current = true;
+  }, []);
+
+  React.useEffect(() => {
     if (!showInlineGuestField || editingInlineGuestId) return;
-    inlineGuestFormRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
+    focusBookingDrawerSection("inline-participant-form");
+  }, [editingInlineGuestId, focusBookingDrawerSection, showInlineGuestField]);
+
+  React.useLayoutEffect(() => {
+    if (slotBookingScreen !== "new-booking") return;
+    if (!restoreBookingDrawerScrollRef.current) return;
+    const scroller = bookingDrawerBodyRef.current;
+    if (!scroller) return;
+    const sectionId = pendingBookingDrawerFocusRef.current;
+    const savedTop = savedBookingDrawerScrollTopRef.current;
+    let cancelled = false;
+    const frame = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        if (cancelled) return;
+        restoreBookingDrawerScrollRef.current = false;
+        if (sectionId) {
+          const escaped =
+            typeof CSS !== "undefined" && typeof CSS.escape === "function"
+              ? CSS.escape(sectionId)
+              : sectionId.replace(/"/g, '\\"');
+          const node = scroller.querySelector(
+            `[data-booking-section="${escaped}"]`,
+          );
+          if (node) {
+            node.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            pendingBookingDrawerFocusRef.current = null;
+            return;
+          }
+        }
+        if (savedTop > 0) scroller.scrollTop = savedTop;
+      });
     });
-  }, [showInlineGuestField, editingInlineGuestId]);
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+    };
+  }, [
+    bookingGuests,
+    showInlineGuestField,
+    slotBookingScreen,
+  ]);
 
   const persistOverviewBlockedTime = async (draft: BlockTimeDraft) => {
     const nextBlocks = buildBlocksFromDraft(draft, draft.teamIds);
@@ -5543,12 +5613,7 @@ export default function ProfessionalFixedLocationCalendar({
         ) {
           setBookingGuests(
             snap.people
-              .filter(
-                (person) =>
-                  !person.isRequester &&
-                  person.participantType !== "notes" &&
-                  person.name?.trim().toLowerCase() !== "notes",
-              )
+              .filter((person) => isExtraBookingParticipant(person))
               .map((person) => ({
                 id: person.id,
                 name: person.name,
@@ -5593,9 +5658,7 @@ export default function ProfessionalFixedLocationCalendar({
           const extras = snap.people
             .filter(
               (person) =>
-                !person.isRequester &&
-                person.participantType !== "notes" &&
-                person.name?.trim().toLowerCase() !== "notes" &&
+                isExtraBookingParticipant(person) &&
                 !existingIds.has(String(person.id)),
             )
             .map((person) => ({
@@ -7538,10 +7601,11 @@ export default function ProfessionalFixedLocationCalendar({
       inlineGuestParticipantType === "model"
         ? `Model ${modelCount}`
         : `Guest ${guestCount}`;
+    const newGuestId = `guest-${Date.now()}`;
     setBookingGuests((prev) => [
       ...prev,
       {
-        id: `guest-${Date.now()}`,
+        id: newGuestId,
         name: guestName || fallbackName,
         email,
         phoneCode,
@@ -7555,6 +7619,7 @@ export default function ProfessionalFixedLocationCalendar({
     setEditingInlineGuestId(null);
     setInlineGuestParticipantType("guest");
     setShowInlineGuestField(false);
+    focusBookingDrawerSection(newGuestId);
   }, [
     bookingGuests,
     editingInlineGuestId,
@@ -7567,6 +7632,7 @@ export default function ProfessionalFixedLocationCalendar({
     inlineGuestParticipantType,
     showSnackbar,
     slotLocation,
+    focusBookingDrawerSection,
   ]);
 
   const beginEditInlineGuest = React.useCallback(
@@ -7606,6 +7672,9 @@ export default function ProfessionalFixedLocationCalendar({
   const renderInlineGuestFields = (variant: "card" | "panel") => (
     <Box
       ref={variant === "panel" ? inlineGuestFormRef : undefined}
+      {...(variant === "panel"
+        ? { "data-booking-section": "inline-participant-form" }
+        : {})}
       sx={
         variant === "panel"
           ? {
@@ -7766,10 +7835,12 @@ export default function ProfessionalFixedLocationCalendar({
           },
         ]),
       );
+      focusBookingDrawerSection(id);
     },
     [
       bookingGuests,
       data.resources,
+      focusBookingDrawerSection,
       selectedServices,
       selectedSlot?.end,
       selectedSlot?.resourceId,
@@ -7975,6 +8046,14 @@ export default function ProfessionalFixedLocationCalendar({
       return [...rest.slice(0, insertAt), ...next, ...rest.slice(insertAt)];
     })();
     setBookingGuests(sortCalendarGuestsByCanonicalOrder(nextGuests));
+    const existingIds = new Set(bookingGuests.map((guest) => guest.id));
+    const focused =
+      nextGuests.find(
+        (guest) =>
+          guest.participantType === "buffer" &&
+          (!existingIds.has(guest.id) || guest.id === editingBufferId),
+      ) ?? nextGuests.find((guest) => guest.participantType === "buffer");
+    if (focused?.id) focusBookingDrawerSection(focused.id);
     setSelectedSlot((prev) => {
       if (!prev) return prev;
       let startMin = minutesSinceMidnight(prev.start);
@@ -8010,6 +8089,7 @@ export default function ProfessionalFixedLocationCalendar({
     bufferDraft,
     editingBufferId,
     selectedServices,
+    focusBookingDrawerSection,
   ]);
 
   const beginEditBuffer = React.useCallback(
@@ -8197,6 +8277,8 @@ export default function ProfessionalFixedLocationCalendar({
       const existingEvent = editingEventId
         ? events.find((event) => event.id === editingEventId)
         : null;
+      const persistDesiredLocationKm =
+        slotLocation === "DL" || existingEvent?.location === "DL";
 
       if (incomingRequestEditMode && editingEventId && existingEvent) {
         const originalServices =
@@ -8261,9 +8343,9 @@ export default function ProfessionalFixedLocationCalendar({
           showInternalNote,
           bookingInternalNote,
           bookingTotalDiscount,
-          showKilometerAllowance: slotLocation === "DL" && showKilometerAllowance,
+          showKilometerAllowance: persistDesiredLocationKm && showKilometerAllowance,
           kilometerAllowanceDraft:
-            slotLocation === "DL"
+            persistDesiredLocationKm
               ? kilometerAllowanceDraft
               : { eurPerKm: "", totalKilometer: "" },
           clientNote: existingEvent.details?.clientNote,
@@ -8615,9 +8697,9 @@ export default function ProfessionalFixedLocationCalendar({
           showInternalNote,
           bookingInternalNote,
           bookingTotalDiscount,
-          showKilometerAllowance: slotLocation === "DL" && showKilometerAllowance,
+          showKilometerAllowance: persistDesiredLocationKm && showKilometerAllowance,
           kilometerAllowanceDraft:
-            slotLocation === "DL"
+            persistDesiredLocationKm
               ? kilometerAllowanceDraft
               : { eurPerKm: "", totalKilometer: "" },
           clientNote: existingEvent?.details?.clientNote,
@@ -8662,7 +8744,6 @@ export default function ProfessionalFixedLocationCalendar({
             return {
               id: service.id,
               name: service.name,
-              price: service.price,
               durationMins: service.durationMins,
               staffResourceId: staffId,
               teamMemberId: staffId,
@@ -8670,6 +8751,7 @@ export default function ProfessionalFixedLocationCalendar({
               startTime: service.startTime,
               endTime: service.endTime,
               guestId: guest.id,
+              ...persistLinePricing(service),
             };
           }),
       );
@@ -8682,6 +8764,7 @@ export default function ProfessionalFixedLocationCalendar({
             guestId: null as string | null,
             teamMemberId: staffId ?? service.teamMemberId ?? null,
             teamMemberName: staffName,
+            ...persistLinePricing(service),
           };
         }),
         ...guestServiceLines,
@@ -8690,15 +8773,18 @@ export default function ProfessionalFixedLocationCalendar({
         ...selectedProducts.map((product) => ({
           ...product,
           guestId: null as string | null,
+          ...persistLinePricing(product),
         })),
         ...bookingUniqueItems.map((product) => ({
           ...product,
           guestId: null as string | null,
+          ...persistLinePricing(product),
         })),
         ...guestsForPersist.flatMap((guest) =>
           guest.products.map((product) => ({
             ...product,
             guestId: guest.id,
+            ...persistLinePricing(product),
           })),
         ),
       ];
@@ -8852,8 +8938,7 @@ export default function ProfessionalFixedLocationCalendar({
               guestId: service.guestId ?? null,
               teamMemberId,
               teamMemberName: teamMemberName || undefined,
-              originalPrice: service.price,
-              discount: service.discount ?? null,
+              ...persistLinePricing(service),
             };
           }),
           teamMembers: mergeBookingTeamMembers(
@@ -8938,12 +9023,16 @@ export default function ProfessionalFixedLocationCalendar({
           clockHm(existingEvent.start) !== clockHm(selectedSlot.start) ||
           clockHm(existingEvent.end) !== clockHm(selectedSlot.end);
         const silentBaseline = silentEditBaselineRef.current;
-        const clientServicesReordered = isServiceReorderOnly(
-          silentBaseline?.services ?? existingEvent.details?.services ?? [],
-          selectedServices,
-        );
+        const servicesReordered = hasServiceReorderOnly({
+          previousServices:
+            silentBaseline?.services ?? existingEvent.details?.services ?? [],
+          currentServices: selectedServices,
+          previousGuests:
+            silentBaseline?.guests ?? existingEvent.details?.guests,
+          currentGuests: guestsForPersist,
+        });
         const scheduleChanged =
-          dateChanged || (timeWindowChanged && !clientServicesReordered);
+          dateChanged || (timeWindowChanged && !servicesReordered);
         const silentSafeOnly =
           existingEvent.status === "Confirmed" &&
           isSilentSafeBookingChange({
@@ -11179,6 +11268,7 @@ export default function ProfessionalFixedLocationCalendar({
         anchor="right"
         open={slotDrawerOpen}
         onClose={closeBookingDrawer}
+        contentRef={bookingDrawerBodyRef}
         bodyBgcolor={
           isCancelledOrInvalidBooking ? m.cancelledSurface : undefined
         }
@@ -13357,37 +13447,6 @@ export default function ProfessionalFixedLocationCalendar({
                                   ),
                                 }}
                               />
-                              {viewingBookingEvent.details?.silentUpdated &&
-                              viewingBookingEvent.bookingScenario !== "EBR" &&
-                              viewingBookingEvent.bookingScenario !== "ER" ? (
-                                <Tooltip
-                                  title={ACTIVITY_COMPARISON_SIGNPOST}
-                                  placement="top"
-                                >
-                                  <Chip
-                                    size="small"
-                                    label="Updated"
-                                    onClick={() =>
-                                      openActivityComparison("silent_updated")
-                                    }
-                                    sx={{
-                                      height: 18,
-                                      fontSize: 9,
-                                      fontWeight: 800,
-                                      borderRadius: "6px",
-                                      border: `1px solid ${alpha(m.teal, 0.4)}`,
-                                      bgcolor: alpha(m.teal, 0.12),
-                                      color: m.teal,
-                                      cursor: "pointer",
-                                      "& .MuiChip-label": {
-                                        px: 0.7,
-                                        py: 0,
-                                        lineHeight: 1.2,
-                                      },
-                                    }}
-                                  />
-                                </Tooltip>
-                              ) : null}
                               {getBookingScenarioIndicators(
                                 viewingBookingEvent,
                               )
@@ -14280,7 +14339,7 @@ export default function ProfessionalFixedLocationCalendar({
                     ) : null}
 
                     {/* Client */}
-                    <Box>
+                    <Box data-booking-section="client">
                       <BodyText
                         sx={{
                           fontSize: 12,
@@ -15002,6 +15061,7 @@ export default function ProfessionalFixedLocationCalendar({
                           ) {
                             if (guest.id !== firstDrawerPlanningId) return null;
                             return (
+                              <Box data-booking-section={guest.id}>
                               <BookingDrawerPlanningGroup
                                 key="planning-group"
                                 items={drawerPlanningGuests}
@@ -15073,6 +15133,7 @@ export default function ProfessionalFixedLocationCalendar({
                                     : undefined
                                 }
                               />
+                              </Box>
                             );
                           }
                           const sectionLabel = participantRoleHeading(
@@ -15096,7 +15157,7 @@ export default function ProfessionalFixedLocationCalendar({
                               guest.planningDuration,
                             );
                           return (
-                          <Box key={block.key}>
+                          <Box key={block.key} data-booking-section={guest.id}>
                             <BodyText
                               sx={{
                                 fontSize: 12,

@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import {
   detectProductLineChanges,
   detectServiceLineChanges,
+  hasServiceReorderOnly,
   isAwaitingClientChangeApproval,
   isSilentSafeBookingChange,
   resolveLineChangeTags,
@@ -222,6 +223,46 @@ assert.equal(
     scheduleChanged: false,
   }),
   false,
+);
+
+const guestReorderPrev = [
+  {
+    ...guestA,
+    services: [
+      guestA.services[0],
+      {
+        id: "brow",
+        name: "brow",
+        price: 40,
+        durationMins: 20,
+        startTime: "12:26",
+        endTime: "12:46",
+        guestId: "g-model",
+      },
+    ],
+  },
+];
+const guestReorderNext = [
+  {
+    ...guestReorderPrev[0],
+    services: [
+      guestReorderPrev[0].services[1],
+      {
+        ...guestReorderPrev[0].services[0],
+        startTime: "12:15",
+        endTime: "12:26",
+      },
+    ],
+  },
+];
+assert.equal(
+  hasServiceReorderOnly({
+    previousServices: original,
+    currentServices: original,
+    previousGuests: guestReorderPrev,
+    currentGuests: guestReorderNext,
+  }),
+  true,
 );
 
 console.log("bookingRequestNegotiation.tags.test.ts passed");

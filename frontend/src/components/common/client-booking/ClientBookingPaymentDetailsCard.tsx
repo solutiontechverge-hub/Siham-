@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
-import { Avatar, Box, Paper, Stack, Typography } from "@mui/material";
+import { Avatar, Box, Paper, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import {
   parseTimeLabelToMinutes,
@@ -27,12 +27,17 @@ import {
   planningScheduleMeta,
   resolveTeamMemberFirstName,
 } from "./buildBookingSummarySections";
+import {
+  extraBookingParticipantIds,
+  resolveBookingLineOwnerId,
+} from "../../../data/bookingChronologicalBlocks";
 import ProjectUploadThumb from "./ProjectUploadThumb";
 import type { BookingEditSuggestedProduct } from "./bookingEditRequest";
 import type { ClientBookingDraft, ClientBookingSummarySection } from "./types";
 import BookingSummaryNote from "./BookingSummaryNote";
 import BookingLineAmount from "../calendar/BookingLineAmount";
 import { clientLineDiscountLabel } from "../../../data/bookingLinePricing";
+import { BodyText } from "../../ui/typography";
 
 export type ClientBookingPrepaymentState = "none" | "required" | "paid";
 
@@ -64,10 +69,11 @@ function OutcomeChangesNoteBlock({
         py: 1.35,
       }}
     >
-      <Typography
+      <BodyText
         sx={{
-          fontWeight: 900,
+          m: 0,
           fontSize: 12.5,
+          fontWeight: 900,
           color: alpha(m.navy, 0.82),
           mb: 0.85,
         }}
@@ -75,31 +81,33 @@ function OutcomeChangesNoteBlock({
         {isAccepted
           ? "Professional has accepted your new changes"
           : "Professional has rejected your new changes"}
-      </Typography>
+      </BodyText>
       {note.scheduleLabel ? (
-        <Typography
+        <BodyText
           sx={{
+            m: 0,
             fontSize: 12,
-            fontWeight: 800,
+            fontWeight: 700,
             color: alpha(m.navy, 0.68),
             mb: 0.5,
           }}
         >
           {isAccepted ? "Updated time" : "Requested time"}: {note.scheduleLabel}
-        </Typography>
+        </BodyText>
       ) : null}
       {note.services?.length ? (
         <Box sx={{ mt: 0.35 }}>
-          <Typography
+          <BodyText
             sx={{
-              fontSize: 11.5,
+              m: 0,
+              fontSize: 12,
               fontWeight: 800,
               color: alpha(m.navy, 0.55),
               mb: 0.35,
             }}
           >
             {isAccepted ? "Updated services" : "Requested services"}
-          </Typography>
+          </BodyText>
           <Stack spacing={0.35}>
             {note.services.map((service, index) => (
               <Stack
@@ -108,24 +116,26 @@ function OutcomeChangesNoteBlock({
                 justifyContent="space-between"
                 spacing={1}
               >
-                <Typography
+                <BodyText
                   sx={{
-                    fontSize: 12,
-                    fontWeight: 800,
+                    m: 0,
+                    fontSize: 12.5,
+                    fontWeight: 900,
                     color: alpha(m.navy, 0.72),
                   }}
                 >
                   {service.name}
-                </Typography>
-                <Typography
+                </BodyText>
+                <BodyText
                   sx={{
-                    fontSize: 12,
+                    m: 0,
+                    fontSize: 12.5,
                     fontWeight: 900,
                     color: alpha(m.navy, 0.72),
                   }}
                 >
                   €{service.price}
-                </Typography>
+                </BodyText>
               </Stack>
             ))}
           </Stack>
@@ -133,16 +143,17 @@ function OutcomeChangesNoteBlock({
       ) : null}
       {note.products?.length ? (
         <Box sx={{ mt: 0.75 }}>
-          <Typography
+          <BodyText
             sx={{
-              fontSize: 11.5,
+              m: 0,
+              fontSize: 12,
               fontWeight: 800,
               color: alpha(m.navy, 0.55),
               mb: 0.35,
             }}
           >
             {isAccepted ? "Updated products" : "Requested products"}
-          </Typography>
+          </BodyText>
           <Stack spacing={0.35}>
             {note.products.map((product, index) => (
               <Stack
@@ -151,24 +162,26 @@ function OutcomeChangesNoteBlock({
                 justifyContent="space-between"
                 spacing={1}
               >
-                <Typography
+                <BodyText
                   sx={{
-                    fontSize: 12,
-                    fontWeight: 800,
+                    m: 0,
+                    fontSize: 12.5,
+                    fontWeight: 900,
                     color: alpha(m.navy, 0.72),
                   }}
                 >
                   {product.name}
-                </Typography>
-                <Typography
+                </BodyText>
+                <BodyText
                   sx={{
-                    fontSize: 12,
+                    m: 0,
+                    fontSize: 12.5,
                     fontWeight: 900,
                     color: alpha(m.navy, 0.72),
                   }}
                 >
                   €{product.price}
-                </Typography>
+                </BodyText>
               </Stack>
             ))}
           </Stack>
@@ -336,9 +349,9 @@ export default function ClientBookingPaymentDetailsCard({
     products: listedProducts,
   });
   const catalogHeadingSx = {
+    fontSize: 12.5,
     fontWeight: 800,
-    fontSize: 12,
-    color: alpha(m.navy, 0.55),
+    color: alpha(m.navy, 0.72),
     mb: 1,
   } as const;
 
@@ -436,16 +449,17 @@ export default function ClientBookingPaymentDetailsCard({
           spacing={1.5}
         >
           <Box sx={{ minWidth: 0 }}>
-            <Typography
+            <BodyText
               sx={{
+                m: 0,
                 fontSize: 13,
                 fontWeight: 900,
-                color: alpha(m.navy, 0.82),
-                lineHeight: 1.2,
+                color: alpha(m.navy, 0.86),
+                lineHeight: 1.25,
               }}
             >
               {service.name}
-            </Typography>
+            </BodyText>
             <ServiceSummaryMetaLine
               timeRange={timeRange}
               durationLabel={`${service.durationMins} Mins`}
@@ -460,15 +474,16 @@ export default function ClientBookingPaymentDetailsCard({
                 <PersonOutlineRoundedIcon
                   sx={{ fontSize: 14, color: alpha(m.navy, 0.4) }}
                 />
-                <Typography
+                <BodyText
                   sx={{
+                    m: 0,
                     fontSize: 10.5,
-                    fontWeight: 800,
+                    fontWeight: 700,
                     color: alpha(m.navy, 0.48),
                   }}
                 >
                   By {teamFirst}
-                </Typography>
+                </BodyText>
               </Stack>
             ) : null}
             {changeTags.length ? (
@@ -523,18 +538,19 @@ export default function ClientBookingPaymentDetailsCard({
           spacing={0.75}
           sx={{ minWidth: 0, flexWrap: "wrap" }}
         >
-          <Typography
+          <BodyText
             sx={{
+              m: 0,
               fontSize: 13,
               fontWeight: 900,
-              color: alpha(m.navy, 0.82),
-              lineHeight: 1.2,
+              color: alpha(m.navy, 0.86),
+              lineHeight: 1.25,
             }}
           >
             {item.quantity && item.quantity > 1
               ? `${item.name} ×${item.quantity}`
               : item.name}
-          </Typography>
+          </BodyText>
           {(() => {
             const productTags = productChangeTags(item.id);
             return productTags.length ? (
@@ -564,21 +580,26 @@ export default function ClientBookingPaymentDetailsCard({
     >
       <Avatar
         sx={{
-          width: 40,
-          height: 40,
+          width: 34,
+          height: 34,
           bgcolor: alpha(m.teal, 0.12),
           color: m.teal,
           fontWeight: 900,
-          fontSize: 15,
+          fontSize: 14,
         }}
       >
         {name.charAt(0).toUpperCase()}
       </Avatar>
-      <Typography
-        sx={{ fontWeight: 900, fontSize: 14, color: m.headingText }}
+      <BodyText
+        sx={{
+          m: 0,
+          fontWeight: 900,
+          fontSize: 13,
+          color: m.headingText,
+        }}
       >
         {name}
-      </Typography>
+      </BodyText>
     </Stack>
   );
 
@@ -594,14 +615,21 @@ export default function ClientBookingPaymentDetailsCard({
     chronologicalSections.find(
       (section) => section.isRequester || section.participantType === "requester",
     )?.key ?? "";
+  const requesterParticipantId =
+    chronologicalSections.find(
+      (section) => section.isRequester || section.participantType === "requester",
+    )?.participantId ||
+    String(requesterSectionKey).split("::")[0] ||
+    "requester";
+  const extraParticipantIds = React.useMemo(
+    () => extraBookingParticipantIds(draft?.people),
+    [draft?.people],
+  );
 
   const catalogItemsForSection = (
     items: typeof catalogProducts,
     section: ClientBookingSummarySection,
   ) => {
-    const isRequester = Boolean(
-      section.isRequester || section.participantType === "requester",
-    );
     const participantId =
       section.participantId ||
       String(section.key).split("::")[0] ||
@@ -614,11 +642,12 @@ export default function ClientBookingPaymentDetailsCard({
       })?.key === section.key;
     if (!isFirstBlockForPerson) return [];
     return items.filter((item) => {
-      const assigned = String(
-        (item as { guestId?: string | null }).guestId ?? "",
-      ).trim();
-      if (!assigned) return isRequester || section.key === requesterSectionKey;
-      return assigned === participantId || assigned === section.key;
+      const ownerId = resolveBookingLineOwnerId(
+        (item as { guestId?: string | null }).guestId,
+        requesterParticipantId,
+        extraParticipantIds,
+      );
+      return ownerId === participantId || ownerId === section.key;
     });
   };
 
@@ -638,7 +667,7 @@ export default function ClientBookingPaymentDetailsCard({
     if (!items.length) return null;
     return (
       <Box>
-        <Typography sx={catalogHeadingSx}>{heading}</Typography>
+        <BodyText sx={catalogHeadingSx}>{heading}</BodyText>
         <Stack spacing={1}>
           {items.map((item) => renderCatalogItem(item))}
         </Stack>
@@ -650,26 +679,43 @@ export default function ClientBookingPaymentDetailsCard({
     section: ClientBookingSummarySection,
     heading?: string,
     asPersonCard?: boolean,
+    hideRoleHeading?: boolean,
   ) => {
     const services = section.items;
     const products = catalogItemsForSection(catalogProducts, section);
     const uniqueItems = catalogItemsForSection(catalogUniqueItems, section);
+    const personName = section.title?.trim() || "";
+    const roleHeading = heading?.trim() || "";
+    const showInnerName = asPersonCard && Boolean(personName || roleHeading);
     return (
-    <Box key={section.key} sx={asPersonCard ? nestedCardSx : undefined}>
-      {asPersonCard
-        ? renderPersonHeader(heading || section.title)
-        : heading ? (
-        <Typography
+    <Box key={section.key}>
+      {asPersonCard && roleHeading && !hideRoleHeading ? (
+        <BodyText
           sx={{
+            m: 0,
+            fontSize: 12,
             fontWeight: 900,
-            fontSize: 12.5,
-            color: alpha(m.navy, 0.72),
+            color: alpha(m.navy, 0.65),
+            mb: 0.75,
+          }}
+        >
+          {roleHeading}
+        </BodyText>
+      ) : !asPersonCard && roleHeading && !hideRoleHeading ? (
+        <BodyText
+          sx={{
+            m: 0,
+            fontSize: 12,
+            fontWeight: 900,
+            color: alpha(m.navy, 0.65),
             mb: 1,
           }}
         >
-          {heading}
-        </Typography>
+          {roleHeading}
+        </BodyText>
       ) : null}
+    <Box sx={asPersonCard ? nestedCardSx : undefined}>
+      {showInnerName ? renderPersonHeader(personName || roleHeading) : null}
       <Stack spacing={1.5}>
       {(() => {
         const meta = planningScheduleMeta(section);
@@ -677,15 +723,18 @@ export default function ClientBookingPaymentDetailsCard({
         const activity =
           rawActivity &&
           rawActivity.toLowerCase() !== "buffer" &&
-          rawActivity !== heading
+          rawActivity !== roleHeading &&
+          rawActivity !== personName
             ? rawActivity
             : "";
-        const showSchedule =
-          Boolean(activity) ||
-          Boolean(meta.timeRange) ||
-          Boolean(meta.durationLabel) ||
+        const isTimedParticipant =
           section.participantType === "buffer" ||
           section.participantType === "planning";
+        const showSchedule =
+          isTimedParticipant ||
+          Boolean(activity) ||
+          (services.length > 0 &&
+            (Boolean(meta.timeRange) || Boolean(meta.durationLabel)));
         if (!showSchedule) return null;
         return (
         <Box
@@ -698,16 +747,17 @@ export default function ClientBookingPaymentDetailsCard({
           }}
         >
           {activity ? (
-            <Typography
+            <BodyText
               sx={{
-                fontSize: 13,
+                m: 0,
+                fontSize: 12.5,
                 fontWeight: 900,
                 color: alpha(m.navy, 0.82),
                 mb: 0.35,
               }}
             >
               {activity}
-            </Typography>
+            </BodyText>
           ) : null}
           {meta.timeRange || meta.durationLabel || section.teamMemberLabel ? (
             <ServiceSummaryMetaLine
@@ -728,7 +778,7 @@ export default function ClientBookingPaymentDetailsCard({
       })()}
       {services.length ? (
         <Box>
-          <Typography sx={catalogHeadingSx}>Service</Typography>
+          <BodyText sx={catalogHeadingSx}>Service</BodyText>
           <Stack spacing={1}>
             {services.map((service) => renderService(service, section))}
           </Stack>
@@ -737,6 +787,7 @@ export default function ClientBookingPaymentDetailsCard({
       {renderCatalogGroup("Product", products)}
       {renderCatalogGroup("Unique item", uniqueItems)}
       </Stack>
+    </Box>
     </Box>
     );
   };
@@ -752,17 +803,17 @@ export default function ClientBookingPaymentDetailsCard({
       }}
     >
       <Box sx={{ p: 2, bgcolor: "#fff" }}>
-        <Typography
+        <BodyText
           sx={{
-            fontWeight: 700,
-            fontSize: 16,
+            m: 0,
+            fontWeight: 900,
+            fontSize: 13,
             color: alpha(m.navy, 0.82),
-            letterSpacing: "-0.01em",
             mb: 1.35,
           }}
         >
           Booking & Payment Details
-        </Typography>
+        </BodyText>
         <Stack
           direction="row"
           alignItems="center"
@@ -779,32 +830,39 @@ export default function ClientBookingPaymentDetailsCard({
           <Avatar
             src={requesterAvatarUrl}
             sx={{
-              width: 44,
-              height: 44,
+              width: 34,
+              height: 34,
               bgcolor: alpha(m.teal, 0.12),
               color: m.teal,
               fontWeight: 900,
-              fontSize: 16,
+              fontSize: 14,
             }}
           >
             {requesterName.charAt(0).toUpperCase()}
           </Avatar>
           <Stack spacing={0.25}>
-            <Typography
-              sx={{ fontWeight: 900, fontSize: 14, color: alpha(m.navy, 0.88) }}
+            <BodyText
+              sx={{
+                m: 0,
+                fontSize: 12.5,
+                fontWeight: 900,
+                color: alpha(m.navy, 0.82),
+                lineHeight: 1.2,
+              }}
             >
               {requesterName}
-            </Typography>
+            </BodyText>
             {requesterEmail ? (
-              <Typography
+              <BodyText
                 sx={{
+                  m: 0,
                   fontSize: 12,
                   fontWeight: 700,
                   color: alpha(m.navy, 0.55),
                 }}
               >
                 {requesterEmail}
-              </Typography>
+              </BodyText>
             ) : null}
           </Stack>
         </Stack>
@@ -816,16 +874,17 @@ export default function ClientBookingPaymentDetailsCard({
               ...nestedCardSx,
             }}
           >
-            <Typography
+            <BodyText
               sx={{
+                m: 0,
                 fontWeight: 900,
-                fontSize: 14,
+                fontSize: 13,
                 color: m.headingText,
                 mb: 1,
               }}
             >
               Project Details and Media
-            </Typography>
+            </BodyText>
             {project?.description?.trim() ? (
               <Box
                 sx={{
@@ -837,22 +896,24 @@ export default function ClientBookingPaymentDetailsCard({
                   mb: (project.uploads?.length ?? 0) > 0 ? 1.25 : 0,
                 }}
               >
-                <Typography
+                <BodyText
                   sx={{
-                    fontSize: 12.5,
+                    m: 0,
+                    fontSize: 12,
                     fontWeight: 700,
                     color: alpha(m.navy, 0.62),
                     whiteSpace: "pre-wrap",
                   }}
                 >
                   {project.description}
-                </Typography>
+                </BodyText>
               </Box>
             ) : null}
             {(project?.uploads?.length ?? 0) > 0 ? (
               <Box>
-                <Typography
+                <BodyText
                   sx={{
+                    m: 0,
                     fontWeight: 900,
                     fontSize: 12,
                     color: m.headingText,
@@ -860,7 +921,7 @@ export default function ClientBookingPaymentDetailsCard({
                   }}
                 >
                   Media
-                </Typography>
+                </BodyText>
                 <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
                   {project!.uploads.map((upload) => (
                     <ProjectUploadThumb
@@ -898,7 +959,13 @@ export default function ClientBookingPaymentDetailsCard({
               section,
               participantHeadingOrdinal(section, ordinals),
             );
-            return renderSectionBlock(section, heading, asPersonCard);
+            const hideRoleHeading = isRequester && requesterAppearanceIndex === 0;
+            return renderSectionBlock(
+              section,
+              heading,
+              asPersonCard,
+              hideRoleHeading,
+            );
           });
           })()}
 
@@ -945,7 +1012,7 @@ export default function ClientBookingPaymentDetailsCard({
             variant="plain"
             prepaidAction={
               prepaymentState === "required" && onPayNow ? (
-                <Typography
+                <BodyText
                   component="button"
                   type="button"
                   onClick={onPayNow}
@@ -955,14 +1022,14 @@ export default function ClientBookingPaymentDetailsCard({
                     p: 0,
                     cursor: "pointer",
                     color: m.teal,
-                    fontWeight: 900,
                     fontSize: 12.5,
+                    fontWeight: 800,
                     fontFamily: "inherit",
                     "&:hover": { color: m.tealDark },
                   }}
                 >
                   {payNowLabel}
-                </Typography>
+                </BodyText>
               ) : undefined
             }
           />

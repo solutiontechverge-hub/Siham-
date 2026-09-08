@@ -1,4 +1,6 @@
-import { buildClientDraftChronologicalBlocks } from "../../../data/bookingChronologicalBlocks";
+import {
+  buildClientDraftChronologicalBlocks,
+} from "../../../data/bookingChronologicalBlocks";
 import { parseDurationMinsLabel } from "../../../data/bookingServiceEdit.data";
 import { fmtMinutesToTimeLabel } from "../../../app/clients/booking/booking-time";
 import { parseClockToMinutes } from "../calendar/calendar.utils";

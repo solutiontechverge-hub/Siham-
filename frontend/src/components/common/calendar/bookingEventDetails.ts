@@ -4,6 +4,7 @@ import type {
   CalendarBookingServiceItem,
   CalendarEvent,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
+import { extraBookingParticipantIds, isExtraBookingParticipant } from "../../../data/bookingChronologicalBlocks";
 import { ensureGroupedServiceStartEndTimes } from "../../../data/bookingServiceEdit.data";
 import { splitContactPhone } from "../../../lib/phone-validation";
 import type { ManualEntryDiscount } from "../../sections/finance/manualEntry.data";
@@ -148,6 +149,45 @@ export function resolveKilometerAllowanceAmount(
   const km = Number(kilometerAllowance?.totalKilometer);
   if (!Number.isFinite(rate) || !Number.isFinite(km) || rate <= 0 || km <= 0) return 0;
   return Math.round((rate * km + Number.EPSILON) * 100) / 100;
+}
+
+export function hasKilometerAllowanceValues(
+  kilometerAllowance?: CalendarBookingDetails["kilometerAllowance"] | null,
+): boolean {
+  return Boolean(
+    String(kilometerAllowance?.eurPerKm ?? "").trim() ||
+      String(kilometerAllowance?.totalKilometer ?? "").trim(),
+  );
+}
+
+/** Prefer details, then notes — never invent a rate or distance. */
+export function resolveEventKilometerAllowance(
+  details:
+    | Pick<CalendarBookingDetails, "showKilometerAllowance" | "kilometerAllowance">
+    | null
+    | undefined,
+  notes?: string | null,
+): {
+  showKilometerAllowance: boolean;
+  kilometerAllowance: NonNullable<CalendarBookingDetails["kilometerAllowance"]>;
+} {
+  const parsed = notes?.trim() ? parseCalendarEntryNotes(notes) : undefined;
+  const kilometerAllowance = hasKilometerAllowanceValues(details?.kilometerAllowance)
+    ? {
+        eurPerKm: String(details?.kilometerAllowance?.eurPerKm ?? ""),
+        totalKilometer: String(details?.kilometerAllowance?.totalKilometer ?? ""),
+      }
+    : {
+        eurPerKm: parsed?.kilometerAllowance?.eurPerKm ?? "",
+        totalKilometer: parsed?.kilometerAllowance?.totalKilometer ?? "",
+      };
+  return {
+    showKilometerAllowance:
+      Boolean(details?.showKilometerAllowance) ||
+      Boolean(parsed?.showKilometerAllowance) ||
+      hasKilometerAllowanceValues(kilometerAllowance),
+    kilometerAllowance,
+  };
 }
 
 function metaHasValues(meta: StoredBookingNoteMeta) {
@@ -431,18 +471,19 @@ function normalizeAssignmentId(value: string | null | undefined): string {
 export function requesterPersonIds(
   snapshot?: CalendarBookingDetails["clientSnapshot"],
 ): Set<string> {
+  const extraIds = extraBookingParticipantIds(snapshot?.people);
   const ids = new Set<string>();
   for (const person of snapshot?.people ?? []) {
-    if (!person.isRequester) continue;
     const id = normalizeAssignmentId(person.id);
-    if (id) ids.add(id);
+    if (!id || extraIds.has(id)) continue;
+    ids.add(id);
   }
   return ids;
 }
 
 /**
- * Main-client lines are unassigned (`guestId` empty) or tagged to the requester.
- * Any other person id is a guest/model assignment and must not leak onto Client.
+ * Main-client lines are unassigned, tagged to the requester, or tagged to a
+ * company contact. Guest/model/planning/buffer ids stay on their own cards.
  */
 export function isMainClientAssignedLine(
   guestId: string | null | undefined,
@@ -480,11 +521,7 @@ type SnapshotPerson = NonNullable<
 >[number];
 
 function isDisplayableSnapshotPerson(person: SnapshotPerson) {
-  return (
-    !person.isRequester &&
-    person.participantType !== "notes" &&
-    person.name?.trim().toLowerCase() !== "notes"
-  );
+  return isExtraBookingParticipant(person);
 }
 
 function guestFromSnapshotPerson(
@@ -560,7 +597,9 @@ export function mainDrawerServicesFromClientSnapshot(
     ...(service.endTime ? { endTime: service.endTime } : {}),
     ...(service.teamMemberId ? { staffResourceId: String(service.teamMemberId) } : {}),
     ...(service.teamMemberName ? { teamMemberName: service.teamMemberName } : {}),
-    ...(service.guestId != null ? { guestId: service.guestId } : {}),
+    guestId: service.guestId == null || !String(service.guestId).trim()
+      ? null
+      : String(service.guestId),
     ...(service.originalPrice != null ? { originalPrice: Number(service.originalPrice) } : {}),
     ...(service.discount ? { discount: service.discount } : {}),
   }));
@@ -780,7 +819,14 @@ export const emptyDesiredLocation = () => ({
 });
 
 export function resolveBookingDetailsFromEvent(ev: CalendarEvent): CalendarBookingDetails {
-  if (ev.details) return ev.details;
+  const km = resolveEventKilometerAllowance(ev.details, ev.notes);
+  if (ev.details) {
+    return {
+      ...ev.details,
+      showKilometerAllowance: km.showKilometerAllowance,
+      kilometerAllowance: km.kilometerAllowance,
+    };
+  }
 
   return {
     services: [],
@@ -788,6 +834,8 @@ export function resolveBookingDetailsFromEvent(ev: CalendarEvent): CalendarBooki
     clientEmail: "",
     phoneCode: "",
     phoneNumber: "",
+    showKilometerAllowance: km.showKilometerAllowance,
+    kilometerAllowance: km.kilometerAllowance,
     ...(ev.location === "DL"
       ? {
           desiredLocation: {

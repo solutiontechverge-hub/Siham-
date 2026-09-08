@@ -28,7 +28,10 @@ import {
   toPrepaymentIconVariant,
 } from "./prepaymentStatus";
 import { useBookingPaymentDueMeta } from "./resolveBookingPaymentDueMeta";
-import { hasUnseenBookingUpdate } from "./bookingUpdateSeen";
+import {
+  shouldShowSilentUpdatedTag,
+  useBookingUpdateSeenVersion,
+} from "./bookingUpdateSeen";
 import { sanitizeInternalNoteText } from "./bookingEventDetails";
 import BookingIdTooltipLabel from "./BookingIdTooltipLabel";
 import {
@@ -142,11 +145,13 @@ export default function CalendarBookingCard({
     isIncomingEbr ||
     isIncomingEr ||
     (event.bookingScenario === "BR" && event.status === "Requested");
+  useBookingUpdateSeenVersion();
   const showUpdated =
     event.bookingScenario !== "EBR" &&
     event.bookingScenario !== "ER" &&
     event.status !== "Requested" &&
-    hasUnseenBookingUpdate({
+    shouldShowSilentUpdatedTag({
+      silentUpdated: event.details?.silentUpdated,
       viewer: "professional",
       bookingRef,
       updatedAt: event.updatedAt,

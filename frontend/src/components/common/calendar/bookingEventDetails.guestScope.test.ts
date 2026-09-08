@@ -7,6 +7,9 @@ import {
   filterMainClientAssignedLines,
   hydrateBookingDrawerFromEvent,
   isMainClientAssignedLine,
+  mainDrawerServicesFromClientSnapshot,
+  resolveEventKilometerAllowance,
+  resolveKilometerAllowanceAmount,
 } from "./bookingEventDetails";
 
 const requesterIds = new Set(["p-requester"]);
@@ -154,6 +157,156 @@ assert.equal(planningHydration.guests.length, 2);
 assert.equal(
   planningHydration.guests.some((guest) => guest.participantType === "planning"),
   true,
+);
+
+const companyEvent: CalendarEvent = {
+  ...event,
+  details: {
+    ...event.details,
+    services: [
+      {
+        id: "svc-company",
+        name: "Company cut",
+        price: 50,
+        durationMins: 30,
+        guestId: "contact-1",
+        originalPrice: 70,
+        discount: { type: "fixed", amount: 20 },
+      },
+      {
+        id: "svc-model",
+        name: "Model style",
+        price: 11,
+        durationMins: 60,
+        guestId: "model-1",
+      },
+    ],
+    products: [
+      {
+        id: "prod-company",
+        name: "Kit",
+        price: 2,
+        quantity: 1,
+        unitPrice: 22,
+        originalPrice: 22,
+        discount: { type: "fixed", amount: 20 },
+        guestId: "contact-1",
+      },
+    ],
+    guests: [
+      {
+        id: "model-1",
+        name: "ali",
+        services: [
+          {
+            id: "svc-model",
+            name: "Model style",
+            price: 11,
+            durationMins: 60,
+            guestId: "model-1",
+          },
+        ],
+        products: [],
+        participantType: "model",
+      },
+    ],
+    clientSnapshot: {
+      people: [
+        { id: "p-requester", name: "Company Legal", isRequester: true },
+        { id: "contact-1", name: "Contact Person" },
+        { id: "model-1", name: "ali", isRequester: false, participantType: "model" },
+      ],
+    },
+  },
+};
+
+const companyHydration = hydrateBookingDrawerFromEvent(companyEvent);
+assert.deepEqual(
+  companyHydration.services.map((service) => service.name),
+  ["Company cut"],
+);
+assert.deepEqual(
+  companyHydration.products.map((product) => product.name),
+  ["Kit"],
+);
+assert.equal(companyHydration.guests.length, 1);
+assert.equal(companyHydration.guests[0]?.name, "ali");
+assert.equal(companyHydration.services[0]?.originalPrice, 70);
+
+const sharedCatalogSnapshot = {
+  people: [
+    { id: "p-requester", name: "alizaCompany", isRequester: true as const },
+    { id: "model-1", name: "ali", isRequester: false as const, participantType: "model" as const },
+  ],
+  services: [
+    {
+      id: "svc-umar",
+      name: "Muhammad umer arshad",
+      price: 11,
+      durationMins: 60,
+      guestId: null,
+    },
+    {
+      id: "svc-umar",
+      name: "Muhammad umer arshad",
+      price: 11,
+      durationMins: 60,
+      guestId: "model-1",
+    },
+  ],
+};
+const snapshotMain = mainDrawerServicesFromClientSnapshot(sharedCatalogSnapshot);
+assert.equal(snapshotMain?.length, 1);
+assert.equal(snapshotMain?.[0]?.id, "svc-umar");
+assert.equal(snapshotMain?.[0]?.guestId ?? null, null);
+
+const eurPerKm = "12";
+const totalKilometer = "11";
+const expectedKmAmount = resolveKilometerAllowanceAmount({
+  eurPerKm,
+  totalKilometer,
+});
+assert.equal(expectedKmAmount, 12 * 11);
+
+const kmNotes = `---mollure-meta---\n${JSON.stringify({
+  showKilometerAllowance: true,
+  kilometerAllowance: { eurPerKm, totalKilometer },
+})}`;
+const kmFromNotes = resolveEventKilometerAllowance(
+  { showKilometerAllowance: true, kilometerAllowance: { eurPerKm: "", totalKilometer: "" } },
+  kmNotes,
+);
+assert.equal(kmFromNotes.kilometerAllowance.eurPerKm, eurPerKm);
+assert.equal(kmFromNotes.kilometerAllowance.totalKilometer, totalKilometer);
+assert.equal(
+  resolveKilometerAllowanceAmount(kmFromNotes.kilometerAllowance),
+  expectedKmAmount,
+);
+
+const kmEvent: CalendarEvent = {
+  id: "b-km",
+  resourceId: "r-1",
+  date: "2026-09-08",
+  start: "09:00",
+  end: "10:00",
+  title: "Booking",
+  status: "Requested",
+  location: "DL",
+  bookingType: "Online",
+  notes: kmNotes,
+  details: {
+    clientEmail: "alizacc@yopmail.com",
+    services: [],
+    showKilometerAllowance: true,
+  },
+};
+const kmHydration = hydrateBookingDrawerFromEvent(kmEvent);
+assert.equal(kmHydration.kilometerAllowance.eurPerKm, eurPerKm);
+assert.equal(kmHydration.kilometerAllowance.totalKilometer, totalKilometer);
+assert.equal(kmHydration.showKilometerAllowance, true);
+assert.equal(
+  resolveKilometerAllowanceAmount(kmHydration.kilometerAllowance),
+  expectedKmAmount,
 );
 
 console.log("bookingEventDetails.guestScope.test.ts: all assertions passed");

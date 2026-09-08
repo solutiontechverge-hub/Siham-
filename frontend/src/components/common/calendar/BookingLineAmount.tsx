@@ -1,21 +1,20 @@
 "use client";
 
-import { Stack, Typography } from "@mui/material";
+import { Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { formatBookingEur } from "../../../data/bookingLinePricing";
+import { BodyText } from "../../ui/typography";
 
 type BookingLineAmountProps = {
   amount: number;
   originalAmount?: number | null;
   discountLabel?: string | null;
-  amountFontSize?: number;
 };
 
 export default function BookingLineAmount({
   amount,
   originalAmount,
   discountLabel,
-  amountFontSize = 13,
 }: BookingLineAmountProps) {
   const m = useTheme().palette.mollure;
   const showOriginal =
@@ -26,8 +25,9 @@ export default function BookingLineAmount({
   return (
     <Stack alignItems="flex-end" spacing={0.15} sx={{ flexShrink: 0 }}>
       {showOriginal ? (
-        <Typography
+        <BodyText
           sx={{
+            m: 0,
             fontSize: 11,
             fontWeight: 800,
             color: alpha(m.navy, 0.38),
@@ -36,21 +36,23 @@ export default function BookingLineAmount({
           }}
         >
           €{formatBookingEur(originalAmount)}
-        </Typography>
+        </BodyText>
       ) : null}
-      <Typography
+      <BodyText
         sx={{
-          fontSize: amountFontSize,
+          m: 0,
+          fontSize: 13,
           fontWeight: 900,
           color: alpha(m.navy, 0.82),
           lineHeight: 1.15,
         }}
       >
         €{formatBookingEur(amount)}
-      </Typography>
+      </BodyText>
       {discountLabel ? (
-        <Typography
+        <BodyText
           sx={{
+            m: 0,
             fontSize: 10.5,
             fontWeight: 800,
             color: m.teal,
@@ -59,7 +61,7 @@ export default function BookingLineAmount({
           }}
         >
           {discountLabel}
-        </Typography>
+        </BodyText>
       ) : null}
     </Stack>
   );

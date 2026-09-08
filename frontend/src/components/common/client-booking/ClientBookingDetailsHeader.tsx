@@ -12,9 +12,9 @@ import {
   Menu,
   MenuItem,
   Stack,
-  Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import { BodyText } from "../../ui/typography";
 import { useSnackbar } from "../AppSnackbar";
 import { getApiErrorMessage } from "../../../lib/api-error";
 import {
@@ -255,7 +255,7 @@ export default function ClientBookingDetailsHeader({
           spacing={1.5}
         >
           <Box sx={{ minWidth: 0 }}>
-            <Typography
+            <BodyText
               sx={{
                 fontWeight: 900,
                 fontSize: 20,
@@ -270,7 +270,7 @@ export default function ClientBookingDetailsHeader({
               <Box component="span" sx={{ color: m.teal }}>
                 #{bookingRef}
               </Box>
-            </Typography>
+            </BodyText>
             {bookedDateLabel ? (
               <Stack
                 direction="row"
@@ -278,8 +278,9 @@ export default function ClientBookingDetailsHeader({
                 spacing={0.75}
                 sx={{ mt: 0.65 }}
               >
-                <Typography
+                <BodyText
                   sx={{
+                    m: 0,
                     fontSize: 11.5,
                     fontWeight: 700,
                     color: alpha(m.navy, 0.55),
@@ -301,7 +302,7 @@ export default function ClientBookingDetailsHeader({
                       ({bookedTimeLabel})
                     </Box>
                   ) : null}
-                </Typography>
+                </BodyText>
                 {scheduleChangeTags.length ? (
                   <BookingChangeTags variants={scheduleChangeTags} />
                 ) : null}

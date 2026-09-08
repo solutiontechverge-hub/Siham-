@@ -88,6 +88,125 @@ function isNotesPerson(person: ChronologicalPerson) {
   return person.participantType === "notes" || person.id === "p-notes";
 }
 
+/**
+ * Extra cards (guest / model / planning / buffer). Anyone else — requester,
+ * company contact, or untyped person — stays on the main Client section.
+ */
+export function isExtraBookingParticipant(
+  person: Pick<
+    ChronologicalPerson,
+    "id" | "name" | "isRequester" | "participantType"
+  >,
+): boolean {
+  if (person.isRequester) return false;
+  if (isNotesPerson(person)) return false;
+  if (isPlanningPerson(person) || isBufferPerson(person)) return true;
+  return person.participantType === "model" || person.participantType === "guest";
+}
+
+export function extraBookingParticipantIds(
+  people: readonly ChronologicalPerson[] | null | undefined,
+): Set<string> {
+  const ids = new Set<string>();
+  for (const person of people ?? []) {
+    if (!isExtraBookingParticipant(person)) continue;
+    const id = String(person.id ?? "").trim();
+    if (id) ids.add(id);
+  }
+  return ids;
+}
+
+/** Map a line's guestId onto requester unless it belongs to an extra participant. */
+export function resolveBookingLineOwnerId(
+  guestId: string | null | undefined,
+  requesterId: string,
+  extraIds: ReadonlySet<string>,
+  assignedTo?: string | null,
+): string {
+  const raw = String(guestId ?? assignedTo ?? "").trim();
+  if (raw && extraIds.has(raw)) return raw;
+  return requesterId;
+}
+
+const SERVICE_UUID_RE =
+  /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i;
+
+/** Catalog identity for a line — UUID if present, otherwise the raw id. */
+export function catalogServiceIdentity(id: string | null | undefined): string {
+  const raw = String(id ?? "").trim();
+  if (!raw) return "";
+  const match = raw.match(SERVICE_UUID_RE);
+  return (match ? match[0] : raw).toLowerCase();
+}
+
+export function bookingServiceOwnerKey(
+  guestId: string | null | undefined,
+  extraIds: ReadonlySet<string>,
+  assignedTo?: string | null,
+): string {
+  const raw = String(guestId ?? assignedTo ?? "").trim();
+  if (raw && extraIds.has(raw)) return raw;
+  return "";
+}
+
+type DedupeServiceLine = {
+  id: string;
+  name?: string;
+  durationMins?: number;
+  price?: number;
+  guestId?: string | null;
+  assignedTo?: string | null;
+  startTime?: string;
+};
+
+/**
+ * One catalog service per owner. Same person + same catalog/name+duration
+ * is one line even if guestId or id formatting differs.
+ */
+export function dedupeServicesByOwner<T extends DedupeServiceLine>(
+  services: readonly T[],
+  extraIds: ReadonlySet<string>,
+): T[] {
+  const kept = new Map<string, T>();
+  const fingerprintToKey = new Map<string, string>();
+  const order: string[] = [];
+
+  for (const service of services) {
+    const owner = bookingServiceOwnerKey(
+      service.guestId,
+      extraIds,
+      service.assignedTo,
+    );
+    const catalog = catalogServiceIdentity(service.id) || String(service.id);
+    const catalogKey = `${owner}::id::${catalog}`;
+    const fingerprint = `${owner}::fp::${String(service.name ?? "").trim().toLowerCase()}::${Math.round((Number(service.price) || 0) * 100)}`;
+    const existingKey = kept.has(catalogKey)
+      ? catalogKey
+      : fingerprintToKey.get(fingerprint);
+    const next: T = { ...service, guestId: owner || null };
+
+    if (existingKey) {
+      const existing = kept.get(existingKey);
+      if (
+        existing &&
+        !String(existing.startTime ?? "").trim() &&
+        String(next.startTime ?? "").trim()
+      ) {
+        kept.set(existingKey, next);
+      }
+      continue;
+    }
+
+    kept.set(catalogKey, next);
+    if (String(service.name ?? "").trim()) {
+      fingerprintToKey.set(fingerprint, catalogKey);
+    }
+    order.push(catalogKey);
+  }
+
+  return order.map((key) => kept.get(key)!);
+}
+
 /** Display order for booking cards: Client → Models/Guests → Planning → Buffers. */
 export function canonicalParticipantRank(
   type: ChronologicalParticipantType | ChronologicalPerson["participantType"] | string | undefined,
@@ -511,12 +630,11 @@ export function buildClientDraftChronologicalBlocks(
     bookingStart,
     combineServices = false,
     people,
-    services,
     teamMembers = [],
     productGuestIds = new Set<string>(),
   } = input;
   if (
-    !services.length &&
+    !input.services.length &&
     !people.some((p) => isPlanningPerson(p) || isBufferPerson(p)) &&
     productGuestIds.size === 0
   ) {
@@ -535,19 +653,29 @@ export function buildClientDraftChronologicalBlocks(
     (person) =>
       person.isRequester ? "requester" : resolveParticipantType(person),
   );
+  const extraIds = extraBookingParticipantIds(peopleList);
+  const services = dedupeServicesByOwner(input.services, extraIds);
   const knownIds = new Set(peopleList.map((person) => person.id));
   const addOrphanPerson = (id: string) => {
     if (!id || id === "unassigned" || knownIds.has(id) || id === requesterPerson.id) {
       return;
     }
+    if (!extraIds.has(id)) return;
     knownIds.add(id);
     peopleList.push({ id, name: "Guest", participantType: "guest" });
   };
   for (const service of services) {
-    addOrphanPerson(String(service.guestId ?? service.assignedTo ?? "").trim());
+    const ownerId = resolveBookingLineOwnerId(
+      service.guestId,
+      requesterPerson.id,
+      extraIds,
+      service.assignedTo,
+    );
+    if (ownerId !== requesterPerson.id) addOrphanPerson(ownerId);
   }
   for (const guestId of productGuestIds) {
-    addOrphanPerson(String(guestId).trim());
+    const ownerId = resolveBookingLineOwnerId(guestId, requesterPerson.id, extraIds);
+    if (ownerId !== requesterPerson.id) addOrphanPerson(ownerId);
   }
   if (!peopleList.some((person) => person.id === requesterPerson.id)) {
     peopleList.unshift(requesterPerson);
@@ -564,7 +692,12 @@ export function buildClientDraftChronologicalBlocks(
 
   const serviceGroups = new Map<string, ClientBookingDraftService[]>();
   for (const service of services) {
-    const key = service.guestId ?? service.assignedTo ?? requesterPerson.id;
+    const key = resolveBookingLineOwnerId(
+      service.guestId,
+      requesterPerson.id,
+      extraIds,
+      service.assignedTo,
+    );
     const prev = serviceGroups.get(key) ?? [];
     prev.push(service);
     serviceGroups.set(key, prev);
@@ -604,7 +737,11 @@ export function buildClientDraftChronologicalBlocks(
     }
 
     const items = serviceGroups.get(person.id) ?? [];
-    const hasProducts = productGuestIds.has(person.id);
+    const hasProducts = [...productGuestIds].some(
+      (guestId) =>
+        resolveBookingLineOwnerId(guestId, requesterPerson.id, extraIds) ===
+        person.id,
+    );
     if (!items.length && !hasProducts) continue;
 
     if (!items.length && hasProducts) {
@@ -997,7 +1134,40 @@ function resolveTeamMemberNames(
   ];
 }
 
-/** One calendar card per chronological participant block. Shared only when 2+ members. */
+function pickDisplaySpan(
+  parts: ReadonlyArray<{ start?: string; end?: string }>,
+  fallback: { start: string; end: string },
+) {
+  let start = fallback.start;
+  let end = fallback.end;
+  let startMin = minutesSinceMidnight(fallback.start);
+  let endMin = minutesSinceMidnight(fallback.end);
+  for (const part of parts) {
+    const partStart = part.start?.trim();
+    if (partStart) {
+      const min = minutesSinceMidnight(partStart);
+      if (Number.isFinite(min) && min < startMin) {
+        startMin = min;
+        start = partStart;
+      }
+    }
+    const partEnd = part.end?.trim();
+    if (partEnd) {
+      const min = minutesSinceMidnight(partEnd);
+      if (Number.isFinite(min) && min > endMin) {
+        endMin = min;
+        end = partEnd;
+      }
+    }
+  }
+  return { start, end };
+}
+
+/**
+ * Overview cards:
+ * Desired Location — one team member, one card for the full booking window.
+ * Fixed Location — one card per assigned team member (not per client/model block).
+ */
 export function calendarEventToDisplaySegments(
   event: CalendarEvent,
   nameById: ReadonlyMap<string, string> = new Map(),
@@ -1005,14 +1175,41 @@ export function calendarEventToDisplaySegments(
   const slots = collectAssignedTeamMemberSlots(event);
   const teamIds = slots.map((slot) => slot.id);
   const names = resolveTeamMemberNames(teamIds, event, nameById);
-  const teamShared = teamIds.length > 1;
+  const isDesiredLocation = event.location === "DL";
+  const teamShared = !isDesiredLocation && teamIds.length > 1;
+  const blocks = expandCalendarEventToChronologicalSegments(event);
+  const span = pickDisplaySpan(blocks, {
+    start: event.start,
+    end: event.end,
+  });
 
-  return expandCalendarEventToChronologicalSegments(event).map((segment) =>
-    calendarSegmentToDisplayEvent(segment, event, {
-      teamShared,
-      sharedTeamMemberNames: names,
-    }),
-  );
+  if (isDesiredLocation || teamIds.length <= 1) {
+    const resourceId = teamIds[0] || event.resourceId;
+    return [
+      {
+        ...event,
+        resourceId: resourceId || event.resourceId,
+        start: span.start,
+        end: span.end,
+        title: event.title,
+        showClientName: event.showClientName,
+        teamShared: false,
+        sharedTeamMemberNames: names,
+      },
+    ];
+  }
+
+  return slots.map((slot, index) => ({
+    ...event,
+    id: `${event.id}::segment-${index}`,
+    resourceId: slot.id,
+    start: slot.start,
+    end: slot.end,
+    title: event.title,
+    showClientName: event.showClientName,
+    teamShared,
+    sharedTeamMemberNames: names,
+  }));
 }
 
 export function resolveParentCalendarEventId(eventId: string) {

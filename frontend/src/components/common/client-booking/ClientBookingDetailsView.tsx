@@ -32,10 +32,7 @@ import {
   setActiveBookingSession,
   unlockEbrDraft,
 } from "../../../app/clients/booking/clientBookingSession";
-import {
-  hasUnseenBookingUpdate,
-  markBookingUpdateSeen,
-} from "../calendar/bookingUpdateSeen";
+import { markBookingUpdateSeen } from "../calendar/bookingUpdateSeen";
 import { enrichClientBookingRecord } from "../../../app/clients/booking/clientBookingDraftCache";
 import { clearPublicProfileBookingSelection } from "../../../data/publicProfileBookingSelection";
 import ClientBookingCancelDialog from "./ClientBookingCancelDialog";
@@ -98,7 +95,10 @@ import {
   detectEditedServiceIds,
   detectServiceLineChanges,
   detectProductLineChanges,
+  isSilentSafeBookingChange,
 } from "../calendar/bookingRequestNegotiation";
+import { splitContactPhone } from "../../../lib/phone-validation";
+import type { CalendarBookingGuestItem } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import { isResponseWindowOverdue } from "../calendar/bookingResponseDeadline";
 import {
   FinanceDocumentPreviewDrawer,
@@ -161,6 +161,47 @@ function resolvePrimaryProfessional(draft: ClientBookingDraft | null) {
   const primary =
     teamMembers.find((tm) => tm.id === primaryId) ?? teamMembers[0];
   return { name: primary?.name ?? "Professional", id: primary?.id ?? "" };
+}
+
+function guestsFromPeopleAndServices(
+  people:
+    | readonly {
+        id: string;
+        name: string;
+        isRequester?: boolean;
+        participantType?: CalendarBookingGuestItem["participantType"];
+      }[]
+    | undefined,
+  services: readonly {
+    id: string;
+    name: string;
+    price: number;
+    durationMins: number;
+    startTime?: string;
+    endTime?: string;
+    guestId?: string | null;
+    teamMemberId?: string | null;
+  }[],
+  fallbackGuests?: readonly CalendarBookingGuestItem[],
+): CalendarBookingGuestItem[] {
+  const fallbackById = new Map((fallbackGuests ?? []).map((guest) => [guest.id, guest]));
+  const fromPeople = (people ?? [])
+    .filter((person) => !person.isRequester)
+    .map((person) => {
+      const fallback = fallbackById.get(person.id);
+      return {
+        id: person.id,
+        name: person.name,
+        email: fallback?.email ?? "",
+        phoneCode: fallback?.phoneCode,
+        phoneNumber: fallback?.phoneNumber,
+        participantType: person.participantType ?? fallback?.participantType,
+        services: services.filter((service) => service.guestId === person.id),
+        products: fallback?.products ?? [],
+      };
+    });
+  if (fromPeople.length) return fromPeople;
+  return [...(fallbackGuests ?? [])];
 }
 
 function usableAddressLabel(value?: string | null) {
@@ -382,52 +423,10 @@ export default function ClientBookingDetailsView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeBooking?.editRequest, bookingRef]);
 
-  // Pin Updated for this visit so it stays visible on the Confirmed status row.
-  // Mark seen immediately after pinning so the list tag is gone when they leave
-  // (no approval click — opening the booking is enough).
-  const [showStatusUpdated, setShowStatusUpdated] = React.useState(false);
-  React.useEffect(() => {
-    setShowStatusUpdated(false);
-  }, [bookingRef]);
+  // Opening the booking clears the list/calendar "Updated" tag — no approval click.
   React.useEffect(() => {
     if (!bookingRef) return;
-    const silentUpdated =
-      Boolean(activeBooking?.silentUpdated) ||
-      Boolean(parseCalendarEntryNotes(activeBooking?.notes)?.silentUpdated);
-    if (
-      isEbrIncoming ||
-      editRequest.isPending ||
-      bookingStatus !== "confirmed" ||
-      !silentUpdated
-    ) {
-      return;
-    }
-    if (
-      hasUnseenBookingUpdate({
-        viewer: "client",
-        bookingRef,
-        updatedAt: activeBooking?.updatedAt,
-        lastEditedBy: activeBooking?.lastEditedBy ?? null,
-      })
-    ) {
-      setShowStatusUpdated(true);
-      markBookingUpdateSeen("client", bookingRef, activeBooking?.updatedAt);
-    }
-  }, [
-    bookingRef,
-    bookingStatus,
-    isEbrIncoming,
-    editRequest.isPending,
-    activeBooking?.silentUpdated,
-    activeBooking?.updatedAt,
-    activeBooking?.lastEditedBy,
-    activeBooking?.notes,
-  ]);
-  React.useEffect(() => {
-    if (!bookingRef) return;
-    return () => {
-      markBookingUpdateSeen("client", bookingRef, activeBooking?.updatedAt);
-    };
+    markBookingUpdateSeen("client", bookingRef, activeBooking?.updatedAt);
   }, [bookingRef, activeBooking?.updatedAt]);
 
   // After editing services for an EBR suggestion, auto-send once booking session is ready.
@@ -2098,25 +2097,94 @@ export default function ClientBookingDetailsView({
         (activeBooking?.draft?.selectedDateISO ?? "") ||
       (sessionDraft.selectedTime ?? "") !==
         (activeBooking?.draft?.selectedTime ?? "");
+    const currentPhone = splitContactPhone(
+      sessionRecord?.contactPhone ?? activeBooking?.contactPhone ?? "",
+      priorNotes?.phoneCode,
+    );
+    const comparableServiceLines = services.map((s) => ({
+      id: s.id,
+      name: s.name,
+      price: s.price,
+      durationMins: s.durationMins,
+      guestId: s.guestId ?? null,
+      teamMemberId: s.teamMemberId ?? null,
+      startTime: s.startTime,
+      endTime: s.endTime,
+    }));
+    const previousGuests = guestsFromPeopleAndServices(
+      priorNotes?.clientSnapshot?.people,
+      priorNotes?.services ?? originalServices,
+      priorNotes?.guests,
+    );
+    const currentGuests = guestsFromPeopleAndServices(
+      sessionDraft.people,
+      comparableServiceLines,
+      priorNotes?.guests,
+    );
+    const silentSafeOnly = isSilentSafeBookingChange({
+      previousServices: priorNotes?.services ?? originalServices,
+      currentServices: comparableServiceLines,
+      previousGuests,
+      currentGuests,
+      previousPhoneCode: priorNotes?.phoneCode,
+      currentPhoneCode: currentPhone.countryCode,
+      previousPhoneNumber: priorNotes?.phoneNumber,
+      currentPhoneNumber: currentPhone.phone,
+      previousProducts: priorNotes?.products ?? [],
+      currentProducts: productLines,
+      scheduleChanged: scheduleEdited,
+    });
     const nextNotes = serializeCalendarEntryNotes(
       priorNotes?.internalNote ?? "",
-      {
-        ...priorNotes,
-        clientSnapshot,
-        services: serviceLines,
-        products: productLines,
-        lastEditedBy: "client",
-        ...(scheduleEdited ? { scheduleEdited: true } : {}),
-        originalServices: originalServices.length
-          ? originalServices
-          : serviceLines,
-        editedServiceIds: detectEditedServiceIds(
-          originalServices,
-          serviceLines,
-        ),
-        addedServiceIds: lineChanges.added,
-        cancelledServiceIds: lineChanges.cancelled,
-      },
+      silentSafeOnly
+        ? {
+            ...priorNotes,
+            clientSnapshot,
+            services: serviceLines,
+            products: productLines,
+            guests: currentGuests,
+            phoneCode: currentPhone.countryCode || priorNotes?.phoneCode,
+            phoneNumber: currentPhone.phone || priorNotes?.phoneNumber,
+            lastEditedBy: "client",
+            silentUpdated: true,
+            editedServiceIds: undefined,
+            addedServiceIds: undefined,
+            cancelledServiceIds: undefined,
+            editedProductIds: undefined,
+            addedProductIds: undefined,
+            cancelledProductIds: undefined,
+            scheduleEdited: undefined,
+            silentUpdateSnapshot: {
+              phoneCode: priorNotes?.phoneCode,
+              phoneNumber: priorNotes?.phoneNumber,
+              guests: priorNotes?.guests ?? previousGuests,
+              services: priorNotes?.services,
+              desiredLocation: priorNotes?.desiredLocation,
+            },
+            originalServices: originalServices.length
+              ? originalServices
+              : serviceLines,
+          }
+        : {
+            ...priorNotes,
+            clientSnapshot,
+            services: serviceLines,
+            products: productLines,
+            guests: currentGuests,
+            lastEditedBy: "client",
+            silentUpdated: undefined,
+            silentUpdateSnapshot: undefined,
+            ...(scheduleEdited ? { scheduleEdited: true } : {}),
+            originalServices: originalServices.length
+              ? originalServices
+              : serviceLines,
+            editedServiceIds: detectEditedServiceIds(
+              originalServices,
+              serviceLines,
+            ),
+            addedServiceIds: lineChanges.added,
+            cancelledServiceIds: lineChanges.cancelled,
+          },
       null,
       null,
     );
@@ -2154,6 +2222,7 @@ export default function ClientBookingDetailsView({
       message: "Booking updated.",
     });
   }, [
+    activeBooking?.contactPhone,
     activeBooking?.draft,
     activeBooking?.notes,
     apiBookingId,
@@ -2726,9 +2795,6 @@ export default function ClientBookingDetailsView({
             onDeleteBooking={() => setDeleteDialogOpen(true)}
             onDiscardBookingRequest={() => setDiscardDialogOpen(true)}
             onOpenActivity={() => setActivityOpen(true)}
-            showUpdated={showStatusUpdated}
-            updatedSignpostTitle={ACTIVITY_COMPARISON_SIGNPOST}
-            onUpdatedClick={() => openActivityComparison("silent_updated")}
             showEditScenario={
               bookingStatus === "confirmed" &&
               !editRequest.isPending &&

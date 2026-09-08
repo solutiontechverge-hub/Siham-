@@ -1,13 +1,45 @@
+"use client";
+
 /**
  * Track which booking updates each viewer has already opened.
  * Keyed by `${viewer}:${bookingRef}` → last seen updated_at ISO.
  */
+
+import * as React from "react";
 
 export type BookingUpdateViewer = "professional" | "client";
 
 const STORAGE_KEY = "mollure:booking_update_seen_v1";
 
 type SeenMap = Record<string, string>;
+
+let seenVersion = 0;
+const seenListeners = new Set<() => void>();
+
+function bumpSeenVersion() {
+  seenVersion += 1;
+  seenListeners.forEach((listener) => listener());
+}
+
+export function subscribeBookingUpdateSeen(listener: () => void) {
+  seenListeners.add(listener);
+  return () => {
+    seenListeners.delete(listener);
+  };
+}
+
+export function getBookingUpdateSeenVersion() {
+  return seenVersion;
+}
+
+/** Re-render list/calendar tags after a booking is opened and marked seen. */
+export function useBookingUpdateSeenVersion() {
+  return React.useSyncExternalStore(
+    subscribeBookingUpdateSeen,
+    getBookingUpdateSeenVersion,
+    getBookingUpdateSeenVersion,
+  );
+}
 
 function storageKey(viewer: BookingUpdateViewer, bookingRef: string) {
   const ref = bookingRef.replace(/^#/, "").trim();
@@ -58,6 +90,26 @@ export function hasUnseenBookingUpdate(input: {
   return toMs(input.updatedAt) > toMs(seen);
 }
 
+/**
+ * Contact / guest name / service-order change — show "Updated" until the
+ * other party opens the booking. No approval click.
+ */
+export function shouldShowSilentUpdatedTag(input: {
+  silentUpdated?: boolean | null;
+  viewer: BookingUpdateViewer;
+  bookingRef?: string | null;
+  updatedAt?: string | null;
+  lastEditedBy?: "client" | "professional" | null;
+}): boolean {
+  if (!input.silentUpdated) return false;
+  return hasUnseenBookingUpdate({
+    viewer: input.viewer,
+    bookingRef: input.bookingRef,
+    updatedAt: input.updatedAt,
+    lastEditedBy: input.lastEditedBy,
+  });
+}
+
 /** Call when the viewer opens booking details / drawer. */
 export function markBookingUpdateSeen(
   viewer: BookingUpdateViewer,
@@ -70,6 +122,9 @@ export function markBookingUpdateSeen(
   if (!ref) return;
   const stamp = updatedAt?.trim() || new Date().toISOString();
   const all = loadSeen();
-  all[storageKey(viewer, ref)] = stamp;
+  const key = storageKey(viewer, ref);
+  if (all[key] === stamp) return;
+  all[key] = stamp;
   saveSeen(all);
+  bumpSeenVersion();
 }
