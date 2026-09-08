@@ -1,9 +1,10 @@
 "use client";
 
-import { Box, Divider, Stack, Typography } from "@mui/material";
+import { Box, Divider, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import type { ClientBookingDraftProjectDetails } from "./types";
 import ProjectUploadThumb from "./ProjectUploadThumb";
+import { BodyText } from "../../ui/typography";
 
 type Props = {
   project: ClientBookingDraftProjectDetails;
@@ -24,22 +25,24 @@ export default function ClientBookingProjectDetailsCard({ project }: Props) {
       }}
     >
       <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 2, pb: 1.25 }}>
-        <Typography
+        <BodyText
           sx={{
-            fontWeight: 700,
-            fontSize: "22px",
+            m: 0,
+            fontWeight: 900,
+            fontSize: 13,
             color: alpha(m.navy, 0.72),
             textAlign: "center",
             lineHeight: 1.2,
           }}
         >
           Project Details and Media
-        </Typography>
+        </BodyText>
       </Box>
       <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
       <Box sx={{ px: { xs: 2, md: 2.5 }, py: 1.75 }}>
-        <Typography
+        <BodyText
           sx={{
+            m: 0,
             fontSize: 12,
             fontWeight: 900,
             color: alpha(m.navy, 0.65),
@@ -47,7 +50,7 @@ export default function ClientBookingProjectDetailsCard({ project }: Props) {
           }}
         >
           Description
-        </Typography>
+        </BodyText>
         <Box
           sx={{
             borderRadius: "10px",
@@ -58,8 +61,9 @@ export default function ClientBookingProjectDetailsCard({ project }: Props) {
             mb: 1.75,
           }}
         >
-          <Typography
+          <BodyText
             sx={{
+              m: 0,
               fontSize: 12.5,
               fontWeight: 700,
               color: description ? alpha(m.navy, 0.72) : alpha(m.navy, 0.38),
@@ -67,11 +71,12 @@ export default function ClientBookingProjectDetailsCard({ project }: Props) {
             }}
           >
             {description || "No description added"}
-          </Typography>
+          </BodyText>
         </Box>
 
-        <Typography
+        <BodyText
           sx={{
+            m: 0,
             fontSize: 12,
             fontWeight: 900,
             color: alpha(m.navy, 0.65),
@@ -79,7 +84,7 @@ export default function ClientBookingProjectDetailsCard({ project }: Props) {
           }}
         >
           Media
-        </Typography>
+        </BodyText>
         {uploads.length > 0 ? (
           <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
             {uploads.map((upload) => (
@@ -87,15 +92,16 @@ export default function ClientBookingProjectDetailsCard({ project }: Props) {
             ))}
           </Stack>
         ) : (
-          <Typography
+          <BodyText
             sx={{
+              m: 0,
               fontSize: 12.5,
               fontWeight: 700,
               color: alpha(m.navy, 0.38),
             }}
           >
             No files uploaded
-          </Typography>
+          </BodyText>
         )}
       </Box>
     </Box>

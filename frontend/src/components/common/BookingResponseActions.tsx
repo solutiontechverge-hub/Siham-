@@ -8,10 +8,12 @@ import { alpha, useTheme } from "@mui/material/styles";
 
 type Props = {
   onAccept: () => void;
-  onSuggestChange: () => void;
+  onSuggestChange?: () => void;
   onReject: () => void;
   /** Hide Accept until online prepayment is completed. */
   showAccept?: boolean;
+  /** Hide Suggest changes when the professional has never chatted with this client. */
+  showSuggestChange?: boolean;
 };
 
 const ACTION_SX = {
@@ -22,12 +24,13 @@ const ACTION_SX = {
   borderRadius: "10px",
 } as const;
 
-/** Note-from-sender ke neeche: Choose Your Response + Accept / Suggest Change / Reject. */
+/** Note-from-sender ke neeche: Choose Your Response + Accept / Suggest changes / Reject. */
 export default function BookingResponseActions({
   onAccept,
   onSuggestChange,
   onReject,
   showAccept = true,
+  showSuggestChange = true,
 }: Props) {
   const m = useTheme().palette.mollure;
 
@@ -71,14 +74,16 @@ export default function BookingResponseActions({
           Accept
         </AppButton>
         ) : null}
+        {showSuggestChange ? (
         <AppButton
           tone="secondary"
           fullWidth
           onClick={onSuggestChange}
           sx={ACTION_SX}
         >
-          Suggest Change
+          Suggest changes
         </AppButton>
+        ) : null}
         <AppButton
           tone="danger"
           fullWidth

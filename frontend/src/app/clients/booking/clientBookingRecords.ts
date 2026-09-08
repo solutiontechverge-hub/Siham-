@@ -47,6 +47,8 @@ export type ClientBookingRecord = {
   updatedAt?: string | null;
   /** Who last changed the booking (for Updated pill). */
   lastEditedBy?: "client" | "professional" | null;
+  /** Contact / guest name / service-order change — client shows Updated, not Edited. */
+  silentUpdated?: boolean;
   /** Service/product ids marked edited in notes (pro BR update / EBR). */
   editedServiceIds?: string[];
   editedProductIds?: string[];

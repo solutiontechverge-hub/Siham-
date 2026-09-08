@@ -14,6 +14,12 @@ import { summarizeClientBookingPrice } from "../../../components/common/calendar
 import { buildResponseDeadline } from "../../../components/common/calendar/bookingResponseDeadline";
 import { syncEditRequestFromBookingApi } from "../../../components/common/client-booking/syncEditRequestFromApi";
 import { mergeBookingTeamMembers } from "../../../components/common/client-booking/buildBookingSummarySections";
+import {
+  canonicalParticipantRank,
+  dedupePlanningPeople,
+  extraBookingParticipantIds,
+  dedupeServicesByOwner,
+} from "../../../data/bookingChronologicalBlocks";
 import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
 import { inferProjectUploadKind, isProjectUploadImage } from "../../../lib/projectUploadMedia";
 import type { BusinessSetupListing, CalendarBooking, CreateBookingRequest } from "../../../store/services/businessApi";
@@ -106,7 +112,13 @@ function mergeDraftPeople(
     people.push(mapped);
     byId.set(String(mapped.id), mapped);
   }
-  return people.length ? people : undefined;
+  const deduped = dedupePlanningPeople(people);
+  deduped.sort((a, b) => {
+    const aType = a.isRequester ? "requester" : a.participantType;
+    const bType = b.isRequester ? "requester" : b.participantType;
+    return canonicalParticipantRank(aType) - canonicalParticipantRank(bType);
+  });
+  return deduped.length ? deduped : undefined;
 }
 
 /** Pull a UUID out of synthetic cart ids like `profile-svc-<uuid>-0`. */
@@ -645,17 +657,18 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
   const desiredLocation = desiredLocationFromColumns ?? desiredLocationFromDetails;
 
   const snapshotServices = clientSnapshot?.services ?? [];
-  const snapshotById = new Map(snapshotServices.map((s) => [s.id, s]));
-  const snapshotByName = new Map(snapshotServices.map((s) => [s.name, s]));
-  const resolveGuestId = (
-    id: string,
-    name: string,
-    fallback: string | null | undefined,
-  ) =>
-    fallback ??
-    snapshotById.get(id)?.guestId ??
-    snapshotByName.get(name)?.guestId ??
-    null;
+  const extraParticipantIds = extraBookingParticipantIds([
+    ...(clientSnapshot?.people ?? []),
+    ...(notesDetails?.guests ?? []),
+  ]);
+  /** Missing / non-extra guestId is the main client — never infer from another catalog row. */
+  const resolveGuestId = (fallback: string | null | undefined) => {
+    if (fallback == null) return null;
+    const trimmed = String(fallback).trim();
+    if (!trimmed) return null;
+    if (!extraParticipantIds.has(trimmed)) return null;
+    return trimmed;
+  };
 
   const guestNestedServices = (notesDetails?.guests ?? []).flatMap((guest) =>
     (guest.services ?? []).map((service) => ({
@@ -663,7 +676,9 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
       name: service.name,
       durationMins: service.durationMins,
       ...withClientDiscountFields(service),
-      guestId: guest.id,
+      startTime: service.startTime,
+      endTime: service.endTime,
+      guestId: resolveGuestId(service.guestId ?? guest.id),
       teamMemberId: service.staffResourceId ?? service.teamMemberId ?? null,
       teamMemberName: service.teamMemberName ?? null,
     })),
@@ -671,19 +686,6 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
 
   const draftServices = ((): ClientBookingDraft["services"] => {
     const noteServices = notesDetails?.services ?? [];
-
-    if (activeEbr?.suggestedServices?.length) {
-      return activeEbr.suggestedServices.map((service) => ({
-        id: service.id,
-        name: service.name,
-        durationMins: service.durationMins,
-        ...withClientDiscountFields(service),
-        guestId: resolveGuestId(service.id, service.name, service.guestId ?? null),
-        teamMemberId: service.staffResourceId ?? booking.team_member_id,
-        teamMemberName: service.teamMemberName ?? null,
-      }));
-    }
-
     const merged: ClientBookingDraft["services"] = [];
     const pushUnique = (row: {
       id: string;
@@ -693,94 +695,85 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
       guestId?: string | null;
       teamMemberId?: string | null;
       teamMemberName?: string | null;
+      startTime?: string;
+      endTime?: string;
       originalPrice?: number;
       discountPct?: number;
       discountType?: "fixed" | "percentage";
       discountAmount?: number;
       discount?: { type: "fixed" | "percentage"; amount: number } | null;
     }) => {
-      const guestId = row.guestId ?? null;
-      const exists = merged.some(
-        (item) => item.id === row.id && String(item.guestId ?? "") === String(guestId ?? ""),
-      );
-      if (exists) return;
       merged.push({
         id: row.id,
         name: row.name,
         durationMins: row.durationMins,
         ...withClientDiscountFields(row),
-        guestId,
+        startTime: row.startTime,
+        endTime: row.endTime,
+        guestId: row.guestId ?? null,
         teamMemberId: row.teamMemberId ?? booking.team_member_id,
         teamMemberName: row.teamMemberName ?? null,
       });
     };
 
-    if (noteServices.length) {
+    if (activeEbr?.suggestedServices?.length) {
+      for (const service of activeEbr.suggestedServices) {
+        pushUnique({
+          id: service.id,
+          name: service.name,
+          durationMins: service.durationMins,
+          price: service.price,
+          guestId: resolveGuestId(service.guestId),
+          teamMemberId: service.staffResourceId ?? booking.team_member_id,
+          teamMemberName: service.teamMemberName ?? null,
+          startTime: service.startTime,
+          endTime: service.endTime,
+          originalPrice: service.originalPrice,
+          discount: service.discount,
+          discountPct: service.discountPct,
+        });
+      }
+    }
+    if (!activeEbr?.suggestedServices?.length) {
       for (const service of noteServices) {
         pushUnique({
           id: service.id,
           name: service.name,
           durationMins: service.durationMins,
           price: service.price,
-          guestId: resolveGuestId(service.id, service.name, service.guestId ?? null),
+          guestId: resolveGuestId(service.guestId),
           teamMemberId: service.staffResourceId ?? service.teamMemberId ?? null,
           teamMemberName: service.teamMemberName ?? null,
+          startTime: service.startTime,
+          endTime: service.endTime,
           originalPrice: service.originalPrice,
           discount: service.discount,
           discountPct: service.discountPct,
         });
-      }
-      const nonRequesterIds = new Set(
-        (clientSnapshot?.people ?? [])
-          .filter((person) => !person.isRequester)
-          .map((person) => String(person.id)),
-      );
-      const noteHasGuestLine = merged.some(
-        (service) =>
-          Boolean(service.guestId) && nonRequesterIds.has(String(service.guestId)),
-      );
-      if (!noteHasGuestLine) {
-        for (const service of snapshotServices) {
-          const guestId = service.guestId ?? null;
-          if (!guestId || !nonRequesterIds.has(String(guestId))) continue;
-          pushUnique({
-            id: service.id,
-            name: service.name,
-            durationMins: service.durationMins,
-            price: service.price,
-            guestId,
-            teamMemberId: service.teamMemberId ?? null,
-            teamMemberName: service.teamMemberName ?? null,
-            originalPrice: service.originalPrice,
-            discount: service.discount,
-            discountPct: service.discountPct,
-          });
-        }
-      }
-      for (const service of guestNestedServices) {
-        pushUnique(service);
-      }
-    } else {
-      for (const service of snapshotServices) {
-        pushUnique({
-          id: service.id,
-          name: service.name,
-          durationMins: service.durationMins,
-          price: service.price,
-          guestId: service.guestId ?? null,
-          teamMemberId: service.teamMemberId ?? null,
-          teamMemberName: service.teamMemberName ?? null,
-          originalPrice: service.originalPrice,
-          discount: service.discount,
-          discountPct: service.discountPct,
-        });
-      }
-      for (const service of guestNestedServices) {
-        pushUnique(service);
       }
     }
+    for (const service of snapshotServices) {
+      pushUnique({
+        id: service.id,
+        name: service.name,
+        durationMins: service.durationMins,
+        price: service.price,
+        guestId: resolveGuestId(service.guestId ?? null),
+        teamMemberId: service.teamMemberId ?? null,
+        teamMemberName: service.teamMemberName ?? null,
+        startTime: service.startTime,
+        endTime: service.endTime,
+        originalPrice: service.originalPrice,
+        discount: service.discount,
+        discountPct: service.discountPct,
+      });
+    }
+    for (const service of guestNestedServices) {
+      pushUnique(service);
+    }
 
-    if (merged.length) return merged;
+    const unique = dedupeServicesByOwner(merged, extraParticipantIds);
+    if (unique.length) return unique;
 
     return names.map((name, index) => ({
       id: `${booking.service_id ?? booking.id}-${index}`,
@@ -823,9 +816,17 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
     );
     const mergedProducts = [...noteProducts];
     for (const product of guestProducts) {
-      if (!mergedProducts.some((p) => p.id === product.id)) {
-        mergedProducts.push(product);
+      const guestId = product.guestId ?? null;
+      if (
+        mergedProducts.some(
+          (item) =>
+            item.id === product.id &&
+            String(item.guestId ?? "") === String(guestId ?? ""),
+        )
+      ) {
+        continue;
       }
+      mergedProducts.push(product);
     }
     if (mergedProducts.length) {
       return mergedProducts.map((product) => ({
@@ -981,6 +982,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
       // First-time BR is not an "update".
       return null;
     })(),
+    silentUpdated: Boolean(notesDetails?.silentUpdated),
     editedServiceIds:
       notesDetails?.editedServiceIds?.length
         ? notesDetails.editedServiceIds

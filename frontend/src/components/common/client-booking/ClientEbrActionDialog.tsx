@@ -33,8 +33,8 @@ const EBR_COPY: Record<
   },
   suggest: {
     title: "Suggest change EBR",
-    body: "By choosing “Suggest Change”, you can communicate your changes through the messaging tool.",
-    confirmLabel: "Suggest Change",
+    body: "By choosing “Suggest changes”, you can communicate your changes through the messaging tool.",
+    confirmLabel: "Suggest changes",
   },
   reject: {
     title: "Decline edited request",
@@ -57,8 +57,8 @@ const BR_COPY: Record<
   },
   suggest: {
     title: "Suggest changes",
-    body: "By choosing “Suggest Change”, you can communicate your changes through the messaging tool.",
-    confirmLabel: "Suggest Change",
+    body: "By choosing “Suggest changes”, you can communicate your changes through the messaging tool.",
+    confirmLabel: "Suggest changes",
   },
   reject: {
     title: "Reject request",
@@ -80,9 +80,9 @@ const ER_COPY: Record<
     snackbarMessage: "Edit request accepted.",
   },
   suggest: {
-    title: "Suggest change",
-    body: "By choosing “Suggest Change”, you can communicate through the messaging tool.",
-    confirmLabel: "Suggest Change",
+    title: "Suggest changes",
+    body: "By choosing “Suggest changes”, you can communicate through the messaging tool.",
+    confirmLabel: "Suggest changes",
   },
   reject: {
     title: "Reject edit request",

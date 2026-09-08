@@ -884,6 +884,23 @@ export default function ClientBookingCreateSummaryView() {
                       >
                         {heading}
                       </Typography>
+                      {section.title &&
+                      section.title !== heading &&
+                      section.participantType !== "planning" &&
+                      section.participantType !== "buffer" &&
+                      section.participantType !== "requester" &&
+                      !section.isRequester ? (
+                        <Typography
+                          sx={{
+                            fontWeight: 800,
+                            fontSize: 12.5,
+                            color: alpha(m.navy, 0.62),
+                            lineHeight: 1,
+                          }}
+                        >
+                          {section.title}
+                        </Typography>
+                      ) : null}
                       {section.isRequester ||
                       section.participantType === "requester" ? (
                       <Typography

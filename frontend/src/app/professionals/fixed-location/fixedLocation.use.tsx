@@ -159,7 +159,7 @@ const initialState: FixedLocationFormState = {
   kilometerAllowanceInstructions: "",
 
   policyResponseHours: "",
-  policyResponseMinutes: "",
+  policyResponseMinutes: "30",
   policyInstructions: "",
 
   rescheduleMinimumHours: "",

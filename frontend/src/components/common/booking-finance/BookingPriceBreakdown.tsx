@@ -58,8 +58,7 @@ function FinanceRow({
           m: 0,
           fontSize: emphasize ? 16 : 13,
           fontWeight: emphasize ? 950 : 700,
-          lineHeight: 1,
-          color: emphasize ? alpha(m.navy, 0.82) : alpha(m.navy, 0.52),
+          color: alpha(m.navy, emphasize ? 0.82 : 0.52),
         }}
       >
         {label}
@@ -78,7 +77,6 @@ function FinanceRow({
               m: 0,
               fontSize: emphasize ? 16 : 13,
               fontWeight: 950,
-              lineHeight: 1,
               color: alpha(m.navy, 0.88),
             }}
           >
@@ -165,7 +163,6 @@ export default function BookingPriceBreakdown({
                     fontWeight: 800,
                     color: alpha(m.navy, 0.42),
                     textDecoration: "line-through",
-                    lineHeight: 1,
                   }}
                 >
                   {formatFinanceEuro(originalPrice)}
@@ -178,7 +175,6 @@ export default function BookingPriceBreakdown({
                   fontSize: 16,
                   fontWeight: 950,
                   color: alpha(m.navy, 0.88),
-                  lineHeight: 1,
                 }}
               >
                 {formatFinanceEuro(totalPrice)}
@@ -199,7 +195,6 @@ export default function BookingPriceBreakdown({
                       fontSize: 12,
                       fontWeight: 800,
                       color: m.teal,
-                      lineHeight: 1,
                     }}
                   >
                     −{formatFinanceEuro(lineDiscountAmount)} Discount
@@ -213,7 +208,6 @@ export default function BookingPriceBreakdown({
                       fontSize: 12,
                       fontWeight: 800,
                       color: m.teal,
-                      lineHeight: 1,
                     }}
                   >
                     {bookingTotalDiscount.type === "percentage"
@@ -229,7 +223,6 @@ export default function BookingPriceBreakdown({
                       fontSize: 12,
                       fontWeight: 800,
                       color: alpha(m.navy, 0.55),
-                      lineHeight: 1,
                     }}
                   >
                     +{formatFinanceEuro(lateCancellationFeeAmount)} Cancel fee
@@ -243,7 +236,6 @@ export default function BookingPriceBreakdown({
                       fontSize: 12,
                       fontWeight: 800,
                       color: alpha(m.navy, 0.55),
-                      lineHeight: 1,
                     }}
                   >
                     +{formatFinanceEuro(lateRescheduleFeeAmount)} Late fee
@@ -257,7 +249,6 @@ export default function BookingPriceBreakdown({
                       fontSize: 12,
                       fontWeight: 800,
                       color: alpha(m.navy, 0.55),
-                      lineHeight: 1,
                     }}
                   >
                     +{formatFinanceEuro(noShowFeeAmount)} No-show fee
@@ -270,6 +261,18 @@ export default function BookingPriceBreakdown({
           )
         }
       />
+
+      {extraAfterDivider.length ? (
+        <Stack spacing={1} sx={{ mt: 1.25 }}>
+          {extraAfterDivider.map((row) => (
+            <FinanceRow
+              key={row.id}
+              label={row.label}
+              value={formatFinanceEuro(row.amount)}
+            />
+          ))}
+        </Stack>
+      ) : null}
 
       {showPrepay ? (
         <Stack spacing={1} sx={{ mt: 1.25 }}>
@@ -285,26 +288,6 @@ export default function BookingPriceBreakdown({
             />
           ) : null}
         </Stack>
-      ) : null}
-
-      {extraAfterDivider.length ? (
-        <Box
-          sx={{
-            mt: 1.25,
-            pt: 1.25,
-            borderTop: `1px solid ${alpha(m.navy, 0.1)}`,
-          }}
-        >
-          <Stack spacing={1}>
-            {extraAfterDivider.map((row) => (
-              <FinanceRow
-                key={row.id}
-                label={row.label}
-                value={formatFinanceEuro(row.amount)}
-              />
-            ))}
-          </Stack>
-        </Box>
       ) : null}
     </Box>
   );

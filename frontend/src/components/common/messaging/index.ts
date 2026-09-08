@@ -27,7 +27,7 @@ export { useMessagingInbox } from "./useMessagingInbox";
 export { useClientMessagingUnread } from "./useClientMessagingUnread";
 export { useProfessionalMessagingUnread } from "./useProfessionalMessagingUnread";
 export { getUnreadFromProfessionalCount, getUnreadFromClientCount, isMessageFromProfessional } from "./messagingUnread";
-export { findThreadIdByBookingRef, canProfessionalReply } from "./messagingThreadAccess";
+export { findThreadIdByBookingRef, canProfessionalReply, hasExistingPeerConversation } from "./messagingThreadAccess";
 export type { MessagingThread, MessagingChatMessage } from "./messagingTypes";
 export type { MessagingReportPayload } from "./messagingReportReasons";
 export type { LinkableBooking } from "./messagingBookingsMock";

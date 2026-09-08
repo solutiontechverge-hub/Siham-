@@ -4,6 +4,7 @@ import type {
   CalendarBookingServiceItem,
   CalendarEvent,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
+import { extraBookingParticipantIds, isExtraBookingParticipant } from "../../../data/bookingChronologicalBlocks";
 import { ensureGroupedServiceStartEndTimes } from "../../../data/bookingServiceEdit.data";
 import { splitContactPhone } from "../../../lib/phone-validation";
 import type { ManualEntryDiscount } from "../../sections/finance/manualEntry.data";
@@ -38,6 +39,10 @@ export type StoredEbrNotePayload = {
   clientNote?: string;
   editedServiceIds?: string[];
   editedProductIds?: string[];
+  addedServiceIds?: string[];
+  cancelledServiceIds?: string[];
+  addedProductIds?: string[];
+  cancelledProductIds?: string[];
   /** Preferred for client→pro rounds so the drawer can show “Edited”. */
   clientEditedServiceIds?: string[];
   suggestedServices?: NonNullable<CalendarBookingDetails["services"]>;
@@ -113,6 +118,7 @@ type StoredBookingNoteMeta = Partial<
     | "desiredLocation"
     | "totalDiscount"
     | "originalServices"
+    | "originalGuests"
     | "needsOk"
     | "ackScenario"
     | "ackRecipient"
@@ -120,6 +126,8 @@ type StoredBookingNoteMeta = Partial<
     | "hiddenForCustomer"
     | "addedServiceIds"
     | "cancelledServiceIds"
+    | "addedProductIds"
+    | "cancelledProductIds"
     | "silentUpdated"
     | "silentUpdateSnapshot"
     | "scheduleEdited"
@@ -142,6 +150,45 @@ export function resolveKilometerAllowanceAmount(
   const km = Number(kilometerAllowance?.totalKilometer);
   if (!Number.isFinite(rate) || !Number.isFinite(km) || rate <= 0 || km <= 0) return 0;
   return Math.round((rate * km + Number.EPSILON) * 100) / 100;
+}
+
+export function hasKilometerAllowanceValues(
+  kilometerAllowance?: CalendarBookingDetails["kilometerAllowance"] | null,
+): boolean {
+  return Boolean(
+    String(kilometerAllowance?.eurPerKm ?? "").trim() ||
+      String(kilometerAllowance?.totalKilometer ?? "").trim(),
+  );
+}
+
+/** Prefer details, then notes — never invent a rate or distance. */
+export function resolveEventKilometerAllowance(
+  details:
+    | Pick<CalendarBookingDetails, "showKilometerAllowance" | "kilometerAllowance">
+    | null
+    | undefined,
+  notes?: string | null,
+): {
+  showKilometerAllowance: boolean;
+  kilometerAllowance: NonNullable<CalendarBookingDetails["kilometerAllowance"]>;
+} {
+  const parsed = notes?.trim() ? parseCalendarEntryNotes(notes) : undefined;
+  const kilometerAllowance = hasKilometerAllowanceValues(details?.kilometerAllowance)
+    ? {
+        eurPerKm: String(details?.kilometerAllowance?.eurPerKm ?? ""),
+        totalKilometer: String(details?.kilometerAllowance?.totalKilometer ?? ""),
+      }
+    : {
+        eurPerKm: parsed?.kilometerAllowance?.eurPerKm ?? "",
+        totalKilometer: parsed?.kilometerAllowance?.totalKilometer ?? "",
+      };
+  return {
+    showKilometerAllowance:
+      Boolean(details?.showKilometerAllowance) ||
+      Boolean(parsed?.showKilometerAllowance) ||
+      hasKilometerAllowanceValues(kilometerAllowance),
+    kilometerAllowance,
+  };
 }
 
 function metaHasValues(meta: StoredBookingNoteMeta) {
@@ -211,6 +258,7 @@ export function serializeCalendarEntryNotes(
     ...(details?.desiredLocation ? { desiredLocation: details.desiredLocation } : {}),
     ...(details?.totalDiscount ? { totalDiscount: details.totalDiscount } : {}),
     ...(details?.originalServices?.length ? { originalServices: details.originalServices } : {}),
+    ...(details?.originalGuests?.length ? { originalGuests: details.originalGuests } : {}),
     ...(details?.needsOk ? { needsOk: true } : {}),
     ...(details?.ackScenario ? { ackScenario: details.ackScenario } : {}),
     ...(details?.ackRecipient ? { ackRecipient: details.ackRecipient } : {}),
@@ -219,6 +267,10 @@ export function serializeCalendarEntryNotes(
     ...(details?.addedServiceIds?.length ? { addedServiceIds: details.addedServiceIds } : {}),
     ...(details?.cancelledServiceIds?.length
       ? { cancelledServiceIds: details.cancelledServiceIds }
+      : {}),
+    ...(details?.addedProductIds?.length ? { addedProductIds: details.addedProductIds } : {}),
+    ...(details?.cancelledProductIds?.length
+      ? { cancelledProductIds: details.cancelledProductIds }
       : {}),
     ...(details?.silentUpdated ? { silentUpdated: true } : {}),
     ...(details?.silentUpdateSnapshot
@@ -372,6 +424,7 @@ export function markClientEbrAcceptedInNotes(
       addedServiceIds: applied?.addedServiceIds,
       cancelledServiceIds: applied?.cancelledServiceIds,
       originalServices: applied?.originalServices ?? details?.originalServices,
+      originalGuests: applied?.originalGuests ?? details?.originalGuests,
       ...(applied?.services ? { services: applied.services } : {}),
       ...(applied?.products ? { products: applied.products } : {}),
     },
@@ -421,18 +474,19 @@ function normalizeAssignmentId(value: string | null | undefined): string {
 export function requesterPersonIds(
   snapshot?: CalendarBookingDetails["clientSnapshot"],
 ): Set<string> {
+  const extraIds = extraBookingParticipantIds(snapshot?.people);
   const ids = new Set<string>();
   for (const person of snapshot?.people ?? []) {
-    if (!person.isRequester) continue;
     const id = normalizeAssignmentId(person.id);
-    if (id) ids.add(id);
+    if (!id || extraIds.has(id)) continue;
+    ids.add(id);
   }
   return ids;
 }
 
 /**
- * Main-client lines are unassigned (`guestId` empty) or tagged to the requester.
- * Any other person id is a guest/model assignment and must not leak onto Client.
+ * Main-client lines are unassigned, tagged to the requester, or tagged to a
+ * company contact. Guest/model/planning/buffer ids stay on their own cards.
  */
 export function isMainClientAssignedLine(
   guestId: string | null | undefined,
@@ -470,11 +524,7 @@ type SnapshotPerson = NonNullable<
 >[number];
 
 function isDisplayableSnapshotPerson(person: SnapshotPerson) {
-  return (
-    !person.isRequester &&
-    person.participantType !== "notes" &&
-    person.name?.trim().toLowerCase() !== "notes"
-  );
+  return isExtraBookingParticipant(person);
 }
 
 function guestFromSnapshotPerson(
@@ -506,6 +556,8 @@ function guestFromSnapshotPerson(
           endTime: service.endTime,
           staffResourceId: service.teamMemberId ?? undefined,
           guestId: service.guestId ?? person.id,
+          discount: service.discount ?? null,
+          originalPrice: service.originalPrice,
         })),
       details.services,
       person.id,
@@ -548,7 +600,11 @@ export function mainDrawerServicesFromClientSnapshot(
     ...(service.endTime ? { endTime: service.endTime } : {}),
     ...(service.teamMemberId ? { staffResourceId: String(service.teamMemberId) } : {}),
     ...(service.teamMemberName ? { teamMemberName: service.teamMemberName } : {}),
-    ...(service.guestId != null ? { guestId: service.guestId } : {}),
+    guestId: service.guestId == null || !String(service.guestId).trim()
+      ? null
+      : String(service.guestId),
+    ...(service.originalPrice != null ? { originalPrice: Number(service.originalPrice) } : {}),
+    ...(service.discount ? { discount: service.discount } : {}),
   }));
 }
 
@@ -658,6 +714,7 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
       ...(meta.desiredLocation ? { desiredLocation: meta.desiredLocation } : {}),
       ...(meta.totalDiscount ? { totalDiscount: meta.totalDiscount } : {}),
       ...(meta.originalServices?.length ? { originalServices: meta.originalServices } : {}),
+      ...(meta.originalGuests?.length ? { originalGuests: meta.originalGuests } : {}),
       ...(meta.needsOk ? { needsOk: true } : {}),
       ...(meta.ackScenario ? { ackScenario: meta.ackScenario } : {}),
       ...(meta.ackRecipient === "client" || meta.ackRecipient === "professional"
@@ -668,6 +725,26 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
       ...(meta.addedServiceIds?.length ? { addedServiceIds: meta.addedServiceIds } : {}),
       ...(meta.cancelledServiceIds?.length
         ? { cancelledServiceIds: meta.cancelledServiceIds }
+        : {}),
+      ...(ebr?.status !== "rejected" && ebr?.addedServiceIds?.length && !meta.addedServiceIds?.length
+        ? { addedServiceIds: ebr.addedServiceIds }
+        : {}),
+      ...(ebr?.status !== "rejected" &&
+      ebr?.cancelledServiceIds?.length &&
+      !meta.cancelledServiceIds?.length
+        ? { cancelledServiceIds: ebr.cancelledServiceIds }
+        : {}),
+      ...(meta.addedProductIds?.length ? { addedProductIds: meta.addedProductIds } : {}),
+      ...(meta.cancelledProductIds?.length
+        ? { cancelledProductIds: meta.cancelledProductIds }
+        : {}),
+      ...(ebr?.status !== "rejected" && ebr?.addedProductIds?.length && !meta.addedProductIds?.length
+        ? { addedProductIds: ebr.addedProductIds }
+        : {}),
+      ...(ebr?.status !== "rejected" &&
+      ebr?.cancelledProductIds?.length &&
+      !meta.cancelledProductIds?.length
+        ? { cancelledProductIds: ebr.cancelledProductIds }
         : {}),
       ...(meta.silentUpdated ? { silentUpdated: true } : {}),
       ...(meta.silentUpdateSnapshot
@@ -746,7 +823,14 @@ export const emptyDesiredLocation = () => ({
 });
 
 export function resolveBookingDetailsFromEvent(ev: CalendarEvent): CalendarBookingDetails {
-  if (ev.details) return ev.details;
+  const km = resolveEventKilometerAllowance(ev.details, ev.notes);
+  if (ev.details) {
+    return {
+      ...ev.details,
+      showKilometerAllowance: km.showKilometerAllowance,
+      kilometerAllowance: km.kilometerAllowance,
+    };
+  }
 
   return {
     services: [],
@@ -754,6 +838,8 @@ export function resolveBookingDetailsFromEvent(ev: CalendarEvent): CalendarBooki
     clientEmail: "",
     phoneCode: "",
     phoneNumber: "",
+    showKilometerAllowance: km.showKilometerAllowance,
+    kilometerAllowance: km.kilometerAllowance,
     ...(ev.location === "DL"
       ? {
           desiredLocation: {
@@ -822,9 +908,36 @@ export function hydrateBookingDrawerFromEvent(ev: CalendarEvent): BookingDrawerH
     const existingIds = new Set(
       guests.map((guest) => normalizeAssignmentId(guest.id)),
     );
+    const existingPlanningKeys = new Set(
+      guests
+        .filter(
+          (guest) =>
+            guest.participantType === "planning" || guest.name === "Planning",
+        )
+        .map((guest) =>
+          [
+            (guest.planningActivity ?? "").trim().toLowerCase(),
+            (guest.planningStartTime ?? "").trim(),
+            (guest.planningEndTime ?? "").trim(),
+            (guest.planningDuration ?? "").trim().toLowerCase(),
+          ].join("|"),
+        ),
+    );
     for (const person of snapshotPeople) {
       if (!isDisplayableSnapshotPerson(person)) continue;
       if (existingIds.has(normalizeAssignmentId(person.id))) continue;
+      const isPlanning =
+        person.participantType === "planning" || person.name === "Planning";
+      if (isPlanning) {
+        const fingerprint = [
+          (person.planningActivity ?? "").trim().toLowerCase(),
+          (person.planningStartTime ?? "").trim(),
+          (person.planningEndTime ?? "").trim(),
+          (person.planningDuration ?? "").trim().toLowerCase(),
+        ].join("|");
+        if (existingPlanningKeys.has(fingerprint)) continue;
+        existingPlanningKeys.add(fingerprint);
+      }
       guests.push(guestFromSnapshotPerson(person, snapshotServices, details));
     }
   }
@@ -918,7 +1031,13 @@ export function buildBookingDetailsSnapshot(input: {
   kilometerAllowanceDraft: BookingDrawerHydration["kilometerAllowance"];
   requestDirection?: CalendarBookingDetails["requestDirection"];
   originalServices?: CalendarBookingDetails["originalServices"];
+  originalGuests?: CalendarBookingDetails["originalGuests"];
   editedServiceIds?: CalendarBookingDetails["editedServiceIds"];
+  addedServiceIds?: CalendarBookingDetails["addedServiceIds"];
+  cancelledServiceIds?: CalendarBookingDetails["cancelledServiceIds"];
+  editedProductIds?: CalendarBookingDetails["editedProductIds"];
+  addedProductIds?: CalendarBookingDetails["addedProductIds"];
+  cancelledProductIds?: CalendarBookingDetails["cancelledProductIds"];
   clientEditedServiceIds?: CalendarBookingDetails["clientEditedServiceIds"];
   lastEditedBy?: CalendarBookingDetails["lastEditedBy"];
   clientNote?: string;
@@ -979,7 +1098,17 @@ export function buildBookingDetailsSnapshot(input: {
     kilometerAllowance: input.kilometerAllowanceDraft,
     ...(input.requestDirection ? { requestDirection: input.requestDirection } : {}),
     ...(input.originalServices ? { originalServices: input.originalServices } : {}),
+    ...(input.originalGuests?.length ? { originalGuests: input.originalGuests } : {}),
     ...(input.editedServiceIds ? { editedServiceIds: input.editedServiceIds } : {}),
+    ...(input.addedServiceIds?.length ? { addedServiceIds: input.addedServiceIds } : {}),
+    ...(input.cancelledServiceIds?.length
+      ? { cancelledServiceIds: input.cancelledServiceIds }
+      : {}),
+    ...(input.editedProductIds?.length ? { editedProductIds: input.editedProductIds } : {}),
+    ...(input.addedProductIds?.length ? { addedProductIds: input.addedProductIds } : {}),
+    ...(input.cancelledProductIds?.length
+      ? { cancelledProductIds: input.cancelledProductIds }
+      : {}),
     ...(input.clientEditedServiceIds ? { clientEditedServiceIds: input.clientEditedServiceIds } : {}),
     ...(input.lastEditedBy ? { lastEditedBy: input.lastEditedBy } : {}),
   };

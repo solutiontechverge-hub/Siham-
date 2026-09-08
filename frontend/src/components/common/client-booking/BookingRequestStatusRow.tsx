@@ -105,8 +105,6 @@ export default function BookingRequestStatusRow({
   bookingRequestDirection = "outgoing",
   rowMode = "default",
   showUpdated = false,
-  updatedSignpostTitle,
-  onUpdatedClick,
   showEditScenario = false,
   ebrSignpostTitle,
   onEbrClick,
@@ -189,24 +187,20 @@ export default function BookingRequestStatusRow({
       />
 
       {showUpdated && !isEbrIncoming && !showErPill ? (
-        <Tooltip title={updatedSignpostTitle || "Updated"} placement="top">
-          <Chip
-            label="Updated"
-            size="small"
-            onClick={onUpdatedClick}
-            sx={{
-              height: 18,
-              fontWeight: 800,
-              fontSize: 9,
-              borderRadius: "6px",
-              bgcolor: alpha(m.teal, 0.12),
-              color: m.teal,
-              border: `1px solid ${alpha(m.teal, 0.4)}`,
-              cursor: onUpdatedClick ? "pointer" : "default",
-              "& .MuiChip-label": { px: 0.7, py: 0, lineHeight: 1.2 },
-            }}
-          />
-        </Tooltip>
+        <Chip
+          label="Updated"
+          size="small"
+          sx={{
+            height: 18,
+            fontWeight: 800,
+            fontSize: 9,
+            borderRadius: "6px",
+            bgcolor: alpha(m.teal, 0.12),
+            color: m.teal,
+            border: `1px solid ${alpha(m.teal, 0.4)}`,
+            "& .MuiChip-label": { px: 0.7, py: 0, lineHeight: 1.2 },
+          }}
+        />
       ) : null}
 
       {showEditScenario &&

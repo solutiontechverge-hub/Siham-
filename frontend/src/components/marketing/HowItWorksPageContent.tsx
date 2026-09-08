@@ -1763,7 +1763,7 @@ export function HowItWorksPageContent({
                       </Box>
                       <Typography variant="body2" color="text.secondary">
                         The client will be notified that the booking has been
-                        edited
+                        updated
                       </Typography>
                     </Stack>
                   </Stack>

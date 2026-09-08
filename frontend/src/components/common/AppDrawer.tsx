@@ -45,6 +45,8 @@ type AppDrawerProps = Omit<DrawerProps, "children" | "title"> & {
   headerTone?: "default" | "danger";
   /** Panel shell background (header keeps its own tone). */
   bodyBgcolor?: string;
+  /** Scrollable body — used to restore position after sub-screens. */
+  contentRef?: React.Ref<HTMLDivElement>;
 };
 
 /** Single shared Mollure panel drawer — soft teal header, scroll body, optional footer. */
@@ -60,6 +62,7 @@ export default function AppDrawer({
   contentVariant = "default",
   headerTone = "default",
   bodyBgcolor,
+  contentRef,
   onClose,
   anchor = "right",
   PaperProps,
@@ -227,6 +230,7 @@ export default function AppDrawer({
         </Stack>
 
         <Box
+          ref={contentRef}
           sx={[
             // minHeight: 0 lets this flex child shrink so the footer stays pinned
             // instead of the whole column growing and scrolling with content.

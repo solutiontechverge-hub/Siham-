@@ -298,7 +298,7 @@ export default function ClientBookingChangeResponsePanel({
             minHeight: 40,
           }}
         >
-          Suggest Change
+          Suggest changes
         </AppButton>
       </Stack>
     </Stack>

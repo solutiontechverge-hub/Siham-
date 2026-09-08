@@ -359,6 +359,12 @@ export function useFixedLocationCalendarPage() {
       ? String(setupData.data.prepayment_percentage)
       : undefined;
 
+  const kilometerAllowanceEurPerKmDefault =
+    setupData?.data?.kilometer_allowance != null &&
+    Number(setupData.data.kilometer_allowance) > 0
+      ? String(setupData.data.kilometer_allowance)
+      : undefined;
+
   const desiredLocationSetup = React.useMemo(
     () =>
       buildDesiredLocationFromSetupFields(
@@ -529,6 +535,7 @@ export function useFixedLocationCalendarPage() {
     lateCancellationFeePercentDefault,
     noShowFeePercentDefault,
     prepaymentPercentDefault,
+    kilometerAllowanceEurPerKmDefault,
     cancellationBeforeHours: setupData?.data?.cancellation_before_hours ?? null,
     cancellationBeforeMinutes: setupData?.data?.cancellation_before_minutes ?? null,
     responseTimeHours: setupData?.data?.response_time_hours ?? null,

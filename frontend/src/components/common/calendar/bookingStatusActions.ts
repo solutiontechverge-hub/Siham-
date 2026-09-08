@@ -6,7 +6,10 @@ import {
   canRespondToIncomingRequest,
   isOutgoingBookingRequest,
 } from "./bookingRequestNegotiation";
-import { isResponseWindowOverdue } from "./bookingResponseDeadline";
+import {
+  shouldShowExpiredResponseBanner,
+  type ResponseWindowInput,
+} from "./bookingResponseDeadline";
 import { canDiscardBookingRequest } from "./bookingStatus";
 
 export type ProfessionalBookingAction =
@@ -72,13 +75,20 @@ export function resolveProfessionalBookingActions(
     CalendarEvent,
     "status" | "bookingScenario" | "bookingType" | "details"
   > | null | undefined,
-  opts?: { protectiveFeeCheckoutApplicable?: boolean },
+  opts?: {
+    protectiveFeeCheckoutApplicable?: boolean;
+    responseTime?: ResponseWindowInput | null;
+  },
 ): ProfessionalActionFlags {
   const flags = falseProfessionalFlags();
   if (!event) return flags;
 
   const status = event.status;
   const feeCheckoutOk = Boolean(opts?.protectiveFeeCheckoutApplicable);
+  const expiredBanner = shouldShowExpiredResponseBanner(
+    event,
+    opts?.responseTime,
+  );
 
   if (status === "BR Accepted") {
     if (professionalShouldAck(event.details)) {
@@ -98,6 +108,8 @@ export function resolveProfessionalBookingActions(
       flags.cancel = true;
       flags.in_progress = true;
       flags.no_show = true;
+    } else {
+      flags.discard = true;
     }
     // Incoming client ER → respond with Accept / Suggest / Reject.
     if (
@@ -108,15 +120,7 @@ export function resolveProfessionalBookingActions(
       flags.suggest_change = true;
       flags.reject = true;
     }
-    if (
-      erPending &&
-      isResponseWindowOverdue({
-        responseStatus: event.details?.responseStatus,
-        responseStartedAt: event.details?.responseStartedAt,
-        respondBy: event.details?.respondBy,
-        responseWindowMinutes: event.details?.responseWindowMinutes,
-      })
-    ) {
+    if (erPending && expiredBanner) {
       flags.restart_response = true;
     }
     return flags;
@@ -161,14 +165,8 @@ export function resolveProfessionalBookingActions(
       flags.edit = true;
       flags.discard = true;
     }
-    const overdue = isResponseWindowOverdue({
-      responseStatus: event.details?.responseStatus,
-      responseStartedAt: event.details?.responseStartedAt,
-      respondBy: event.details?.respondBy,
-      responseWindowMinutes: event.details?.responseWindowMinutes,
-    });
     if (
-      overdue &&
+      expiredBanner &&
       (canDiscardBookingRequest(event) ||
         canDiscardEbr(event) ||
         canRespondToIncomingRequest(event) ||
@@ -257,9 +255,19 @@ export function resolveClientBookingActions(input: {
 }
 
 export function showProfessionalActionMenu(
-  event: Pick<CalendarEvent, "status"> | null | undefined,
+  event: Pick<
+    CalendarEvent,
+    "status" | "bookingScenario" | "bookingType" | "details"
+  > | null | undefined,
+  opts?: { responseTime?: ResponseWindowInput | null },
 ): boolean {
   if (!event) return false;
+  if (event.status === "Requested") {
+    const flags = resolveProfessionalBookingActions(event, {
+      responseTime: opts?.responseTime,
+    });
+    return flags.edit || flags.discard;
+  }
   return (
     event.status === "Confirmed" ||
     event.status === "BR Accepted" ||

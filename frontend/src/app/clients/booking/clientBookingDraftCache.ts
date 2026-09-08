@@ -1,6 +1,10 @@
 import type { ClientBookingDraft } from "../../../components/common/client-booking/types";
 import type { ClientBookingRecord } from "./clientBookingRecords";
 import { liveMediaUrl } from "../../../lib/projectUploadMedia";
+import {
+  extraBookingParticipantIds,
+  dedupeServicesByOwner,
+} from "../../../data/bookingChronologicalBlocks";
 
 const DRAFT_SNAPSHOT_KEY = "mollure:booking_draft_snapshots_v1";
 
@@ -58,10 +62,6 @@ function hasPeople(draft?: ClientBookingDraft | DraftSnapshot | null) {
 function hasProject(draft?: ClientBookingDraft | DraftSnapshot | null) {
   const project = draft?.projectDetails;
   return Boolean(project?.description?.trim()) || (project?.uploads?.length ?? 0) > 0;
-}
-
-function servicesHaveGuestIds(draft?: ClientBookingDraft | DraftSnapshot | null) {
-  return (draft?.services ?? []).some((s) => Boolean(s.guestId));
 }
 
 function mergeProjectUploads(
@@ -158,35 +158,38 @@ export function mergeClientBookingDraftRichness(
       const match = byId.get(service.id) ?? byName.get(service.name);
       return {
         ...service,
-        guestId: service.guestId ?? match?.guestId ?? null,
+        // Missing guestId is the main client. Do not copy another person's id.
+        guestId: service.guestId === undefined ? null : service.guestId,
         teamMemberId: service.teamMemberId ?? match?.teamMemberId ?? null,
       };
     });
 
-    if (
-      !servicesHaveGuestIds({ services }) &&
-      fallbackServices.some((s) => Boolean(s.guestId)) &&
-      fallbackServices.length >= primaryServices.length
-    ) {
-      const primaryIds = new Set(services.map((s) => s.id));
-      for (const fb of fallbackServices) {
-        if (!fb.guestId || primaryIds.has(fb.id)) continue;
-        services = [
-          ...services,
-          {
-            id: fb.id,
-            name: fb.name,
-            durationMins: fb.durationMins,
-            price: fb.price,
-            guestId: fb.guestId ?? null,
-            teamMemberId: fb.teamMemberId ?? null,
-            isAddOn: fb.isAddOn,
-          },
-        ];
-        primaryIds.add(fb.id);
-      }
+    const lineKey = (row: { id: string; guestId?: string | null }) =>
+      `${row.id}::${row.guestId ?? ""}`;
+    const primaryKeys = new Set(services.map(lineKey));
+    for (const fb of fallbackServices) {
+      const key = lineKey(fb);
+      if (primaryKeys.has(key)) continue;
+      services = [
+        ...services,
+        {
+          id: fb.id,
+          name: fb.name,
+          durationMins: fb.durationMins,
+          price: fb.price,
+          guestId: fb.guestId ?? null,
+          teamMemberId: fb.teamMemberId ?? null,
+          isAddOn: fb.isAddOn,
+        },
+      ];
+      primaryKeys.add(key);
     }
   }
+
+  services = dedupeServicesByOwner(
+    services,
+    extraBookingParticipantIds(people),
+  );
 
   const fallbackProducts = liveFallback.products;
   const products =

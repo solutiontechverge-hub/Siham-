@@ -1,8 +1,9 @@
 "use client";
 
-import { Stack, Typography } from "@mui/material";
+import { Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { MollureMetaDot } from "./MollureMetaDot";
+import { BodyText } from "../ui/typography";
 
 type ServiceSummaryMetaLineProps = {
   timeRange?: string;
@@ -17,6 +18,7 @@ export function ServiceSummaryMetaLine({
 }: ServiceSummaryMetaLineProps) {
   const m = useTheme().palette.mollure;
   const textSx = {
+    m: 0,
     fontSize: 10.5,
     fontWeight: 700,
     color: alpha(m.navy, 0.48),
@@ -29,11 +31,13 @@ export function ServiceSummaryMetaLine({
       spacing={0.55}
       sx={{ mt: 0.25, flexWrap: "wrap" }}
     >
-      {timeRange ? <Typography sx={textSx}>{timeRange}</Typography> : null}
+      {timeRange ? <BodyText sx={textSx}>{timeRange}</BodyText> : null}
       {timeRange && durationLabel ? <MollureMetaDot /> : null}
-      {durationLabel ? <Typography sx={textSx}>{durationLabel}</Typography> : null}
+      {durationLabel ? (
+        <BodyText sx={textSx}>{durationLabel}</BodyText>
+      ) : null}
       {staffName && (timeRange || durationLabel) ? <MollureMetaDot /> : null}
-      {staffName ? <Typography sx={textSx}>{staffName}</Typography> : null}
+      {staffName ? <BodyText sx={textSx}>{staffName}</BodyText> : null}
     </Stack>
   );
 }
