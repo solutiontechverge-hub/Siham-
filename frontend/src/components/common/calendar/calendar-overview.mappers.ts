@@ -425,10 +425,24 @@ export function mapCalendarBookingToEvent(
       ...(parsedNotes?.hiddenForCustomer ? { hiddenForCustomer: true } : {}),
       ...(parsedNotes?.addedServiceIds?.length
         ? { addedServiceIds: parsedNotes.addedServiceIds }
-        : {}),
+        : pendingEbr?.addedServiceIds?.length
+          ? { addedServiceIds: pendingEbr.addedServiceIds }
+          : {}),
       ...(parsedNotes?.cancelledServiceIds?.length
         ? { cancelledServiceIds: parsedNotes.cancelledServiceIds }
-        : {}),
+        : pendingEbr?.cancelledServiceIds?.length
+          ? { cancelledServiceIds: pendingEbr.cancelledServiceIds }
+          : {}),
+      ...(parsedNotes?.addedProductIds?.length
+        ? { addedProductIds: parsedNotes.addedProductIds }
+        : pendingEbr?.addedProductIds?.length
+          ? { addedProductIds: pendingEbr.addedProductIds }
+          : {}),
+      ...(parsedNotes?.cancelledProductIds?.length
+        ? { cancelledProductIds: parsedNotes.cancelledProductIds }
+        : pendingEbr?.cancelledProductIds?.length
+          ? { cancelledProductIds: pendingEbr.cancelledProductIds }
+          : {}),
       ...(parsedNotes?.silentUpdated ? { silentUpdated: true } : {}),
       ...(parsedNotes?.silentUpdateSnapshot
         ? { silentUpdateSnapshot: parsedNotes.silentUpdateSnapshot }
@@ -498,8 +512,23 @@ export function mapCalendarBookingToEvent(
                 : {}),
             paymentMethod: parsedNotes.paymentMethod,
             showKilometerAllowance: parsedNotes.showKilometerAllowance,
+            ...(parsedNotes.kilometerAllowance
+              ? {
+                  kilometerAllowance: {
+                    eurPerKm: parsedNotes.kilometerAllowance.eurPerKm ?? "",
+                    totalKilometer:
+                      parsedNotes.kilometerAllowance.totalKilometer ?? "",
+                  },
+                }
+              : {}),
             ...(parsedNotes.cancellationReason ? { cancellationReason: parsedNotes.cancellationReason } : {}),
             ...(parsedNotes.clientSnapshot ? { clientSnapshot: parsedNotes.clientSnapshot } : {}),
+            ...(parsedNotes.originalServices?.length
+              ? { originalServices: parsedNotes.originalServices }
+              : {}),
+            ...(parsedNotes.originalGuests?.length
+              ? { originalGuests: parsedNotes.originalGuests }
+              : {}),
             ...(parsedNotes.guests?.length
               ? { guests: parsedNotes.guests }
               : (() => {

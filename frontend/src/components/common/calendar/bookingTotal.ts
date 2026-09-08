@@ -125,14 +125,7 @@ function isRequesterPerson(person: BookingPricePerson): boolean {
 
 function isGuestOrModelPerson(person: BookingPricePerson): boolean {
   if (isRequesterPerson(person)) return false;
-  if (
-    person.participantType === "planning" ||
-    person.participantType === "buffer" ||
-    person.participantType === "notes"
-  ) {
-    return false;
-  }
-  return true;
+  return person.participantType === "guest" || person.participantType === "model";
 }
 
 /** Split requester vs guest/model vs product buckets. Amounts stay dynamic. */

@@ -28,7 +28,10 @@ import {
   toPrepaymentIconVariant,
 } from "./prepaymentStatus";
 import { useBookingPaymentDueMeta } from "./resolveBookingPaymentDueMeta";
-import { hasUnseenBookingUpdate } from "./bookingUpdateSeen";
+import {
+  shouldShowSilentUpdatedTag,
+  useBookingUpdateSeenVersion,
+} from "./bookingUpdateSeen";
 import { sanitizeInternalNoteText } from "./bookingEventDetails";
 import BookingIdTooltipLabel from "./BookingIdTooltipLabel";
 import {
@@ -54,6 +57,7 @@ export type CalendarBookingCardProps = {
   onOpenNotes: () => void;
   onOpenClient: (anchorEl: HTMLElement) => void;
   onOpenMessages: () => void;
+  responseTimeConfigured?: boolean;
 };
 
 function scenarioBadgeResponseIndicators(
@@ -87,6 +91,7 @@ export default function CalendarBookingCard({
   onOpenNotes,
   onOpenClient,
   onOpenMessages,
+  responseTimeConfigured,
 }: CalendarBookingCardProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -110,7 +115,9 @@ export default function CalendarBookingCard({
   const unreadCount = useProfessionalMessagingUnread(bookingRef);
   const accent = statusCardAccent(event.status, statusColor);
   const scenarioIndicators = getBookingScenarioIndicators(event);
-  const responseIndicators = resolveBookingResponseIndicators(event);
+  const responseIndicators = resolveBookingResponseIndicators(event, {
+    responseTimeConfigured,
+  });
   const prepaymentStatus = resolveCalendarPrepaymentStatus(event);
   const prepaymentIconVariant = prepaymentStatus
     ? toPrepaymentIconVariant(prepaymentStatus)
@@ -142,11 +149,13 @@ export default function CalendarBookingCard({
     isIncomingEbr ||
     isIncomingEr ||
     (event.bookingScenario === "BR" && event.status === "Requested");
+  useBookingUpdateSeenVersion();
   const showUpdated =
     event.bookingScenario !== "EBR" &&
     event.bookingScenario !== "ER" &&
     event.status !== "Requested" &&
-    hasUnseenBookingUpdate({
+    shouldShowSilentUpdatedTag({
+      silentUpdated: event.details?.silentUpdated,
       viewer: "professional",
       bookingRef,
       updatedAt: event.updatedAt,

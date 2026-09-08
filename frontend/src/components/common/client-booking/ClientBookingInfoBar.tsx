@@ -2,8 +2,9 @@
 
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import PhoneOutlinedIcon from "@mui/icons-material/PhoneOutlined";
-import { Box, Chip, Grid, Stack, Typography } from "@mui/material";
+import { Box, Chip, Grid, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import { BodyText } from "../../ui/typography";
 import { locationModeChipSx } from "./locationModeChipSx";
 
 type Props = {
@@ -37,8 +38,9 @@ export default function ClientBookingInfoBar({
     <Box sx={{ mb: 2 }}>
       <Grid container spacing={0}>
         <Grid item xs={12} md={4} sx={colSx}>
-          <Typography
+          <BodyText
             sx={{
+              m: 0,
               fontSize: 13,
               fontWeight: 800,
               color: alpha(m.navy, 0.48),
@@ -46,9 +48,10 @@ export default function ClientBookingInfoBar({
             }}
           >
             Professional
-          </Typography>
-          <Typography
+          </BodyText>
+          <BodyText
             sx={{
+              m: 0,
               fontWeight: 900,
               fontSize: 14,
               color: alpha(m.navy, 0.88),
@@ -56,10 +59,11 @@ export default function ClientBookingInfoBar({
             }}
           >
             {professionalName}
-          </Typography>
+          </BodyText>
           {professionalRole ? (
-            <Typography
+            <BodyText
               sx={{
+                m: 0,
                 fontSize: 12,
                 fontWeight: 600,
                 color: alpha(m.navy, 0.48),
@@ -67,7 +71,7 @@ export default function ClientBookingInfoBar({
               }}
             >
               {professionalRole}
-            </Typography>
+            </BodyText>
           ) : null}
         </Grid>
 
@@ -78,11 +82,11 @@ export default function ClientBookingInfoBar({
             spacing={0.75}
             sx={{ mb: 0.65 }}
           >
-            <Typography
-              sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.48) }}
+            <BodyText
+              sx={{ m: 0, fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.48) }}
             >
               Location
-            </Typography>
+            </BodyText>
             <Chip label={locationBadge} size="small" sx={locationModeChipSx} />
           </Stack>
           <Box
@@ -103,9 +107,10 @@ export default function ClientBookingInfoBar({
                 display: "block",
               }}
             />
-            <Typography
+            <BodyText
               component="span"
               sx={{
+                m: 0,
                 fontWeight: 700,
                 fontSize: 12,
                 color: alpha(m.navy, 0.62),
@@ -114,13 +119,14 @@ export default function ClientBookingInfoBar({
               }}
             >
               {address?.trim() || "—"}
-            </Typography>
+            </BodyText>
           </Box>
         </Grid>
 
         <Grid item xs={12} md={4} sx={colSx}>
-          <Typography
+          <BodyText
             sx={{
+              m: 0,
               fontSize: 13,
               fontWeight: 800,
               color: alpha(m.navy, 0.48),
@@ -128,20 +134,21 @@ export default function ClientBookingInfoBar({
             }}
           >
             Contact number
-          </Typography>
+          </BodyText>
           <Box sx={{ display: "flex", alignItems: "center", gap: 0.6 }}>
             <PhoneOutlinedIcon
               sx={{ fontSize: 16, color: alpha(m.navy, 0.45) }}
             />
-            <Typography
+            <BodyText
               sx={{
+                m: 0,
                 fontWeight: 700,
                 fontSize: 12.5,
                 color: alpha(m.navy, 0.62),
               }}
             >
               {phone?.trim() || "—"}
-            </Typography>
+            </BodyText>
           </Box>
         </Grid>
       </Grid>

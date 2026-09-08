@@ -23,7 +23,10 @@ export function canProfessionalReply(store: MessagingStore, threadId?: string) {
   return threadHasClientMessage(store, threadId) || threadHasActiveBooking(store, threadId);
 }
 
-export function findThreadIdByBookingRef(store: MessagingStore, bookingRef?: string) {
+export function findThreadIdByBookingRef(
+  store: Pick<MessagingStore, "threads">,
+  bookingRef?: string,
+) {
   if (!bookingRef?.trim()) return "";
   const raw = bookingRef.trim();
   const q = normalizeBookingIdQuery(bookingRef);
@@ -36,6 +39,58 @@ export function findThreadIdByBookingRef(store: MessagingStore, bookingRef?: str
     return Boolean(q && normalizedMeta.includes(q));
   });
   return match?.id ?? "";
+}
+
+function threadHasPriorConversation(
+  store: Pick<MessagingStore, "messagesByThreadId">,
+  thread: MessagingThread,
+): boolean {
+  if (thread.isNewConversation || thread.id.startsWith("draft:")) return false;
+  const messages = store.messagesByThreadId[thread.id] ?? [];
+  if (
+    messages.some(
+      (message) =>
+        !message.deletedForEveryone &&
+        (Boolean(message.body?.trim()) || (message.attachments?.length ?? 0) > 0),
+    )
+  ) {
+    return true;
+  }
+  const preview = thread.preview?.trim() ?? "";
+  if (preview && preview !== "Tap to start a conversation") return true;
+  return Boolean(thread.lastActivityAt);
+}
+
+/** True when this booking/client already has a real chat history (not a first contact). */
+export function hasExistingPeerConversation(
+  store: Pick<MessagingStore, "threads" | "messagesByThreadId">,
+  options?: {
+    bookingRef?: string;
+    peerName?: string;
+    peerEmail?: string;
+    peerProfileId?: string;
+  },
+): boolean {
+  if (!options) return false;
+  const ids = new Set<string>();
+  const byBooking = findThreadIdByBookingRef(store, options.bookingRef);
+  if (byBooking) ids.add(byBooking);
+
+  const email = options.peerEmail?.trim().toLowerCase();
+  const profileId = options.peerProfileId?.trim();
+  const name = options.peerName?.trim().toLowerCase();
+
+  for (const thread of store.threads) {
+    if (email && thread.peerEmail?.trim().toLowerCase() === email) ids.add(thread.id);
+    if (profileId && thread.peerProfileId === profileId) ids.add(thread.id);
+    if (name && thread.name.trim().toLowerCase() === name) ids.add(thread.id);
+  }
+
+  for (const id of ids) {
+    const thread = store.threads.find((item) => item.id === id);
+    if (thread && threadHasPriorConversation(store, thread)) return true;
+  }
+  return false;
 }
 
 export function findThreadIdByClientName(store: MessagingStore, clientName?: string) {

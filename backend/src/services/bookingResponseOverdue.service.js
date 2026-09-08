@@ -26,7 +26,15 @@ function joinNotes(human, meta) {
 }
 
 
-function resolveRespondByMs(meta, createdAt, updatedAt, windowMinutes) {
+function hasNotesResponseDeadline(meta) {
+  if (!meta || typeof meta !== "object") return false;
+  if (meta.respondBy) return true;
+  if (meta.responseStartedAt) return true;
+  if (Number(meta.responseWindowMinutes) > 0) return true;
+  return false;
+}
+
+function resolveRespondByMs(meta, windowMinutes) {
   if (meta?.respondBy) {
     const due = Date.parse(meta.respondBy);
     if (Number.isFinite(due)) return due;
@@ -37,15 +45,6 @@ function resolveRespondByMs(meta, createdAt, updatedAt, windowMinutes) {
     if (Number.isFinite(start)) return start + windowMinutes * 60_000;
   }
 
-  // Prefer updated_at when notes already have negotiation meta (EBR/ER rounds).
-  const hasNegotiation =
-    Boolean(meta?.ebr) ||
-    Boolean(meta?.er) ||
-    meta?.responseStatus === "suggestion_for_change" ||
-    meta?.requestDirection;
-  const anchor = hasNegotiation ? updatedAt || createdAt : createdAt;
-  const start = Date.parse(anchor);
-  if (Number.isFinite(start)) return start + windowMinutes * 60_000;
   return null;
 }
 
@@ -58,8 +57,8 @@ function hasPendingNegotiation(status, meta) {
 
 /**
  * Permanently stamp responseStatus=overdue_response on pending BR/EBR/ER
- * once the response window elapses. Uses notes deadlines when present,
- * otherwise business_setup response_time_* / env fallback.
+ * once the stored notes deadline elapses. Blank template falls back to the
+ * flat 30-minute default. Bookings that never received a deadline are skipped.
  */
 export async function processOverdueResponseStatusUpdates() {
   const result = await query(
@@ -87,18 +86,14 @@ export async function processOverdueResponseStatusUpdates() {
     const { human, meta } = splitNotes(row.notes);
     if (!hasPendingNegotiation(row.status, meta)) continue;
     if (meta.responseStatus === "overdue_response") continue;
+    if (!hasNotesResponseDeadline(meta)) continue;
 
     const windowMinutes = resolveResponseWindowMinutes(
       row.response_time_hours,
       row.response_time_minutes,
       meta?.responseWindowMinutes,
     );
-    const dueMs = resolveRespondByMs(
-      meta,
-      row.created_at,
-      row.updated_at,
-      windowMinutes,
-    );
+    const dueMs = resolveRespondByMs(meta, windowMinutes);
     if (!dueMs || now <= dueMs) continue;
 
     const startedAt =

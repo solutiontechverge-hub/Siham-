@@ -310,119 +310,209 @@ function CancellationActivityDetails({ item }: { item: BookingActivityItem }) {
   );
 }
 
-function ComparisonRowView({
-  row,
-  compact,
+function isBlankComparisonValue(value?: string | null) {
+  const trimmed = String(value ?? "").trim();
+  return (
+    !trimmed ||
+    trimmed === "—" ||
+    trimmed === "---" ||
+    trimmed === "–" ||
+    trimmed.toLowerCase() === "removed"
+  );
+}
+
+function ComparisonSide({
+  caption,
+  label,
+  value,
+  tone,
+  emptyNote,
 }: {
-  row: ActivityComparisonRow;
-  compact?: boolean;
+  caption: string;
+  label: "Before" | "After";
+  value: string;
+  tone: "before" | "after" | "removed" | "empty";
+  emptyNote?: string;
 }) {
   const m = useTheme().palette.mollure;
+  const blank = isBlankComparisonValue(value);
+  const display = blank ? "—" : value;
 
-  if (compact || row.changeKind === "updated") {
-    return (
-      <Stack spacing={0.35}>
-        <Typography
-          sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.5) }}
-        >
-          {row.label}
-        </Typography>
-        <Typography
+  return (
+    <Box
+      sx={{
+        borderRadius: "8px",
+        border: `1px solid ${alpha(m.navy, 0.1)}`,
+        bgcolor:
+          tone === "after"
+            ? alpha(m.teal, 0.06)
+            : tone === "removed"
+              ? alpha("#C45C5C", 0.04)
+              : alpha(m.navy, 0.03),
+        px: 1.15,
+        py: 0.95,
+        minWidth: 0,
+      }}
+    >
+      <Typography
+        sx={{
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: 0.2,
+          color: alpha(m.navy, 0.55),
+          mb: 0.35,
+          lineHeight: 1.35,
+        }}
+      >
+        <Box
+          component="span"
           sx={{
-            fontSize: 12.5,
-            fontWeight: 700,
-            color: alpha(m.navy, 0.82),
-            lineHeight: 1.45,
+            textTransform: "uppercase",
+            letterSpacing: 0.3,
+            color: alpha(m.navy, 0.42),
           }}
         >
-          <Box
-            component="span"
-            sx={{
-              color: alpha(m.navy, 0.45),
-              textDecoration: "line-through",
-              fontWeight: 600,
-            }}
-          >
-            {row.originalValue}
-          </Box>
-          <Box component="span" sx={{ mx: 0.75, color: alpha(m.navy, 0.35) }}>
-            →
-          </Box>
-          <Box component="span" sx={{ color: m.teal, fontWeight: 800 }}>
-            {row.newValue}
-          </Box>
+          {label}
+        </Box>
+        {" "}
+        ({caption})
+      </Typography>
+      <Typography
+        sx={{
+          fontSize: 13,
+          fontWeight: tone === "after" && !blank ? 800 : 700,
+          lineHeight: 1.4,
+          color:
+            tone === "after" && !blank
+              ? m.teal
+              : tone === "removed" && !blank
+                ? alpha("#C45C5C", 0.9)
+                : alpha(m.navy, blank ? 0.38 : 0.82),
+          wordBreak: "break-word",
+        }}
+      >
+        {display}
+      </Typography>
+      {blank && emptyNote ? (
+        <Typography
+          sx={{
+            mt: 0.2,
+            fontSize: 10.5,
+            fontWeight: 600,
+            color: alpha(m.navy, 0.42),
+          }}
+        >
+          {emptyNote}
         </Typography>
-      </Stack>
-    );
-  }
+      ) : null}
+    </Box>
+  );
+}
+
+function ComparisonRowView({
+  row,
+  baselineCaption,
+  proposedCaption,
+}: {
+  row: ActivityComparisonRow;
+  baselineCaption: string;
+  proposedCaption: string;
+}) {
+  const m = useTheme().palette.mollure;
+  const originalBlank = isBlankComparisonValue(row.originalValue);
+  const newBlank = isBlankComparisonValue(row.newValue);
+  const kindLabel =
+    row.changeKind === "added"
+      ? "Added"
+      : row.changeKind === "removed"
+        ? "Removed"
+        : row.changeKind === "updated"
+          ? "Updated"
+          : "Changed";
 
   return (
     <Box
       sx={{
         borderRadius: "10px",
-        border: `1px solid ${alpha(m.navy, 0.08)}`,
-        bgcolor: alpha(m.navy, 0.015),
+        border: `1px solid ${alpha(m.navy, 0.1)}`,
+        bgcolor: "#fff",
         px: 1.25,
-        py: 1.1,
+        py: 1.15,
       }}
     >
       <Stack
         direction="row"
         justifyContent="space-between"
         alignItems="center"
-        sx={{ mb: 0.75 }}
+        spacing={1}
+        sx={{ mb: 1 }}
       >
         <Typography
-          sx={{ fontSize: 11.5, fontWeight: 800, color: alpha(m.navy, 0.55) }}
+          sx={{
+            fontSize: 13.5,
+            fontWeight: 900,
+            color: alpha(m.navy, 0.88),
+            lineHeight: 1.3,
+          }}
         >
           {row.label}
         </Typography>
         <Typography
           sx={{
+            flexShrink: 0,
             fontSize: 10,
             fontWeight: 800,
             letterSpacing: 0.2,
             textTransform: "uppercase",
+            px: 0.75,
+            py: 0.2,
+            borderRadius: "999px",
+            bgcolor:
+              row.changeKind === "added"
+                ? alpha(m.teal, 0.12)
+                : row.changeKind === "removed"
+                  ? alpha("#C45C5C", 0.12)
+                  : alpha(m.navy, 0.06),
             color:
               row.changeKind === "added"
                 ? m.teal
                 : row.changeKind === "removed"
-                  ? alpha("#C45C5C", 0.9)
-                  : alpha(m.navy, 0.45),
+                  ? alpha("#C45C5C", 0.95)
+                  : alpha(m.navy, 0.55),
           }}
         >
-          {row.changeKind === "added"
-            ? "Added"
-            : row.changeKind === "removed"
-              ? "Removed"
-              : "Changed"}
+          {kindLabel}
         </Typography>
       </Stack>
-      <Stack spacing={0.65}>
-        <Typography
-          sx={{
-            fontSize: 11.5,
-            fontWeight: 600,
-            color: alpha(m.navy, 0.42),
-            textDecoration:
-              row.changeKind === "removed" || row.changeKind === "changed"
-                ? "line-through"
-                : "none",
-            lineHeight: 1.4,
-          }}
-        >
-          {row.originalValue}
-        </Typography>
-        <Typography
-          sx={{
-            fontSize: 12.5,
-            fontWeight: 800,
-            color: m.teal,
-            lineHeight: 1.4,
-          }}
-        >
-          {row.newValue}
-        </Typography>
+      <Stack spacing={0.85}>
+        <ComparisonSide
+          label="Before"
+          caption={baselineCaption}
+          value={row.originalValue}
+          emptyNote={
+            originalBlank && row.changeKind !== "removed"
+              ? "Did not exist"
+              : undefined
+          }
+          tone={
+            row.changeKind === "removed" || row.changeKind === "changed"
+              ? "before"
+              : originalBlank
+                ? "empty"
+                : "before"
+          }
+        />
+        <ComparisonSide
+          label="After"
+          caption={proposedCaption}
+          value={row.newValue}
+          emptyNote={
+            newBlank && row.changeKind === "removed"
+              ? "No longer present"
+              : undefined
+          }
+          tone={row.changeKind === "removed" ? "removed" : "after"}
+        />
       </Stack>
     </Box>
   );
@@ -430,7 +520,6 @@ function ComparisonRowView({
 
 function ComparisonPanel({ comparison }: { comparison: ActivityComparison }) {
   const m = useTheme().palette.mollure;
-  const isSilent = comparison.mode === "silent_updated";
 
   return (
     <Box
@@ -467,9 +556,14 @@ function ComparisonPanel({ comparison }: { comparison: ActivityComparison }) {
         </Box>
         {comparison.proposedCaption}
       </Typography>
-      <Stack spacing={isSilent ? 1.15 : 1}>
+      <Stack spacing={1.15}>
         {comparison.rows.map((row) => (
-          <ComparisonRowView key={row.id} row={row} compact={isSilent} />
+          <ComparisonRowView
+            key={row.id}
+            row={row}
+            baselineCaption={comparison.baselineCaption}
+            proposedCaption={comparison.proposedCaption}
+          />
         ))}
       </Stack>
     </Box>

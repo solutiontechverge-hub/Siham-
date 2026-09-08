@@ -98,3 +98,34 @@ export function effectiveServiceAmount(service: {
   }
   return roundBookingMoney(service.price);
 }
+
+/** Keep list/net price + original + discount together when persisting a line. */
+export function persistLinePricing(item: {
+  price: number;
+  originalPrice?: number;
+  discount?: BookingLineDiscount | null;
+  discountPct?: number;
+}) {
+  const price = roundBookingMoney(Number(item.price) || 0);
+  const originalRaw = Number(item.originalPrice);
+  let original =
+    Number.isFinite(originalRaw) && originalRaw > 0
+      ? roundBookingMoney(originalRaw)
+      : price;
+  if (item.discount && original <= price) {
+    if (item.discount.type === "percentage") {
+      const pct = Number(item.discount.amount) || 0;
+      if (pct > 0 && pct < 100) {
+        original = roundBookingMoney(price / (1 - pct / 100));
+      }
+    } else {
+      original = roundBookingMoney(price + (Number(item.discount.amount) || 0));
+    }
+  }
+  return {
+    price,
+    originalPrice: original,
+    discount: item.discount ?? null,
+    ...(typeof item.discountPct === "number" ? { discountPct: item.discountPct } : {}),
+  };
+}

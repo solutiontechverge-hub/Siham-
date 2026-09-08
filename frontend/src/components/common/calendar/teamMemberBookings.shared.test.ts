@@ -249,4 +249,101 @@ assert.equal(sameMemberCards.length, 1);
 assert.equal(sameMemberCards[0].teamShared, false);
 assert.equal(sameMemberCards[0].title, "Muhammad umer arshad");
 
+const desiredLocationCards = calendarEventToDisplaySegments(
+  event({
+    id: "parent-dl",
+    location: "DL",
+    resourceId: "tm-ali",
+    start: "11:15",
+    end: "12:26",
+    title: "Muhammad umer arshad · eyelash",
+    showClientName: "alizaCompany",
+    details: {
+      services: [
+        {
+          id: "svc-main-a",
+          name: "Muhammad umer arshad",
+          price: 11,
+          durationMins: 60,
+          startTime: "11:15",
+          endTime: "12:15",
+          teamMemberId: "tm-ali",
+          guestId: null,
+        },
+        {
+          id: "svc-main-b",
+          name: "eyelash",
+          price: 111,
+          durationMins: 11,
+          startTime: "12:15",
+          endTime: "12:26",
+          teamMemberId: "tm-ali",
+          guestId: null,
+        },
+      ],
+      guests: [
+        {
+          id: "model-1",
+          name: "ali",
+          participantType: "model",
+          services: [
+            {
+              id: "svc-m1-a",
+              name: "Muhammad umer arshad",
+              price: 11,
+              durationMins: 60,
+              startTime: "12:26",
+              endTime: "13:26",
+              teamMemberId: "tm-ali",
+            },
+            {
+              id: "svc-m1-b",
+              name: "eyelash",
+              price: 111,
+              durationMins: 11,
+              startTime: "13:26",
+              endTime: "13:37",
+              teamMemberId: "tm-ali",
+            },
+          ],
+          products: [],
+        },
+        {
+          id: "model-2",
+          name: "umer",
+          participantType: "model",
+          services: [
+            {
+              id: "svc-m2-a",
+              name: "Muhammad umer arshad",
+              price: 11,
+              durationMins: 60,
+              startTime: "13:37",
+              endTime: "14:37",
+              teamMemberId: "tm-ali",
+            },
+            {
+              id: "svc-m2-b",
+              name: "eyelash",
+              price: 111,
+              durationMins: 11,
+              startTime: "14:37",
+              endTime: "14:48",
+              teamMemberId: "tm-ali",
+            },
+          ],
+          products: [],
+        },
+      ],
+    },
+  }),
+  new Map([["tm-ali", "ali khan"]]),
+);
+assert.equal(desiredLocationCards.length, 1);
+assert.equal(desiredLocationCards[0]?.start, "11:15");
+assert.equal(desiredLocationCards[0]?.end, "14:48");
+assert.equal(desiredLocationCards[0]?.showClientName, "alizaCompany");
+assert.equal(desiredLocationCards[0]?.title, "Muhammad umer arshad · eyelash");
+assert.equal(desiredLocationCards[0]?.teamShared, false);
+
 console.log("teamMemberBookings.shared.test.ts passed");

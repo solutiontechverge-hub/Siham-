@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Box, Typography } from "@mui/material";
+import { Box } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import { BodyText } from "../../ui/typography";
 
 export default function BookingSummaryNote({ note }: { note?: string | null }) {
   const m = useTheme().palette.mollure;
@@ -11,16 +12,17 @@ export default function BookingSummaryNote({ note }: { note?: string | null }) {
 
   return (
     <Box>
-      <Typography
+      <BodyText
         sx={{
-          fontWeight: 900,
+          m: 0,
           fontSize: 12,
+          fontWeight: 900,
           color: alpha(m.navy, 0.78),
           mb: 0.75,
         }}
       >
         Note
-      </Typography>
+      </BodyText>
       <Box
         sx={{
           borderRadius: "10px",
@@ -30,18 +32,18 @@ export default function BookingSummaryNote({ note }: { note?: string | null }) {
           bgcolor: alpha(m.navy, 0.02),
         }}
       >
-        <Typography
+        <BodyText
           sx={{
+            m: 0,
             fontSize: 12,
             fontWeight: 700,
             color: alpha(m.navy, 0.72),
-            lineHeight: 1.35,
             whiteSpace: "pre-wrap",
             wordBreak: "break-word",
           }}
         >
           {text}
-        </Typography>
+        </BodyText>
       </Box>
     </Box>
   );

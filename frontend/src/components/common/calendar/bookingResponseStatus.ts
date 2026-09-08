@@ -8,6 +8,7 @@ export type CalendarResponseStatus = "suggestion_for_change" | "overdue_response
 
 export function resolveBookingResponseIndicators(
   event: Pick<CalendarEvent, "bookingScenario" | "details" | "status">,
+  opts?: { responseTimeConfigured?: boolean },
 ): BookingIndicatorVariant[] {
   const indicators: BookingIndicatorVariant[] = [];
   const details = event.details;
@@ -50,6 +51,7 @@ export function resolveBookingResponseIndicators(
 
   if (
     pendingNegotiation &&
+    opts?.responseTimeConfigured !== false &&
     isResponseWindowOverdue({
       responseStatus: details?.responseStatus,
       responseStartedAt: details?.responseStartedAt,

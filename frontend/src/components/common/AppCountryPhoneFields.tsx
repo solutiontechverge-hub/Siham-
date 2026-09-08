@@ -17,6 +17,8 @@ export type AppCountryPhoneFieldsProps = {
   onCountryCodeChange: (dialCode: string) => void;
   onPhoneChange: (phone: string) => void;
   label?: string;
+  /** Shown beside the label — e.g. first-visit Updated chip. */
+  labelAdornment?: React.ReactNode;
   phonePlaceholder?: string;
   countryCodeError?: string;
   phoneError?: string;
@@ -36,6 +38,7 @@ export default function AppCountryPhoneFields({
   onCountryCodeChange,
   onPhoneChange,
   label = "Contact Number",
+  labelAdornment,
   phonePlaceholder = "Enter your phone number",
   countryCodeError,
   phoneError,
@@ -78,22 +81,29 @@ export default function AppCountryPhoneFields({
   return (
     <Box sx={{ width: "100%" }}>
       {label ? (
-        <BodyText
-          sx={{
-            fontSize: 12,
-            fontWeight: 900,
-            color: alpha(m.navy, 0.65),
-            mb: 0.75,
-          }}
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={0.75}
+          sx={{ mb: 0.75, minWidth: 0 }}
         >
-          {label}
-          {required ? (
-            <Box component="span" sx={{ color: "error.main", fontWeight: 700 }}>
-              {" "}
-              *
-            </Box>
-          ) : null}
-        </BodyText>
+          <BodyText
+            sx={{
+              fontSize: 12,
+              fontWeight: 900,
+              color: alpha(m.navy, 0.65),
+            }}
+          >
+            {label}
+            {required ? (
+              <Box component="span" sx={{ color: "error.main", fontWeight: 700 }}>
+                {" "}
+                *
+              </Box>
+            ) : null}
+          </BodyText>
+          {labelAdornment}
+        </Stack>
       ) : null}
       <Stack
         direction="row"
