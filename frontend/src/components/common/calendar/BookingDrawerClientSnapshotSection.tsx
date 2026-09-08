@@ -43,17 +43,28 @@ export default function BookingDrawerClientSnapshotSection({
     [hiddenPersonIds],
   );
   const hideGuestBlocks = hiddenIds.size > 0;
-  const nonRequesterPeople = people.filter((p) => {
-    if (p.isRequester) return false;
-    if (p.participantType === "notes") return false;
-    if (hiddenIds.has(String(p.id))) return false;
-    if (!hideGuestBlocks) return true;
-    const isPlanning =
-      p.participantType === "planning" || p.name === "Planning";
-    const isBuffer = p.participantType === "buffer";
-    // Guest / model already appear in the booking guests editor below.
-    return isPlanning || isBuffer;
-  });
+  const nonRequesterPeople = [...people]
+    .filter((p) => {
+      if (p.isRequester) return false;
+      if (p.participantType === "notes") return false;
+      if (hiddenIds.has(String(p.id))) return false;
+      if (!hideGuestBlocks) return true;
+      const isPlanning =
+        p.participantType === "planning" || p.name === "Planning";
+      const isBuffer = p.participantType === "buffer";
+      // Guest / model already appear in the booking guests editor below.
+      return isPlanning || isBuffer;
+    })
+    .sort((a, b) => {
+      const rank = (person: (typeof people)[number]) => {
+        if (person.participantType === "model") return 1;
+        if (person.participantType === "planning" || person.name === "Planning")
+          return 2;
+        if (person.participantType === "buffer") return 3;
+        return 1;
+      };
+      return rank(a) - rank(b);
+    });
   if (!hasProject && nonRequesterPeople.length === 0) return null;
 
   const modelTotal = nonRequesterPeople.filter(

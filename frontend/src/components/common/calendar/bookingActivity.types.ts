@@ -126,7 +126,19 @@ export type BookingActivityBuildInput = {
     cancelledServiceIds?: string[] | null;
     phoneCode?: string | null;
     phoneNumber?: string | null;
-    guests?: Array<{ name?: string | null }> | null;
+    guests?: Array<{
+      id?: string;
+      name?: string | null;
+      services?: Array<{
+        id: string;
+        name: string;
+        price: number;
+        durationMins?: number;
+        startTime?: string;
+        endTime?: string;
+        guestId?: string | null;
+      }> | null;
+    }> | null;
     desiredLocation?: string | {
       street?: string;
       number?: string;
@@ -138,7 +150,28 @@ export type BookingActivityBuildInput = {
     silentUpdateSnapshot?: {
       phoneCode?: string | null;
       phoneNumber?: string | null;
-      guests?: Array<{ name?: string | null }> | null;
+      guests?: Array<{
+        id?: string;
+        name?: string | null;
+        services?: Array<{
+          id: string;
+          name: string;
+          price: number;
+          durationMins?: number;
+          startTime?: string;
+          endTime?: string;
+          guestId?: string | null;
+        }> | null;
+      }> | null;
+      services?: Array<{
+        id: string;
+        name: string;
+        price: number;
+        durationMins?: number;
+        startTime?: string;
+        endTime?: string;
+        guestId?: string | null;
+      }> | null;
       desiredLocation?: string | {
         street?: string;
         number?: string;

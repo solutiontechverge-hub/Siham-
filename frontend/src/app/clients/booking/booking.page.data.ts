@@ -74,6 +74,24 @@ export function isNotesPerson(
   );
 }
 
+export function sortPeopleByCanonicalBookingOrder<T extends BookingPerson>(
+  people: readonly T[],
+): T[] {
+  return [...people].sort((a, b) => {
+    const rank = (person: T) => {
+      if (person.isRequester) return 0;
+      if (person.participantType === "model" || person.participantType === "guest")
+        return 1;
+      if (person.participantType === "planning" || person.name === "Planning")
+        return 2;
+      if (person.participantType === "buffer") return 3;
+      if (isNotesPerson(person)) return 4;
+      return 1;
+    };
+    return rank(a) - rank(b);
+  });
+}
+
 export function createNotesPerson(): BookingPerson {
   return {
     id: NOTES_PERSON_ID,

@@ -118,6 +118,39 @@ function guestNames(
     .filter(Boolean);
 }
 
+function flattenServices(
+  services?: Array<{
+    id: string;
+    name: string;
+    price: number;
+    durationMins?: number;
+    startTime?: string;
+    endTime?: string;
+    guestId?: string | null;
+  }> | null,
+  guests?: Array<{
+    id?: string;
+    services?: Array<{
+      id: string;
+      name: string;
+      price: number;
+      durationMins?: number;
+      startTime?: string;
+      endTime?: string;
+      guestId?: string | null;
+    }> | null;
+  }> | null,
+) {
+  const client = [...(services ?? [])];
+  const fromGuests = (guests ?? []).flatMap((guest) =>
+    (guest.services ?? []).map((service) => ({
+      ...service,
+      guestId: service.guestId ?? guest.id ?? null,
+    })),
+  );
+  return [...client, ...fromGuests];
+}
+
 function resolveComparisonForBooking(input: {
   mode: ActivityComparisonMode;
   notesDetails: ReturnType<typeof parseCalendarEntryNotes>;
@@ -142,13 +175,8 @@ function resolveComparisonForBooking(input: {
   } = input;
 
   const details = currentDetails ?? null;
-  const originalServices =
-    details?.originalServices?.length
-      ? details.originalServices
-      : notesDetails?.originalServices?.length
-        ? notesDetails.originalServices
-        : null;
-
+  const snapshot =
+    details?.silentUpdateSnapshot ?? notesDetails?.silentUpdateSnapshot;
   const suggestedServices =
     ebr?.suggestedServices?.length
       ? ebr.suggestedServices
@@ -156,17 +184,35 @@ function resolveComparisonForBooking(input: {
         ? editReq.suggestedServices
         : null;
 
-  const currentServices =
-    suggestedServices?.length
-      ? suggestedServices
-      : details?.services?.length
-        ? details.services
-        : notesDetails?.services?.length
-          ? notesDetails.services
+  const liveServices = flattenServices(
+    details?.services ?? notesDetails?.services,
+    details?.guests ?? notesDetails?.guests,
+  );
+  const snapshotServices = flattenServices(
+    snapshot?.services,
+    snapshot?.guests,
+  );
+  const originalServices =
+    mode === "silent_updated"
+      ? snapshotServices.length
+        ? snapshotServices
+        : liveServices
+      : details?.originalServices?.length
+        ? details.originalServices
+        : notesDetails?.originalServices?.length
+          ? notesDetails.originalServices
           : null;
 
-  const snapshot =
-    details?.silentUpdateSnapshot ?? notesDetails?.silentUpdateSnapshot;
+  const currentServices =
+    mode === "silent_updated"
+      ? liveServices
+      : suggestedServices?.length
+        ? suggestedServices
+        : details?.services?.length
+          ? details.services
+          : notesDetails?.services?.length
+            ? notesDetails.services
+            : null;
 
   return buildActivityComparison({
     mode,
@@ -177,9 +223,16 @@ function resolveComparisonForBooking(input: {
       ebr?.editedServiceIds ??
       editReq.editedServiceIds ??
       notesDetails?.editedServiceIds,
-    addedServiceIds: details?.addedServiceIds ?? notesDetails?.addedServiceIds,
+    addedServiceIds:
+      details?.addedServiceIds ??
+      ebr?.addedServiceIds ??
+      editReq.addedServiceIds ??
+      notesDetails?.addedServiceIds,
     cancelledServiceIds:
-      details?.cancelledServiceIds ?? notesDetails?.cancelledServiceIds,
+      details?.cancelledServiceIds ??
+      ebr?.cancelledServiceIds ??
+      editReq.cancelledServiceIds ??
+      notesDetails?.cancelledServiceIds,
     originalProducts: notesDetails?.products,
     currentProducts:
       ebr?.suggestedProducts ??

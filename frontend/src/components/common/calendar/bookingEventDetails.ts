@@ -38,6 +38,10 @@ export type StoredEbrNotePayload = {
   clientNote?: string;
   editedServiceIds?: string[];
   editedProductIds?: string[];
+  addedServiceIds?: string[];
+  cancelledServiceIds?: string[];
+  addedProductIds?: string[];
+  cancelledProductIds?: string[];
   /** Preferred for client→pro rounds so the drawer can show “Edited”. */
   clientEditedServiceIds?: string[];
   suggestedServices?: NonNullable<CalendarBookingDetails["services"]>;
@@ -120,6 +124,8 @@ type StoredBookingNoteMeta = Partial<
     | "hiddenForCustomer"
     | "addedServiceIds"
     | "cancelledServiceIds"
+    | "addedProductIds"
+    | "cancelledProductIds"
     | "silentUpdated"
     | "silentUpdateSnapshot"
     | "scheduleEdited"
@@ -219,6 +225,10 @@ export function serializeCalendarEntryNotes(
     ...(details?.addedServiceIds?.length ? { addedServiceIds: details.addedServiceIds } : {}),
     ...(details?.cancelledServiceIds?.length
       ? { cancelledServiceIds: details.cancelledServiceIds }
+      : {}),
+    ...(details?.addedProductIds?.length ? { addedProductIds: details.addedProductIds } : {}),
+    ...(details?.cancelledProductIds?.length
+      ? { cancelledProductIds: details.cancelledProductIds }
       : {}),
     ...(details?.silentUpdated ? { silentUpdated: true } : {}),
     ...(details?.silentUpdateSnapshot
@@ -506,6 +516,8 @@ function guestFromSnapshotPerson(
           endTime: service.endTime,
           staffResourceId: service.teamMemberId ?? undefined,
           guestId: service.guestId ?? person.id,
+          discount: service.discount ?? null,
+          originalPrice: service.originalPrice,
         })),
       details.services,
       person.id,
@@ -549,6 +561,8 @@ export function mainDrawerServicesFromClientSnapshot(
     ...(service.teamMemberId ? { staffResourceId: String(service.teamMemberId) } : {}),
     ...(service.teamMemberName ? { teamMemberName: service.teamMemberName } : {}),
     ...(service.guestId != null ? { guestId: service.guestId } : {}),
+    ...(service.originalPrice != null ? { originalPrice: Number(service.originalPrice) } : {}),
+    ...(service.discount ? { discount: service.discount } : {}),
   }));
 }
 
@@ -668,6 +682,26 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
       ...(meta.addedServiceIds?.length ? { addedServiceIds: meta.addedServiceIds } : {}),
       ...(meta.cancelledServiceIds?.length
         ? { cancelledServiceIds: meta.cancelledServiceIds }
+        : {}),
+      ...(ebr?.status !== "rejected" && ebr?.addedServiceIds?.length && !meta.addedServiceIds?.length
+        ? { addedServiceIds: ebr.addedServiceIds }
+        : {}),
+      ...(ebr?.status !== "rejected" &&
+      ebr?.cancelledServiceIds?.length &&
+      !meta.cancelledServiceIds?.length
+        ? { cancelledServiceIds: ebr.cancelledServiceIds }
+        : {}),
+      ...(meta.addedProductIds?.length ? { addedProductIds: meta.addedProductIds } : {}),
+      ...(meta.cancelledProductIds?.length
+        ? { cancelledProductIds: meta.cancelledProductIds }
+        : {}),
+      ...(ebr?.status !== "rejected" && ebr?.addedProductIds?.length && !meta.addedProductIds?.length
+        ? { addedProductIds: ebr.addedProductIds }
+        : {}),
+      ...(ebr?.status !== "rejected" &&
+      ebr?.cancelledProductIds?.length &&
+      !meta.cancelledProductIds?.length
+        ? { cancelledProductIds: ebr.cancelledProductIds }
         : {}),
       ...(meta.silentUpdated ? { silentUpdated: true } : {}),
       ...(meta.silentUpdateSnapshot
@@ -822,9 +856,36 @@ export function hydrateBookingDrawerFromEvent(ev: CalendarEvent): BookingDrawerH
     const existingIds = new Set(
       guests.map((guest) => normalizeAssignmentId(guest.id)),
     );
+    const existingPlanningKeys = new Set(
+      guests
+        .filter(
+          (guest) =>
+            guest.participantType === "planning" || guest.name === "Planning",
+        )
+        .map((guest) =>
+          [
+            (guest.planningActivity ?? "").trim().toLowerCase(),
+            (guest.planningStartTime ?? "").trim(),
+            (guest.planningEndTime ?? "").trim(),
+            (guest.planningDuration ?? "").trim().toLowerCase(),
+          ].join("|"),
+        ),
+    );
     for (const person of snapshotPeople) {
       if (!isDisplayableSnapshotPerson(person)) continue;
       if (existingIds.has(normalizeAssignmentId(person.id))) continue;
+      const isPlanning =
+        person.participantType === "planning" || person.name === "Planning";
+      if (isPlanning) {
+        const fingerprint = [
+          (person.planningActivity ?? "").trim().toLowerCase(),
+          (person.planningStartTime ?? "").trim(),
+          (person.planningEndTime ?? "").trim(),
+          (person.planningDuration ?? "").trim().toLowerCase(),
+        ].join("|");
+        if (existingPlanningKeys.has(fingerprint)) continue;
+        existingPlanningKeys.add(fingerprint);
+      }
       guests.push(guestFromSnapshotPerson(person, snapshotServices, details));
     }
   }
@@ -919,6 +980,11 @@ export function buildBookingDetailsSnapshot(input: {
   requestDirection?: CalendarBookingDetails["requestDirection"];
   originalServices?: CalendarBookingDetails["originalServices"];
   editedServiceIds?: CalendarBookingDetails["editedServiceIds"];
+  addedServiceIds?: CalendarBookingDetails["addedServiceIds"];
+  cancelledServiceIds?: CalendarBookingDetails["cancelledServiceIds"];
+  editedProductIds?: CalendarBookingDetails["editedProductIds"];
+  addedProductIds?: CalendarBookingDetails["addedProductIds"];
+  cancelledProductIds?: CalendarBookingDetails["cancelledProductIds"];
   clientEditedServiceIds?: CalendarBookingDetails["clientEditedServiceIds"];
   lastEditedBy?: CalendarBookingDetails["lastEditedBy"];
   clientNote?: string;
@@ -980,6 +1046,15 @@ export function buildBookingDetailsSnapshot(input: {
     ...(input.requestDirection ? { requestDirection: input.requestDirection } : {}),
     ...(input.originalServices ? { originalServices: input.originalServices } : {}),
     ...(input.editedServiceIds ? { editedServiceIds: input.editedServiceIds } : {}),
+    ...(input.addedServiceIds?.length ? { addedServiceIds: input.addedServiceIds } : {}),
+    ...(input.cancelledServiceIds?.length
+      ? { cancelledServiceIds: input.cancelledServiceIds }
+      : {}),
+    ...(input.editedProductIds?.length ? { editedProductIds: input.editedProductIds } : {}),
+    ...(input.addedProductIds?.length ? { addedProductIds: input.addedProductIds } : {}),
+    ...(input.cancelledProductIds?.length
+      ? { cancelledProductIds: input.cancelledProductIds }
+      : {}),
     ...(input.clientEditedServiceIds ? { clientEditedServiceIds: input.clientEditedServiceIds } : {}),
     ...(input.lastEditedBy ? { lastEditedBy: input.lastEditedBy } : {}),
   };

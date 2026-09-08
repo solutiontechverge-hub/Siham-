@@ -84,6 +84,66 @@ function isBufferPerson(person: ChronologicalPerson) {
   return id === "buffer" || id.startsWith("buffer-") || id.startsWith("p-buffer");
 }
 
+function isNotesPerson(person: ChronologicalPerson) {
+  return person.participantType === "notes" || person.id === "p-notes";
+}
+
+/** Display order for booking cards: Client → Models/Guests → Planning → Buffers. */
+export function canonicalParticipantRank(
+  type: ChronologicalParticipantType | ChronologicalPerson["participantType"] | string | undefined,
+): number {
+  switch (type) {
+    case "requester":
+      return 0;
+    case "model":
+    case "guest":
+      return 1;
+    case "planning":
+      return 2;
+    case "buffer":
+      return 3;
+    case "notes":
+      return 4;
+    default:
+      return 1;
+  }
+}
+
+export function sortByCanonicalBookingOrder<T>(
+  items: readonly T[],
+  getType: (item: T) => ChronologicalParticipantType | string | undefined,
+): T[] {
+  return [...items].sort(
+    (a, b) => canonicalParticipantRank(getType(a)) - canonicalParticipantRank(getType(b)),
+  );
+}
+
+function planningFingerprint(person: ChronologicalPerson) {
+  return [
+    (person.planningActivity ?? "").trim().toLowerCase(),
+    (person.planningStartTime ?? person.bufferStartTime ?? "").trim(),
+    (person.planningEndTime ?? person.bufferEndTime ?? "").trim(),
+    (person.planningDuration ?? "").trim().toLowerCase(),
+  ].join("|");
+}
+
+/** Collapse duplicate planning rows that were saved with different ids but the same window. */
+export function dedupePlanningPeople<T extends ChronologicalPerson>(people: readonly T[]): T[] {
+  const seen = new Set<string>();
+  const next: T[] = [];
+  for (const person of people) {
+    if (!isPlanningPerson(person)) {
+      next.push(person);
+      continue;
+    }
+    const fingerprint = planningFingerprint(person);
+    if (seen.has(fingerprint)) continue;
+    seen.add(fingerprint);
+    next.push(person);
+  }
+  return next;
+}
+
 function resolveParticipantType(
   person: ChronologicalPerson,
 ): ChronologicalParticipantType {
@@ -238,6 +298,89 @@ function groupTimedEntriesIntoBlocks<T extends ChronologicalServiceLine>(
   return blocks;
 }
 
+function sortBlockItemsByStartTime<T extends ChronologicalServiceLine>(items: T[]) {
+  return [...items].sort((a, b) => {
+    const aStart = a.startTime?.trim();
+    const bStart = b.startTime?.trim();
+    if (!aStart && !bStart) return a.id.localeCompare(b.id);
+    if (!aStart) return 1;
+    if (!bStart) return -1;
+    const diff = minutesSinceMidnight(aStart) - minutesSinceMidnight(bStart);
+    if (diff !== 0) return diff;
+    return a.id.localeCompare(b.id);
+  });
+}
+
+/**
+ * Drawer / payment-summary grouping: one card per person with every service
+ * that belongs to them. Calendar timeline still uses time-sliced blocks.
+ */
+function collapsePersonBlocks<T extends ChronologicalServiceLine>(
+  blocks: readonly ChronologicalBlock<T>[],
+  teamMemberNameById: ReadonlyMap<string, string>,
+): ChronologicalBlock<T>[] {
+  if (blocks.length <= 1) return [...blocks];
+
+  const collapsed: ChronologicalBlock<T>[] = [];
+  const indexByParticipant = new Map<string, number>();
+
+  for (const block of blocks) {
+    const keepSeparate =
+      block.participantType === "planning" ||
+      block.participantType === "buffer";
+    if (keepSeparate) {
+      collapsed.push({
+        ...block,
+        items: [...block.items],
+        key: `${block.participantId}::${collapsed.length}`,
+        blockIndex: collapsed.length,
+      });
+      continue;
+    }
+
+    const existingIndex = indexByParticipant.get(block.participantId);
+    if (existingIndex == null) {
+      indexByParticipant.set(block.participantId, collapsed.length);
+      collapsed.push({
+        ...block,
+        items: [...block.items],
+        key: `${block.participantId}::${collapsed.length}`,
+        blockIndex: collapsed.length,
+      });
+      continue;
+    }
+
+    const existing = collapsed[existingIndex];
+    existing.items.push(...block.items);
+    if (
+      minutesSinceMidnight(block.startTime) <
+      minutesSinceMidnight(existing.startTime)
+    ) {
+      existing.startTime = block.startTime;
+    }
+    if (
+      minutesSinceMidnight(block.endTime) >
+      minutesSinceMidnight(existing.endTime)
+    ) {
+      existing.endTime = block.endTime;
+    }
+  }
+
+  return collapsed.map((block, index) => {
+    const items = sortBlockItemsByStartTime(block.items);
+    return {
+      ...block,
+      key: `${block.participantId}::${index}`,
+      blockIndex: index,
+      items,
+      teamMemberLabel: teamMemberChipLabelForItems(items, teamMemberNameById),
+      teamMemberId: items[0]
+        ? resolveLineTeamMemberId(items[0])
+        : block.teamMemberId,
+    };
+  });
+}
+
 export type BuildChronologicalBlocksInput<T extends ChronologicalServiceLine> = {
   bookingStart?: string;
   requesterPerson: ChronologicalPerson;
@@ -387,7 +530,11 @@ export function buildClientDraftChronologicalBlocks(
       isRequester: true,
     };
 
-  const peopleList: ChronologicalPerson[] = [...people];
+  const peopleList: ChronologicalPerson[] = sortByCanonicalBookingOrder(
+    dedupePlanningPeople(people),
+    (person) =>
+      person.isRequester ? "requester" : resolveParticipantType(person),
+  );
   const knownIds = new Set(peopleList.map((person) => person.id));
   const addOrphanPerson = (id: string) => {
     if (!id || id === "unassigned" || knownIds.has(id) || id === requesterPerson.id) {
@@ -405,6 +552,15 @@ export function buildClientDraftChronologicalBlocks(
   if (!peopleList.some((person) => person.id === requesterPerson.id)) {
     peopleList.unshift(requesterPerson);
   }
+  peopleList.sort(
+    (a, b) =>
+      canonicalParticipantRank(
+        a.isRequester ? "requester" : resolveParticipantType(a),
+      ) -
+      canonicalParticipantRank(
+        b.isRequester ? "requester" : resolveParticipantType(b),
+      ),
+  );
 
   const serviceGroups = new Map<string, ClientBookingDraftService[]>();
   for (const service of services) {
@@ -425,7 +581,7 @@ export function buildClientDraftChronologicalBlocks(
   const entries: ChronologicalTimedEntry<ClientBookingDraftService>[] = [];
 
   for (const person of peopleList) {
-    if (person.participantType === "notes" || person.id === "p-notes") continue;
+    if (isNotesPerson(person)) continue;
 
     const participantType = resolveParticipantType(person);
     if (participantType === "planning" || participantType === "buffer") {
@@ -512,7 +668,13 @@ export function buildClientDraftChronologicalBlocks(
   );
 
   const sortedEntries = [...entries].sort(compareTimedEntries);
-  return groupTimedEntriesIntoBlocks(sortedEntries, peopleById, teamMemberNameById);
+  return sortByCanonicalBookingOrder(
+    collapsePersonBlocks(
+      groupTimedEntriesIntoBlocks(sortedEntries, peopleById, teamMemberNameById),
+      teamMemberNameById,
+    ),
+    (block) => block.participantType,
+  );
 }
 
 export type DrawerChronologicalBlock = {
@@ -528,6 +690,20 @@ export type DrawerChronologicalBlock = {
   endTime: string;
 };
 
+/** Split a person's chronological blocks so products can attach to the earliest only. */
+export function splitParticipantDrawerBlocks(
+  blocks: readonly DrawerChronologicalBlock[],
+  participantId: string,
+): {
+  first: DrawerChronologicalBlock | undefined;
+  rest: DrawerChronologicalBlock[];
+} {
+  const matches = blocks.filter(
+    (block) => block.participantId === participantId,
+  );
+  return { first: matches[0], rest: matches.slice(1) };
+}
+
 export function buildDrawerChronologicalBlocks(input: {
   bookingStart?: string;
   requesterPerson: ChronologicalPerson;
@@ -535,27 +711,33 @@ export function buildDrawerChronologicalBlocks(input: {
   guests: readonly CalendarBookingGuestItem[];
   teamMembers?: ReadonlyArray<{ id: string; name: string }>;
 }): DrawerChronologicalBlock[] {
-  const blocks = buildChronologicalBlocks({
-    bookingStart: input.bookingStart,
-    requesterPerson: input.requesterPerson,
-    mainServices: input.mainServices,
-    guests: input.guests.map((guest) => ({
-      person: {
-        id: guest.id,
-        name: guest.name,
-        participantType: guest.participantType,
-        planningActivity: guest.planningActivity,
-        planningDuration: guest.planningDuration,
-        planningStartTime: guest.planningStartTime,
-        planningEndTime: guest.planningEndTime,
-        bufferStartTime: guest.bufferStartTime,
-        bufferEndTime: guest.bufferEndTime,
-        bufferTeamMemberId: guest.bufferTeamMemberId,
-      },
-      services: guest.services,
-    })),
-    teamMembers: input.teamMembers,
-  });
+  const teamMemberNameById = new Map(
+    (input.teamMembers ?? []).map((member) => [member.id, member.name]),
+  );
+  const blocks = collapsePersonBlocks(
+    buildChronologicalBlocks({
+      bookingStart: input.bookingStart,
+      requesterPerson: input.requesterPerson,
+      mainServices: input.mainServices,
+      guests: input.guests.map((guest) => ({
+        person: {
+          id: guest.id,
+          name: guest.name,
+          participantType: guest.participantType,
+          planningActivity: guest.planningActivity,
+          planningDuration: guest.planningDuration,
+          planningStartTime: guest.planningStartTime,
+          planningEndTime: guest.planningEndTime,
+          bufferStartTime: guest.bufferStartTime,
+          bufferEndTime: guest.bufferEndTime,
+          bufferTeamMemberId: guest.bufferTeamMemberId,
+        },
+        services: guest.services,
+      })),
+      teamMembers: input.teamMembers,
+    }),
+    teamMemberNameById,
+  );
 
   return blocks.map((block) => ({
     key: block.key,
@@ -683,7 +865,7 @@ export function expandCalendarEventToChronologicalSegments(
   }
 
   return blocks.map((block, index) => {
-    const serviceTitle = block.items.map((item) => item.name).join(" + ");
+    const serviceTitle = block.items.map((item) => item.name).join(" · ");
     const planningTitle = block.planningItem?.activity?.trim();
     const segmentTitle =
       block.participantType === "planning" || block.participantType === "buffer"
@@ -707,6 +889,7 @@ export function expandCalendarEventToChronologicalSegments(
 export function calendarSegmentToDisplayEvent(
   segment: CalendarChronologicalSegment,
   parent: CalendarEvent,
+  extras?: Pick<CalendarEvent, "teamShared" | "sharedTeamMemberNames">,
 ): CalendarEvent {
   return {
     ...parent,
@@ -716,6 +899,9 @@ export function calendarSegmentToDisplayEvent(
     end: segment.end,
     title: segment.title,
     showClientName: segment.participantLabel,
+    teamShared: extras?.teamShared ?? parent.teamShared,
+    sharedTeamMemberNames:
+      extras?.sharedTeamMemberNames ?? parent.sharedTeamMemberNames,
   };
 }
 
@@ -811,7 +997,7 @@ function resolveTeamMemberNames(
   ];
 }
 
-/** One calendar card per assigned team member. Shared only when 2+ members. */
+/** One calendar card per chronological participant block. Shared only when 2+ members. */
 export function calendarEventToDisplaySegments(
   event: CalendarEvent,
   nameById: ReadonlyMap<string, string> = new Map(),
@@ -821,34 +1007,12 @@ export function calendarEventToDisplaySegments(
   const names = resolveTeamMemberNames(teamIds, event, nameById);
   const teamShared = teamIds.length > 1;
 
-  if (!teamShared) {
-    const slot = slots[0];
-    return [
-      {
-        ...event,
-        id: `${event.id}::segment-0`,
-        resourceId: slot?.id || event.resourceId,
-        title: event.title,
-        showClientName: event.showClientName,
-        start: event.start,
-        end: event.end,
-        teamShared: false,
-        sharedTeamMemberNames: names,
-      },
-    ];
-  }
-
-  return slots.map((slot, index) => ({
-    ...event,
-    id: `${event.id}::segment-${index}`,
-    resourceId: slot.id,
-    start: slot.start,
-    end: slot.end,
-    title: event.title,
-    showClientName: event.showClientName,
-    teamShared: true,
-    sharedTeamMemberNames: names,
-  }));
+  return expandCalendarEventToChronologicalSegments(event).map((segment) =>
+    calendarSegmentToDisplayEvent(segment, event, {
+      teamShared,
+      sharedTeamMemberNames: names,
+    }),
+  );
 }
 
 export function resolveParentCalendarEventId(eventId: string) {
@@ -921,4 +1085,22 @@ export function sortCalendarGuestsByStartTime<T extends CalendarBookingGuestItem
     if (diff !== 0) return diff;
     return a.id.localeCompare(b.id);
   });
+}
+
+function calendarGuestParticipantType(
+  guest: Pick<CalendarBookingGuestItem, "participantType" | "name">,
+): ChronologicalParticipantType {
+  if (guest.participantType === "planning" || guest.name === "Planning") {
+    return "planning";
+  }
+  if (guest.participantType === "buffer") return "buffer";
+  if (guest.participantType === "model") return "model";
+  return "guest";
+}
+
+/** Drawer / details cards: Client, then models/guests, then planning, buffers last. */
+export function sortCalendarGuestsByCanonicalOrder<T extends CalendarBookingGuestItem>(
+  guests: readonly T[],
+): T[] {
+  return sortByCanonicalBookingOrder(guests, calendarGuestParticipantType);
 }

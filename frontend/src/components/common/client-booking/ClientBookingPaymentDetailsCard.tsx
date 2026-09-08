@@ -9,7 +9,7 @@ import {
   serviceTimeRangeLabel,
 } from "../../../app/clients/booking/booking-time";
 import { ServiceSummaryMetaLine } from "../ServiceSummaryMetaLine";
-import BookingEditedTag from "../calendar/BookingEditedTag";
+import { BookingChangeTags } from "../calendar/BookingEditedTag";
 import BookingPriceBreakdown from "../booking-finance/BookingPriceBreakdown";
 import {
   lineDiscountAmountFromItems,
@@ -18,7 +18,7 @@ import {
 } from "../calendar/bookingTotal";
 import type { ManualEntryDiscount } from "../../sections/finance/manualEntry.data";
 import type { BookingEditTagVariant } from "../calendar/bookingRequestNegotiation";
-import { resolveServiceChangeTag } from "../calendar/bookingRequestNegotiation";
+import { resolveLineChangeTags } from "../calendar/bookingRequestNegotiation";
 import {
   buildBookingSummarySections,
   bookingParticipantDisplayHeading,
@@ -202,8 +202,12 @@ type Props = {
   cancelledServices?: ReadonlyArray<ClientBookingDraft["services"][number]>;
   products?: readonly BookingEditSuggestedProduct[];
   editedProductIds?: readonly string[];
-  /** When true, changed lines show Pending instead of Edited/Added/Cancelled. */
+  addedProductIds?: readonly string[];
+  cancelledProductIds?: readonly string[];
+  /** When true, changed lines also show Pending (client approval outstanding). */
   changesAwaitingApproval?: boolean;
+  /** Date/time row tag: Edited, plus Pending while awaiting approval. */
+  scheduleChangeTags?: readonly BookingEditTagVariant[];
   editTagSignpostTitle?: string;
   onEditTagSignpostClick?: () => void;
   onPayNow?: () => void;
@@ -240,7 +244,10 @@ export default function ClientBookingPaymentDetailsCard({
   cancelledServices = [],
   products = [],
   editedProductIds = [],
+  addedProductIds = [],
+  cancelledProductIds = [],
   changesAwaitingApproval = false,
+  scheduleChangeTags = [],
   editTagSignpostTitle,
   onEditTagSignpostClick,
   onPayNow,
@@ -259,26 +266,10 @@ export default function ClientBookingPaymentDetailsCard({
       draft?.selectedTime ? parseTimeLabelToMinutes(draft.selectedTime) : 0,
     [draft?.selectedTime],
   );
-  const editedServiceIdSet = React.useMemo(
-    () => new Set(editedServiceIds),
-    [editedServiceIds],
-  );
-  const addedServiceIdSet = React.useMemo(
-    () => new Set(addedServiceIds),
-    [addedServiceIds],
-  );
-  const cancelledServiceIdSet = React.useMemo(
-    () => new Set(cancelledServiceIds),
-    [cancelledServiceIds],
-  );
-  const editedProductIdSet = React.useMemo(
-    () => new Set(editedProductIds),
-    [editedProductIds],
-  );
 
-  const serviceChangeTag = React.useCallback(
-    (serviceId: string): BookingEditTagVariant | null =>
-      resolveServiceChangeTag(serviceId, {
+  const serviceChangeTags = React.useCallback(
+    (serviceId: string) =>
+      resolveLineChangeTags(serviceId, {
         editedIds: editedServiceIds,
         addedIds: addedServiceIds,
         cancelledIds: cancelledServiceIds,
@@ -292,12 +283,20 @@ export default function ClientBookingPaymentDetailsCard({
     ],
   );
 
-  const productChangeTag = React.useCallback(
-    (productId: string): BookingEditTagVariant | null => {
-      if (!editedProductIdSet.has(productId)) return null;
-      return changesAwaitingApproval ? "pending" : "edited";
-    },
-    [changesAwaitingApproval, editedProductIdSet],
+  const productChangeTags = React.useCallback(
+    (productId: string) =>
+      resolveLineChangeTags(productId, {
+        editedIds: editedProductIds,
+        addedIds: addedProductIds,
+        cancelledIds: cancelledProductIds,
+        awaitingApproval: changesAwaitingApproval,
+      }),
+    [
+      addedProductIds,
+      cancelledProductIds,
+      changesAwaitingApproval,
+      editedProductIds,
+    ],
   );
 
   const listedProducts = products.length
@@ -417,7 +416,7 @@ export default function ClientBookingPaymentDetailsCard({
     const timeRange = draft?.selectedTime
       ? serviceTimeRangeLabel(serviceStartMinutes, service.durationMins)
       : undefined;
-    const changeTag = serviceChangeTag(service.id);
+    const changeTags = serviceChangeTags(service.id);
 
     return (
       <Box
@@ -472,14 +471,12 @@ export default function ClientBookingPaymentDetailsCard({
                 </Typography>
               </Stack>
             ) : null}
-            {changeTag ? (
-              <Box sx={{ mt: 0.7 }}>
-                <BookingEditedTag
-                  variant={changeTag}
-                  signpostTitle={editTagSignpostTitle}
-                  onSignpostClick={onEditTagSignpostClick}
-                />
-              </Box>
+            {changeTags.length ? (
+              <BookingChangeTags
+                variants={changeTags}
+                signpostTitle={editTagSignpostTitle}
+                onSignpostClick={onEditTagSignpostClick}
+              />
             ) : null}
           </Box>
           <BookingLineAmount
@@ -539,10 +536,10 @@ export default function ClientBookingPaymentDetailsCard({
               : item.name}
           </Typography>
           {(() => {
-            const productTag = productChangeTag(item.id);
-            return productTag ? (
-              <BookingEditedTag
-                variant={productTag}
+            const productTags = productChangeTags(item.id);
+            return productTags.length ? (
+              <BookingChangeTags
+                variants={productTags}
                 signpostTitle={editTagSignpostTitle}
                 onSignpostClick={onEditTagSignpostClick}
               />
@@ -717,6 +714,13 @@ export default function ClientBookingPaymentDetailsCard({
               timeRange={meta.timeRange}
               durationLabel={meta.durationLabel}
               staffName={section.teamMemberLabel}
+            />
+          ) : null}
+          {scheduleChangeTags.length ? (
+            <BookingChangeTags
+              variants={scheduleChangeTags}
+              signpostTitle={editTagSignpostTitle}
+              onSignpostClick={onEditTagSignpostClick}
             />
           ) : null}
         </Box>

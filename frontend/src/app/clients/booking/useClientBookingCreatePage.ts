@@ -38,6 +38,10 @@ import {
 } from "../../../data/businessPublicProfile.data";
 import { useBusinessPublicProfile } from "../../../hooks/useBusinessPublicProfile";
 import { extractUuidFromSyntheticId } from "./clientBookingApi.mapper";
+import {
+  addMinutesToTime,
+  parseDurationMinsLabel,
+} from "../../../data/bookingServiceEdit.data";
 import { enrichClientBookingRecord } from "./clientBookingDraftCache";
 import { parsePrepaymentPercent } from "../../../components/common/client-booking/parsePrepaymentPercent";
 import { buildBookingSummarySections } from "../../../components/common/client-booking/buildBookingSummarySections";
@@ -71,6 +75,7 @@ import {
   createNotesPerson,
   isAdditionalGuest,
   isNotesPerson,
+  sortPeopleByCanonicalBookingOrder,
   buildAddServiceCatalog,
   resolveProfileCatalogService,
   servicesMissingTeamMember,
@@ -1401,6 +1406,8 @@ export function useClientBookingCreatePage() {
             planningActivity: p.planningActivity,
             planningDuration: p.planningDuration,
             planningIsLocked: p.planningIsLocked,
+            planningStartTime: p.planningStartTime,
+            planningEndTime: p.planningEndTime,
           }))
         : [
             {
@@ -1415,7 +1422,7 @@ export function useClientBookingCreatePage() {
       ) {
         draftPeople.push(createNotesPerson());
       }
-      setPeople(draftPeople);
+      setPeople(sortPeopleByCanonicalBookingOrder(draftPeople));
 
       const personWithServices =
         draftPeople.find((p) =>
@@ -1688,9 +1695,23 @@ export function useClientBookingCreatePage() {
       const next = [...prev];
       const [moved] = next.splice(fromIdx, 1);
       next.splice(toIdx, 0, moved);
-      return next;
+      return sortPeopleByCanonicalBookingOrder(next);
     });
   }, []);
+
+  const planningWindowFromDraft = React.useCallback(
+    (duration: string, existingStart?: string) => {
+      const startTime = existingStart?.trim() || selectedTime || "";
+      const durationMins = parseDurationMinsLabel(duration) ?? 60;
+      return {
+        planningStartTime: startTime || undefined,
+        planningEndTime: startTime
+          ? addMinutesToTime(startTime, durationMins)
+          : undefined,
+      };
+    },
+    [selectedTime],
+  );
 
   const syncPlanningDraftToPerson = (
     personId: string,
@@ -1704,6 +1725,7 @@ export function useClientBookingCreatePage() {
               ...p,
               planningActivity: activity.trim(),
               planningDuration: duration.trim(),
+              ...planningWindowFromDraft(duration, p.planningStartTime),
             }
           : p,
       ),
@@ -1798,7 +1820,9 @@ export function useClientBookingCreatePage() {
         return;
       }
       const nextPerson = createNotesPerson();
-      setPeople((prev) => [...prev, nextPerson]);
+      setPeople((prev) =>
+        sortPeopleByCanonicalBookingOrder([...prev, nextPerson]),
+      );
       setSelectedPersonId(nextPerson.id);
       return;
     }
@@ -1817,8 +1841,16 @@ export function useClientBookingCreatePage() {
       name: cardName,
       isRequester: false,
       participantType: isPlanning ? "planning" : isModel ? "model" : "guest",
+      ...(isPlanning
+        ? {
+            planningActivity: "Photoshoot",
+            ...planningWindowFromDraft(planningDuration),
+          }
+        : {}),
     };
-    setPeople((prev) => [...prev, nextPerson]);
+    setPeople((prev) =>
+      sortPeopleByCanonicalBookingOrder([...prev, nextPerson]),
+    );
     setParticipantMenuAnchor(null);
     if (isPlanning) {
       selectPlanningCard(nextPerson);
@@ -2059,6 +2091,10 @@ export function useClientBookingCreatePage() {
                   ...p,
                   planningActivity: planningActivity.trim(),
                   planningDuration: planningDuration.trim(),
+                  ...planningWindowFromDraft(
+                    planningDuration,
+                    p.planningStartTime,
+                  ),
                 }
               : p,
           )

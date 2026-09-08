@@ -425,10 +425,24 @@ export function mapCalendarBookingToEvent(
       ...(parsedNotes?.hiddenForCustomer ? { hiddenForCustomer: true } : {}),
       ...(parsedNotes?.addedServiceIds?.length
         ? { addedServiceIds: parsedNotes.addedServiceIds }
-        : {}),
+        : pendingEbr?.addedServiceIds?.length
+          ? { addedServiceIds: pendingEbr.addedServiceIds }
+          : {}),
       ...(parsedNotes?.cancelledServiceIds?.length
         ? { cancelledServiceIds: parsedNotes.cancelledServiceIds }
-        : {}),
+        : pendingEbr?.cancelledServiceIds?.length
+          ? { cancelledServiceIds: pendingEbr.cancelledServiceIds }
+          : {}),
+      ...(parsedNotes?.addedProductIds?.length
+        ? { addedProductIds: parsedNotes.addedProductIds }
+        : pendingEbr?.addedProductIds?.length
+          ? { addedProductIds: pendingEbr.addedProductIds }
+          : {}),
+      ...(parsedNotes?.cancelledProductIds?.length
+        ? { cancelledProductIds: parsedNotes.cancelledProductIds }
+        : pendingEbr?.cancelledProductIds?.length
+          ? { cancelledProductIds: pendingEbr.cancelledProductIds }
+          : {}),
       ...(parsedNotes?.silentUpdated ? { silentUpdated: true } : {}),
       ...(parsedNotes?.silentUpdateSnapshot
         ? { silentUpdateSnapshot: parsedNotes.silentUpdateSnapshot }

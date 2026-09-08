@@ -271,6 +271,18 @@ export default function BookingPriceBreakdown({
         }
       />
 
+      {extraAfterDivider.length ? (
+        <Stack spacing={1} sx={{ mt: 1.25 }}>
+          {extraAfterDivider.map((row) => (
+            <FinanceRow
+              key={row.id}
+              label={row.label}
+              value={formatFinanceEuro(row.amount)}
+            />
+          ))}
+        </Stack>
+      ) : null}
+
       {showPrepay ? (
         <Stack spacing={1} sx={{ mt: 1.25 }}>
           <FinanceRow
@@ -285,26 +297,6 @@ export default function BookingPriceBreakdown({
             />
           ) : null}
         </Stack>
-      ) : null}
-
-      {extraAfterDivider.length ? (
-        <Box
-          sx={{
-            mt: 1.25,
-            pt: 1.25,
-            borderTop: `1px solid ${alpha(m.navy, 0.1)}`,
-          }}
-        >
-          <Stack spacing={1}>
-            {extraAfterDivider.map((row) => (
-              <FinanceRow
-                key={row.id}
-                label={row.label}
-                value={formatFinanceEuro(row.amount)}
-              />
-            ))}
-          </Stack>
-        </Box>
       ) : null}
     </Box>
   );

@@ -14,6 +14,10 @@ import { summarizeClientBookingPrice } from "../../../components/common/calendar
 import { buildResponseDeadline } from "../../../components/common/calendar/bookingResponseDeadline";
 import { syncEditRequestFromBookingApi } from "../../../components/common/client-booking/syncEditRequestFromApi";
 import { mergeBookingTeamMembers } from "../../../components/common/client-booking/buildBookingSummarySections";
+import {
+  canonicalParticipantRank,
+  dedupePlanningPeople,
+} from "../../../data/bookingChronologicalBlocks";
 import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
 import { inferProjectUploadKind, isProjectUploadImage } from "../../../lib/projectUploadMedia";
 import type { BusinessSetupListing, CalendarBooking, CreateBookingRequest } from "../../../store/services/businessApi";
@@ -106,7 +110,13 @@ function mergeDraftPeople(
     people.push(mapped);
     byId.set(String(mapped.id), mapped);
   }
-  return people.length ? people : undefined;
+  const deduped = dedupePlanningPeople(people);
+  deduped.sort((a, b) => {
+    const aType = a.isRequester ? "requester" : a.participantType;
+    const bType = b.isRequester ? "requester" : b.participantType;
+    return canonicalParticipantRank(aType) - canonicalParticipantRank(bType);
+  });
+  return deduped.length ? deduped : undefined;
 }
 
 /** Pull a UUID out of synthetic cart ids like `profile-svc-<uuid>-0`. */
@@ -646,16 +656,17 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
 
   const snapshotServices = clientSnapshot?.services ?? [];
   const snapshotById = new Map(snapshotServices.map((s) => [s.id, s]));
-  const snapshotByName = new Map(snapshotServices.map((s) => [s.name, s]));
   const resolveGuestId = (
     id: string,
-    name: string,
+    _name: string,
     fallback: string | null | undefined,
-  ) =>
-    fallback ??
-    snapshotById.get(id)?.guestId ??
-    snapshotByName.get(name)?.guestId ??
-    null;
+  ) => {
+    if (fallback !== undefined) {
+      const trimmed = fallback == null ? "" : String(fallback).trim();
+      return trimmed || null;
+    }
+    return snapshotById.get(id)?.guestId ?? null;
+  };
 
   const guestNestedServices = (notesDetails?.guests ?? []).flatMap((guest) =>
     (guest.services ?? []).map((service) => ({
@@ -663,6 +674,8 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
       name: service.name,
       durationMins: service.durationMins,
       ...withClientDiscountFields(service),
+      startTime: service.startTime,
+      endTime: service.endTime,
       guestId: guest.id,
       teamMemberId: service.staffResourceId ?? service.teamMemberId ?? null,
       teamMemberName: service.teamMemberName ?? null,
@@ -678,7 +691,9 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
         name: service.name,
         durationMins: service.durationMins,
         ...withClientDiscountFields(service),
-        guestId: resolveGuestId(service.id, service.name, service.guestId ?? null),
+        startTime: service.startTime,
+        endTime: service.endTime,
+        guestId: resolveGuestId(service.id, service.name, service.guestId),
         teamMemberId: service.staffResourceId ?? booking.team_member_id,
         teamMemberName: service.teamMemberName ?? null,
       }));
@@ -693,6 +708,8 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
       guestId?: string | null;
       teamMemberId?: string | null;
       teamMemberName?: string | null;
+      startTime?: string;
+      endTime?: string;
       originalPrice?: number;
       discountPct?: number;
       discountType?: "fixed" | "percentage";
@@ -709,6 +726,8 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
         name: row.name,
         durationMins: row.durationMins,
         ...withClientDiscountFields(row),
+        startTime: row.startTime,
+        endTime: row.endTime,
         guestId,
         teamMemberId: row.teamMemberId ?? booking.team_member_id,
         teamMemberName: row.teamMemberName ?? null,
@@ -722,62 +741,35 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
           name: service.name,
           durationMins: service.durationMins,
           price: service.price,
-          guestId: resolveGuestId(service.id, service.name, service.guestId ?? null),
+          guestId: resolveGuestId(service.id, service.name, service.guestId),
           teamMemberId: service.staffResourceId ?? service.teamMemberId ?? null,
           teamMemberName: service.teamMemberName ?? null,
+          startTime: service.startTime,
+          endTime: service.endTime,
           originalPrice: service.originalPrice,
           discount: service.discount,
           discountPct: service.discountPct,
         });
       }
-      const nonRequesterIds = new Set(
-        (clientSnapshot?.people ?? [])
-          .filter((person) => !person.isRequester)
-          .map((person) => String(person.id)),
-      );
-      const noteHasGuestLine = merged.some(
-        (service) =>
-          Boolean(service.guestId) && nonRequesterIds.has(String(service.guestId)),
-      );
-      if (!noteHasGuestLine) {
-        for (const service of snapshotServices) {
-          const guestId = service.guestId ?? null;
-          if (!guestId || !nonRequesterIds.has(String(guestId))) continue;
-          pushUnique({
-            id: service.id,
-            name: service.name,
-            durationMins: service.durationMins,
-            price: service.price,
-            guestId,
-            teamMemberId: service.teamMemberId ?? null,
-            teamMemberName: service.teamMemberName ?? null,
-            originalPrice: service.originalPrice,
-            discount: service.discount,
-            discountPct: service.discountPct,
-          });
-        }
-      }
-      for (const service of guestNestedServices) {
-        pushUnique(service);
-      }
-    } else {
-      for (const service of snapshotServices) {
-        pushUnique({
-          id: service.id,
-          name: service.name,
-          durationMins: service.durationMins,
-          price: service.price,
-          guestId: service.guestId ?? null,
-          teamMemberId: service.teamMemberId ?? null,
-          teamMemberName: service.teamMemberName ?? null,
-          originalPrice: service.originalPrice,
-          discount: service.discount,
-          discountPct: service.discountPct,
-        });
-      }
-      for (const service of guestNestedServices) {
-        pushUnique(service);
-      }
+    }
+    for (const service of snapshotServices) {
+      pushUnique({
+        id: service.id,
+        name: service.name,
+        durationMins: service.durationMins,
+        price: service.price,
+        guestId: service.guestId ?? null,
+        teamMemberId: service.teamMemberId ?? null,
+        teamMemberName: service.teamMemberName ?? null,
+        startTime: service.startTime,
+        endTime: service.endTime,
+        originalPrice: service.originalPrice,
+        discount: service.discount,
+        discountPct: service.discountPct,
+      });
+    }
+    for (const service of guestNestedServices) {
+      pushUnique(service);
     }
 
     if (merged.length) return merged;
@@ -981,6 +973,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
       // First-time BR is not an "update".
       return null;
     })(),
+    silentUpdated: Boolean(notesDetails?.silentUpdated),
     editedServiceIds:
       notesDetails?.editedServiceIds?.length
         ? notesDetails.editedServiceIds

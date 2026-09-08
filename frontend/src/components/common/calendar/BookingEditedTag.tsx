@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Tooltip, Typography } from "@mui/material";
+import { Box, Stack, Tooltip, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import type { BookingEditTagVariant } from "./bookingRequestNegotiation";
 
@@ -74,4 +74,36 @@ export default function BookingEditedTag({
   }
 
   return tag;
+}
+
+type BookingChangeTagsProps = {
+  variants: readonly BookingEditTagVariant[];
+  signpostTitle?: string;
+  onSignpostClick?: () => void;
+};
+
+export function BookingChangeTags({
+  variants,
+  signpostTitle,
+  onSignpostClick,
+}: BookingChangeTagsProps) {
+  if (!variants.length) return null;
+  return (
+    <Stack
+      direction="row"
+      spacing={0.5}
+      useFlexGap
+      flexWrap="wrap"
+      sx={{ mt: 0.55 }}
+    >
+      {variants.map((variant) => (
+        <BookingEditedTag
+          key={variant}
+          variant={variant}
+          signpostTitle={signpostTitle}
+          onSignpostClick={onSignpostClick}
+        />
+      ))}
+    </Stack>
+  );
 }

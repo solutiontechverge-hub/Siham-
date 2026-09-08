@@ -97,6 +97,7 @@ import {
 import {
   detectEditedServiceIds,
   detectServiceLineChanges,
+  detectProductLineChanges,
 } from "../calendar/bookingRequestNegotiation";
 import { isResponseWindowOverdue } from "../calendar/bookingResponseDeadline";
 import {
@@ -382,18 +383,22 @@ export default function ClientBookingDetailsView({
   }, [activeBooking?.editRequest, bookingRef]);
 
   // Pin Updated for this visit so it stays visible on the Confirmed status row.
-  // Clear from localStorage when leaving the page.
+  // Mark seen immediately after pinning so the list tag is gone when they leave
+  // (no approval click — opening the booking is enough).
   const [showStatusUpdated, setShowStatusUpdated] = React.useState(false);
   React.useEffect(() => {
     setShowStatusUpdated(false);
   }, [bookingRef]);
   React.useEffect(() => {
     if (!bookingRef) return;
+    const silentUpdated =
+      Boolean(activeBooking?.silentUpdated) ||
+      Boolean(parseCalendarEntryNotes(activeBooking?.notes)?.silentUpdated);
     if (
       isEbrIncoming ||
       editRequest.isPending ||
-      (bookingStatus !== "confirmed" &&
-        bookingStatus !== "requested")
+      bookingStatus !== "confirmed" ||
+      !silentUpdated
     ) {
       return;
     }
@@ -406,14 +411,17 @@ export default function ClientBookingDetailsView({
       })
     ) {
       setShowStatusUpdated(true);
+      markBookingUpdateSeen("client", bookingRef, activeBooking?.updatedAt);
     }
   }, [
     bookingRef,
     bookingStatus,
     isEbrIncoming,
     editRequest.isPending,
+    activeBooking?.silentUpdated,
     activeBooking?.updatedAt,
     activeBooking?.lastEditedBy,
+    activeBooking?.notes,
   ]);
   React.useEffect(() => {
     if (!bookingRef) return;
@@ -2281,8 +2289,9 @@ export default function ClientBookingDetailsView({
   );
 
   /**
-   * Line-change tags after EBR accept (client or professional),
-   * or Pending while a bundled edit awaits client approval.
+   * Line-change tags after EBR accept (client or professional).
+   * While a professional-sent edit awaits client approval, each changed line
+   * keeps Edited/Added/Cancelled and also shows Pending.
    */
   const clientChangesAwaitingApproval =
     editRequest.isSuggested || isEbrIncoming;
@@ -2325,8 +2334,35 @@ export default function ClientBookingDetailsView({
     draft?.services,
   ]);
 
+  const pendingProductChangeSets = React.useMemo(() => {
+    if (!clientChangesAwaitingApproval) return null;
+    const original = bookingNotesMeta?.products ?? [];
+    const current =
+      displayDraft?.products ??
+      editRequest.suggestedProducts ??
+      draft?.products ??
+      [];
+    if (!original.length && !current.length) return null;
+    const changes = detectProductLineChanges(original, current);
+    if (
+      !changes.added.length &&
+      !changes.edited.length &&
+      !changes.cancelled.length
+    ) {
+      return null;
+    }
+    return changes;
+  }, [
+    bookingNotesMeta?.products,
+    clientChangesAwaitingApproval,
+    displayDraft?.products,
+    draft?.products,
+    editRequest.suggestedProducts,
+  ]);
+
   const clientVisibleEditedServiceIds = React.useMemo(() => {
     if (pendingServiceChangeSets) return pendingServiceChangeSets.edited;
+    if (bookingNotesMeta?.silentUpdated) return undefined;
     return (
       bookingNotesMeta?.editedServiceIds ??
       editRequest.editedServiceIds ??
@@ -2335,6 +2371,7 @@ export default function ClientBookingDetailsView({
   }, [
     activeBooking?.editedServiceIds,
     bookingNotesMeta?.editedServiceIds,
+    bookingNotesMeta?.silentUpdated,
     editRequest.editedServiceIds,
     pendingServiceChangeSets,
   ]);
@@ -2375,6 +2412,7 @@ export default function ClientBookingDetailsView({
     displayDraft?.services,
   ]);
   const clientVisibleEditedProductIds = React.useMemo(() => {
+    if (pendingProductChangeSets) return pendingProductChangeSets.edited;
     if (bookingNotesMeta?.lastEditedBy === "client") return undefined;
     if (editRequest.isPending) return undefined;
     if (isEbrIncoming || editRequest.isSuggested) {
@@ -2396,6 +2434,52 @@ export default function ClientBookingDetailsView({
     editRequest.isRejected,
     editRequest.isSuggested,
     isEbrIncoming,
+    pendingProductChangeSets,
+  ]);
+  const clientVisibleAddedProductIds = React.useMemo(
+    () =>
+      pendingProductChangeSets?.added ??
+      editRequest.addedProductIds ??
+      bookingNotesMeta?.addedProductIds,
+    [
+      bookingNotesMeta?.addedProductIds,
+      editRequest.addedProductIds,
+      pendingProductChangeSets,
+    ],
+  );
+  const clientVisibleCancelledProductIds = React.useMemo(
+    () =>
+      pendingProductChangeSets?.cancelled ??
+      editRequest.cancelledProductIds ??
+      bookingNotesMeta?.cancelledProductIds,
+    [
+      bookingNotesMeta?.cancelledProductIds,
+      editRequest.cancelledProductIds,
+      pendingProductChangeSets,
+    ],
+  );
+  const clientScheduleChangeTags = React.useMemo(() => {
+    const scheduleChanged =
+      Boolean(bookingNotesMeta?.scheduleEdited) ||
+      Boolean(
+        editRequest.originalDateISO &&
+          editRequest.suggestedDateISO &&
+          (editRequest.originalDateISO !== editRequest.suggestedDateISO ||
+            (editRequest.originalTime &&
+              editRequest.suggestedTime &&
+              editRequest.originalTime !== editRequest.suggestedTime)),
+      );
+    if (!scheduleChanged) return [];
+    return clientChangesAwaitingApproval
+      ? (["edited", "pending"] as const)
+      : (["edited"] as const);
+  }, [
+    bookingNotesMeta?.scheduleEdited,
+    clientChangesAwaitingApproval,
+    editRequest.originalDateISO,
+    editRequest.originalTime,
+    editRequest.suggestedDateISO,
+    editRequest.suggestedTime,
   ]);
   const lineTagComparisonMode = React.useMemo(():
     | "ebr"
@@ -2616,6 +2700,7 @@ export default function ClientBookingDetailsView({
             requiresPrepayment={requiresPrepayment}
             prepaymentPaid={isPrepaymentPaid}
             paymentDue={isPaymentDue}
+            scheduleChangeTags={clientScheduleChangeTags}
             onEditDateTime={
               bookingStatus === "confirmed"
                 ? () => openConfirmedEbrEditor("datetime")
@@ -2648,6 +2733,7 @@ export default function ClientBookingDetailsView({
               bookingStatus === "confirmed" &&
               !editRequest.isPending &&
               !isEbrIncoming &&
+              !bookingNotesMeta?.silentUpdated &&
               (Boolean(bookingNotesMeta?.lastEditedBy) ||
                 Boolean(activeBooking?.editedServiceIds?.length) ||
                 Boolean(activeBooking?.editedProductIds?.length) ||
@@ -2706,6 +2792,14 @@ export default function ClientBookingDetailsView({
                   cancelledServices={cancelledServicesForDisplay}
                   products={editRequest.suggestedProducts}
                   editedProductIds={clientVisibleEditedProductIds}
+                  addedProductIds={clientVisibleAddedProductIds}
+                  cancelledProductIds={clientVisibleCancelledProductIds}
+                  changesAwaitingApproval={clientChangesAwaitingApproval}
+                  scheduleChangeTags={clientScheduleChangeTags}
+                  editTagSignpostTitle={ACTIVITY_COMPARISON_SIGNPOST}
+                  onEditTagSignpostClick={() =>
+                    openActivityComparison(lineTagComparisonMode)
+                  }
                 />
                 <ClientBookingChangeResponsePanel
                   variant="rejected"
@@ -2760,6 +2854,14 @@ export default function ClientBookingDetailsView({
                   cancelledServices={cancelledServicesForDisplay}
                   products={paymentProducts}
                   editedProductIds={clientVisibleEditedProductIds}
+                  addedProductIds={clientVisibleAddedProductIds}
+                  cancelledProductIds={clientVisibleCancelledProductIds}
+                  changesAwaitingApproval={clientChangesAwaitingApproval}
+                  scheduleChangeTags={clientScheduleChangeTags}
+                  editTagSignpostTitle={ACTIVITY_COMPARISON_SIGNPOST}
+                  onEditTagSignpostClick={() =>
+                    openActivityComparison(lineTagComparisonMode)
+                  }
                   onPayNow={
                     paymentCardPrepaymentState === "required" && canActOnPayment
                       ? handlePayNow

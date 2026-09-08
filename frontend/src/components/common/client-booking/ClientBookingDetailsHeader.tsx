@@ -32,6 +32,7 @@ import { useLazyGetBookingReviewInviteQuery } from "../../../store/services/revi
 import BookingRequestStatusRow, {
   type BookingRequestRowMode,
 } from "./BookingRequestStatusRow";
+import { BookingChangeTags } from "../calendar/BookingEditedTag";
 import { useBookingEditRequest } from "./useBookingEditRequest";
 import { useRouter } from "next/navigation";
 
@@ -68,6 +69,8 @@ type Props = {
   onEbrClick?: () => void;
   erSignpostTitle?: string;
   onErClick?: () => void;
+  /** Date/time field tags after a confirmed-booking change. */
+  scheduleChangeTags?: readonly import("../calendar/bookingRequestNegotiation").BookingEditTagVariant[];
   /** BR/EBR/ER response window elapsed. */
   responseOverdue?: boolean;
   messagingHref?: string;
@@ -101,6 +104,7 @@ export default function ClientBookingDetailsHeader({
   onEbrClick,
   erSignpostTitle,
   onErClick,
+  scheduleChangeTags = [],
   responseOverdue = false,
   messagingHref,
 }: Props) {
@@ -298,6 +302,9 @@ export default function ClientBookingDetailsHeader({
                     </Box>
                   ) : null}
                 </Typography>
+                {scheduleChangeTags.length ? (
+                  <BookingChangeTags variants={scheduleChangeTags} />
+                ) : null}
                 <IconButton
                   size="small"
                   aria-label="Open messaging"

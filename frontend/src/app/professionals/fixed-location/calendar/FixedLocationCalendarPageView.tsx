@@ -21,6 +21,7 @@ export default function FixedLocationCalendarPageView() {
     lateCancellationFeePercentDefault,
     noShowFeePercentDefault,
     prepaymentPercentDefault,
+    kilometerAllowanceEurPerKmDefault,
     cancellationBeforeHours,
     cancellationBeforeMinutes,
     responseTimeHours,
@@ -55,6 +56,7 @@ export default function FixedLocationCalendarPageView() {
       lateCancellationFeePercentDefault={lateCancellationFeePercentDefault}
       noShowFeePercentDefault={noShowFeePercentDefault}
       prepaymentPercentDefault={prepaymentPercentDefault}
+      kilometerAllowanceEurPerKmDefault={kilometerAllowanceEurPerKmDefault}
       cancellationBeforeHours={cancellationBeforeHours}
       cancellationBeforeMinutes={cancellationBeforeMinutes}
       responseTimeHours={responseTimeHours}

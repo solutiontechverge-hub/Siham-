@@ -35,8 +35,16 @@ export type BookingEditSuggestionPayload = {
   professionalNote?: string;
   editedServiceIds?: string[];
   editedProductIds?: string[];
+  addedServiceIds?: string[];
+  cancelledServiceIds?: string[];
+  addedProductIds?: string[];
+  cancelledProductIds?: string[];
   suggestedServices?: BookingEditSuggestedService[];
   suggestedProducts?: BookingEditSuggestedProduct[];
+  suggestedDateISO?: string;
+  suggestedTime?: string;
+  originalDateISO?: string;
+  originalTime?: string;
 };
 
 export type BookingEditRequestRecord = {
@@ -61,6 +69,10 @@ export type BookingEditRequestRecord = {
   clientNote?: string;
   editedServiceIds?: string[];
   editedProductIds?: string[];
+  addedServiceIds?: string[];
+  cancelledServiceIds?: string[];
+  addedProductIds?: string[];
+  cancelledProductIds?: string[];
   suggestedServices?: BookingEditSuggestedService[];
   suggestedProducts?: BookingEditSuggestedProduct[];
   /** Client-requested schedule kept when professional rejects an EBR. */
@@ -218,8 +230,16 @@ export function professionalSuggestBookingChanges(
     professionalNote: payload.professionalNote,
     editedServiceIds: payload.editedServiceIds ?? [],
     editedProductIds: payload.editedProductIds ?? [],
+    addedServiceIds: payload.addedServiceIds,
+    cancelledServiceIds: payload.cancelledServiceIds,
+    addedProductIds: payload.addedProductIds,
+    cancelledProductIds: payload.cancelledProductIds,
     suggestedServices: payload.suggestedServices,
     suggestedProducts: payload.suggestedProducts,
+    suggestedDateISO: payload.suggestedDateISO,
+    suggestedTime: payload.suggestedTime,
+    originalDateISO: payload.originalDateISO,
+    originalTime: payload.originalTime,
   };
   const normalized = bookingRef.replace(/^#/, "").trim();
   all[bookingRef] = next;

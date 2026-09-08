@@ -39,14 +39,19 @@ export function buildBookingSummarySections(
       .map((product) => String(product.guestId ?? "").trim())
       .filter(Boolean),
   );
+  const hasRequesterCatalog = (draft?.products ?? []).some(
+    (product) => !String(product.guestId ?? "").trim(),
+  );
   if (
     !draft?.services?.length &&
     !people.some(
       (person) =>
         person.participantType === "planning" ||
+        person.participantType === "buffer" ||
         Boolean(person.planningActivity?.trim() || person.planningDuration?.trim()),
     ) &&
-    productGuestIds.size === 0
+    productGuestIds.size === 0 &&
+    !hasRequesterCatalog
   ) {
     return [];
   }
@@ -58,6 +63,7 @@ export function buildBookingSummarySections(
       name: "Client",
       isRequester: true,
     };
+  if (hasRequesterCatalog) productGuestIds.add(requesterPerson.id);
 
   const blocks = buildClientDraftChronologicalBlocks({
     bookingStart: draft?.selectedTime,
@@ -97,6 +103,24 @@ export function resolveTeamMemberFirstName(
       : undefined) || fallbackName?.trim() || undefined;
   if (!fullName) return undefined;
   return fullName.split(/\s+/)[0];
+}
+
+/** Role label above a person card (Client / Model 2 / Guest). */
+export function participantRoleHeading(
+  participantType:
+    | ClientBookingSummarySection["participantType"]
+    | "requester",
+  ordinal?: { index?: number; total?: number },
+): string {
+  if (participantType === "requester") return "Client";
+  return bookingParticipantDisplayHeading(
+    {
+      participantType,
+      isRequester: false,
+      title: "",
+    },
+    ordinal,
+  );
 }
 
 /** Guest / Model / Planning headings on booking details (dynamic ordinals). */

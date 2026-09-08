@@ -77,6 +77,8 @@ assert.equal(types.includes("model"), true);
 
 assert.equal(types.includes("buffer"), true);
 
+assert.deepEqual(types, ["requester", "guest", "model", "planning", "buffer"]);
+
 const guestSection = sections.find((section) => section.participantType === "guest");
 assert.equal(guestSection?.title.includes("Sara") || guestSection?.title === "Sara Guest", true);
 assert.equal(guestSection?.items.some((item) => item.id === "svc-guest"), true);
@@ -114,5 +116,38 @@ assert.equal(bufferMeta.durationLabel, "15 Mins");
 const planningMeta = planningScheduleMeta(planningSection!);
 assert.equal(Boolean(planningMeta.timeRange), true);
 assert.equal(planningMeta.durationLabel, "30 Mins");
+
+const requesterItems =
+  sections.find((section) => section.participantType === "requester")?.items ??
+  [];
+assert.equal(
+  requesterItems.some((item) => item.id === "svc-main"),
+  true,
+);
+
+const duplicatePlanningDraft: ClientBookingDraft = {
+  ...draft,
+  people: [
+    ...(draft.people ?? []),
+    {
+      id: "p-planning-dup-1",
+      name: "Planning",
+      participantType: "planning",
+      planningActivity: "Look prep",
+      planningDuration: "30 mins",
+    },
+    {
+      id: "p-planning-dup-2",
+      name: "Planning",
+      participantType: "planning",
+      planningActivity: "Look prep",
+      planningDuration: "30 mins",
+    },
+  ],
+};
+const dedupedPlanning = buildBookingSummarySections(duplicatePlanningDraft).filter(
+  (section) => section.participantType === "planning",
+);
+assert.equal(dedupedPlanning.length, 1);
 
 console.log("buildBookingSummarySections.test.ts: all assertions passed");

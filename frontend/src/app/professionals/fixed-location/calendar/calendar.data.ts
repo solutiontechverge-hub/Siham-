@@ -214,7 +214,9 @@ export type CalendarBookingDetails = {
   isGuest?: boolean;
   addedServiceIds?: string[];
   cancelledServiceIds?: string[];
-  /** Guest name / contact-only change — tag Updated, do not start ER. */
+  addedProductIds?: string[];
+  cancelledProductIds?: string[];
+  /** Guest name / contact / service-order change — tag Updated, do not start ER. */
   silentUpdated?: boolean;
   /**
    * Prior contact/guest values captured when a silent update is saved,
@@ -224,6 +226,7 @@ export type CalendarBookingDetails = {
     phoneCode?: string;
     phoneNumber?: string;
     guests?: CalendarBookingGuestItem[];
+    services?: CalendarBookingServiceItem[];
     desiredLocation?: {
       street: string;
       number: string;

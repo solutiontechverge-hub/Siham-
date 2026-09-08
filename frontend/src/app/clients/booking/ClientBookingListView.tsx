@@ -30,10 +30,7 @@ import BookingRequestSentIcon from "../../../components/common/calendar/BookingR
 import { AppPagination, AppSearchField } from "../../../components/common";
 import { getBookingEditRequest } from "../../../components/common/client-booking/bookingEditRequest";
 import { syncEditRequestFromBookingApi } from "../../../components/common/client-booking/syncEditRequestFromApi";
-import {
-  hasUnseenBookingUpdate,
-  markBookingUpdateSeen,
-} from "../../../components/common/calendar/bookingUpdateSeen";
+import { hasUnseenBookingUpdate } from "../../../components/common/calendar/bookingUpdateSeen";
 import {
   getCheckoutPath,
   setActiveBookingSession,
@@ -111,7 +108,6 @@ export default function ClientBookingListView({ listTab }: Props) {
 
   const openBooking = (record: ClientBookingRecord) => {
     const enriched = enrichClientBookingRecord(record);
-    markBookingUpdateSeen("client", enriched.bookingRef, enriched.updatedAt);
     setActiveBookingSession(enriched);
     router.push(getCheckoutPath(enriched, listTab));
   };
@@ -261,9 +257,11 @@ export default function ClientBookingListView({ listTab }: Props) {
                     displayStatus !== "no_show" &&
                     Boolean(b.requiresPrepayment) &&
                     !b.prepaid);
+                const isSilentUpdated = Boolean(b.silentUpdated);
                 const isConfirmedEdited =
                   displayStatus === "confirmed" &&
                   !pendingEr &&
+                  !isSilentUpdated &&
                   Boolean(
                     b.lastEditedBy ||
                       b.editedServiceIds?.length ||
@@ -276,6 +274,7 @@ export default function ClientBookingListView({ listTab }: Props) {
                 const showUpdated =
                   !pendingEr &&
                   displayStatus === "confirmed" &&
+                  isSilentUpdated &&
                   hasUnseenBookingUpdate({
                     viewer: "client",
                     bookingRef: b.bookingRef,

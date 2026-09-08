@@ -17,9 +17,13 @@ import {
   formatLineDiscountLabel,
   type BookingLineDiscount,
 } from "../../../data/bookingLinePricing";
-import BookingEditedTag from "./BookingEditedTag";
+import { BookingChangeTags } from "./BookingEditedTag";
 import BookingLineAmount from "./BookingLineAmount";
-import type { BookingEditTagVariant } from "./bookingRequestNegotiation";
+import type {
+  BookingEditTagResult,
+  BookingEditTagVariant,
+} from "./bookingRequestNegotiation";
+import { normalizeBookingEditTags } from "./bookingRequestNegotiation";
 
 type SelectedProductItem = {
   id: string;
@@ -41,8 +45,8 @@ type BookingDrawerSelectedItemsSectionProps = {
   nested?: boolean;
   showRemoveButtons?: boolean;
   resolveStaffName?: (staffResourceId?: string) => string | undefined;
-  resolveServiceEditTag?: (serviceId: string) => BookingEditTagVariant | null;
-  resolveProductEditTag?: (productId: string) => BookingEditTagVariant | null;
+  resolveServiceEditTag?: (serviceId: string) => BookingEditTagResult;
+  resolveProductEditTag?: (productId: string) => BookingEditTagResult;
   editTagSignpostTitle?: string;
   onEditTagSignpostClick?: () => void;
   onRemoveService?: (serviceId: string) => void;
@@ -146,7 +150,9 @@ export default function BookingDrawerSelectedItemsSection({
             Service
           </BodyText>
           {services.map((service) => {
-            const editTag = resolveServiceEditTag?.(service.id) ?? null;
+            const editTags = normalizeBookingEditTags(
+              resolveServiceEditTag?.(service.id),
+            );
             const staffName =
               resolveStaffName?.(
                 service.staffResourceId ||
@@ -240,14 +246,12 @@ export default function BookingDrawerSelectedItemsSection({
                       durationLabel={`${service.durationMins} Mins`}
                       staffName={staffName}
                     />
-                    {editTag ? (
-                      <Box sx={{ mt: 0.55 }}>
-                        <BookingEditedTag
-                          variant={editTag}
-                          signpostTitle={editTagSignpostTitle}
-                          onSignpostClick={onEditTagSignpostClick}
-                        />
-                      </Box>
+                    {editTags.length ? (
+                      <BookingChangeTags
+                        variants={editTags}
+                        signpostTitle={editTagSignpostTitle}
+                        onSignpostClick={onEditTagSignpostClick}
+                      />
                     ) : null}
                   </Box>
                   <Stack
@@ -293,6 +297,12 @@ export default function BookingDrawerSelectedItemsSection({
                 service.staffResourceId ||
                   (service as { teamMemberId?: string }).teamMemberId,
               )?.trim() || "Unassigned";
+            const cancelledTags = normalizeBookingEditTags(
+              resolveServiceEditTag?.(service.id),
+            );
+            const tags = cancelledTags.length
+              ? cancelledTags
+              : (["cancelled"] as BookingEditTagVariant[]);
             return (
               <Box key={`cancelled-${service.id}`} sx={cardSx}>
                 <Stack
@@ -320,13 +330,11 @@ export default function BookingDrawerSelectedItemsSection({
                       durationLabel={`${service.durationMins} Mins`}
                       staffName={staffName}
                     />
-                    <Box sx={{ mt: 0.55 }}>
-                      <BookingEditedTag
-                        variant="cancelled"
-                        signpostTitle={editTagSignpostTitle}
-                        onSignpostClick={onEditTagSignpostClick}
-                      />
-                    </Box>
+                    <BookingChangeTags
+                      variants={tags}
+                      signpostTitle={editTagSignpostTitle}
+                      onSignpostClick={onEditTagSignpostClick}
+                    />
                   </Box>
                   <BodyText
                     sx={{
@@ -352,7 +360,9 @@ export default function BookingDrawerSelectedItemsSection({
             Product
           </BodyText>
           {products.map((product) => {
-            const editTag = resolveProductEditTag?.(product.id) ?? null;
+            const editTags = normalizeBookingEditTags(
+              resolveProductEditTag?.(product.id),
+            );
             return (
             <Box key={`product-${product.id}`} sx={cardSx}>
               <Stack
@@ -383,14 +393,12 @@ export default function BookingDrawerSelectedItemsSection({
                     Qty {product.quantity} · €{product.unitPrice.toFixed(2)}{" "}
                     each
                   </BodyText>
-                  {editTag ? (
-                    <Box sx={{ mt: 0.55 }}>
-                      <BookingEditedTag
-                        variant={editTag}
-                        signpostTitle={editTagSignpostTitle}
-                        onSignpostClick={onEditTagSignpostClick}
-                      />
-                    </Box>
+                  {editTags.length ? (
+                    <BookingChangeTags
+                      variants={editTags}
+                      signpostTitle={editTagSignpostTitle}
+                      onSignpostClick={onEditTagSignpostClick}
+                    />
                   ) : null}
                 </Box>
                 <Stack
@@ -435,7 +443,9 @@ export default function BookingDrawerSelectedItemsSection({
             Unique item
           </BodyText>
           {uniqueItems.map((item) => {
-            const editTag = resolveProductEditTag?.(item.id) ?? null;
+            const editTags = normalizeBookingEditTags(
+              resolveProductEditTag?.(item.id),
+            );
             return (
             <Box key={`unique-${item.id}`} sx={cardSx}>
               <Stack
@@ -465,14 +475,12 @@ export default function BookingDrawerSelectedItemsSection({
                   >
                     Qty {item.quantity} · €{item.unitPrice.toFixed(2)} each
                   </BodyText>
-                  {editTag ? (
-                    <Box sx={{ mt: 0.55 }}>
-                      <BookingEditedTag
-                        variant={editTag}
-                        signpostTitle={editTagSignpostTitle}
-                        onSignpostClick={onEditTagSignpostClick}
-                      />
-                    </Box>
+                  {editTags.length ? (
+                    <BookingChangeTags
+                      variants={editTags}
+                      signpostTitle={editTagSignpostTitle}
+                      onSignpostClick={onEditTagSignpostClick}
+                    />
                   ) : null}
                 </Box>
                 <Stack
