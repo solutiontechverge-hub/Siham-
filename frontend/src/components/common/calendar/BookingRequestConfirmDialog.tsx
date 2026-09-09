@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import type { CalendarBookingScenario } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import { Box, Typography } from "@mui/material";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
@@ -8,7 +9,6 @@ import AppModal, {
   MessagingModalCancelButton,
   MessagingModalPrimaryButton,
 } from "../AppModal";
-import { useSnackbar } from "../AppSnackbar";
 
 export type BookingRequestConfirmAction = "accept" | "suggest" | "reject";
 
@@ -17,7 +17,8 @@ type Props = {
   action: BookingRequestConfirmAction | null;
   scenario?: CalendarBookingScenario | null;
   onClose: () => void;
-  onConfirm: () => void;
+  /** Awaited — success snackbar is shown by the caller after the API succeeds. */
+  onConfirm: () => void | Promise<void>;
 };
 
 function copyFor(
@@ -27,25 +28,23 @@ function copyFor(
   title: string;
   body: string;
   confirmLabel: string;
-  snackbarMessage?: string;
   showWarning?: boolean;
 } {
   const isFirstBr = !scenario || scenario === "BR";
   const isEr = scenario === "ER";
   if (action === "accept") {
     return {
-      title: isEr ? "Accept edit request" : isFirstBr ? "Accept booking request" : "Accept edited request",
+      title: isEr
+        ? "Accept edit request"
+        : isFirstBr
+          ? "Accept booking request"
+          : "Accept edited request",
       body: isFirstBr
         ? "By accepting, this booking request will be confirmed."
         : isEr
           ? "By accepting, the requested changes will be applied to this confirmed booking."
           : "By accepting, the edited booking request will be applied.",
       confirmLabel: "Accept",
-      snackbarMessage: isEr
-        ? "Edit request accepted."
-        : isFirstBr
-          ? "Booking request accepted."
-          : "Edited booking request accepted.",
     };
   }
   if (action === "suggest") {
@@ -67,11 +66,6 @@ function copyFor(
         ? "By rejecting, the requested changes will not be applied. The booking stays confirmed."
         : "These edited changes will not be applied. The booking stays confirmed.",
     confirmLabel: isFirstBr || isEr ? "Reject" : "Decline",
-    snackbarMessage: isEr
-      ? "Edit request rejected. Booking stays confirmed."
-      : isFirstBr
-        ? "Booking request rejected."
-        : "Edit request rejected. Booking stays confirmed.",
     showWarning: true,
   };
 }
@@ -84,7 +78,7 @@ export default function BookingRequestConfirmDialog({
   onConfirm,
 }: Props) {
   const m = useTheme().palette.mollure;
-  const { showSnackbar } = useSnackbar();
+  const [submitting, setSubmitting] = React.useState(false);
   if (!action) return null;
 
   const copy = copyFor(action, scenario);
@@ -95,23 +89,30 @@ export default function BookingRequestConfirmDialog({
       footerVariant="actions"
       open={open}
       title={copy.title}
-      onClose={onClose}
+      onClose={submitting ? () => undefined : onClose}
       maxWidth="sm"
       headerTone={action === "reject" ? "danger" : "default"}
       footer={
         <>
-          <MessagingModalCancelButton onClick={onClose} />
+          <MessagingModalCancelButton
+            onClick={onClose}
+            disabled={submitting}
+          />
           <MessagingModalPrimaryButton
             label={copy.confirmLabel}
+            disabled={submitting}
             onClick={() => {
-              onConfirm();
-              if (copy.snackbarMessage) {
-                showSnackbar({
-                  severity: "success",
-                  message: copy.snackbarMessage,
-                });
-              }
-              onClose();
+              void (async () => {
+                setSubmitting(true);
+                try {
+                  await onConfirm();
+                  onClose();
+                } catch {
+                  // Caller shows the error snackbar.
+                } finally {
+                  setSubmitting(false);
+                }
+              })();
             }}
           />
         </>

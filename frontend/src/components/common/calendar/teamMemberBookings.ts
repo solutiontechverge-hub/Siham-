@@ -122,8 +122,16 @@ export function eventHasKnownTeamAssignment(
   if (
     event.details?.services?.some(
       (service) =>
-        service.teamMemberId &&
-        knownTeamIds.has(String(service.teamMemberId)),
+        knownTeamId(service.teamMemberId, knownTeamIds) ||
+        knownTeamId(service.staffResourceId, knownTeamIds),
+    )
+  ) {
+    return true;
+  }
+
+  if (
+    event.details?.clientSnapshot?.services?.some((service) =>
+      knownTeamId(service.teamMemberId, knownTeamIds),
     )
   ) {
     return true;
@@ -132,13 +140,25 @@ export function eventHasKnownTeamAssignment(
   const guests = event.details?.guests ?? [];
   return guests.some(
     (guest) =>
-      (guest.bufferTeamMemberId &&
-        knownTeamIds.has(String(guest.bufferTeamMemberId))) ||
+      knownTeamId(guest.bufferTeamMemberId, knownTeamIds) ||
       (guest.services ?? []).some(
         (service) =>
-          service.teamMemberId &&
-          knownTeamIds.has(String(service.teamMemberId)),
+          knownTeamId(service.teamMemberId, knownTeamIds) ||
+          knownTeamId(service.staffResourceId, knownTeamIds),
       ),
+  );
+}
+
+function serviceAssignedToTeamMember(
+  service: {
+    teamMemberId?: string | null;
+    staffResourceId?: string | null;
+  },
+  focusedId: string,
+) {
+  return (
+    String(service.teamMemberId ?? "") === focusedId ||
+    String(service.staffResourceId ?? "") === focusedId
   );
 }
 
@@ -150,7 +170,16 @@ export function eventBelongsToTeamMember(
   if (String(event.resourceId) === focusedId) return true;
 
   const services = event.details?.services ?? [];
-  if (services.some((service) => String(service.teamMemberId ?? "") === focusedId)) {
+  if (services.some((service) => serviceAssignedToTeamMember(service, focusedId))) {
+    return true;
+  }
+
+  const snapshotServices = event.details?.clientSnapshot?.services ?? [];
+  if (
+    snapshotServices.some(
+      (service) => String(service.teamMemberId ?? "") === focusedId,
+    )
+  ) {
     return true;
   }
 
@@ -158,8 +187,8 @@ export function eventBelongsToTeamMember(
   return guests.some(
     (guest) =>
       String(guest.bufferTeamMemberId ?? "") === focusedId ||
-      (guest.services ?? []).some(
-        (service) => String(service.teamMemberId ?? "") === focusedId,
+      (guest.services ?? []).some((service) =>
+        serviceAssignedToTeamMember(service, focusedId),
       ),
   );
 }

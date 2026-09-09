@@ -231,13 +231,27 @@ export function useMessagingInbox(
     [businessSetups?.data, mergeProfessionalsIntoStore],
   );
 
+  const seedThread = navigation?.seedThread;
+  const openedFromBooking = Boolean(
+    navigation?.threadId ||
+      navigation?.bookingRef ||
+      seedThread ||
+      searchParams.get("booking") ||
+      searchParams.get("thread"),
+  );
+
   React.useEffect(() => {
     if (!isAuthed || !apiInboxLoaded || !apiInbox) return;
 
+    const applySeed = (base: MessagingStore) =>
+      seedThread ? upsertThreadIntoStore(base, seedThread) : base;
+
     if (inboxHydratedRef.current) {
       setStore((prev) => {
-        if (!prev) return mergeApiInboxWithPrefs(apiInbox, loadMessagingPrefs(), audience);
-        const merged = mergeApiInboxIntoStore(prev, apiInbox, loadMessagingPrefs(), audience);
+        if (!prev) return applySeed(mergeApiInboxWithPrefs(apiInbox, loadMessagingPrefs(), audience));
+        const merged = applySeed(
+          mergeApiInboxIntoStore(prev, apiInbox, loadMessagingPrefs(), audience),
+        );
         saveMessagingStore(merged);
         return merged;
       });
@@ -250,7 +264,7 @@ export function useMessagingInbox(
 
     const load = async () => {
       try {
-        let merged = mergeApiInboxWithPrefs(apiInbox, loadMessagingPrefs(), audience);
+        let merged = applySeed(mergeApiInboxWithPrefs(apiInbox, loadMessagingPrefs(), audience));
         if (audience === "client" && !professionalsLoadedRef.current) {
           professionalsLoadedRef.current = true;
           merged = await loadProfessionalsPage(merged, 0, "");
@@ -262,7 +276,13 @@ export function useMessagingInbox(
         setStore(merged);
         saveMessagingStore(merged);
         inboxHydratedRef.current = true;
-        if (merged.threads[0]) setActiveThreadId((prev) => prev || merged.threads[0].id);
+        const preferredId =
+          navigation?.threadId?.trim() ||
+          seedThread?.id?.trim() ||
+          findThreadIdByBookingRef(merged, navigation?.bookingRef) ||
+          merged.threads[0]?.id ||
+          "";
+        if (preferredId) setActiveThreadId((prev) => prev || preferredId);
       } finally {
         inboxHydratingRef.current = false;
       }
@@ -276,6 +296,9 @@ export function useMessagingInbox(
     businessSetups?.data?.length,
     isAuthed,
     loadProfessionalsPage,
+    navigation?.bookingRef,
+    navigation?.threadId,
+    seedThread,
   ]);
 
   React.useEffect(() => {
@@ -300,15 +323,20 @@ export function useMessagingInbox(
   React.useEffect(() => {
     if (!store) return;
     const bookingRef = navigation?.bookingRef ?? searchParams.get("booking") ?? "";
-    const threadRef = navigation?.threadId ?? searchParams.get("thread") ?? "";
+    const threadRef =
+      navigation?.threadId?.trim() ||
+      seedThread?.id?.trim() ||
+      searchParams.get("thread") ||
+      "";
     const businessSetupId =
       navigation?.businessSetupId ?? searchParams.get("setup") ?? "";
-    const searchPrefill =
-      navigation?.searchPrefill ??
-      searchParams.get("client") ??
-      searchParams.get("professional") ??
-      "";
-    const seedThread = navigation?.seedThread;
+    const fromBooking = Boolean(threadRef || bookingRef || seedThread);
+    const searchPrefill = fromBooking
+      ? (navigation?.searchPrefill ?? "")
+      : (navigation?.searchPrefill ??
+        searchParams.get("client") ??
+        searchParams.get("professional") ??
+        "");
 
     let workingStore = store;
     if (seedThread) {
@@ -329,35 +357,23 @@ export function useMessagingInbox(
     const byBooking = findThreadIdByBookingRef(workingStore, bookingRef);
     const bySetup = findThreadIdByBusinessSetupId(workingStore, businessSetupId);
     const byName = findThreadIdByClientName(workingStore, searchPrefill);
-    // Prefer the booking shop's current name when it uniquely identifies a thread.
     const resolvedThreadId =
       threadRef ||
       byBooking ||
       (byName && bySetup && byName === bySetup ? byName : "") ||
       bySetup ||
       byName ||
-      workingStore.threads.find(
-        (thread) =>
-          thread.name.toLowerCase() ===
-          (searchParams.get("client") ?? "").toLowerCase(),
-      )?.id ||
       "";
 
-    const openedFromBooking = Boolean(threadRef || bookingRef || seedThread);
+    if (fromBooking) {
+      if (resolvedThreadId) setActiveThreadId(resolvedThreadId);
+      setSearch("");
+      return;
+    }
 
     if (resolvedThreadId) {
       setActiveThreadId(resolvedThreadId);
-      // Booking/thread deep-links select the conversation directly — do not
-      // filter the sidebar by client name (that caused empty "no match" states).
-      if (openedFromBooking) {
-        setSearch("");
-        return;
-      }
-      const thread = workingStore.threads.find((item) => item.id === resolvedThreadId);
-      if (thread) {
-        setSearch(thread.name);
-        return;
-      }
+      return;
     }
 
     if (searchPrefill.trim()) {
@@ -367,9 +383,9 @@ export function useMessagingInbox(
     navigation?.bookingRef,
     navigation?.businessSetupId,
     navigation?.searchPrefill,
-    navigation?.seedThread,
     navigation?.threadId,
     searchParams,
+    seedThread,
     store,
   ]);
 
@@ -385,13 +401,15 @@ export function useMessagingInbox(
       setStore((prev) => {
         const runtime = loadMessagingRuntimeSnapshot();
         if (!runtime) return prev;
-        if (!prev) return mergeApiInboxWithPrefs(runtime, loadMessagingPrefs(), audience);
-        return mergeApiInboxIntoStore(prev, runtime, loadMessagingPrefs(), audience);
+        const applySeed = (base: MessagingStore) =>
+          seedThread ? upsertThreadIntoStore(base, seedThread) : base;
+        if (!prev) return applySeed(mergeApiInboxWithPrefs(runtime, loadMessagingPrefs(), audience));
+        return applySeed(mergeApiInboxIntoStore(prev, runtime, loadMessagingPrefs(), audience));
       });
     };
     window.addEventListener(MESSAGING_UPDATED_EVENT, onExternalUpdate);
     return () => window.removeEventListener(MESSAGING_UPDATED_EVENT, onExternalUpdate);
-  }, [audience, isAuthed]);
+  }, [audience, isAuthed, seedThread]);
 
   const threadIdsKey = store?.threads.map((thread) => thread.id).join("|") ?? "";
 
@@ -491,8 +509,7 @@ export function useMessagingInbox(
           return false;
         }
         const hasClientMsg = (store.messagesByThreadId[thread.id] ?? []).some(isMessageFromClient);
-        // Show only when the client initiated chat, or there is a real linked booking
-        // (requested / confirmed / completed / in_progress).
+        // Show only when the client initiated chat, or there is a real linked booking.
         if (!hasClientMsg && !threadHasActiveBooking(store, thread.id)) return false;
       }
       return true;
@@ -538,9 +555,10 @@ export function useMessagingInbox(
   ]);
 
   React.useEffect(() => {
-    const hasBookingNavigationTarget = bookingNavigationThreadIds.size > 0;
+    const hasBookingNavigationTarget = bookingNavigationThreadIds.size > 0 || openedFromBooking;
     if (!visibleThreads.length) {
       if (hasBookingNavigationTarget && activeThreadId) return;
+      if (hasBookingNavigationTarget) return;
       if (activeThreadId) setActiveThreadId("");
       return;
     }
@@ -553,7 +571,13 @@ export function useMessagingInbox(
       return;
     }
     setActiveThreadId(visibleThreads[0].id);
-  }, [activeThreadId, bookingNavigationThreadIds, store, visibleThreads]);
+  }, [
+    activeThreadId,
+    bookingNavigationThreadIds,
+    openedFromBooking,
+    store,
+    visibleThreads,
+  ]);
 
   React.useEffect(() => {
     if (!store || !activeThreadId) return;
@@ -1025,5 +1049,6 @@ export function useMessagingInbox(
     loadMoreThreads,
     hasMoreThreads,
     loadingMore,
+    openedFromBooking,
   };
 }

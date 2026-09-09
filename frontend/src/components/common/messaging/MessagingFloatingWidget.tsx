@@ -16,6 +16,7 @@ import {
   loadMessagingRuntimeSnapshot,
   mergeApiInboxWithPrefs,
   loadMessagingPrefs,
+  upsertThreadIntoStore,
 } from "./messagingStorage";
 import { markAllThreadsReadForAudience } from "./messagingUnread";
 
@@ -42,10 +43,13 @@ export default function MessagingFloatingWidget({
     if (!open) return;
     const runtime = loadMessagingRuntimeSnapshot();
     if (!runtime) return;
-    const store = mergeApiInboxWithPrefs(runtime, loadMessagingPrefs(), audience);
+    let store = mergeApiInboxWithPrefs(runtime, loadMessagingPrefs(), audience);
+    if (params.seedThread) {
+      store = upsertThreadIntoStore(store, params.seedThread);
+    }
     const next = markAllThreadsReadForAudience(store, audience);
     saveMessagingStore(next);
-  }, [audience, open]);
+  }, [audience, open, params.seedThread]);
 
   return (
     <>

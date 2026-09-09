@@ -9,6 +9,27 @@ export function resolveCalendarBookingIdentity(
   return event.bookingCode?.trim() || resolveParentCalendarEventId(event.id);
 }
 
+/** One card per booking identity × staff column × start (drops mirrored duplicates). */
+export function dedupeCalendarDisplaySegments(
+  events: readonly CalendarEvent[],
+): CalendarEvent[] {
+  const seen = new Set<string>();
+  const out: CalendarEvent[] = [];
+  for (const event of events) {
+    const key = [
+      resolveCalendarBookingIdentity(event).toLowerCase(),
+      String(event.resourceId ?? "").trim(),
+      event.date,
+      event.start,
+      event.end,
+    ].join("|");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(event);
+  }
+  return out;
+}
+
 export function countUniqueCalendarBookings(
   events: readonly Pick<CalendarEvent, "id" | "bookingCode">[],
 ) {

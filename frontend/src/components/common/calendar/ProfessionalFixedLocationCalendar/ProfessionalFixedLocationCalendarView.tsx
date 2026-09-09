@@ -89,6 +89,7 @@ import CalendarBookingTicketStack from "../CalendarBookingTicketStack";
 import {
   buildMultiServiceBookingTitle,
   clusterSameStartTimeEvents,
+  dedupeCalendarDisplaySegments,
   findExternalStaffBookingOverlaps,
   findInternalStaffServiceOverlaps,
   getClusterTimeBounds,
@@ -107,6 +108,7 @@ import {
   emptyDesiredLocation,
   hydrateBookingDrawerFromEvent,
   parseApiCalendarEventId,
+  resolveCalendarMessagingRef,
   parseStoredEbrFromNotes,
   parseStoredErFromNotes,
   resolveKilometerAllowanceAmount,
@@ -161,6 +163,7 @@ import CalendarDesignModal, {
 import CalendarPublicBusinessHoursModal, {
   createEmptyPublicBusinessHoursDraft,
   draftFromPublicBusinessHoursEntries,
+  locationHasPublicHoursConfigured,
   replacePublicBusinessHoursForLocations,
   type PublicBusinessHoursDraft,
   type PublicBusinessHoursEntry,
@@ -342,6 +345,7 @@ import {
   formatMonthYearUtc,
   blockTitleFromDraft,
   buildBlocksFromDraft,
+  calendarEntryIdFromBlockId,
   createEmptyBlockTimeDraft,
   dedupeCalendarBlocks,
   bookingOverlapsAnyBlock,
@@ -366,11 +370,12 @@ import {
 } from "../calendar.utils";
 import {
   BOOKING_SCENARIO_LABELS,
-  calendarBookingStatusLabel,
   canDiscardBookingRequest,
-  getBookingScenarioIndicators,
+  getActionRequiredScenarioIndicators,
   isAllowedStatusForBookingType,
-  isBookingRequestAccepted,
+  professionalCalendarDisplayStatus,
+  professionalCalendarStatusLabel,
+  professionalWaitingForClientPrepay,
   scenarioIndicatorDisplayLabel,
   statusAccentColor,
 } from "../bookingStatus";
@@ -383,6 +388,7 @@ import BookingResponseExpiryBanner from "../BookingResponseExpiryBanner";
 import BookingGuidelineIcon from "../BookingGuidelineIcon";
 import {
   buildAcceptAckDetails,
+  clearBookingAckDetails,
   prepayBlocksConfirmation,
   professionalShouldAck,
 } from "../bookingAcknowledgment";
@@ -415,8 +421,12 @@ import BookingRequestReceivedIcon from "../BookingRequestReceivedIcon";
 import BookingRequestSentIcon from "../BookingRequestSentIcon";
 import PaymentDueIcon from "../../client-booking/PaymentDueIcon";
 import { useBookingPaymentDueMeta } from "../resolveBookingPaymentDueMeta";
-import { resolveBookingResponseIndicators } from "../bookingResponseStatus";
 import {
+  actionRequiredBookingIndicators,
+  resolveBookingResponseIndicators,
+} from "../bookingResponseStatus";
+import {
+  isActionRequiredPrepaymentStatus,
   resolveCalendarPrepaymentStatus,
   toPrepaymentIconVariant,
 } from "../prepaymentStatus";
@@ -517,6 +527,7 @@ export type ProfessionalFixedLocationCalendarProps = {
     id: string,
     status:
       | "requested"
+      | "br_accepted"
       | "cancelled"
       | "completed"
       | "confirmed"
@@ -722,10 +733,13 @@ export default function ProfessionalFixedLocationCalendar({
 
   const openBookingMessages = React.useCallback(
     (ev: CalendarEvent) => {
-      const bookingRef = ev.bookingCode ?? extractBookingId(ev.id);
+      const { bookingRef, customerId } = resolveCalendarMessagingRef(ev);
       void (async () => {
         try {
-          const result = await openMessagingForBooking({ bookingRef }).unwrap();
+          const result = await openMessagingForBooking({
+            bookingRef,
+            customerId,
+          }).unwrap();
           openMessaging(prepareBookingMessagingOpen(result));
         } catch (error) {
           showSnackbar({
@@ -766,6 +780,8 @@ export default function ProfessionalFixedLocationCalendar({
               event.bookingScenario ?? "",
               event.updatedAt ?? "",
               event.notes ?? "",
+              // Client pay can change only this field while status/notes stay put.
+              event.details?.prepaymentStatus ?? "",
               event.details?.services?.map((s) => s.id).join(",") ?? "",
             ].join(":"),
         )
@@ -2070,7 +2086,74 @@ export default function ProfessionalFixedLocationCalendar({
   const awaitingLineApproval =
     awaitingClientChangeApproval ||
     isAwaitingIncomingClientEdit(viewingBookingEvent);
+  const savedBookingDetails = viewingBookingEvent?.details;
+  const drawerScheduleChangedForSilent = React.useMemo(() => {
+    if (!viewingBookingEvent || !selectedSlot) return false;
+    const dateChanged = viewingBookingEvent.date !== selectedSlot.date;
+    const timeWindowChanged =
+      clockHm(viewingBookingEvent.start) !== clockHm(selectedSlot.start) ||
+      clockHm(viewingBookingEvent.end) !== clockHm(selectedSlot.end);
+    if (!dateChanged && !timeWindowChanged) return false;
+    const servicesReordered = hasServiceReorderOnly({
+      previousServices: (savedBookingDetails?.services ?? []).filter(
+        (service) => !String(service.guestId ?? "").trim(),
+      ),
+      currentServices: selectedServices,
+      previousGuests: savedBookingDetails?.guests,
+      currentGuests: bookingGuests,
+    });
+    return dateChanged || (timeWindowChanged && !servicesReordered);
+  }, [
+    bookingGuests,
+    savedBookingDetails?.guests,
+    savedBookingDetails?.services,
+    selectedServices,
+    selectedSlot,
+    viewingBookingEvent,
+  ]);
+  /** Live Confirmed edit that is only phone / guest name / reorder → Updated, not Edited. */
+  const silentSafeDrawerEdit = React.useMemo(() => {
+    if (awaitingLineApproval) return false;
+    if (viewingBookingEvent?.status !== "Confirmed") return false;
+    if (!isEditingExisting && !savedBookingDetails?.silentUpdated) return false;
+    return isSilentSafeBookingChange({
+      previousServices: (savedBookingDetails?.services ?? []).filter(
+        (service) => !String(service.guestId ?? "").trim(),
+      ),
+      currentServices: selectedServices,
+      previousGuests: savedBookingDetails?.guests,
+      currentGuests: bookingGuests,
+      previousPeople: savedBookingDetails?.clientSnapshot?.people,
+      currentPeople: savedBookingDetails?.clientSnapshot?.people,
+      previousPhoneCode: savedBookingDetails?.phoneCode,
+      currentPhoneCode: bookingPhoneDraft.phoneCode,
+      previousPhoneNumber: savedBookingDetails?.phoneNumber,
+      currentPhoneNumber: bookingPhoneDraft.phoneNumber,
+      previousProducts: savedBookingDetails?.products ?? [],
+      currentProducts: [...selectedProducts, ...bookingUniqueItems],
+      scheduleChanged: drawerScheduleChangedForSilent,
+    });
+  }, [
+    awaitingLineApproval,
+    bookingGuests,
+    bookingPhoneDraft.phoneCode,
+    bookingPhoneDraft.phoneNumber,
+    bookingUniqueItems,
+    drawerScheduleChangedForSilent,
+    isEditingExisting,
+    savedBookingDetails?.clientSnapshot?.people,
+    savedBookingDetails?.guests,
+    savedBookingDetails?.phoneCode,
+    savedBookingDetails?.phoneNumber,
+    savedBookingDetails?.products,
+    savedBookingDetails?.services,
+    savedBookingDetails?.silentUpdated,
+    selectedProducts,
+    selectedServices,
+    viewingBookingEvent?.status,
+  ]);
   const silentFieldUpdates = React.useMemo(() => {
+    // Other-party silent update only — never show Updated for the viewer's own save.
     if (!showSilentFieldTags || awaitingLineApproval) {
       return {
         phoneUpdated: false,
@@ -2079,11 +2162,11 @@ export default function ProfessionalFixedLocationCalendar({
       };
     }
     return detectSilentUpdatedFields({
-      snapshot: viewingBookingEvent?.details?.silentUpdateSnapshot,
+      snapshot: savedBookingDetails?.silentUpdateSnapshot,
       currentPhoneCode: bookingPhoneDraft.phoneCode,
       currentPhoneNumber: bookingPhoneDraft.phoneNumber,
       currentGuests: bookingGuests,
-      currentPeople: viewingBookingEvent?.details?.clientSnapshot?.people,
+      currentPeople: savedBookingDetails?.clientSnapshot?.people,
       currentServices: selectedServices,
     });
   }, [
@@ -2091,10 +2174,10 @@ export default function ProfessionalFixedLocationCalendar({
     bookingGuests,
     bookingPhoneDraft.phoneCode,
     bookingPhoneDraft.phoneNumber,
+    savedBookingDetails?.clientSnapshot?.people,
+    savedBookingDetails?.silentUpdateSnapshot,
     selectedServices,
     showSilentFieldTags,
-    viewingBookingEvent?.details?.clientSnapshot?.people,
-    viewingBookingEvent?.details?.silentUpdateSnapshot,
   ]);
   const drawerLineChangeSets = React.useMemo(() => {
     const ebr = parseStoredEbrFromNotes(drawerEbrNotes);
@@ -2130,18 +2213,33 @@ export default function ProfessionalFixedLocationCalendar({
       original.length > 0
         ? detectServiceLineChanges(original, current)
         : { added: [] as string[], edited: [] as string[], cancelled: [] as string[] };
+    // Suppress false Edited from reorder clocks / silent-only diffs.
+    // Never drop stored Edited/Added/Cancelled — those persist until next ER.
+    const suppressComputedErLineTags =
+      !awaitingLineApproval &&
+      (showSilentFieldTags ||
+        silentSafeDrawerEdit ||
+        Boolean(savedBookingDetails?.silentUpdated));
     const added =
       negotiationDetails?.addedServiceIds?.length
         ? negotiationDetails.addedServiceIds
         : ebr?.addedServiceIds?.length
           ? ebr.addedServiceIds
-          : computed.added;
+          : savedBookingDetails?.addedServiceIds?.length
+            ? savedBookingDetails.addedServiceIds
+            : suppressComputedErLineTags
+              ? []
+              : computed.added;
     const cancelled =
       negotiationDetails?.cancelledServiceIds?.length
         ? negotiationDetails.cancelledServiceIds
         : ebr?.cancelledServiceIds?.length
           ? ebr.cancelledServiceIds
-          : computed.cancelled;
+          : savedBookingDetails?.cancelledServiceIds?.length
+            ? savedBookingDetails.cancelledServiceIds
+            : suppressComputedErLineTags
+              ? []
+              : computed.cancelled;
     const addedSet = new Set(added);
     const cancelledSet = new Set(cancelled);
     const storedEdited = [
@@ -2149,8 +2247,24 @@ export default function ProfessionalFixedLocationCalendar({
       ...(negotiationDetails?.clientEditedServiceIds ?? []),
       ...(ebr?.editedServiceIds ?? []),
       ...(ebr?.clientEditedServiceIds ?? []),
+      ...(savedBookingDetails?.editedServiceIds ?? []),
     ];
-    const editedSource = storedEdited.length ? storedEdited : computed.edited;
+    const reorderOnly = hasServiceReorderOnly({
+      previousServices: (savedBookingDetails?.services ?? original).filter(
+        (service) => !String(service.guestId ?? "").trim(),
+      ),
+      currentServices: selectedServices,
+      previousGuests:
+        savedBookingDetails?.guests ??
+        negotiationDetails?.originalGuests ??
+        savedBookingDetails?.originalGuests,
+      currentGuests: bookingGuests,
+    });
+    const editedSource = storedEdited.length
+      ? storedEdited
+      : reorderOnly || suppressComputedErLineTags
+        ? []
+        : computed.edited;
     return {
       added,
       cancelled,
@@ -2159,19 +2273,31 @@ export default function ProfessionalFixedLocationCalendar({
       ),
     };
   }, [
+    awaitingLineApproval,
     bookingGuests,
     drawerEbrNotes,
     negotiationDetails?.addedServiceIds,
     negotiationDetails?.cancelledServiceIds,
     negotiationDetails?.clientEditedServiceIds,
     negotiationDetails?.editedServiceIds,
+    negotiationDetails?.originalGuests,
     negotiationDetails?.originalServices,
+    savedBookingDetails?.addedServiceIds,
+    savedBookingDetails?.cancelledServiceIds,
+    savedBookingDetails?.editedServiceIds,
+    savedBookingDetails?.guests,
+    savedBookingDetails?.originalGuests,
+    savedBookingDetails?.services,
+    savedBookingDetails?.silentUpdated,
     selectedServices,
+    showSilentFieldTags,
+    silentSafeDrawerEdit,
     viewingBookingEvent?.details?.originalServices,
   ]);
   /** Per-item Edited / Added / Cancelled, plus Pending while client approval is outstanding. */
   const resolveServiceEditTag = React.useCallback(
     (serviceId: string) => {
+      // Persisted Edited/Added/Cancelled always win over ephemeral Updated.
       const erTags = resolveLineChangeTags(serviceId, {
         editedIds: drawerLineChangeSets.edited,
         addedIds: drawerLineChangeSets.added,
@@ -2396,23 +2522,23 @@ export default function ProfessionalFixedLocationCalendar({
         phoneNumber: bookingPhoneDraft.phoneNumber,
       };
     }
-    setEditBaselineSignature((prev) => prev ?? bookingEditSignature);
-    setIsEditingExisting(true);
-  }, [
-    bookingEditSignature,
-    bookingGuests,
-    bookingPhoneDraft.phoneCode,
-    bookingPhoneDraft.phoneNumber,
-    bookingUniqueItems,
-    editingEventId,
-    isCancelledOrInvalidBooking,
-    isCompletedBooking,
-    isEditingExisting,
-    selectedProducts,
-    selectedServices,
-    showIncomingErActions,
-    showIncomingRequestActions,
-  ]);
+      setEditBaselineSignature((prev) => prev ?? bookingEditSignature);
+      setIsEditingExisting(true);
+    }, [
+      bookingEditSignature,
+      bookingGuests,
+      bookingPhoneDraft.phoneCode,
+      bookingPhoneDraft.phoneNumber,
+      bookingUniqueItems,
+      editingEventId,
+      isCancelledOrInvalidBooking,
+      isCompletedBooking,
+      isEditingExisting,
+      selectedProducts,
+      selectedServices,
+      showIncomingErActions,
+      showIncomingRequestActions,
+    ]);
 
   const lockClientIdentity =
     isViewingBooking && isClientOriginatedBooking(viewingBookingEvent);
@@ -2659,8 +2785,9 @@ export default function ProfessionalFixedLocationCalendar({
   ]);
 
   const persistOverviewBlockedTime = async (draft: BlockTimeDraft) => {
-    const nextBlocks = buildBlocksFromDraft(draft, draft.teamIds);
-    if (!nextBlocks.length) {
+    const blockTitle = blockTitleFromDraft(draft) || "Blocked time";
+    const optimisticBlocks = buildBlocksFromDraft(draft, draft.teamIds);
+    if (!optimisticBlocks.length) {
       showSnackbar({
         severity: "warning",
         message:
@@ -2669,38 +2796,41 @@ export default function ProfessionalFixedLocationCalendar({
       return;
     }
 
-    setBlocks((prev) => {
-      const seen = new Set(
-        prev.map(
-          (block) =>
-            `${block.resourceId}-${block.date}-${block.start}-${block.end}`,
-        ),
-      );
-      const unique = nextBlocks.filter((block) => {
-        const key = `${block.resourceId}-${block.date}-${block.start}-${block.end}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-      return [...prev, ...unique];
-    });
     setActiveDateIso(draft.dateFrom);
     if (draft.teamIds.length === 1) {
       setSelectedResourceId(draft.teamIds[0]);
     }
-    setBlockTimeOpen(false);
-    showSnackbar({ severity: "success", message: "Blocked time added." });
 
-    if (!onCreateCalendarEntry) return;
+    if (!onCreateCalendarEntry) {
+      setBlocks((prev) => {
+        const seen = new Set(
+          prev.map(
+            (block) =>
+              `${block.resourceId}-${block.date}-${block.start}-${block.end}`,
+          ),
+        );
+        const unique = optimisticBlocks.filter((block) => {
+          const key = `${block.resourceId}-${block.date}-${block.start}-${block.end}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+        return [...prev, ...unique];
+      });
+      setBlockTimeOpen(false);
+      showSnackbar({ severity: "success", message: "Blocked time added." });
+      return;
+    }
 
     try {
+      const createdEntries: Array<{ teamId: string; entryId: string }> = [];
       for (const teamId of draft.teamIds) {
         const teamMemberId = String(teamId).trim() || null;
         for (const location of draft.locations) {
-          await onCreateCalendarEntry({
+          const entry = await onCreateCalendarEntry({
             team_member_id: teamMemberId,
             status: "blocked",
-            title: blockTitleFromDraft(draft) || "Blocked time",
+            title: blockTitle,
             blocked_time_start: toDateTimeInput(draft.dateFrom, draft.startTime),
             blocked_time_end: toDateTimeInput(
               draft.dateTo || draft.dateFrom,
@@ -2713,13 +2843,59 @@ export default function ProfessionalFixedLocationCalendar({
               `${draft.dayFrom || ""}${draft.dayTo ? ` - ${draft.dayTo}` : ""}`.trim() ||
               null,
           });
+          if (entry?.id) {
+            createdEntries.push({
+              teamId: String(teamId),
+              entryId: String(entry.id),
+            });
+          }
         }
       }
+
+      const nextBlocks: CalendarBlock[] = [];
+      const seen = new Set<string>();
+      for (const { teamId, entryId } of createdEntries) {
+        let cursor = draft.dateFrom;
+        const endDate = draft.dateTo || draft.dateFrom;
+        while (cursor <= endDate) {
+          const key = `${entryId}|${teamId}|${cursor}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            nextBlocks.push({
+              id: `blk-${entryId}`,
+              resourceId: teamId,
+              date: cursor,
+              start: draft.startTime,
+              end: draft.endTime,
+              title: blockTitle,
+              kind: "unavailable",
+            });
+          }
+          cursor = addDaysIso(cursor, 1);
+        }
+      }
+
+      setBlocks((prev) => {
+        const replaceKeys = new Set(
+          nextBlocks.map(
+            (block) =>
+              `${block.resourceId}-${block.date}-${block.start}-${block.end}`,
+          ),
+        );
+        const kept = prev.filter(
+          (block) =>
+            !replaceKeys.has(
+              `${block.resourceId}-${block.date}-${block.start}-${block.end}`,
+            ),
+        );
+        return [...kept, ...nextBlocks];
+      });
+      setBlockTimeOpen(false);
+      showSnackbar({ severity: "success", message: "Blocked time added." });
     } catch {
       showSnackbar({
-        severity: "warning",
-        message:
-          "Blocked time shown on calendar, but it could not be saved to the server.",
+        severity: "error",
+        message: "Unable to save blocked time. Please try again.",
       });
     }
   };
@@ -3045,7 +3221,7 @@ export default function ProfessionalFixedLocationCalendar({
           return;
         }
         // Confirmed (and other editable statuses): edit directly — no ER note step.
-        setIsEditingExisting(true);
+        beginExistingBookingEdit();
         return;
       }
 
@@ -3165,21 +3341,26 @@ export default function ProfessionalFixedLocationCalendar({
         const current =
           viewingBookingEvent ??
           events.find((event) => event.id === editingEventId);
-        const nextDetails = {
+        const nextDetails = clearBookingAckDetails({
           ...(current?.details ?? {}),
-          needsOk: false,
-          ackScenario: undefined,
-        };
+        });
         const nextNotes = serializeCalendarEntryNotes(
           nextDetails.internalNote ?? "",
           nextDetails,
           parseStoredEbrFromNotes(current?.notes),
           parseStoredErFromNotes(current?.notes),
         );
+        const parsed = parseApiCalendarEventId(editingEventId);
         try {
-          await persistEventStatus(editingEventId, current?.status ?? "Confirmed", {
-            notes: nextNotes,
-          });
+          if (parsed?.kind === "booking" && onUpdateBookingStatus) {
+            await onUpdateBookingStatus(parsed.id, "confirmed", {
+              notes: nextNotes ?? undefined,
+            });
+          } else {
+            await persistEventStatus(editingEventId, "Confirmed", {
+              notes: nextNotes,
+            });
+          }
         } catch {
           showSnackbar({
             severity: "error",
@@ -3192,13 +3373,15 @@ export default function ProfessionalFixedLocationCalendar({
             event.id === editingEventId
               ? {
                   ...event,
+                  status: "Confirmed",
                   bookingScenario: undefined,
                   notes: nextNotes,
-                  details: { ...(event.details ?? {}), needsOk: false, ackScenario: undefined },
+                  details: nextDetails,
                 }
               : event,
           ),
         );
+        setSlotStatus("Confirmed");
         showSnackbar({
           severity: "success",
           message: "Booking request acknowledged.",
@@ -3259,7 +3442,7 @@ export default function ProfessionalFixedLocationCalendar({
 
       setPendingBookingAction(action);
     },
-    [editingEventId, events, persistEventStatus, showSnackbar, viewingBookingEvent, showLateCancellation, lateCancellationFeeAmount, showNoShowFee, noShowFeeAmount, lateCancellationFeePercent, lateCancellationFeePercentCeiling, noShowFeePercent, noShowFeePercentCeiling, cancellationFeeAt, exceededCancellationWindow],
+    [beginExistingBookingEdit, editingEventId, events, onUpdateBookingStatus, persistEventStatus, showSnackbar, viewingBookingEvent, showLateCancellation, lateCancellationFeeAmount, showNoShowFee, noShowFeeAmount, lateCancellationFeePercent, lateCancellationFeePercentCeiling, noShowFeePercent, noShowFeePercentCeiling, cancellationFeeAt, exceededCancellationWindow],
   );
 
   const handleConfirmCancel = React.useCallback(async () => {
@@ -3731,9 +3914,7 @@ export default function ProfessionalFixedLocationCalendar({
     viewMode === "week" ? (hasTeamMembers ? 2 : 1) : hasTeamMembers ? 1 : 0;
   const timelineHeaderPx =
     laneHeaderPx * timelineHeaderRows +
-    (filteredResources.length > TEAM_NAV_VISIBLE_SLOTS
-      ? TEAM_NAV_SCROLLBAR_PX
-      : 0);
+    (hasTeamMembers ? TEAM_NAV_SCROLLBAR_PX : 0);
 
   const slotLines = React.useMemo(() => {
     const out: number[] = [];
@@ -3941,8 +4122,10 @@ export default function ProfessionalFixedLocationCalendar({
         );
       });
     })();
-    return scoped.flatMap((event) =>
-      calendarEventToDisplaySegments(event, resourceNameById),
+    return dedupeCalendarDisplaySegments(
+      scoped.flatMap((event) =>
+        calendarEventToDisplaySegments(event, resourceNameById),
+      ),
     );
   }, [
     activeResource?.id,
@@ -4547,7 +4730,12 @@ export default function ProfessionalFixedLocationCalendar({
   const drawerOrderedBlocks = React.useMemo(
     () =>
       chronologicalDrawerGuests.map((guest, index) => {
-        const services = sortServicesByStartTime(guest.services);
+        const services = sortServicesByStartTime(guest.services).map(
+          (service) => ({
+            ...service,
+            guestId: service.guestId ?? guest.id,
+          }),
+        );
         const participantType =
           guest.participantType === "planning" || guest.name === "Planning"
             ? ("planning" as const)
@@ -4761,6 +4949,8 @@ export default function ProfessionalFixedLocationCalendar({
     (startTime: string) => {
       if (!selectedSlot || isViewingExisting) return;
       const newStart = fmtMinToTime(minutesSinceMidnight(startTime));
+      // Same clock — do not rewrite nested service times (would false-tag Edited).
+      if (clockHm(selectedSlot.start) === clockHm(newStart)) return;
       const [nextSelectedServices, ...nextGuestServiceGroups] =
         recalculateGroupedServiceStartEndTimes(
           [selectedServices, ...bookingGuests.map((guest) => guest.services)],
@@ -4906,14 +5096,16 @@ export default function ProfessionalFixedLocationCalendar({
       ? `repeat(${teamNavMemberCount}, minmax(0, 1fr))`
       : "1fr";
   const teamNavScrollOverflowSx = {
-    overflowX: teamNavNeedsScroll ? ("auto" as const) : ("hidden" as const),
+    // Keep overflow mode stable so member switches don't flash a scrollbar gutter.
+    overflowX: teamNavNeedsScroll ? ("scroll" as const) : ("hidden" as const),
     overflowY: "hidden" as const,
     WebkitOverflowScrolling: "touch" as const,
+    scrollbarGutter: "stable" as const,
     ...(teamNavNeedsScroll
       ? {
           scrollbarWidth: "thin" as const,
           "&::-webkit-scrollbar": {
-            height: 8,
+            height: TEAM_NAV_SCROLLBAR_PX,
             display: "block",
           },
           "&::-webkit-scrollbar-track": {
@@ -4926,7 +5118,10 @@ export default function ProfessionalFixedLocationCalendar({
         }
       : {
           scrollbarWidth: "none" as const,
-          "&::-webkit-scrollbar": { display: "none" },
+          "&::-webkit-scrollbar": {
+            height: TEAM_NAV_SCROLLBAR_PX,
+            display: "none",
+          },
         }),
   };
 
@@ -5294,8 +5489,8 @@ export default function ProfessionalFixedLocationCalendar({
       <Box
         sx={{
           position: "relative",
-          minHeight: laneHeaderPx + (teamNavNeedsScroll ? TEAM_NAV_SCROLLBAR_PX : 0),
-          height: laneHeaderPx + (teamNavNeedsScroll ? TEAM_NAV_SCROLLBAR_PX : 0),
+          minHeight: laneHeaderPx + TEAM_NAV_SCROLLBAR_PX,
+          height: laneHeaderPx + TEAM_NAV_SCROLLBAR_PX,
           bgcolor: "#fff",
           borderBottom: `1px solid ${alpha(m.navy, 0.07)}`,
           width: "100%",
@@ -5551,6 +5746,8 @@ export default function ProfessionalFixedLocationCalendar({
       ev.bookingScenario ?? "",
       ev.updatedAt ?? "",
       ev.notes ?? "",
+      // Unlock Accept / Prepaid label when client completes online prepay.
+      ev.details?.prepaymentStatus ?? "",
       ev.details?.services?.map((service) => service.id).join(",") ?? "",
     ].join(":");
   }, []);
@@ -5999,6 +6196,7 @@ export default function ProfessionalFixedLocationCalendar({
         severity: "error",
         message: getApiErrorMessage(error, "Unable to accept edit request."),
       });
+      throw error;
     }
   }, [
     editingEventId,
@@ -6037,6 +6235,7 @@ export default function ProfessionalFixedLocationCalendar({
         severity: "error",
         message: getApiErrorMessage(error, "Unable to reject edit request."),
       });
+      throw error;
     }
   }, [
     editingEventId,
@@ -6181,73 +6380,6 @@ export default function ProfessionalFixedLocationCalendar({
     viewingBookingEvent,
   ]);
 
-  const handleAcknowledgeAcceptedBr = React.useCallback(async () => {
-    if (!editingEventId) return;
-    const current =
-      viewingBookingEvent ??
-      events.find((event) => event.id === editingEventId);
-    const nextDetails = {
-      ...(current?.details ?? {}),
-      needsOk: false,
-      ackScenario: undefined,
-      ackRecipient: undefined,
-    };
-    const nextNotes = serializeCalendarEntryNotes(
-      nextDetails.internalNote ?? "",
-      nextDetails,
-      parseStoredEbrFromNotes(current?.notes),
-      parseStoredErFromNotes(current?.notes),
-    );
-    const parsed = parseApiCalendarEventId(editingEventId);
-    try {
-      if (parsed?.kind === "booking" && onUpdateBookingStatus) {
-        await onUpdateBookingStatus(parsed.id, "confirmed", {
-          notes: nextNotes ?? undefined,
-        });
-      } else {
-        await persistEventStatus(editingEventId, "Confirmed", {
-          notes: nextNotes,
-        });
-      }
-    } catch {
-      showSnackbar({
-        severity: "error",
-        message: "Unable to acknowledge booking.",
-      });
-      return;
-    }
-    setEvents((prev) =>
-      prev.map((event) =>
-        event.id === editingEventId
-          ? {
-              ...event,
-              status: "Confirmed",
-              bookingScenario: undefined,
-              notes: nextNotes,
-              details: {
-                ...(event.details ?? {}),
-                needsOk: false,
-                ackScenario: undefined,
-                ackRecipient: undefined,
-              },
-            }
-          : event,
-      ),
-    );
-    setSlotStatus("Confirmed");
-    showSnackbar({
-      severity: "success",
-      message: "Booking request acknowledged.",
-    });
-  }, [
-    editingEventId,
-    events,
-    onUpdateBookingStatus,
-    persistEventStatus,
-    showSnackbar,
-    viewingBookingEvent,
-  ]);
-
   const handleAcceptIncomingRequest = React.useCallback(async () => {
     if (!editingEventId || !viewingBookingEvent) return;
     const parsed = parseApiCalendarEventId(editingEventId);
@@ -6285,7 +6417,7 @@ export default function ProfessionalFixedLocationCalendar({
           ),
         });
         restoreIncomingActions();
-        return;
+        throw error;
       }
       setEvents((prev) =>
         prev.map((event) =>
@@ -6456,9 +6588,33 @@ export default function ProfessionalFixedLocationCalendar({
             end_time: `${suggestedDate}T${suggestedEnd}:00`,
           };
         }
+        const parsedAccepted = parseCalendarEntryNotes(nextNotes);
+        nextNotes = serializeCalendarEntryNotes(
+          parsedAccepted?.internalNote ?? appliedNote,
+          {
+            ...(parsedAccepted ?? {}),
+            needsOk: true,
+            ackRecipient: "client",
+            ackScenario: "EBR",
+          },
+          parseStoredEbrFromNotes(nextNotes),
+          parseStoredErFromNotes(nextNotes),
+        );
+      } else {
+        nextNotes = serializeCalendarEntryNotes(
+          ackDetails.internalNote ?? "",
+          ackDetails,
+          parseStoredEbrFromNotes(viewingBookingEvent.notes),
+          parseStoredErFromNotes(viewingBookingEvent.notes),
+        );
       }
 
-      await onUpdateBookingStatus(parsed.id, "confirmed", {
+      const nextApiStatus = isClientEbr ? "confirmed" : "br_accepted";
+      const nextLocalStatus = isClientEbr
+        ? ("Confirmed" as const)
+        : ("BR Accepted" as const);
+
+      await onUpdateBookingStatus(parsed.id, nextApiStatus, {
         ...(nextNotes !== undefined ? { notes: nextNotes } : {}),
         ...(isClientEbr || professionalAddedLines
           ? { total_price: bookingTotalForSave }
@@ -6471,8 +6627,12 @@ export default function ProfessionalFixedLocationCalendar({
           if (event.id !== editingEventId) return event;
           return {
             ...event,
-            status: "Confirmed" as const,
-            bookingScenario: viewingBookingEvent.bookingScenario ?? "BR",
+            status: nextLocalStatus,
+            bookingScenario: isClientEbr
+              ? undefined
+              : ackDetails.needsOk
+                ? ackScenario
+                : undefined,
             notes: nextNotes ?? event.notes,
             ...(scheduleExtras.booking_date
               ? {
@@ -6482,9 +6642,14 @@ export default function ProfessionalFixedLocationCalendar({
                 }
               : {}),
             details: {
-              ...event.details,
-              needsOk: true,
-              ackScenario: viewingBookingEvent.bookingScenario ?? "BR",
+              ...(isClientEbr
+                ? {
+                    ...event.details,
+                    needsOk: true,
+                    ackRecipient: "client" as const,
+                    ackScenario: "EBR" as const,
+                  }
+                : ackDetails),
               responseStatus: undefined,
               lastEditedBy: professionalAddedLines
                 ? "professional"
@@ -6514,7 +6679,7 @@ export default function ProfessionalFixedLocationCalendar({
           end: suggestedEnd || selectedSlot.end,
         });
       }
-      setSlotStatus("Confirmed");
+      setSlotStatus(nextLocalStatus);
       setIncomingRequestEditMode(false);
       setIsEditingExisting(false);
     } catch (error) {
@@ -6523,6 +6688,7 @@ export default function ProfessionalFixedLocationCalendar({
         severity: "error",
         message: getApiErrorMessage(error, "Unable to accept booking request."),
       });
+      throw error;
     }
   }, [
     bookingGuests,
@@ -6562,7 +6728,7 @@ export default function ProfessionalFixedLocationCalendar({
           severity: "error",
           message: "Unable to reject booking request.",
         });
-        return;
+        throw new Error("Unable to reject booking request.");
       }
       try {
         const rejectedNotes = markClientEbrRejectedInNotes(
@@ -6602,6 +6768,7 @@ export default function ProfessionalFixedLocationCalendar({
             "Unable to reject booking request.",
           ),
         });
+        throw error;
       }
       return;
     }
@@ -6619,7 +6786,7 @@ export default function ProfessionalFixedLocationCalendar({
         severity: "error",
         message: getApiErrorMessage(error, "Unable to reject booking request."),
       });
-      return;
+      throw error;
     }
     setEvents((prev) =>
       prev.map((event) =>
@@ -6646,6 +6813,7 @@ export default function ProfessionalFixedLocationCalendar({
       ...hydration.guests.flatMap((guest) => guest.services),
     ]);
     setIncomingRequestEditMode(true);
+    setAllowDrawerTimeSelection(true);
     setIsEditingExisting(true);
   }, [viewingBookingEvent]);
 
@@ -7879,8 +8047,6 @@ export default function ProfessionalFixedLocationCalendar({
         return;
       }
       const id = `planning-${Date.now()}`;
-      const planningEnd =
-        defaultStart ? addMinutesToTime(defaultStart, 60) : undefined;
       setBookingGuests((prev) =>
         sortCalendarGuestsByCanonicalOrder([
           ...prev,
@@ -7890,12 +8056,10 @@ export default function ProfessionalFixedLocationCalendar({
             services: [],
             products: [],
             participantType: "planning",
-            planningActivity: "Photoshoot",
-            planningDuration: planningEnd
-              ? formatDurationMinsLabel(60)
-              : "",
+            planningActivity: "",
+            planningDuration: "",
             planningStartTime: defaultStart || undefined,
-            planningEndTime: planningEnd,
+            planningEndTime: undefined,
           },
         ]),
       );
@@ -8345,8 +8509,14 @@ export default function ProfessionalFixedLocationCalendar({
         slotLocation === "DL" || existingEvent?.location === "DL";
 
       if (incomingRequestEditMode && editingEventId && existingEvent) {
-        const originalServices =
+        const originalServicesRaw =
           existingEvent.details?.originalServices ?? originalServicesSnapshot;
+        const originalServices = flattenBookingServices({
+          services: originalServicesRaw,
+          guests:
+            existingEvent.details?.originalGuests ??
+            existingEvent.details?.guests,
+        });
         const currentServicesForDiff = [
           ...selectedServices.map((service) => ({
             id: service.id,
@@ -8372,7 +8542,7 @@ export default function ProfessionalFixedLocationCalendar({
           ),
         ];
         const lineChanges = detectServiceLineChanges(
-          originalServices,
+          originalServices.length ? originalServices : originalServicesRaw,
           currentServicesForDiff,
         );
         const scheduleChanged =
@@ -8753,7 +8923,7 @@ export default function ProfessionalFixedLocationCalendar({
             addClientSource === "guest" ||
             Boolean(selectedClient?.isGuest) ||
             Boolean(existingEvent?.details?.isGuest),
-          selectedServices,
+          selectedServices: selectedServices,
           selectedProducts: [...selectedProducts, ...bookingUniqueItems],
           bookingGuests: guestsForPersist,
           bookingPhoneDraft,
@@ -9061,7 +9231,6 @@ export default function ProfessionalFixedLocationCalendar({
             : originalServicesSnapshot.length
               ? originalServicesSnapshot
               : selectedServices;
-        details.originalServices = originalServices;
         const originalGuests =
           existingEvent.details?.originalGuests?.length
             ? existingEvent.details.originalGuests
@@ -9075,6 +9244,10 @@ export default function ProfessionalFixedLocationCalendar({
           services: details.services ?? [],
           guests: guestsForPersist,
         });
+        // Persist flattened originals so removed guest lines stay available for Cancelled chips.
+        details.originalServices = originalComparable.length
+          ? originalComparable
+          : originalServices;
         const editedIds = detectEditedServiceIds(
           originalComparable,
           currentComparable,
@@ -9128,16 +9301,25 @@ export default function ProfessionalFixedLocationCalendar({
             silentBaseline
               ? [...silentBaseline.products, ...silentBaseline.uniqueItems]
               : (existingEvent.details?.products ?? originalProducts),
-          currentProducts: details.products ?? [
-            ...selectedProducts,
-            ...bookingUniqueItems,
-          ],
+          // Catalog + unique only — guest products live on guestsForPersist so
+          // flattenBookingProducts does not false-flag nested guest products.
+          currentProducts: [...selectedProducts, ...bookingUniqueItems],
           scheduleChanged,
         });
         if (silentSafeOnly) {
           details.silentUpdated = true;
           details.lastEditedBy = "professional";
-          details.silentUpdateSnapshot = {
+          // Keep prior Edited/Added/Cancelled — only Updated is ephemeral.
+          details.editedServiceIds = existingEvent.details?.editedServiceIds;
+          details.addedServiceIds = existingEvent.details?.addedServiceIds;
+          details.cancelledServiceIds =
+            existingEvent.details?.cancelledServiceIds;
+          details.editedProductIds = existingEvent.details?.editedProductIds;
+          details.addedProductIds = existingEvent.details?.addedProductIds;
+          details.cancelledProductIds =
+            existingEvent.details?.cancelledProductIds;
+          details.scheduleEdited = existingEvent.details?.scheduleEdited;
+          const rawSnapshot = {
             phoneCode:
               silentBaseline?.phoneCode ?? existingEvent.details?.phoneCode,
             phoneNumber:
@@ -9151,7 +9333,15 @@ export default function ProfessionalFixedLocationCalendar({
             people: existingEvent.details?.clientSnapshot?.people,
             desiredLocation: existingEvent.details?.desiredLocation,
           };
+          try {
+            details.silentUpdateSnapshot = JSON.parse(
+              JSON.stringify(rawSnapshot),
+            ) as typeof rawSnapshot;
+          } catch {
+            details.silentUpdateSnapshot = rawSnapshot;
+          }
         } else {
+          details.silentUpdated = undefined;
           const baselineSnapshot = {
             phoneCode:
               silentBaseline?.phoneCode ?? existingEvent.details?.phoneCode,
@@ -9166,10 +9356,17 @@ export default function ProfessionalFixedLocationCalendar({
             people: existingEvent.details?.clientSnapshot?.people,
             desiredLocation: existingEvent.details?.desiredLocation,
           };
-          details.silentUpdateSnapshot =
+          const snapshotForNotes =
             existingEvent.status === "Confirmed"
               ? baselineSnapshot
               : (existingEvent.details?.silentUpdateSnapshot ?? baselineSnapshot);
+          try {
+            details.silentUpdateSnapshot = JSON.parse(
+              JSON.stringify(snapshotForNotes),
+            ) as typeof baselineSnapshot;
+          } catch {
+            details.silentUpdateSnapshot = snapshotForNotes;
+          }
           if (lineChanges.edited.length) {
             details.editedServiceIds = lineChanges.edited;
           }
@@ -9283,6 +9480,11 @@ export default function ProfessionalFixedLocationCalendar({
           const endTime = isIsoDateTime(createPayload.end_time)
             ? createPayload.end_time
             : null;
+          const scheduleFieldsChanged = existingEvent
+            ? existingEvent.date !== selectedSlot.date ||
+              clockHm(existingEvent.start) !== clockHm(selectedSlot.start) ||
+              clockHm(existingEvent.end) !== clockHm(selectedSlot.end)
+            : false;
           if (parsedEditingId.kind === "booking") {
             if (!onUpdateBookingStatus) {
               showSnackbar({
@@ -9295,11 +9497,17 @@ export default function ProfessionalFixedLocationCalendar({
               parsedEditingId.id,
               statusToApiValue(resolvedStatus),
               {
-                notes: persistedNotes,
+                ...(typeof persistedNotes === "string"
+                  ? { notes: persistedNotes }
+                  : {}),
                 total_price: bookingTotal,
                 booking_date: selectedSlot.date,
-                ...(startTime ? { start_time: startTime } : {}),
-                ...(endTime ? { end_time: endTime } : {}),
+                ...(scheduleFieldsChanged && startTime
+                  ? { start_time: startTime }
+                  : {}),
+                ...(scheduleFieldsChanged && endTime
+                  ? { end_time: endTime }
+                  : {}),
                 notify_incoming_er: resolvedStatus === "Requested",
                 initiated_by: "professional",
               },
@@ -9329,7 +9537,10 @@ export default function ProfessionalFixedLocationCalendar({
                     ...event,
                     ...nextEvent,
                     id: event.id,
-                    notes: persistedNotes,
+                    notes:
+                      typeof persistedNotes === "string"
+                        ? persistedNotes
+                        : event.notes,
                   }
                 : event,
             ),
@@ -9382,6 +9593,7 @@ export default function ProfessionalFixedLocationCalendar({
           setActiveDateIso(selectedSlot.date);
           return true;
         } catch (error) {
+          console.error("[booking-update]", error);
           showSnackbar({
             severity: "error",
             message: getApiErrorMessage(error, "Unable to update booking."),
@@ -9993,8 +10205,22 @@ export default function ProfessionalFixedLocationCalendar({
                   );
                 }}
                 onPublicBusinessHours={() => {
+                  const defaultLocation =
+                    data.supportedLocations.find(
+                      (location) => location === "FL" || location === "DL",
+                    ) ?? "FL";
+                  const existing = Array.isArray(
+                    calendarSettings?.availability.publicBusinessHours,
+                  )
+                    ? calendarSettings.availability.publicBusinessHours
+                    : [];
                   setPublicBusinessHoursDraft(
-                    createEmptyPublicBusinessHoursDraft("FL"),
+                    locationHasPublicHoursConfigured(existing, defaultLocation)
+                      ? draftFromPublicBusinessHoursEntries(
+                          existing,
+                          defaultLocation,
+                        )
+                      : createEmptyPublicBusinessHoursDraft(defaultLocation),
                   );
                   setPublicBusinessHoursOpen(true);
                 }}
@@ -11147,6 +11373,9 @@ export default function ProfessionalFixedLocationCalendar({
                                               responseTimeConfigured={
                                                 responseTimeConfigured
                                               }
+                                              responseTime={
+                                                businessResponseWindowInput
+                                              }
                                               {...eventHandlers}
                                             />
                                           );
@@ -11170,6 +11399,9 @@ export default function ProfessionalFixedLocationCalendar({
                                             statusColor={resolveStatusColor(ev)}
                                             responseTimeConfigured={
                                               responseTimeConfigured
+                                            }
+                                            responseTime={
+                                              businessResponseWindowInput
                                             }
                                             onOpen={() =>
                                               eventHandlers.onOpen(ev)
@@ -11218,12 +11450,23 @@ export default function ProfessionalFixedLocationCalendar({
           onActiveDateChange={setActiveDateIso}
           onCreateBlockedTime={async (draft) => {
             const blockTitle = blockTitleFromDraft(draft);
-            const nextBlocks = buildBlocksFromDraft(draft, draft.teamIds);
-            setBlocks((prev) => [...prev, ...nextBlocks]);
-            if (!onCreateCalendarEntry) return;
+            if (!onCreateCalendarEntry) {
+              setBlocks((prev) => [
+                ...prev,
+                ...buildBlocksFromDraft(draft, draft.teamIds),
+              ]);
+              showSnackbar({
+                severity: "success",
+                message: "Blocked time added.",
+              });
+              return;
+            }
+
+            const createdEntries: Array<{ teamId: string; entryId: string }> =
+              [];
             for (const teamId of draft.teamIds) {
               for (const location of draft.locations) {
-                await onCreateCalendarEntry({
+                const entry = await onCreateCalendarEntry({
                   team_member_id: String(teamId).trim() || null,
                   status: "blocked",
                   title: blockTitle,
@@ -11242,8 +11485,53 @@ export default function ProfessionalFixedLocationCalendar({
                     `${draft.dayFrom}${draft.dayTo ? ` - ${draft.dayTo}` : ""}`.trim() ||
                     null,
                 });
+                if (entry?.id) {
+                  createdEntries.push({
+                    teamId: String(teamId),
+                    entryId: String(entry.id),
+                  });
+                }
               }
             }
+
+            const nextBlocks: CalendarBlock[] = [];
+            const seen = new Set<string>();
+            for (const { teamId, entryId } of createdEntries) {
+              let cursor = draft.dateFrom;
+              const endDate = draft.dateTo || draft.dateFrom;
+              while (cursor <= endDate) {
+                const key = `${entryId}|${teamId}|${cursor}`;
+                if (!seen.has(key)) {
+                  seen.add(key);
+                  nextBlocks.push({
+                    id: `blk-${entryId}`,
+                    resourceId: teamId,
+                    date: cursor,
+                    start: draft.startTime,
+                    end: draft.endTime,
+                    title: blockTitle,
+                    kind: "unavailable",
+                  });
+                }
+                cursor = addDaysIso(cursor, 1);
+              }
+            }
+
+            setBlocks((prev) => {
+              const replaceKeys = new Set(
+                nextBlocks.map(
+                  (block) =>
+                    `${block.resourceId}-${block.date}-${block.start}-${block.end}`,
+                ),
+              );
+              const kept = prev.filter(
+                (block) =>
+                  !replaceKeys.has(
+                    `${block.resourceId}-${block.date}-${block.start}-${block.end}`,
+                  ),
+              );
+              return [...kept, ...nextBlocks];
+            });
             showSnackbar({
               severity: "success",
               message: "Blocked time added.",
@@ -11251,12 +11539,32 @@ export default function ProfessionalFixedLocationCalendar({
           }}
           onDeleteBlockedEntry={
             onDeleteCalendarEntry
-              ? async (entryId) => {
-                  await onDeleteCalendarEntry(entryId);
+              ? async (idOrBlockId) => {
+                  const entryId =
+                    calendarEntryIdFromBlockId(idOrBlockId) ??
+                    (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+                      idOrBlockId,
+                    )
+                      ? idOrBlockId
+                      : null);
+
+                  if (entryId) {
+                    await onDeleteCalendarEntry(entryId);
+                  }
+
                   setBlocks((prev) =>
                     prev.filter((block) => {
-                      const raw = block.id.replace(/^blk-/, "");
-                      return raw !== entryId && block.id !== entryId;
+                      const blockEntryId = calendarEntryIdFromBlockId(block.id);
+                      if (entryId && blockEntryId === entryId) return false;
+                      if (block.id === idOrBlockId) return false;
+                      if (
+                        !entryId &&
+                        block.id.replace(/^blk-/, "") ===
+                          idOrBlockId.replace(/^blk-/, "")
+                      ) {
+                        return false;
+                      }
+                      return true;
                     }),
                   );
                 }
@@ -13572,7 +13880,7 @@ export default function ProfessionalFixedLocationCalendar({
                             >
                               <Chip
                                 size="small"
-                                label={calendarBookingStatusLabel(
+                                label={professionalCalendarStatusLabel(
                                   viewingBookingEvent,
                                 )}
                                 sx={{
@@ -13586,20 +13894,26 @@ export default function ProfessionalFixedLocationCalendar({
                                     lineHeight: 1.2,
                                   },
                                   ...statusChipSx(
-                                    viewingBookingEvent.status,
+                                    professionalCalendarDisplayStatus(
+                                      viewingBookingEvent,
+                                    ),
                                     m,
                                   ),
                                 }}
                               />
-                              {getBookingScenarioIndicators(
+                              {getActionRequiredScenarioIndicators(
                                 viewingBookingEvent,
-                              )
-                                .filter((indicator) => indicator !== "E")
-                                .map((indicator) => {
+                              ).map((indicator) => {
                                 const responseIndicators =
-                                  resolveBookingResponseIndicators(
-                                    viewingBookingEvent,
-                                    { responseTimeConfigured },
+                                  actionRequiredBookingIndicators(
+                                    resolveBookingResponseIndicators(
+                                      viewingBookingEvent,
+                                      {
+                                        responseTimeConfigured,
+                                        responseTime:
+                                          businessResponseWindowInput,
+                                      },
+                                    ),
                                   );
                                 const prepayment =
                                   resolveCalendarPrepaymentStatus(
@@ -13701,8 +14015,8 @@ export default function ProfessionalFixedLocationCalendar({
                                             )
                                           ) : null}
                                           {indicator === "EBR" &&
-                                          prepaymentVariant &&
-                                          prepaymentVariant !== "pending" ? (
+                                          prepaymentVariant ===
+                                            "canceled_or_invalid" ? (
                                             <PrepaymentStatusIcon
                                               variant={prepaymentVariant}
                                               size={18}
@@ -13728,13 +14042,19 @@ export default function ProfessionalFixedLocationCalendar({
                               })}
                               {(() => {
                                 const scenarioIndicators =
-                                  getBookingScenarioIndicators(
+                                  getActionRequiredScenarioIndicators(
                                     viewingBookingEvent,
                                   );
                                 const responseIndicators =
-                                  resolveBookingResponseIndicators(
-                                    viewingBookingEvent,
-                                    { responseTimeConfigured },
+                                  actionRequiredBookingIndicators(
+                                    resolveBookingResponseIndicators(
+                                      viewingBookingEvent,
+                                      {
+                                        responseTimeConfigured,
+                                        responseTime:
+                                          businessResponseWindowInput,
+                                      },
+                                    ),
                                   );
                                 const prepayment =
                                   resolveCalendarPrepaymentStatus(
@@ -13751,8 +14071,7 @@ export default function ProfessionalFixedLocationCalendar({
                                     return null;
                                   if (
                                     scenarioIndicators.some(
-                                      (indicator) =>
-                                        indicator === "ER" || indicator === "E",
+                                      (indicator) => indicator === "ER",
                                     )
                                   ) {
                                     return null;
@@ -13767,19 +14086,22 @@ export default function ProfessionalFixedLocationCalendar({
 
                                 const standalonePrepayment =
                                   prepayment &&
+                                  isActionRequiredPrepaymentStatus(prepayment) &&
+                                  !professionalWaitingForClientPrepay(
+                                    viewingBookingEvent,
+                                  ) &&
                                   (scenarioIndicators.length === 0 || hasBr)
                                     ? prepayment
                                     : undefined;
 
+                                // Settled prepaid is not an action icon — only pending / refund.
                                 const prepaymentAsIndicator =
                                   standalonePrepayment === "pending"
                                     ? ("waiting_for_prepayment" as const)
-                                    : standalonePrepayment === "confirmed"
-                                      ? ("prepaid" as const)
-                                      : standalonePrepayment === "canceled" ||
-                                          standalonePrepayment === "invalid"
-                                        ? ("refund_pending" as const)
-                                        : null;
+                                    : standalonePrepayment === "canceled" ||
+                                        standalonePrepayment === "invalid"
+                                      ? ("refund_pending" as const)
+                                      : null;
 
                                 const filteredResponses =
                                   standaloneResponses.filter(
@@ -14605,6 +14927,51 @@ export default function ProfessionalFixedLocationCalendar({
                                       }
                                     />
                                   )}
+                                  {isViewingBooking &&
+                                  viewingBookingEvent &&
+                                  isMollureClientPath ? (
+                                    <Tooltip title="Open chat with client">
+                                      <IconButton
+                                        size="small"
+                                        aria-label="Open messaging"
+                                        onClick={() =>
+                                          openBookingMessages(
+                                            viewingBookingEvent,
+                                          )
+                                        }
+                                        sx={{
+                                          color: alpha(m.navy, 0.45),
+                                          p: 0.35,
+                                        }}
+                                      >
+                                        {viewingBookingUnread > 0 ? (
+                                          <Badge
+                                            badgeContent={
+                                              viewingBookingUnread > 9
+                                                ? "9+"
+                                                : viewingBookingUnread
+                                            }
+                                            color="error"
+                                            sx={{
+                                              "& .MuiBadge-badge": {
+                                                fontSize: 10,
+                                                minWidth: 16,
+                                                height: 16,
+                                              },
+                                            }}
+                                          >
+                                            <ChatBubbleOutlineRoundedIcon
+                                              sx={{ fontSize: 18 }}
+                                            />
+                                          </Badge>
+                                        ) : (
+                                          <ChatBubbleOutlineRoundedIcon
+                                            sx={{ fontSize: 18 }}
+                                          />
+                                        )}
+                                      </IconButton>
+                                    </Tooltip>
+                                  ) : null}
                                 </Stack>
                                 <BodyText
                                   sx={{
@@ -14617,46 +14984,6 @@ export default function ProfessionalFixedLocationCalendar({
                                   {selectedClient?.email ?? ""}
                                 </BodyText>
                               </Box>
-                              {isViewingBooking &&
-                              viewingBookingEvent &&
-                              isMollureClientPath ? (
-                                <Tooltip title="Open chat with client">
-                                  <IconButton
-                                    size="small"
-                                    aria-label="Open messaging"
-                                    onClick={() =>
-                                      openBookingMessages(viewingBookingEvent)
-                                    }
-                                    sx={{ color: alpha(m.navy, 0.45), p: 0.5 }}
-                                  >
-                                    {viewingBookingUnread > 0 ? (
-                                      <Badge
-                                        badgeContent={
-                                          viewingBookingUnread > 9
-                                            ? "9+"
-                                            : viewingBookingUnread
-                                        }
-                                        color="error"
-                                        sx={{
-                                          "& .MuiBadge-badge": {
-                                            fontSize: 10,
-                                            minWidth: 16,
-                                            height: 16,
-                                          },
-                                        }}
-                                      >
-                                        <ChatBubbleOutlineRoundedIcon
-                                          sx={{ fontSize: 18 }}
-                                        />
-                                      </Badge>
-                                    ) : (
-                                      <ChatBubbleOutlineRoundedIcon
-                                        sx={{ fontSize: 18 }}
-                                      />
-                                    )}
-                                  </IconButton>
-                                </Tooltip>
-                              ) : null}
                               {showClientRemoveButton ? (
                                 <IconButton
                                   size="small"
@@ -15221,54 +15548,30 @@ export default function ProfessionalFixedLocationCalendar({
                                 items={drawerPlanningGuests}
                                 disabled={isViewingExisting}
                                 showRemove={showLineItemRemoveButton}
-                                onActivityChange={(id, value) => {
-                                  setBookingGuests((prev) =>
-                                    prev.map((item) =>
-                                      item.id === id
-                                        ? {
-                                            ...item,
-                                            planningActivity: value,
-                                            name: "Planning",
-                                          }
-                                        : item,
-                                    ),
-                                  );
-                                }}
-                                onStartTimeChange={(id, startTime) => {
+                                onDurationChange={(id, value) => {
                                   setBookingGuests((prev) =>
                                     sortCalendarGuestsByCanonicalOrder(
                                       prev.map((item) => {
                                         if (item.id !== id) return item;
-                                        const endTime =
-                                          item.planningEndTime ?? "";
-                                        return {
-                                          ...item,
-                                          planningStartTime: startTime,
-                                          planningDuration:
-                                            formatTimeWindowDurationLabel(
-                                              startTime,
-                                              endTime,
-                                            ) || "",
-                                        };
-                                      }),
-                                    ),
-                                  );
-                                }}
-                                onEndTimeChange={(id, endTime) => {
-                                  setBookingGuests((prev) =>
-                                    sortCalendarGuestsByCanonicalOrder(
-                                      prev.map((item) => {
-                                        if (item.id !== id) return item;
+                                        const durationMins =
+                                          parseDurationMinsLabel(value);
                                         const startTime =
-                                          item.planningStartTime ?? "";
+                                          item.planningStartTime?.trim() ||
+                                          selectedSlot?.start?.slice(0, 5) ||
+                                          "";
                                         return {
                                           ...item,
-                                          planningEndTime: endTime,
-                                          planningDuration:
-                                            formatTimeWindowDurationLabel(
-                                              startTime,
-                                              endTime,
-                                            ) || "",
+                                          name: "Planning",
+                                          planningDuration: value,
+                                          planningStartTime:
+                                            startTime || item.planningStartTime,
+                                          planningEndTime:
+                                            startTime && durationMins
+                                              ? addMinutesToTime(
+                                                  startTime,
+                                                  durationMins,
+                                                )
+                                              : undefined,
                                         };
                                       }),
                                     ),
@@ -16825,8 +17128,9 @@ export default function ProfessionalFixedLocationCalendar({
                         ) : null}
 
                         {isViewingBooking &&
-                        (isBookingRequestAccepted(viewingBookingEvent) ||
-                          Boolean(viewingBookingEvent?.details?.needsOk)) ? (
+                        professionalShouldAck(
+                          viewingBookingEvent?.details,
+                        ) ? (
                           <BookingRequestAcceptedPanel
                             totalPrice={drawerPriceDisplay.displayTotal}
                             originalPrice={drawerPriceDisplay.originalPrice}
@@ -16837,7 +17141,9 @@ export default function ProfessionalFixedLocationCalendar({
                             remainingAmount={remainingAfterPrepayment}
                             lines={priceSummaryLines}
                             discountAmount={bookingDiscountAmount}
-                            onOk={handleAcknowledgeAcceptedBr}
+                            onOk={() =>
+                              void handleBookingActionSelect("ok")
+                            }
                           />
                         ) : (
                           <BookingDrawerTotalPriceCard
@@ -17119,6 +17425,15 @@ export default function ProfessionalFixedLocationCalendar({
       <CalendarPublicBusinessHoursModal
         open={publicBusinessHoursOpen}
         onClose={() => setPublicBusinessHoursOpen(false)}
+        availableLocations={data.supportedLocations.filter(
+          (location): location is "FL" | "DL" =>
+            location === "FL" || location === "DL",
+        )}
+        existingEntries={
+          Array.isArray(calendarSettings?.availability.publicBusinessHours)
+            ? calendarSettings.availability.publicBusinessHours
+            : []
+        }
         onApply={async () => {
           try {
             const location =
@@ -17281,7 +17596,7 @@ export default function ProfessionalFixedLocationCalendar({
         action={incomingConfirmAction}
         scenario={viewingBookingEvent?.bookingScenario}
         onClose={() => setIncomingConfirmAction(null)}
-        onConfirm={() => {
+        onConfirm={async () => {
           const action = incomingConfirmAction;
           const prepayRequired =
             showPrepayment &&
@@ -17293,7 +17608,6 @@ export default function ProfessionalFixedLocationCalendar({
             !isDrawerPrepaymentPaid &&
             !drawerPaymentIsOffline
           ) {
-            setIncomingConfirmAction(null);
             showSnackbar({
               severity: "warning",
               message:
@@ -17302,33 +17616,32 @@ export default function ProfessionalFixedLocationCalendar({
             return;
           }
           if (action === "suggest") {
-            setIncomingConfirmAction(null);
             if (viewingBookingEvent) openBookingMessages(viewingBookingEvent);
             return;
           }
+          if (showIncomingErActions) {
+            if (action === "accept") await handleAcceptConfirmedEr();
+            else if (action === "reject") await handleRejectConfirmedEr();
+            setResponseActionsDismissed(true);
+            showSnackbar({
+              severity: "success",
+              message:
+                action === "accept"
+                  ? "Edit request accepted. Client can edit once."
+                  : "Edit request rejected. Booking stays Confirmed.",
+            });
+            return;
+          }
+          if (action === "accept") await handleAcceptIncomingRequest();
+          else if (action === "reject") await handleRejectIncomingRequest();
           setResponseActionsDismissed(true);
-          setActionFeedback({
+          showSnackbar({
             severity: "success",
             message:
               action === "accept"
-                ? showIncomingErActions
-                  ? "Edit request accepted. Client can edit once."
-                  : "Booking request accepted."
-                : showIncomingErActions
-                  ? "Edit request rejected. Booking stays Confirmed."
-                  : "Booking request rejected.",
+                ? "Booking request accepted."
+                : "Booking request rejected.",
           });
-          if (showIncomingErActions) {
-            if (incomingConfirmAction === "accept")
-              void handleAcceptConfirmedEr();
-            else if (incomingConfirmAction === "reject")
-              void handleRejectConfirmedEr();
-            return;
-          }
-          if (incomingConfirmAction === "accept")
-            void handleAcceptIncomingRequest();
-          else if (incomingConfirmAction === "reject")
-            void handleRejectIncomingRequest();
         }}
       />
       <CalendarNoShowModal

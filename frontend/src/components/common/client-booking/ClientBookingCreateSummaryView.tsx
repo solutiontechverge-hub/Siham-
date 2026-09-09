@@ -62,6 +62,7 @@ import {
   withoutItemizedBookingSummaryLines,
 } from "../calendar/bookingTotal";
 import {
+  markNotesPrepaymentPaid,
   parseCalendarEntryNotes,
   resolveKilometerAllowanceAmount,
 } from "../calendar/bookingEventDetails";
@@ -280,10 +281,12 @@ export default function ClientBookingCreateSummaryView() {
     !isPrepaymentPaid &&
     !isOfflinePay &&
     checkoutPaymentMethodSupportsPayNow(checkoutMethodId);
-  const showFixedPrepayRow =
-    !isDesired && requiresPrepayment && prepaymentPercent > 0;
-  const showDesiredPrepayNote =
-    isDesired && prepaymentPercent > 0;
+  const showPrepayRow = requiresPrepayment && prepaymentPercent > 0;
+  const showPayNowAction =
+    showPrepayRow &&
+    !isPrepaymentPaid &&
+    !isOfflinePay &&
+    checkoutPaymentMethodSupportsPayNow(checkoutMethodId);
   const checkoutPrice = summarizeClientBookingPrice({
     services: draft?.services,
     people: draft?.people,
@@ -296,8 +299,7 @@ export default function ClientBookingCreateSummaryView() {
     lateRescheduleFeePercent: bookingNotesMeta?.lateRescheduleFeePercent,
     showNoShowFee: Boolean(bookingNotesMeta?.showNoShowFee),
     noShowFeePercent: bookingNotesMeta?.noShowFeePercent,
-    showPrepayment:
-      (showFixedPrepayRow || showDesiredPrepayNote) && prepaymentPercent > 0,
+    showPrepayment: showPrepayRow,
     prepaymentPercent,
     prepaymentPaid: isPrepaymentPaid,
     prepaymentOffline: isOfflinePay,
@@ -489,10 +491,17 @@ export default function ClientBookingCreateSummaryView() {
     }
 
     try {
+      // Desired stays a request until the pro accepts; Fixed can confirm on prepay.
+      const nextStatus = isDesired ? "requested" : "confirmed";
+      const paidNotes = markNotesPrepaymentPaid(
+        record.notes,
+        "onlineDirect",
+      );
       await updateMyBooking({
         id: bookingId,
         prepayment_status: "paid",
-        status: "confirmed",
+        status: nextStatus,
+        ...(paidNotes ? { notes: paidNotes } : {}),
       }).unwrap();
 
       const paidSession = {
@@ -500,7 +509,8 @@ export default function ClientBookingCreateSummaryView() {
         prepaid: true,
         requiresPrepayment: true,
         prepaymentPercent,
-        status: "confirmed" as const,
+        status: nextStatus as "requested" | "confirmed",
+        ...(paidNotes ? { notes: paidNotes } : {}),
       };
       setActiveBookingSession(paidSession);
       await refreshActiveBooking();
@@ -516,7 +526,9 @@ export default function ClientBookingCreateSummaryView() {
       setStripeDialogOpen(false);
       showSnackbar({
         severity: "success",
-        message: "Prepayment received. You can complete your booking.",
+        message: isDesired
+          ? "Prepayment received. You can send your booking request."
+          : "Prepayment received. You can complete your booking.",
       });
     } catch (error) {
       showSnackbar({
@@ -526,6 +538,7 @@ export default function ClientBookingCreateSummaryView() {
     }
   }, [
     ensureBookingCreated,
+    isDesired,
     prepayAmount,
     prepaymentPercent,
     refreshActiveBooking,
@@ -1190,7 +1203,9 @@ export default function ClientBookingCreateSummaryView() {
             </Box>
           </Box>
 
-          {draft.projectDetails ? (
+          {draft.projectDetails &&
+          (Boolean(draft.projectDetails.description?.trim()) ||
+            (draft.projectDetails.uploads?.length ?? 0) > 0) ? (
             <Box sx={{ px: { xs: 2.25, md: 3.5 }, pb: 2 }}>
               <ClientBookingProjectDetailsCard project={draft.projectDetails} />
             </Box>
@@ -1335,20 +1350,16 @@ export default function ClientBookingCreateSummaryView() {
               discountAmount={checkoutPrice.breakdown.discountAmount}
               lines={checkoutLines}
               prepaidPercent={
-                showFixedPrepayRow || showDesiredPrepayNote
-                  ? prepaymentPercent
-                  : undefined
+                showPrepayRow ? prepaymentPercent : undefined
               }
-              prepaidAmount={
-                showFixedPrepayRow || showDesiredPrepayNote ? prepayAmount : 0
-              }
+              prepaidAmount={showPrepayRow ? prepayAmount : 0}
               remainingAmount={
-                showFixedPrepayRow || showDesiredPrepayNote
+                showPrepayRow
                   ? checkoutPrice.breakdown.remainingAfterPrepayment
                   : undefined
               }
               prepaidAction={
-                showFixedPrepayRow && !isPrepaymentPaid && !isOfflinePay ? (
+                showPayNowAction ? (
                   <Typography
                     component="button"
                     type="button"
@@ -1369,7 +1380,7 @@ export default function ClientBookingCreateSummaryView() {
                   >
                     {isPaying ? "Preparing…" : "Pay Now"}
                   </Typography>
-                ) : showFixedPrepayRow && isPrepaymentPaid ? (
+                ) : showPrepayRow && isPrepaymentPaid ? (
                   <Typography
                     sx={{
                       fontWeight: 800,
@@ -1382,7 +1393,7 @@ export default function ClientBookingCreateSummaryView() {
                 ) : undefined
               }
             />
-            {showDesiredPrepayNote ? (
+            {isDesired && showPrepayRow && !isPrepaymentPaid ? (
               <Typography
                 sx={{
                   mt: 0.85,
@@ -1391,7 +1402,7 @@ export default function ClientBookingCreateSummaryView() {
                   color: alpha(m.navy, 0.5),
                 }}
               >
-                Prepayment is collected after the professional accepts.
+                You can Pay Now, or send the request and pay after the professional accepts.
               </Typography>
             ) : null}
           </Box>

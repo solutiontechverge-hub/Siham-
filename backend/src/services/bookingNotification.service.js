@@ -1,6 +1,9 @@
 import { query } from "../db/index.js";
 import { emitNotificationChanged } from "../messaging/messagingSocket.js";
-import { resolveResponseWindowMinutes } from "../utils/bookingResponseWindow.js";
+import {
+  resolveEffectiveRespondByMs,
+  resolveResponseWindowMinutes,
+} from "../utils/bookingResponseWindow.js";
 import {
   BOOKING_EMAIL_TYPES,
   sendInAppNotificationEmail,
@@ -832,37 +835,32 @@ export async function processRespondRequestReminderNotifications() {
   const now = Date.now();
   const outcomes = [];
   for (const row of result.rows) {
+    const effectiveMinutes = resolveResponseWindowMinutes(
+      row.response_time_hours,
+      row.response_time_minutes,
+    );
+
     let dueMs = null;
     const notes = String(row.notes ?? "");
     const marker = notes.indexOf("---mollure-meta---");
     if (marker !== -1) {
       try {
-        const meta = JSON.parse(notes.slice(marker + "---mollure-meta---".length).trim() || "{}");
-        if (meta?.respondBy) {
-          const parsed = Date.parse(meta.respondBy);
-          if (Number.isFinite(parsed)) dueMs = parsed;
-        } else if (meta?.responseStartedAt && Number(meta.responseWindowMinutes) > 0) {
-          const start = Date.parse(meta.responseStartedAt);
-          if (Number.isFinite(start)) {
-            dueMs = start + Number(meta.responseWindowMinutes) * 60_000;
-          }
-        }
+        const meta = JSON.parse(
+          notes.slice(marker + "---mollure-meta---".length).trim() || "{}",
+        );
+        dueMs = resolveEffectiveRespondByMs(meta, effectiveMinutes);
       } catch {
-        // fall through to setup / env window
+        // fall through to created_at + live window
       }
     }
 
     if (dueMs == null) {
-      const effectiveMinutes = resolveResponseWindowMinutes(
-        row.response_time_hours,
-        row.response_time_minutes,
-      );
       const created = Date.parse(row.created_at);
       if (!Number.isFinite(created)) continue;
       dueMs = created + effectiveMinutes * 60_000;
     }
 
-    // Fire reminder near the end of the window (same timing as overdue stamp).
+    // Fire reminder near the end of the live window (same timing as overdue stamp).
     if (now < dueMs) continue;
 
     const outcome = await dispatchRespondRequestReminderNotification(row.id);

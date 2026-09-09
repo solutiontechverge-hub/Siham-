@@ -305,21 +305,43 @@ export async function createOrGetThreadByBusinessSetup(clientUserId, businessSet
   return createOrGetThread(clientUserId, result.rows[0].professional_user_id);
 }
 
-/**
- * Open (create-or-get) the messaging thread for a booking from live DB data.
- * Works for both the booking client and the booking professional.
- */
-export async function openThreadForBooking(userId, bookingRef) {
-  const raw = String(bookingRef || "").trim();
-  if (!raw) {
-    const error = new Error("Booking reference is required.");
-    error.statusCode = 400;
-    throw error;
+function normalizeMessagingBookingRef(raw) {
+  let value = String(raw || "").trim().replace(/^#/, "");
+  if (/^b-/i.test(value)) value = value.slice(2);
+  if (/^ce-/i.test(value)) value = value.slice(3);
+  value = value.replace(/::segment-\d+$/i, "").trim();
+  return value;
+}
+
+function customerIdFromCalendarNotes(notes) {
+  if (!notes) return "";
+  try {
+    const parsed = typeof notes === "string" ? JSON.parse(notes) : notes;
+    return String(parsed?.customerId ?? parsed?.customer_id ?? "").trim();
+  } catch {
+    return "";
   }
+}
 
-  const normalized = raw.replace(/^#/, "").trim();
-  const codeBare = normalized.replace(/^b/i, "");
+async function findMollureClientForCalendarEntry(entry) {
+  const fromNotes = customerIdFromCalendarNotes(entry.notes);
+  if (fromNotes) return fromNotes;
+  const name = String(entry.client_name || "").trim();
+  if (!name || !entry.professional_profile_id) return "";
+  const result = await query(
+    `SELECT mollure_user_id
+     FROM professional_clients
+     WHERE professional_profile_id = $1
+       AND mollure_user_id IS NOT NULL
+       AND LOWER(TRIM(COALESCE(display_name, ''))) = LOWER($2)
+     LIMIT 1`,
+    [entry.professional_profile_id, name],
+  );
+  return String(result.rows[0]?.mollure_user_id ?? "").trim();
+}
 
+async function loadBookingForMessaging(normalized) {
+  const codeBare = normalized.replace(/^bk-?/i, "").replace(/^b/i, "");
   const bookingResult = await query(
     `SELECT
        b.id,
@@ -350,15 +372,97 @@ export async function openThreadForBooking(userId, bookingRef) {
      LIMIT 1`,
     [normalized, codeBare],
   );
+  return bookingResult.rows[0] ?? null;
+}
 
-  if (bookingResult.rowCount === 0) {
+async function loadCalendarEntryForMessaging(normalized) {
+  const result = await query(
+    `SELECT
+       ce.id,
+       ce.unique_code,
+       ce.status,
+       ce.location_type,
+       ce.notes,
+       ce.client_name,
+       ce.professional_profile_id,
+       pp.user_id AS professional_user_id,
+       bs.id AS business_setup_id,
+       COALESCE(
+         NULLIF(TRIM(bs.business_name), ''),
+         NULLIF(TRIM(bs.salon_name), ''),
+         NULLIF(TRIM(pp.legal_name), ''),
+         NULLIF(TRIM(CONCAT(pp.contact_first_name, ' ', pp.contact_last_name)), ''),
+         pu.email
+       ) AS professional_display_name
+     FROM calendar_entries ce
+     JOIN professional_profiles pp ON pp.id = ce.professional_profile_id
+     JOIN users pu ON pu.id = pp.user_id
+     LEFT JOIN LATERAL (
+       SELECT id, business_name, salon_name
+       FROM business_setups
+       WHERE professional_profile_id = pp.id AND is_active = true
+       ORDER BY id ASC
+       LIMIT 1
+     ) bs ON true
+     WHERE ce.status <> 'blocked'
+       AND (
+         ce.id::text = $1
+         OR LOWER(COALESCE(ce.unique_code, '')) = LOWER($1)
+       )
+     LIMIT 1`,
+    [normalized],
+  );
+  return result.rows[0] ?? null;
+}
+
+/**
+ * Open (create-or-get) the messaging thread for a booking from live DB data.
+ * Works for both the booking client and the booking professional.
+ * Also opens chat for Mollure clients on calendar-only (offline) entries.
+ */
+export async function openThreadForBooking(userId, bookingRef, options = {}) {
+  const raw = String(bookingRef || "").trim();
+  if (!raw) {
+    const error = new Error("Booking reference is required.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const normalized = normalizeMessagingBookingRef(raw);
+  const hintedCustomerId = String(options.customerId || "").trim();
+
+  let booking = await loadBookingForMessaging(normalized);
+  if (!booking) {
+    const entry = await loadCalendarEntryForMessaging(normalized);
+    if (entry) {
+      booking = {
+        id: entry.id,
+        unique_code: entry.unique_code,
+        status: entry.status,
+        location_type: entry.location_type,
+        customer_id:
+          hintedCustomerId || (await findMollureClientForCalendarEntry(entry)),
+        business_setup_id: entry.business_setup_id,
+        professional_user_id: entry.professional_user_id,
+        professional_display_name: entry.professional_display_name,
+      };
+    }
+  }
+
+  if (!booking) {
     const error = new Error("Booking not found.");
     error.statusCode = 404;
     throw error;
   }
 
-  const booking = bookingResult.rows[0];
-  const isClient = String(booking.customer_id) === String(userId);
+  const customerId = String(booking.customer_id || hintedCustomerId || "").trim();
+  if (!customerId) {
+    const error = new Error("This booking has no Mollure client to chat with.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const isClient = String(customerId) === String(userId);
   const isProfessional = String(booking.professional_user_id) === String(userId);
   if (!isClient && !isProfessional) {
     const error = new Error("You do not have access to this booking conversation.");
@@ -366,10 +470,7 @@ export async function openThreadForBooking(userId, bookingRef) {
     throw error;
   }
 
-  const threadId = await createOrGetThread(
-    booking.customer_id,
-    booking.professional_user_id,
-  );
+  const threadId = await createOrGetThread(customerId, booking.professional_user_id);
 
   const code = booking.unique_code || String(booking.id);
   const bookingMeta = buildBookingMeta(code, booking.status, booking.location_type);
@@ -405,7 +506,7 @@ export async function openThreadForBooking(userId, bookingRef) {
     threadId,
     thread: mapThreadRow(threadResult.rows[0], userId),
     bookingRef: code,
-    businessSetupId: String(booking.business_setup_id),
+    businessSetupId: String(booking.business_setup_id || ""),
   };
 }
 

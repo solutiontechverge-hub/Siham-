@@ -1,6 +1,9 @@
 import { query } from "../db/index.js";
 import { emitBookingChanged } from "../messaging/messagingSocket.js";
-import { resolveResponseWindowMinutes } from "../utils/bookingResponseWindow.js";
+import {
+  resolveEffectiveRespondByMs,
+  resolveResponseWindowMinutes,
+} from "../utils/bookingResponseWindow.js";
 
 const NOTES_META_PREFIX = "---mollure-meta---";
 
@@ -25,27 +28,12 @@ function joinNotes(human, meta) {
   return `${prefix}${NOTES_META_PREFIX}\n${JSON.stringify(meta)}`;
 }
 
-
 function hasNotesResponseDeadline(meta) {
   if (!meta || typeof meta !== "object") return false;
   if (meta.respondBy) return true;
   if (meta.responseStartedAt) return true;
   if (Number(meta.responseWindowMinutes) > 0) return true;
   return false;
-}
-
-function resolveRespondByMs(meta, windowMinutes) {
-  if (meta?.respondBy) {
-    const due = Date.parse(meta.respondBy);
-    if (Number.isFinite(due)) return due;
-  }
-
-  if (meta?.responseStartedAt) {
-    const start = Date.parse(meta.responseStartedAt);
-    if (Number.isFinite(start)) return start + windowMinutes * 60_000;
-  }
-
-  return null;
 }
 
 function hasPendingNegotiation(status, meta) {
@@ -56,9 +44,9 @@ function hasPendingNegotiation(status, meta) {
 }
 
 /**
- * Permanently stamp responseStatus=overdue_response on pending BR/EBR/ER
- * once the stored notes deadline elapses. Blank template falls back to the
- * flat 30-minute default. Bookings that never received a deadline are skipped.
+ * Stamp / clear responseStatus=overdue_response from the live business-template
+ * window (flat 30-minute default when unset). Template edits apply immediately
+ * to open BR/EBR/ER negotiations.
  */
 export async function processOverdueResponseStatusUpdates() {
   const result = await query(
@@ -85,27 +73,45 @@ export async function processOverdueResponseStatusUpdates() {
   for (const row of result.rows) {
     const { human, meta } = splitNotes(row.notes);
     if (!hasPendingNegotiation(row.status, meta)) continue;
-    if (meta.responseStatus === "overdue_response") continue;
     if (!hasNotesResponseDeadline(meta)) continue;
 
     const windowMinutes = resolveResponseWindowMinutes(
       row.response_time_hours,
       row.response_time_minutes,
-      meta?.responseWindowMinutes,
     );
-    const dueMs = resolveRespondByMs(meta, windowMinutes);
-    if (!dueMs || now <= dueMs) continue;
+    const dueMs = resolveEffectiveRespondByMs(meta, windowMinutes);
+    if (dueMs == null) continue;
+
+    const isOverdue = now > dueMs;
+    const wasOverdue = meta.responseStatus === "overdue_response";
+
+    if (isOverdue && wasOverdue) {
+      // Keep snapshot fields aligned with the live window.
+      if (
+        Number(meta.responseWindowMinutes) === windowMinutes &&
+        meta.respondBy === new Date(dueMs).toISOString()
+      ) {
+        continue;
+      }
+    } else if (!isOverdue && !wasOverdue) {
+      continue;
+    }
 
     const startedAt =
       meta.responseStartedAt ||
       new Date(dueMs - windowMinutes * 60_000).toISOString();
     const nextMeta = {
       ...meta,
-      responseStatus: "overdue_response",
       responseStartedAt: startedAt,
-      respondBy: meta.respondBy || new Date(dueMs).toISOString(),
+      respondBy: new Date(dueMs).toISOString(),
       responseWindowMinutes: windowMinutes,
     };
+    if (isOverdue) {
+      nextMeta.responseStatus = "overdue_response";
+    } else {
+      delete nextMeta.responseStatus;
+    }
+
     const nextNotes = joinNotes(human, nextMeta);
 
     const updated = await query(

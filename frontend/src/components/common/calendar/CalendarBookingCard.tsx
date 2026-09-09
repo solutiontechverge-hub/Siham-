@@ -13,17 +13,23 @@ import {
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import { extractBookingId } from "./calendar.utils";
 import {
-  getBookingScenarioIndicators,
-  calendarBookingStatusLabel,
+  getActionRequiredScenarioIndicators,
+  professionalCalendarDisplayStatus,
+  professionalCalendarStatusLabel,
+  professionalWaitingForClientPrepay,
   scenarioIndicatorDisplayLabel,
   statusCardAccent,
   statusChipSxWithOverride,
-  isBookingRequestAccepted,
-  isBookingRequestRejected,
+  type BookingScenarioIndicator,
 } from "./bookingStatus";
-import { resolveBookingResponseIndicators } from "./bookingResponseStatus";
+import {
+  actionRequiredBookingIndicators,
+  resolveBookingResponseIndicators,
+} from "./bookingResponseStatus";
+import type { ResponseWindowInput } from "./bookingResponseDeadline";
 import { resolveProfessionalBookingRequestDirection } from "./BookingRequestBadge";
 import {
+  actionRequiredPrepaymentIconVariant,
   resolveCalendarPrepaymentStatus,
   toPrepaymentIconVariant,
 } from "./prepaymentStatus";
@@ -34,10 +40,6 @@ import {
 } from "./bookingUpdateSeen";
 import { sanitizeInternalNoteText } from "./bookingEventDetails";
 import BookingIdTooltipLabel from "./BookingIdTooltipLabel";
-import {
-  isTeamSharedBooking,
-  teamSharedBookingTooltip,
-} from "./teamMemberBookings";
 
 export type CalendarBookingCardProps = {
   event: CalendarEvent;
@@ -53,15 +55,18 @@ export type CalendarBookingCardProps = {
   teamMemberNameById?: ReadonlyMap<string, string>;
   containerSx?: SxProps<Theme>;
   onOpen: () => void;
-  onOpenCalendar: () => void;
+  /** Kept for callers; calendar glyph is not shown (interactive-only icons). */
+  onOpenCalendar?: () => void;
   onOpenNotes: () => void;
   onOpenClient: (anchorEl: HTMLElement) => void;
   onOpenMessages: () => void;
   responseTimeConfigured?: boolean;
+  /** Live business-template response window (drives dynamic overdue). */
+  responseTime?: ResponseWindowInput | null;
 };
 
 function scenarioBadgeResponseIndicators(
-  label: ReturnType<typeof getBookingScenarioIndicators>[number],
+  label: BookingScenarioIndicator,
   responseIndicators: ReturnType<typeof resolveBookingResponseIndicators>,
 ) {
   if (label === "BR" || label === "EBR") return responseIndicators;
@@ -84,14 +89,13 @@ export default function CalendarBookingCard({
   variant = "default",
   positioned = true,
   dense = false,
-  teamMemberNameById,
   containerSx,
   onOpen,
-  onOpenCalendar,
   onOpenNotes,
   onOpenClient,
   onOpenMessages,
   responseTimeConfigured,
+  responseTime,
 }: CalendarBookingCardProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -113,15 +117,22 @@ export default function CalendarBookingCard({
   const isCompactTicket = dense || (isTicket && cardHeight < 48);
   const bookingRef = event.bookingCode ?? extractBookingId(event.id);
   const unreadCount = useProfessionalMessagingUnread(bookingRef);
-  const accent = statusCardAccent(event.status, statusColor);
-  const scenarioIndicators = getBookingScenarioIndicators(event);
-  const responseIndicators = resolveBookingResponseIndicators(event, {
-    responseTimeConfigured,
-  });
+  const displayStatus = professionalCalendarDisplayStatus(event);
+  const waitingForClientPrepay = professionalWaitingForClientPrepay(event);
+  const accent = statusCardAccent(displayStatus, statusColor);
+  const scenarioIndicators = getActionRequiredScenarioIndicators(event);
+  const responseIndicators = actionRequiredBookingIndicators(
+    resolveBookingResponseIndicators(event, {
+      responseTimeConfigured,
+      responseTime,
+    }),
+  );
   const prepaymentStatus = resolveCalendarPrepaymentStatus(event);
-  const prepaymentIconVariant = prepaymentStatus
-    ? toPrepaymentIconVariant(prepaymentStatus)
-    : undefined;
+  const prepaymentIconVariant = waitingForClientPrepay
+    ? undefined
+    : actionRequiredPrepaymentIconVariant(
+        prepaymentStatus ? toPrepaymentIconVariant(prepaymentStatus) : undefined,
+      );
   const paymentDueMeta = useBookingPaymentDueMeta(event);
   const isDesiredLocation = event.location === "DL";
   const isFixedLocation = event.location === "FL";
@@ -135,7 +146,7 @@ export default function CalendarBookingCard({
     : accent.bg;
   const borderColor = serviceColor
     ? alpha(serviceColor, 0.55)
-    : event.status === "Requested"
+    : event.status === "Requested" || waitingForClientPrepay
       ? accent.border
       : isIncomingEr
         ? alpha(m.teal, 0.65)
@@ -148,6 +159,7 @@ export default function CalendarBookingCard({
   const emphasizeRequest =
     isIncomingEbr ||
     isIncomingEr ||
+    waitingForClientPrepay ||
     (event.bookingScenario === "BR" && event.status === "Requested");
   useBookingUpdateSeenVersion();
   const showUpdated =
@@ -161,10 +173,6 @@ export default function CalendarBookingCard({
       updatedAt: event.updatedAt,
       lastEditedBy: event.details?.lastEditedBy ?? null,
     });
-  const teamShared = isTeamSharedBooking(event);
-  const teamSharedTooltip = teamShared
-    ? teamSharedBookingTooltip(event, { nameById: teamMemberNameById })
-    : "";
 
   return (
     <Box
@@ -221,9 +229,9 @@ export default function CalendarBookingCard({
         }
         showUpdated={showUpdated}
         status={{
-          label: calendarBookingStatusLabel(event),
+          label: professionalCalendarStatusLabel(event),
           sx: {
-            ...statusChipSxWithOverride(event.status, statusColor),
+            ...statusChipSxWithOverride(displayStatus, statusColor),
             ...(emphasizeRequest ? { fontWeight: 900 } : null),
           },
         }}
@@ -234,25 +242,11 @@ export default function CalendarBookingCard({
         }
         pattern={cardPattern}
         scenarioBadges={[
-          ...(teamShared
-            ? [
-                {
-                  label: "Shared",
-                  tooltip: teamSharedTooltip,
-                  bold: true,
-                  sx: {
-                    border: `1px solid ${alpha(m.teal, 0.45)}`,
-                    bgcolor: alpha(m.teal, 0.16),
-                    color: m.teal,
-                    cursor: "help",
-                  },
-                },
-              ]
-            : []),
           ...(calendarEventIsGuest(event)
             ? [
                 {
                   label: "Guest",
+                  tooltip: "Guest booking — no profile",
                   bold: true,
                   sx: {
                     border: `1px solid ${alpha(m.navy, 0.18)}`,
@@ -261,50 +255,22 @@ export default function CalendarBookingCard({
                   },
                 },
               ]
-            : event.clientKind === "company" ||
-                event.details?.clientKind === "company"
-              ? [
-                  {
-                    label: "CC",
-                    bold: true,
-                    sx: {
-                      border: `1px solid ${alpha(m.teal, 0.45)}`,
-                      bgcolor: alpha(m.teal, 0.16),
-                      color: m.teal,
-                    },
-                  },
-                ]
-              : [
-                  {
-                    label: "IC",
-                    bold: true,
-                    sx: {
-                      border: `1px solid ${alpha(m.teal, 0.45)}`,
-                      bgcolor: alpha(m.teal, 0.16),
-                      color: m.teal,
-                    },
-                  },
-                ]),
-          ...scenarioIndicators
-            .filter((indicator) => indicator !== "E")
-            .map((indicator) => ({
+            : []),
+          ...scenarioIndicators.map((indicator) => ({
           label: scenarioIndicatorDisplayLabel(indicator),
           showRequestSentIcon: indicator === "BR",
           requestDirection:
             indicator === "BR" || indicator === "ER"
               ? resolveProfessionalBookingRequestDirection(event)
               : undefined,
-          requestAccepted: indicator === "BR" && isBookingRequestAccepted(event),
-          requestRejected: indicator === "BR" && isBookingRequestRejected(event),
           responseIndicators:
             indicator === "EBR"
               ? scenarioBadgeResponseIndicators(indicator, responseIndicators)
               : [],
           prepaymentStatus:
-            indicator === "EBR"
-              ? prepaymentIconVariant === "pending"
-                ? undefined
-                : prepaymentIconVariant
+            indicator === "EBR" &&
+            prepaymentIconVariant === "canceled_or_invalid"
+              ? prepaymentIconVariant
               : undefined,
           showExternalLink: false,
           bold:
@@ -333,8 +299,7 @@ export default function CalendarBookingCard({
               }
             : null
         }
-        // Prepayment pending already covered by prepaymentStatus — strip duplicate
-        // waiting_for_prepayment / prepaid / refund icons from response list.
+        // Pending prepay / refund already covered by prepaymentStatus — skip duplicates.
         responseIndicators={(() => {
           const raw =
             scenarioIndicators.includes("BR")
@@ -345,17 +310,11 @@ export default function CalendarBookingCard({
           if (!raw?.length) return raw;
           const skip = new Set<string>();
           if (prepaymentIconVariant === "pending") skip.add("waiting_for_prepayment");
-          if (prepaymentIconVariant === "confirmed") skip.add("prepaid");
           if (prepaymentIconVariant === "canceled_or_invalid") {
             skip.add("refund_pending");
           }
           return raw.filter((item) => !skip.has(item));
         })()}
-        calendarAction={{
-          show: !isTicket && !dense,
-          tooltip: "Open calendar",
-          onClick: onOpenCalendar,
-        }}
         notesAction={{
           show: hasNote,
           tooltip: incomingErNote

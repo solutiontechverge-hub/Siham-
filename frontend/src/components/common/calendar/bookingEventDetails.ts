@@ -332,6 +332,24 @@ export function rewriteCalendarNotesPreservingNegotiation(
   return serializeCalendarEntryNotes(internalNote, details, ebr, er);
 }
 
+/** Mark notes meta paid so professional Accept unlocks even if column sync lags. */
+export function markNotesPrepaymentPaid(
+  notes: string | null | undefined,
+  paymentMethod?: string | null,
+): string | null {
+  const details = parseCalendarEntryNotes(notes);
+  const internalNote = sanitizeInternalNoteText(details?.internalNote) || "";
+  return rewriteCalendarNotesPreservingNegotiation(notes, internalNote, {
+    ...details,
+    showPrepayment: true,
+    prepaymentStatus: "confirmed",
+    paymentMethod: (paymentMethod || details?.paymentMethod) as
+      | "online"
+      | "offline"
+      | undefined,
+  });
+}
+
 /** Keep suggested changes but mark EBR as rejected (booking columns stay original). */
 export function markClientEbrRejectedInNotes(notes?: string | null): string | null {
   const details = parseCalendarEntryNotes(notes);
@@ -554,7 +572,12 @@ function guestFromSnapshotPerson(
           durationMins: service.durationMins,
           startTime: service.startTime,
           endTime: service.endTime,
-          staffResourceId: service.teamMemberId ?? undefined,
+          ...(service.teamMemberId
+            ? {
+                teamMemberId: String(service.teamMemberId),
+                staffResourceId: String(service.teamMemberId),
+              }
+            : {}),
           guestId: service.guestId ?? person.id,
           discount: service.discount ?? null,
           originalPrice: service.originalPrice,
@@ -591,21 +614,29 @@ export function mainDrawerServicesFromClientSnapshot(
 
   if (!mainServices.length) return undefined;
 
-  return mainServices.map((service) => ({
-    id: service.id,
-    name: service.name,
-    price: Number(service.price) || 0,
-    durationMins: Math.max(15, Number(service.durationMins) || 15),
-    ...(service.startTime ? { startTime: service.startTime } : {}),
-    ...(service.endTime ? { endTime: service.endTime } : {}),
-    ...(service.teamMemberId ? { staffResourceId: String(service.teamMemberId) } : {}),
-    ...(service.teamMemberName ? { teamMemberName: service.teamMemberName } : {}),
-    guestId: service.guestId == null || !String(service.guestId).trim()
-      ? null
-      : String(service.guestId),
-    ...(service.originalPrice != null ? { originalPrice: Number(service.originalPrice) } : {}),
-    ...(service.discount ? { discount: service.discount } : {}),
-  }));
+  return mainServices.map((service) => {
+    const teamMemberId = service.teamMemberId
+      ? String(service.teamMemberId)
+      : undefined;
+    return {
+      id: service.id,
+      name: service.name,
+      price: Number(service.price) || 0,
+      durationMins: Math.max(15, Number(service.durationMins) || 15),
+      ...(service.startTime ? { startTime: service.startTime } : {}),
+      ...(service.endTime ? { endTime: service.endTime } : {}),
+      // Keep both fields: lane filters use teamMemberId; older rows used staffResourceId.
+      ...(teamMemberId
+        ? { teamMemberId, staffResourceId: teamMemberId }
+        : {}),
+      ...(service.teamMemberName ? { teamMemberName: service.teamMemberName } : {}),
+      guestId: service.guestId == null || !String(service.guestId).trim()
+        ? null
+        : String(service.guestId),
+      ...(service.originalPrice != null ? { originalPrice: Number(service.originalPrice) } : {}),
+      ...(service.discount ? { discount: service.discount } : {}),
+    };
+  });
 }
 
 export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingDetails | undefined {
@@ -777,14 +808,41 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
   }
 }
 
-export function parseApiCalendarEventId(eventId: string | null | undefined):
+export type ParsedCalendarEventId =
   | { kind: "booking"; id: string }
-  | { kind: "calendar_entry"; id: string }
-  | null {
+  | { kind: "calendar_entry"; id: string };
+
+export function parseApiCalendarEventId(
+  eventId: string | null | undefined,
+): ParsedCalendarEventId | null {
   if (!eventId) return null;
-  if (eventId.startsWith("b-")) return { kind: "booking", id: eventId.slice(2) };
-  if (eventId.startsWith("ce-")) return { kind: "calendar_entry", id: eventId.slice(3) };
+  const parentId = eventId.replace(/::segment-\d+$/i, "");
+  if (parentId.startsWith("b-")) {
+    return { kind: "booking", id: parentId.slice(2) };
+  }
+  if (parentId.startsWith("ce-")) {
+    return { kind: "calendar_entry", id: parentId.slice(3) };
+  }
   return null;
+}
+
+/** Live chat open: unique code or UUID — never `extractBookingId` (it mangles hyphenated ids). */
+export function resolveCalendarMessagingRef(event: {
+  id: string;
+  bookingCode?: string;
+  details?: { customerId?: string | null };
+}): { bookingRef: string; customerId?: string } {
+  const parsed = parseApiCalendarEventId(event.id);
+  const parsedId = String(parsed?.id ?? "").replace(/::segment-\d+$/i, "");
+  const bookingRef =
+    String(event.bookingCode ?? "").trim() ||
+    parsedId ||
+    String(event.id ?? "").trim();
+  const customerId = String(event.details?.customerId ?? "").trim();
+  return {
+    bookingRef,
+    ...(customerId ? { customerId } : {}),
+  };
 }
 
 export type BookingDrawerHydration = {

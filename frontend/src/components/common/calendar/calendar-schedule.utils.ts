@@ -268,6 +268,48 @@ export function splitScheduleRowForDate(
   return [updatedOriginal, overrideRow];
 }
 
+/**
+ * Remove one location for one team member from a schedule availability row.
+ * Shared "All" rows are split so other members / other locations stay intact.
+ */
+export function removeScheduleAvailabilityForMemberLocation(
+  rows: readonly ScheduleAvailabilityRow[],
+  rowId: string,
+  resourceId: string,
+  location: CalendarBookingLocation,
+): ScheduleAvailabilityRow[] {
+  return rows.flatMap((row) => {
+    if (row.id !== rowId) return [row];
+    if (
+      !row.resourceIds.includes(resourceId) ||
+      !row.locations.includes(location)
+    ) {
+      return [row];
+    }
+
+    const otherResourceIds = row.resourceIds.filter((id) => id !== resourceId);
+    const remainingLocationsForMember = row.locations.filter(
+      (item) => item !== location,
+    );
+    const next: ScheduleAvailabilityRow[] = [];
+
+    if (otherResourceIds.length) {
+      next.push({ ...row, resourceIds: otherResourceIds });
+    }
+
+    if (remainingLocationsForMember.length) {
+      next.push({
+        ...row,
+        id: otherResourceIds.length ? makeScheduleRowId() : row.id,
+        resourceIds: [resourceId],
+        locations: remainingLocationsForMember,
+      });
+    }
+
+    return next;
+  });
+}
+
 function shiftToInterval(shift: { start: string; end: string }): Interval {
   return {
     startMin: minutesSinceMidnight(shift.start),

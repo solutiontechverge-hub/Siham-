@@ -1,12 +1,9 @@
 "use client";
 
 import * as React from "react";
-import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
-import EventSeatRoundedIcon from "@mui/icons-material/EventSeatRounded";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
-import PersonPinCircleRoundedIcon from "@mui/icons-material/PersonPinCircleRounded";
 import StickyNote2OutlinedIcon from "@mui/icons-material/StickyNote2Outlined";
 import {
   Box,
@@ -23,6 +20,8 @@ import BookingIndicatorIcon, {
   BOOKING_INDICATOR_LABELS,
   type BookingIndicatorVariant,
 } from "../calendar/BookingIndicatorIcon";
+import { actionRequiredBookingIndicators } from "../calendar/bookingResponseStatus";
+import { actionRequiredPrepaymentIconVariant } from "../calendar/prepaymentStatus";
 import BookingRequestBadge, {
   type BookingRequestDirection,
 } from "../calendar/BookingRequestBadge";
@@ -268,8 +267,7 @@ function renderScenarioBadge(
         : !badge.showRequestSentIcon && badge.showAcceptedIcon
           ? renderResponseIndicators(["suggestion_for_change"])
           : null}
-      {badge.prepaymentStatus &&
-      badge.prepaymentStatus !== "pending" &&
+      {badge.prepaymentStatus === "canceled_or_invalid" &&
       !badge.responseIndicators?.includes(
         prepaymentVariantToIndicator(badge.prepaymentStatus),
       ) ? (
@@ -373,7 +371,6 @@ export default function BookingTimelineCard({
   actionRailSx,
   backgroundColor,
   borderColor,
-  calendarAction,
   contentSx,
   idLabel,
   locationLabel,
@@ -426,12 +423,13 @@ export default function BookingTimelineCard({
     }
   }
   const standaloneResponseList = uniqueIndicators(
-    (responseIndicators ?? []).filter(
+    actionRequiredBookingIndicators(responseIndicators).filter(
       (item) => !embeddedIndicatorKeys.has(item),
     ),
   );
-  const prepaymentIndicator = prepaymentStatus
-    ? prepaymentVariantToIndicator(prepaymentStatus)
+  const actionPrepayment = actionRequiredPrepaymentIconVariant(prepaymentStatus);
+  const prepaymentIndicator = actionPrepayment
+    ? prepaymentVariantToIndicator(actionPrepayment)
     : null;
   const showStandalonePrepayment =
     Boolean(prepaymentIndicator) &&
@@ -582,9 +580,9 @@ export default function BookingTimelineCard({
           {visibleScenarioBadges.map((badge, index) =>
             renderScenarioBadge(badge, m, `scenario-${index}`),
           )}
-          {showStandalonePrepayment && prepaymentStatus ? (
+          {showStandalonePrepayment && actionPrepayment ? (
             <Tooltip
-              title={PREPAYMENT_STATUS_LABELS[prepaymentStatus]}
+              title={PREPAYMENT_STATUS_LABELS[actionPrepayment]}
               placement="top"
             >
               <Box
@@ -596,7 +594,7 @@ export default function BookingTimelineCard({
                 }}
               >
                 <PrepaymentStatusIcon
-                  variant={prepaymentStatus}
+                  variant={actionPrepayment}
                   size={CARD_INDICATOR_ICON_SIZE}
                 />
               </Box>
@@ -751,15 +749,6 @@ export default function BookingTimelineCard({
               height: 16,
             }}
           >
-            {locationLabel === "FL" ? (
-              <EventSeatRoundedIcon
-                sx={{ fontSize: 14, color: alpha(m.navy, 0.62), flexShrink: 0 }}
-              />
-            ) : (
-              <PersonPinCircleRoundedIcon
-                sx={{ fontSize: 14, color: alpha(m.navy, 0.62), flexShrink: 0 }}
-              />
-            )}
             <BodyText
               sx={{
                 fontSize: 12,

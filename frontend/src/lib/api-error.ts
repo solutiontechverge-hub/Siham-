@@ -35,10 +35,37 @@ export const getApiErrorMessage = (
   if (
     typeof error === "object" &&
     error !== null &&
+    "error" in error &&
+    typeof (error as { error?: unknown }).error === "string" &&
+    String((error as { error: string }).error).trim()
+  ) {
+    const raw = String((error as { error: string }).error).trim();
+    if (/failed to fetch|networkerror|load failed/i.test(raw)) {
+      return "Cannot reach the server. Confirm the backend is running (port 5000) and refresh on the current app URL.";
+    }
+    return raw;
+  }
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "status" in error &&
+    (error as { status?: unknown }).status === "FETCH_ERROR"
+  ) {
+    return "Cannot reach the server. Confirm the backend is running (port 5000) and refresh on the current app URL.";
+  }
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
     "message" in error &&
     typeof (error as ApiErrorShape).message === "string"
   ) {
-    return (error as ApiErrorShape).message ?? fallbackMessage;
+    const msg = (error as ApiErrorShape).message ?? fallbackMessage;
+    if (/failed to fetch|networkerror|load failed/i.test(msg)) {
+      return "Cannot reach the server. Confirm the backend is running (port 5000) and refresh on the current app URL.";
+    }
+    return msg;
   }
 
   return fallbackMessage;

@@ -226,6 +226,14 @@ export function resolveClientBookingActions(input: {
   if (status === "confirmed") {
     flags.edit = true;
     flags.cancel = true;
+    if (
+      clientShouldAck({
+        needsOk: input.needsOk,
+        ackRecipient: input.ackRecipient,
+      })
+    ) {
+      flags.ok = true;
+    }
     return flags;
   }
 

@@ -27,6 +27,7 @@ export function statusLabel(status: MessagingBookingStatus): string {
     completed: "Completed",
     confirmed: "Confirmed",
     requested: "Requests",
+    br_accepted: "BR Accepted",
     cancelled: "Cancelled",
     invalid: "Invalid",
     no_show: "No Show",
