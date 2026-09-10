@@ -24,7 +24,6 @@ import {
   notifyActiveBookingChanged,
   setActiveBookingSession,
 } from "../../app/clients/booking/clientBookingSession";
-import { markBookingUpdateSeen } from "./calendar/bookingUpdateSeen";
 import { buildBookingSummarySections, bookingParticipantDisplayHeading, participantHeadingOrdinal, participantOrdinals, planningScheduleMeta } from "./client-booking/buildBookingSummarySections";
 
 export const FOCUS_BOOKING_REF_KEY = "mollure:focus_booking_ref";
@@ -193,7 +192,7 @@ export default function NotificationBookingSummaryModal({
 
   const handleViewClient = () => {
     if (!record) return;
-    markBookingUpdateSeen("client", record.bookingRef, record.updatedAt);
+    // Do not mark seen here — details page must show first-open Updated chips.
     setActiveBookingSession(record);
     notifyActiveBookingChanged();
     onClose();

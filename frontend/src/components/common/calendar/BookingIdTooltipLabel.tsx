@@ -10,6 +10,7 @@ import {
   Tooltip,
   useMediaQuery,
 } from "@mui/material";
+import { useSnackbar } from "../AppSnackbar";
 
 async function copyBookingId(value: string) {
   try {
@@ -41,6 +42,7 @@ export type BookingIdTooltipLabelProps = {
 export default function BookingIdTooltipLabel({
   bookingId,
 }: BookingIdTooltipLabelProps) {
+  const { showSnackbar } = useSnackbar();
   const isTouch = useMediaQuery("(hover: none)", { noSsr: true });
   const [touchOpen, setTouchOpen] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
@@ -54,13 +56,32 @@ export default function BookingIdTooltipLabel({
     };
   }, []);
 
-  const handleCopy = async (event: React.MouseEvent<HTMLElement>) => {
-    stopCardClick(event);
+  const copyId = async () => {
     const ok = await copyBookingId(bookingId);
-    if (!ok) return;
+    if (!ok) {
+      showSnackbar({
+        severity: "error",
+        message: "Could not copy booking ID",
+      });
+      return;
+    }
     setCopied(true);
     if (copiedResetRef.current) clearTimeout(copiedResetRef.current);
     copiedResetRef.current = setTimeout(() => setCopied(false), 1600);
+    showSnackbar({
+      severity: "success",
+      message: "Booking ID copied",
+    });
+  };
+
+  const handleCopy = async (event: React.MouseEvent<HTMLElement>) => {
+    stopCardClick(event);
+    await copyId();
+  };
+
+  const handleDoubleClick = async (event: React.MouseEvent<HTMLElement>) => {
+    stopCardClick(event);
+    await copyId();
   };
 
   const tooltipBody = (
@@ -119,11 +140,12 @@ export default function BookingIdTooltipLabel({
         component="span"
         role="button"
         tabIndex={0}
-        aria-label="Show booking ID"
+        aria-label="Show booking ID. Double-click to copy."
         onClick={(event) => {
           stopCardClick(event);
           if (isTouch) setTouchOpen((open) => !open);
         }}
+        onDoubleClick={handleDoubleClick}
         onMouseDown={stopCardClick}
         onKeyDown={(event) => {
           if (event.key !== "Enter" && event.key !== " ") return;
@@ -136,6 +158,7 @@ export default function BookingIdTooltipLabel({
           display: "inline-flex",
           alignItems: "center",
           borderBottom: "1px dotted currentColor",
+          userSelect: "none",
         }}
       >
         ID

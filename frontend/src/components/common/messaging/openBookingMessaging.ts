@@ -26,7 +26,7 @@ export function buildBookingMessagingParams(
   result: OpenBookingMessagingResult,
 ): MessagingOpenParams {
   return {
-    threadId: result.threadId,
+    threadId: result.threadId || result.thread?.id,
     bookingRef: result.bookingRef,
     businessSetupId: result.businessSetupId,
     seedThread: result.thread,

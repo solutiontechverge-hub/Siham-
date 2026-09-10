@@ -17,6 +17,7 @@ import {
 import { alpha, useTheme } from "@mui/material/styles";
 import {
   isClientBookingPaymentDue,
+  isWaitingForPrepayment,
   statusChipLabel,
   type BookingListTab,
   type ClientBookingRecord,
@@ -114,6 +115,14 @@ export default function ClientBookingListView({ listTab }: Props) {
     const enriched = enrichClientBookingRecord(record);
     setActiveBookingSession(enriched);
     router.push(getCheckoutPath(enriched, listTab));
+  };
+
+  const openPrepaidCheckout = (record: ClientBookingRecord) => {
+    const enriched = enrichClientBookingRecord(record);
+    setActiveBookingSession(enriched);
+    router.push(
+      `/clients/booking/checkout/prepaid?tab=${encodeURIComponent(listTab)}`,
+    );
   };
 
   const loading = isLoading || isFetching;
@@ -253,14 +262,8 @@ export default function ClientBookingListView({ listTab }: Props) {
                   pendingEr?.initiated_by === "client" ? pendingEr : null;
                 const erNote =
                   (incomingEr?.note || outgoingEr?.note || "").trim() || "";
-                const waitingForPayment =
-                  paymentDue ||
-                  (displayStatus !== "completed" &&
-                    displayStatus !== "cancelled" &&
-                    displayStatus !== "invalid" &&
-                    displayStatus !== "no_show" &&
-                    Boolean(b.requiresPrepayment) &&
-                    !b.prepaid);
+                const waitingForPrepayment = isWaitingForPrepayment(b);
+                const waitingForPayment = paymentDue;
                 const isSilentUpdated = Boolean(b.silentUpdated);
                 const isConfirmedEdited =
                   displayStatus === "confirmed" &&
@@ -442,6 +445,42 @@ export default function ClientBookingListView({ listTab }: Props) {
                                 }}
                               />
                             ) : null}
+                            {waitingForPrepayment ? (
+                              <Box
+                                component="span"
+                                role="button"
+                                tabIndex={0}
+                                title="Waiting for prepayment — pay now"
+                                aria-label="Waiting for prepayment — pay now"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  event.preventDefault();
+                                  openPrepaidCheckout(b);
+                                }}
+                                onKeyDown={(event) => {
+                                  if (event.key !== "Enter" && event.key !== " ")
+                                    return;
+                                  event.stopPropagation();
+                                  event.preventDefault();
+                                  openPrepaidCheckout(b);
+                                }}
+                                sx={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  cursor: "pointer",
+                                  borderRadius: "6px",
+                                  "&:hover": {
+                                    bgcolor: alpha(m.navy, 0.06),
+                                  },
+                                }}
+                              >
+                                <BookingIndicatorIcon
+                                  variant="waiting_for_prepayment"
+                                  size={16}
+                                />
+                              </Box>
+                            ) : null}
                             {waitingForPayment ? (
                               <Box
                                 sx={{
@@ -449,23 +488,11 @@ export default function ClientBookingListView({ listTab }: Props) {
                                   alignItems: "center",
                                   justifyContent: "center",
                                 }}
-                                title={
-                                  paymentDue
-                                    ? "Waiting for payment"
-                                    : "Waiting for prepayment"
-                                }
-                                aria-label={
-                                  paymentDue
-                                    ? "Waiting for payment"
-                                    : "Waiting for prepayment"
-                                }
+                                title="Waiting for payment"
+                                aria-label="Waiting for payment"
                               >
                                 <BookingIndicatorIcon
-                                  variant={
-                                    paymentDue
-                                      ? "waiting_for_payment"
-                                      : "waiting_for_prepayment"
-                                  }
+                                  variant="waiting_for_payment"
                                   size={16}
                                 />
                               </Box>

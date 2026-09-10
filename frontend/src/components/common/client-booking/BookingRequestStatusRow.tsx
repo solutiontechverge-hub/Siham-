@@ -1,6 +1,5 @@
 "use client";
 
-import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import { Box, Chip, Stack, Tooltip } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import type {
@@ -36,6 +35,8 @@ type Props = {
   paymentOverdue?: boolean;
   /** BR/EBR/ER response window has elapsed. */
   responseOverdue?: boolean;
+  /** Click waiting-for-prepayment icon to open checkout. */
+  onWaitingForPrepaymentClick?: () => void;
   bookingRequestDirection?: BookingRequestDirection;
   rowMode?: BookingRequestRowMode;
   /** Post-accept edit from the other party — show next to Confirmed status. */
@@ -110,6 +111,7 @@ export default function BookingRequestStatusRow({
   onEbrClick,
   erSignpostTitle,
   onErClick,
+  onWaitingForPrepaymentClick,
 }: Props) {
   const m = useTheme().palette.mollure;
   const isEbrIncoming = rowMode === "professional_suggested";
@@ -129,6 +131,9 @@ export default function BookingRequestStatusRow({
   const waitingForPrepayment =
     requiresPrepayment &&
     !prepaymentPaid &&
+    (bookingStatus === "br_accepted" ||
+      bookingStatus === "requested" ||
+      (isDraft && bookingRequestSent)) &&
     !isCompleted &&
     !isTerminal;
 
@@ -142,7 +147,6 @@ export default function BookingRequestStatusRow({
     : bookingStatusLabel(chipStatus, {
         edited: showEditScenario && chipStatus === "confirmed",
       });
-  const isConfirmedChip = !isEbrRejected && chipStatus === "confirmed";
 
   // BR only while still pending (draft sent / requested) — hide after accept or reject.
   const showBrPill =
@@ -163,16 +167,6 @@ export default function BookingRequestStatusRow({
       <Chip
         label={chipLabel}
         size="small"
-        icon={
-          isConfirmedChip ? (
-            <CheckCircleRoundedIcon
-              sx={{
-                fontSize: "12px !important",
-                color: `${chipColors.color} !important`,
-              }}
-            />
-          ) : undefined
-        }
         sx={{
           height: 18,
           fontWeight: 800,
@@ -182,7 +176,6 @@ export default function BookingRequestStatusRow({
           color: chipColors.color,
           border: chipColors.border,
           "& .MuiChip-label": { px: 0.7, py: 0, lineHeight: 1.2 },
-          "& .MuiChip-icon": { ml: 0.5, mr: -0.35 },
         }}
       />
 
@@ -256,21 +249,25 @@ export default function BookingRequestStatusRow({
 
       {waitingForPrepayment ? (
         <Box
-          title="Waiting for prepayment"
-          aria-label="Waiting for prepayment"
-          sx={{ display: "grid", placeItems: "center" }}
+          component={onWaitingForPrepaymentClick ? "button" : "span"}
+          type={onWaitingForPrepaymentClick ? "button" : undefined}
+          title="Waiting for prepayment — pay now"
+          aria-label="Waiting for prepayment — pay now"
+          onClick={onWaitingForPrepaymentClick}
+          sx={{
+            display: "grid",
+            placeItems: "center",
+            border: 0,
+            padding: 0,
+            bgcolor: "transparent",
+            cursor: onWaitingForPrepaymentClick ? "pointer" : "default",
+            borderRadius: "6px",
+            "&:hover": onWaitingForPrepaymentClick
+              ? { bgcolor: alpha(m.navy, 0.06) }
+              : undefined,
+          }}
         >
           <BookingIndicatorIcon variant="waiting_for_prepayment" size={16} />
-        </Box>
-      ) : null}
-
-      {prepaymentPaid && !isTerminal && !paymentDue ? (
-        <Box
-          title="Prepayment received"
-          aria-label="Prepayment received"
-          sx={{ display: "grid", placeItems: "center" }}
-        >
-          <BookingIndicatorIcon variant="prepaid" size={16} />
         </Box>
       ) : null}
 

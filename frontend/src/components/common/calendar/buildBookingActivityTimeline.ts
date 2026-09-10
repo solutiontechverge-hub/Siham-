@@ -9,6 +9,7 @@ import {
   parseStoredEbrFromNotes,
 } from "./bookingEventDetails";
 import {
+  detectServiceLineChanges,
   flattenBookingServices,
   resolveIdentityGuests,
 } from "./bookingRequestNegotiation";
@@ -517,19 +518,50 @@ function enrichItemsWithComparison(
     : normalizeStatus(booking?.status ?? "");
   const lastEditedBy =
     input.currentDetails?.lastEditedBy ?? notesDetails?.lastEditedBy ?? null;
+  const originalForHeal = flattenBookingServices({
+    services: asServiceLines(
+      input.currentDetails?.originalServices?.length
+        ? input.currentDetails.originalServices
+        : notesDetails?.originalServices?.length
+          ? notesDetails.originalServices
+          : [],
+    ),
+    guests: asGuestItems(
+      input.currentDetails?.originalGuests ??
+        notesDetails?.originalGuests ??
+        notesDetails?.guests,
+    ),
+  });
+  const currentForHeal = flattenBookingServices({
+    services: asServiceLines(
+      input.currentDetails?.services?.length
+        ? input.currentDetails.services
+        : notesDetails?.services?.length
+          ? notesDetails.services
+          : [],
+    ),
+    guests: asGuestItems(input.currentDetails?.guests ?? notesDetails?.guests),
+  });
+  const healedLineChanges =
+    originalForHeal.length > 0
+      ? detectServiceLineChanges(originalForHeal, currentForHeal)
+      : { added: [] as string[], edited: [] as string[], cancelled: [] as string[] };
+  const hasPersistedOrHealedLineEdits = Boolean(
+    input.currentDetails?.editedServiceIds?.length ||
+      input.currentDetails?.addedServiceIds?.length ||
+      input.currentDetails?.cancelledServiceIds?.length ||
+      input.currentDetails?.editedProductIds?.length ||
+      input.currentDetails?.scheduleEdited ||
+      notesDetails?.editedServiceIds?.length ||
+      notesDetails?.addedServiceIds?.length ||
+      notesDetails?.cancelledServiceIds?.length ||
+      notesDetails?.scheduleEdited ||
+      healedLineChanges.edited.length ||
+      healedLineChanges.added.length ||
+      healedLineChanges.cancelled.length,
+  );
   const hasProfessionalLineEdits =
-    lastEditedBy === "professional" &&
-    Boolean(
-      input.currentDetails?.editedServiceIds?.length ||
-        input.currentDetails?.addedServiceIds?.length ||
-        input.currentDetails?.cancelledServiceIds?.length ||
-        input.currentDetails?.editedProductIds?.length ||
-        input.currentDetails?.scheduleEdited ||
-        notesDetails?.editedServiceIds?.length ||
-        notesDetails?.addedServiceIds?.length ||
-        notesDetails?.cancelledServiceIds?.length ||
-        notesDetails?.scheduleEdited,
-    );
+    lastEditedBy === "professional" && hasPersistedOrHealedLineEdits;
 
   const comparisonMode: ActivityComparisonMode =
     scenario === "ER" ||
@@ -538,7 +570,8 @@ function enrichItemsWithComparison(
         editReq.status === "suggested" ||
         editReq.status === "approved" ||
         editReq.status === "rejected" ||
-        hasProfessionalLineEdits) &&
+        hasProfessionalLineEdits ||
+        (hasPersistedOrHealedLineEdits && scenario !== "EBR")) &&
       scenario !== "EBR")
       ? "er"
       : "ebr";

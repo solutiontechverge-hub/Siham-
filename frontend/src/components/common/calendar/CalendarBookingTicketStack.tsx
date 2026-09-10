@@ -2,13 +2,16 @@
 
 import * as React from "react";
 import { Box, Chip, Stack, Tooltip } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
+import { alpha, useTheme } from "@mui/material/styles";
 import CalendarBookingCard from "./CalendarBookingCard";
 import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
+import type { ResponseWindowInput } from "./bookingResponseDeadline";
 import { resolveSameTimeStackChip } from "./calendar-overlap.utils";
 import { teamSharedBookingTooltip } from "./teamMemberBookings";
 
 const COLUMN_GAP = 4;
+/** Keep every clustered card readable — never crush below this width. */
+const CLUSTER_CARD_MIN_WIDTH_PX = 152;
 
 function SharedDividerChip({
   tooltip,
@@ -75,6 +78,7 @@ export type CalendarBookingTicketStackProps = {
   onOpenClient: (event: CalendarEvent, anchorEl: HTMLElement) => void;
   onOpenMessages: (event: CalendarEvent) => void;
   responseTimeConfigured?: boolean;
+  responseTime?: ResponseWindowInput | null;
 };
 
 export default function CalendarBookingTicketStack({
@@ -91,6 +95,7 @@ export default function CalendarBookingTicketStack({
   onOpenClient,
   onOpenMessages,
   responseTimeConfigured,
+  responseTime,
 }: CalendarBookingTicketStackProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -152,52 +157,81 @@ export default function CalendarBookingTicketStack({
         </Tooltip>
       ) : null}
 
-      <Stack
-        direction="row"
+      <Box
         sx={{
           width: "100%",
           height: "100%",
           minWidth: 0,
-          alignItems: "stretch",
+          overflowX: isDense ? "auto" : "visible",
+          overflowY: "hidden",
+          // Keep lane clicks usable; only this strip scrolls sideways when crowded.
+          WebkitOverflowScrolling: "touch",
+          scrollbarWidth: "thin",
+          "&::-webkit-scrollbar": { height: 4 },
+          "&::-webkit-scrollbar-thumb": {
+            borderRadius: 999,
+            bgcolor: alpha(m.navy, 0.28),
+          },
         }}
       >
-        {events.map((event, index) => (
-          <React.Fragment key={event.id}>
-            <Box sx={{ flex: 1, minWidth: 0, height: "100%" }}>
-              <CalendarBookingCard
-                event={event}
-                top={0}
-                height={cardHeight}
-                left={0}
-                right={0}
-                variant={isDense ? "default" : "ticket"}
-                positioned={false}
-                dense={isDense}
-                teamMemberNameById={teamMemberNameById}
-                serviceColor={getServiceColor(event)}
-                statusColor={getStatusColor?.(event)}
-                onOpen={() => onOpen(event)}
-                onOpenCalendar={() => onOpenCalendar(event)}
-                onOpenNotes={() => onOpenNotes(event)}
-                onOpenClient={(anchorEl) => onOpenClient(event, anchorEl)}
-                onOpenMessages={() => onOpenMessages(event)}
-                responseTimeConfigured={responseTimeConfigured}
-              />
-            </Box>
-            {index < events.length - 1 ? (
-              stackChip?.kind === "shared" ? (
-                <SharedDividerChip
-                  tooltip={sharedTooltip}
-                  zIndex={events.length + 2}
-                  teal={m.teal}
+        <Stack
+          direction="row"
+          sx={{
+            width: isDense ? "max-content" : "100%",
+            minWidth: "100%",
+            height: "100%",
+            alignItems: "stretch",
+          }}
+        >
+          {events.map((event, index) => (
+            <React.Fragment key={event.id}>
+              <Box
+                sx={{
+                  flex: isDense
+                    ? `1 0 ${CLUSTER_CARD_MIN_WIDTH_PX}px`
+                    : "1 1 auto",
+                  width: isDense ? CLUSTER_CARD_MIN_WIDTH_PX : "auto",
+                  minWidth: isDense ? CLUSTER_CARD_MIN_WIDTH_PX : 0,
+                  maxWidth: isDense ? 220 : undefined,
+                  height: "100%",
+                }}
+              >
+                <CalendarBookingCard
+                  event={event}
+                  top={0}
+                  height={cardHeight}
+                  left={0}
+                  right={0}
+                  variant={isDense ? "default" : "ticket"}
+                  positioned={false}
+                  dense={isDense}
+                  teamMemberNameById={teamMemberNameById}
+                  serviceColor={getServiceColor(event)}
+                  statusColor={getStatusColor?.(event)}
+                  onOpen={() => onOpen(event)}
+                  onOpenCalendar={() => onOpenCalendar(event)}
+                  onOpenNotes={() => onOpenNotes(event)}
+                  onOpenClient={(anchorEl) => onOpenClient(event, anchorEl)}
+                  onOpenMessages={() => onOpenMessages(event)}
+                  responseTimeConfigured={responseTimeConfigured}
+                  responseTime={responseTime}
                 />
-              ) : (
-                <Box sx={{ width: COLUMN_GAP, flexShrink: 0 }} />
-              )
-            ) : null}
-          </React.Fragment>
-        ))}
-      </Stack>
+              </Box>
+              {index < events.length - 1 ? (
+                stackChip?.kind === "shared" ? (
+                  <SharedDividerChip
+                    tooltip={sharedTooltip}
+                    zIndex={events.length + 2}
+                    teal={m.teal}
+                  />
+                ) : (
+                  <Box sx={{ width: COLUMN_GAP, flexShrink: 0 }} />
+                )
+              ) : null}
+            </React.Fragment>
+          ))}
+        </Stack>
+      </Box>
     </Box>
   );
 }

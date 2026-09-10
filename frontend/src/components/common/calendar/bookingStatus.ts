@@ -78,22 +78,33 @@ export function calendarBookingStatusLabel(
   return event.status;
 }
 
+/** Pro accepted, but client still owes prepayment — not Confirmed yet. */
+export function professionalWaitingForClientPrepay(
+  event: Pick<CalendarEvent, "status" | "details">,
+): boolean {
+  if (event.status !== "BR Accepted") return false;
+  return prepayBlocksConfirmation({
+    prepayRequired: Boolean(event.details?.showPrepayment),
+    prepayPaid: resolveCalendarPrepaymentStatus(event) === "confirmed",
+  });
+}
+
+/** Chip/accent status on the professional calendar (unpaid prepay reads as Requested). */
+export function professionalCalendarDisplayStatus(
+  event: Pick<
+    CalendarEvent,
+    "status" | "details" | "bookingType" | "bookingScenario"
+  >,
+): CalendarBookingStatus {
+  return professionalWaitingForClientPrepay(event) ? "Requested" : event.status;
+}
+
 /** Professional calendar chip — BR Accepted with unpaid prepay reads as Requested. */
 export function professionalCalendarStatusLabel(
   event: Pick<CalendarEvent, "status" | "details" | "bookingType" | "bookingScenario">,
 ): string {
-  if (event.status !== "BR Accepted") return calendarBookingStatusLabel(event);
-  const prepayRequired = Boolean(event.details?.showPrepayment);
-  const prepayPaid = resolveCalendarPrepaymentStatus(event) === "confirmed";
-  if (
-    prepayBlocksConfirmation({
-      prepayRequired,
-      prepayPaid,
-    })
-  ) {
-    return "Requested";
-  }
-  return "BR Accepted";
+  if (professionalWaitingForClientPrepay(event)) return "Requested";
+  return calendarBookingStatusLabel(event);
 }
 
 type StatusTheme = {
@@ -250,6 +261,19 @@ export function getBookingScenarioIndicators(
 ): BookingScenarioIndicator[] {
   const scenario = resolveBookingScenario(event);
   return scenario ? [scenario] : [];
+}
+
+/** Pending BR / EBR / ER only — settled “E” is history, not an action. */
+export function getActionRequiredScenarioIndicators(
+  event: Pick<
+    CalendarEvent,
+    "bookingType" | "status" | "bookingScenario" | "details"
+  >,
+): Exclude<BookingScenarioIndicator, "E">[] {
+  return getBookingScenarioIndicators(event).filter(
+    (indicator): indicator is Exclude<BookingScenarioIndicator, "E"> =>
+      indicator !== "E",
+  );
 }
 
 export function isAllowedStatusForBookingType(status: CalendarBookingStatus, bookingType?: CalendarBookingType) {

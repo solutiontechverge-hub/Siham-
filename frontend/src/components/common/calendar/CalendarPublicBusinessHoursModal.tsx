@@ -2,17 +2,12 @@
 
 import AppButton from "../AppButton";
 import * as React from "react";
-import {
-  Box,
-  ButtonBase,
-  Checkbox,
-  FormControlLabel,
-  Stack,
-} from "@mui/material";
+import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
+import { Box, ButtonBase, Checkbox, FormControlLabel, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDropdown from "../AppDropdown";
 import AppTextField from "../AppTextField";
-import AppTimePicker from "../AppTimePicker";
+import { AppTimePanel, formatTimeDisplay } from "../AppTimePicker";
 import AppModal from "../AppModal";
 import { BodyText } from "../../ui/typography";
 
@@ -122,9 +117,7 @@ export function draftFromPublicBusinessHoursEntries(
   location: PublicBusinessHoursLocation,
 ): PublicBusinessHoursDraft {
   const forLocation = entries.filter((entry) => entry.location === location);
-  const schedule =
-    forLocation.find((entry) => entry.schedule)?.schedule ||
-    (location === "DL" ? "variable" : "fixed");
+  const schedule = preferredScheduleForLocation(location);
   const note =
     forLocation.find((entry) => entry.note?.trim())?.note?.trim() || "";
 
@@ -148,16 +141,17 @@ export function draftFromPublicBusinessHoursEntries(
     };
   });
 
+  const firstDay = days[0];
   return {
     location,
     locations: [location],
     schedule,
-    day: "",
+    day: firstDay?.day || "",
     dateFrom: "",
     dateTo: "",
-    startTime: "09:00",
-    endTime: "17:00",
-    notAvailable: false,
+    startTime: firstDay?.startTime || "09:00",
+    endTime: firstDay?.endTime || "17:00",
+    notAvailable: Boolean(firstDay?.off),
     note: schedule === "variable" ? note.slice(0, PUBLIC_HOURS_NOTE_MAX_LENGTH) : "",
     days,
   };
@@ -261,12 +255,39 @@ export function scheduleTypeForLocation(
   return match?.schedule || "";
 }
 
+/** Fixed schedule → Fixed Location (FL); Variable schedule → Desired Location (DL). */
+export function preferredLocationForSchedule(
+  schedule: "" | "fixed" | "variable",
+  available: readonly PublicBusinessHoursLocation[] = ["FL", "DL"],
+): PublicBusinessHoursLocation | "" {
+  const allowed = available.filter(
+    (item): item is PublicBusinessHoursLocation =>
+      item === "FL" || item === "DL",
+  );
+  if (schedule === "fixed" && allowed.includes("FL")) return "FL";
+  if (schedule === "variable" && allowed.includes("DL")) return "DL";
+  if (schedule === "fixed" && allowed.includes("DL")) return "DL";
+  if (schedule === "variable" && allowed.includes("FL")) return "FL";
+  return allowed[0] || "";
+}
+
+/** FL defaults to Fixed schedule; DL defaults to Variable schedule. */
+export function preferredScheduleForLocation(
+  location: "" | PublicBusinessHoursLocation,
+): "fixed" | "variable" {
+  return location === "DL" ? "variable" : "fixed";
+}
+
 type CalendarPublicBusinessHoursModalProps = {
   open: boolean;
   onClose: () => void;
   onApply: () => void;
   draft: PublicBusinessHoursDraft;
   setDraft: React.Dispatch<React.SetStateAction<PublicBusinessHoursDraft>>;
+  /** Locations offered by this professional (FL / DL / both). */
+  availableLocations?: readonly PublicBusinessHoursLocation[];
+  /** Saved hours — used when switching Location in the modal. */
+  existingEntries?: readonly PublicBusinessHoursEntry[];
 };
 
 export default function CalendarPublicBusinessHoursModal({
@@ -275,11 +296,32 @@ export default function CalendarPublicBusinessHoursModal({
   onApply,
   draft,
   setDraft,
+  availableLocations = ["FL", "DL"],
+  existingEntries = [],
 }: CalendarPublicBusinessHoursModalProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
+  const locationOptions = React.useMemo(() => {
+    const allowed = new Set(
+      availableLocations.filter(
+        (item): item is PublicBusinessHoursLocation =>
+          item === "FL" || item === "DL",
+      ),
+    );
+    const options: { label: string; value: PublicBusinessHoursLocation }[] = [];
+    if (allowed.has("FL") || allowed.size === 0) {
+      options.push({ label: "FL", value: "FL" });
+    }
+    if (allowed.has("DL") || allowed.size === 0) {
+      options.push({ label: "DL", value: "DL" });
+    }
+    return options;
+  }, [availableLocations]);
   const location =
-    draft.location || draft.locations[0] || ("" as PublicBusinessHoursLocation | "");
+    draft.location ||
+    draft.locations[0] ||
+    locationOptions[0]?.value ||
+    ("" as PublicBusinessHoursLocation | "");
   const offLabel = offLabelForLocation(location);
   const isVariable = draft.schedule === "variable";
   const selectedDay = draft.day || WEEKDAY_ORDER[0];
@@ -288,21 +330,46 @@ export default function CalendarPublicBusinessHoursModal({
     : createDefaultPublicHoursDayConfigs();
   const activeDay =
     dayConfigs.find((row) => row.day === selectedDay) ?? dayConfigs[0];
+  const timesDisabled = Boolean(activeDay?.off);
+  const [editingTimeField, setEditingTimeField] = React.useState<
+    "start" | "end"
+  >("start");
+
+  React.useEffect(() => {
+    if (!open) return;
+    setEditingTimeField("start");
+  }, [open, selectedDay, location]);
+
+  const selectDay = React.useCallback(
+    (day: PublicBusinessHoursDay) => {
+      setDraft((prev) => {
+        const days =
+          prev.days?.length === 7
+            ? prev.days
+            : createDefaultPublicHoursDayConfigs();
+        const active = days.find((row) => row.day === day) ?? days[0];
+        return {
+          ...prev,
+          day,
+          startTime: active.startTime,
+          endTime: active.endTime,
+          notAvailable: active.off,
+          days,
+        };
+      });
+    },
+    [setDraft],
+  );
 
   const updateActiveDay = React.useCallback(
     (patch: Partial<PublicHoursDayConfig>) => {
       setDraft((prev) => {
+        const activeKey = prev.day || WEEKDAY_ORDER[0];
         const days = (prev.days?.length
           ? prev.days
           : createDefaultPublicHoursDayConfigs()
-        ).map((row) =>
-          row.day === (prev.day || WEEKDAY_ORDER[0])
-            ? { ...row, ...patch }
-            : row,
-        );
-        const nextActive =
-          days.find((row) => row.day === (prev.day || WEEKDAY_ORDER[0])) ??
-          days[0];
+        ).map((row) => (row.day === activeKey ? { ...row, ...patch } : row));
+        const nextActive = days.find((row) => row.day === activeKey) ?? days[0];
         return {
           ...prev,
           days,
@@ -315,11 +382,102 @@ export default function CalendarPublicBusinessHoursModal({
     [setDraft],
   );
 
+  const switchLocation = React.useCallback(
+    (next: PublicBusinessHoursLocation) => {
+      const hasSaved = existingEntries.some((entry) => entry.location === next);
+      const nextDraft = hasSaved
+        ? draftFromPublicBusinessHoursEntries(existingEntries, next)
+        : createEmptyPublicBusinessHoursDraft(next);
+      // Keep FL ↔ Fixed and DL ↔ Variable aligned when switching location.
+      const alignedSchedule = preferredScheduleForLocation(next);
+      setDraft({
+        ...nextDraft,
+        schedule: alignedSchedule,
+        note:
+          alignedSchedule === "variable"
+            ? nextDraft.note.slice(0, PUBLIC_HOURS_NOTE_MAX_LENGTH)
+            : "",
+      });
+    },
+    [existingEntries, setDraft],
+  );
+
+  const switchSchedule = React.useCallback(
+    (nextSchedule: "fixed" | "variable") => {
+      const allowed = availableLocations.filter(
+        (item): item is PublicBusinessHoursLocation =>
+          item === "FL" || item === "DL",
+      );
+      const targetLocation = preferredLocationForSchedule(nextSchedule, allowed);
+      if (!targetLocation) {
+        setDraft((p) => ({
+          ...p,
+          schedule: nextSchedule,
+          note:
+            nextSchedule === "variable"
+              ? p.note.slice(0, PUBLIC_HOURS_NOTE_MAX_LENGTH)
+              : "",
+        }));
+        return;
+      }
+
+      if (targetLocation === (draft.location || draft.locations[0])) {
+        setDraft((p) => ({
+          ...p,
+          location: targetLocation,
+          locations: [targetLocation],
+          schedule: nextSchedule,
+          note:
+            nextSchedule === "variable"
+              ? p.note.slice(0, PUBLIC_HOURS_NOTE_MAX_LENGTH)
+              : "",
+        }));
+        return;
+      }
+
+      const hasSaved = existingEntries.some(
+        (entry) => entry.location === targetLocation,
+      );
+      const nextDraft = hasSaved
+        ? draftFromPublicBusinessHoursEntries(existingEntries, targetLocation)
+        : createEmptyPublicBusinessHoursDraft(targetLocation);
+      setDraft({
+        ...nextDraft,
+        location: targetLocation,
+        locations: [targetLocation],
+        schedule: nextSchedule,
+        note:
+          nextSchedule === "variable"
+            ? nextDraft.note.slice(0, PUBLIC_HOURS_NOTE_MAX_LENGTH)
+            : "",
+      });
+    },
+    [
+      availableLocations,
+      draft.location,
+      draft.locations,
+      existingEntries,
+      setDraft,
+    ],
+  );
+
   React.useEffect(() => {
     if (!open) return;
     setDraft((prev) => {
+      const allowed = availableLocations.filter(
+        (item): item is PublicBusinessHoursLocation =>
+          item === "FL" || item === "DL",
+      );
+      const fallbackLocation =
+        allowed[0] ||
+        prev.location ||
+        prev.locations[0] ||
+        ("" as PublicBusinessHoursLocation | "");
       const nextLocation =
-        prev.location || prev.locations[0] || ("" as PublicBusinessHoursLocation | "");
+        prev.location &&
+        (allowed.length === 0 || allowed.includes(prev.location))
+          ? prev.location
+          : fallbackLocation;
       const days =
         prev.days?.length === 7
           ? prev.days
@@ -330,6 +488,13 @@ export default function CalendarPublicBusinessHoursModal({
         ...prev,
         location: nextLocation,
         locations: nextLocation ? [nextLocation] : prev.locations,
+        schedule:
+          prev.schedule ||
+          (nextLocation === "DL"
+            ? "variable"
+            : nextLocation === "FL"
+              ? "fixed"
+              : ""),
         day,
         days,
         startTime: active.startTime,
@@ -341,7 +506,7 @@ export default function CalendarPublicBusinessHoursModal({
             : "",
       };
     });
-  }, [open, setDraft]);
+  }, [open, availableLocations, setDraft]);
 
   return (
     <AppModal
@@ -376,21 +541,10 @@ export default function CalendarPublicBusinessHoursModal({
           <AppDropdown
             label="Location"
             value={location}
-            onChange={(val) => {
-              const next = String(val) as PublicBusinessHoursLocation;
-              setDraft((p) => ({
-                ...p,
-                location: next,
-                locations: [next],
-                schedule:
-                  p.schedule ||
-                  (next === "DL" ? "variable" : "fixed"),
-              }));
-            }}
-            options={[
-              { label: "Fixed Location (FL)", value: "FL" },
-              { label: "Desired Location (DL)", value: "DL" },
-            ]}
+            onChange={(val) =>
+              switchLocation(String(val) as PublicBusinessHoursLocation)
+            }
+            options={locationOptions}
             placeholder="Select Location"
             fullWidth
           />
@@ -398,16 +552,11 @@ export default function CalendarPublicBusinessHoursModal({
           <AppDropdown
             label="Schedule"
             value={draft.schedule}
-            onChange={(val) =>
-              setDraft((p) => ({
-                ...p,
-                schedule: String(val) as PublicBusinessHoursDraft["schedule"],
-                note:
-                  String(val) === "variable"
-                    ? p.note.slice(0, PUBLIC_HOURS_NOTE_MAX_LENGTH)
-                    : "",
-              }))
-            }
+            onChange={(val) => {
+              const next = String(val);
+              if (next !== "fixed" && next !== "variable") return;
+              switchSchedule(next);
+            }}
             options={[
               { label: "Fixed schedule", value: "fixed" },
               { label: "Variable schedule", value: "variable" },
@@ -416,92 +565,129 @@ export default function CalendarPublicBusinessHoursModal({
             fullWidth
           />
 
-          <Box>
-            <BodyText
-              component="label"
-              sx={{
-                display: "block",
-                fontSize: "0.75rem",
-                fontWeight: 500,
-                color: alpha(m.navy, 0.9),
-                lineHeight: 1.25,
-                mb: 0.75,
-              }}
-            >
-              Days
-            </BodyText>
-            <Stack direction="row" flexWrap="wrap" useFlexGap spacing={0.75}>
-              {dayConfigs.map((row) => {
-                const active = row.day === selectedDay;
+          <AppDropdown
+            label="Day"
+            value={selectedDay}
+            onChange={(val) => selectDay(String(val) as PublicBusinessHoursDay)}
+            options={WEEKDAY_ORDER.map((day) => ({
+              label: day,
+              value: day,
+            }))}
+            placeholder="Select Day"
+            fullWidth
+          />
+
+          <Stack spacing={1.25}>
+            <Stack direction="row" spacing={1.25}>
+              {(
+                [
+                  {
+                    key: "start" as const,
+                    label: "Start Time (From)",
+                    value: activeDay?.startTime || "09:00",
+                  },
+                  {
+                    key: "end" as const,
+                    label: "End Time (To)",
+                    value: activeDay?.endTime || "17:00",
+                  },
+                ] as const
+              ).map((field) => {
+                const active = editingTimeField === field.key && !timesDisabled;
                 return (
-                  <ButtonBase
-                    key={row.day}
-                    onClick={() =>
-                      setDraft((p) => ({
-                        ...p,
-                        day: row.day,
-                        startTime: row.startTime,
-                        endTime: row.endTime,
-                        notAvailable: row.off,
-                      }))
-                    }
-                    sx={{
-                      px: 1.1,
-                      height: 34,
-                      borderRadius: "10px",
-                      border: `1px solid ${
-                        active ? alpha(m.teal, 0.45) : alpha(m.navy, 0.12)
-                      }`,
-                      bgcolor: active
-                        ? alpha(m.teal, 0.12)
-                        : row.off
+                  <Box key={field.key} sx={{ flex: 1, minWidth: 0 }}>
+                    <BodyText
+                      component="label"
+                      sx={{
+                        display: "block",
+                        fontSize: "0.75rem",
+                        fontWeight: 500,
+                        color: alpha(m.navy, 0.9),
+                        lineHeight: 1.25,
+                        mb: 0.75,
+                      }}
+                    >
+                      {field.label}
+                    </BodyText>
+                    <ButtonBase
+                      disabled={timesDisabled}
+                      onClick={() => setEditingTimeField(field.key)}
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 1,
+                        width: "100%",
+                        minHeight: 40,
+                        px: 1.5,
+                        py: 0.75,
+                        borderRadius: "6px",
+                        border: `1px solid ${
+                          active ? m.teal : alpha(m.navy, 0.14)
+                        }`,
+                        bgcolor: timesDisabled
                           ? alpha(m.navy, 0.04)
-                          : "#fff",
-                      color: active ? m.teal : alpha(m.navy, 0.7),
-                      fontSize: 12,
-                      fontWeight: 800,
-                    }}
-                  >
-                    {row.day.slice(0, 3)}
-                    {row.off ? "*" : ""}
-                  </ButtonBase>
+                          : active
+                            ? alpha(m.teal, 0.06)
+                            : "#fff",
+                        cursor: timesDisabled ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      <BodyText
+                        sx={{
+                          fontSize: 13,
+                          fontWeight: 700,
+                          color: alpha(m.navy, timesDisabled ? 0.4 : 0.78),
+                        }}
+                      >
+                        {formatTimeDisplay(field.value) || field.value}
+                      </BodyText>
+                      <AccessTimeRoundedIcon
+                        sx={{
+                          fontSize: 18,
+                          color: active ? m.teal : alpha(m.navy, 0.45),
+                        }}
+                      />
+                    </ButtonBase>
+                  </Box>
                 );
               })}
             </Stack>
-            <BodyText
-              sx={{
-                mt: 0.85,
-                fontSize: 12,
-                fontWeight: 700,
-                color: alpha(m.navy, 0.55),
-              }}
-            >
-              Editing {selectedDay}
-              {activeDay?.off ? ` (${offLabel})` : ""}
-            </BodyText>
-          </Box>
 
-          <Stack direction="row" spacing={1.25}>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <AppTimePicker
-                label="Start Time (from)"
-                value={activeDay?.startTime || "09:00"}
-                onChange={(val) => updateActiveDay({ startTime: val, off: false })}
-                fullWidth
-                disabled={Boolean(activeDay?.off)}
-                sx={{ minHeight: 40, py: 0.5 }}
-              />
-            </Box>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <AppTimePicker
-                label="End Time (to)"
-                value={activeDay?.endTime || "17:00"}
-                onChange={(val) => updateActiveDay({ endTime: val, off: false })}
-                fullWidth
-                disabled={Boolean(activeDay?.off)}
-                sx={{ minHeight: 40, py: 0.5 }}
-              />
-            </Box>
+            {!timesDisabled ? (
+              <Box
+                sx={{
+                  borderRadius: "16px",
+                  border: `1px solid ${alpha(m.navy, 0.1)}`,
+                  overflow: "hidden",
+                  bgcolor: "#fff",
+                  boxShadow: "0 8px 24px rgba(16, 35, 63, 0.08)",
+                  display: "flex",
+                  justifyContent: "center",
+                  py: 1,
+                }}
+              >
+                <AppTimePanel
+                  compact
+                  hideHeader
+                  variant="clock"
+                  value={
+                    editingTimeField === "start"
+                      ? activeDay?.startTime || "09:00"
+                      : activeDay?.endTime || "17:00"
+                  }
+                  onChange={(val) =>
+                    updateActiveDay(
+                      editingTimeField === "start"
+                        ? { startTime: val, off: false }
+                        : { endTime: val, off: false },
+                    )
+                  }
+                  minuteStep={1}
+                  disabled={timesDisabled}
+                />
+              </Box>
+            ) : null}
           </Stack>
 
           <FormControlLabel
@@ -510,14 +696,18 @@ export default function CalendarPublicBusinessHoursModal({
                 checked={Boolean(activeDay?.off)}
                 onChange={(e) => updateActiveDay({ off: e.target.checked })}
                 size="small"
+                sx={{
+                  color: alpha(m.navy, 0.35),
+                  "&.Mui-checked": { color: m.teal },
+                }}
               />
             }
             label={offLabel}
             sx={{
               "& .MuiFormControlLabel-label": {
-                fontSize: 12.5,
-                fontWeight: 700,
-                color: alpha(m.navy, 0.7),
+                fontSize: 13,
+                fontWeight: 600,
+                color: alpha(m.navy, 0.72),
               },
               m: 0,
             }}

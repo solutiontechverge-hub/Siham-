@@ -63,7 +63,12 @@ export const openMessagingForBooking = async (req, res) => {
     const bookingRef = String(
       req.query.bookingRef ?? req.query.booking ?? req.body?.bookingRef ?? "",
     ).trim();
-    const data = await openThreadForBooking(req.user.id, bookingRef);
+    const customerId = String(
+      req.query.customerId ?? req.body?.customerId ?? "",
+    ).trim();
+    const data = await openThreadForBooking(req.user.id, bookingRef, {
+      customerId,
+    });
     return res.status(200).json({
       success: true,
       message: "Conversation opened for booking.",

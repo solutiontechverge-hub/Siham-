@@ -52,6 +52,17 @@ export function clientShouldAck(
   return Boolean(details?.needsOk && details?.ackRecipient === "client");
 }
 
+/** After OK — drop ack flags so the booking can rest as Confirmed. */
+export function clearBookingAckDetails<T extends CalendarBookingDetails>(
+  details: T,
+): T {
+  const next = { ...details };
+  delete next.needsOk;
+  delete next.ackRecipient;
+  delete next.ackScenario;
+  return next;
+}
+
 export function buildAcceptAckDetails(input: {
   prepayRequired: boolean;
   prepayPaid: boolean;

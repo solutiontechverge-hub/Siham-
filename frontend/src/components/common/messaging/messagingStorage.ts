@@ -94,6 +94,24 @@ export function mergeApiInboxWithPrefs(
   });
 }
 
+/** Keep a locally seeded booking link when the API inbox still reports unlinked. */
+function withPreservedBookingLink(
+  apiThread: MessagingThread,
+  local?: MessagingThread,
+): MessagingThread {
+  if (!local) return apiThread;
+  const localLinked = Boolean(local.bookingId?.trim()) && !local.unlinked;
+  const apiLinked = Boolean(apiThread.bookingId?.trim()) && !apiThread.unlinked;
+  if (!localLinked || apiLinked) return apiThread;
+  return {
+    ...apiThread,
+    bookingId: local.bookingId,
+    bookingMeta: local.bookingMeta,
+    bookingStatus: local.bookingStatus,
+    unlinked: false,
+  };
+}
+
 function threadProfessionalKey(thread: MessagingThread): string {
   return thread.professionalUserId || thread.peerProfileId || thread.businessSetupId || thread.id;
 }
@@ -130,7 +148,10 @@ export function mergeApiInboxIntoStore(
           return !apiProfessionalKeys.has(threadProfessionalKey(thread));
         });
 
-  const apiThreads = api.threads.filter((thread) => !isMockMessagingThreadId(thread.id));
+  const localById = new Map(current.threads.map((thread) => [thread.id, thread]));
+  const apiThreads = api.threads
+    .filter((thread) => !isMockMessagingThreadId(thread.id))
+    .map((thread) => withPreservedBookingLink(thread, localById.get(thread.id)));
   const apiThreadIds = new Set(apiThreads.map((thread) => thread.id));
   const localOnlyThreads =
     audience === "professional"
@@ -356,7 +377,12 @@ export function hideThreadsForAudience(store: MessagingStore, audience: Messagin
 }
 
 export function normalizeBookingIdQuery(query: string): string {
-  return query.trim().replace(/^#/, "").replace(/^b/i, "").toLowerCase();
+  return query
+    .trim()
+    .replace(/^#/, "")
+    .replace(/^bk-?/i, "")
+    .replace(/^b/i, "")
+    .toLowerCase();
 }
 
 export function threadMatchesSearch(

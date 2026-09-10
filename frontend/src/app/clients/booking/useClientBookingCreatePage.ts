@@ -893,24 +893,17 @@ export function useClientBookingCreatePage() {
     services,
   ]);
 
-  const addServiceCatalog = React.useMemo(() => {
-    const memberItems = hasAssignableTeamMembers
-      ? catalogByTeamMemberId[addServiceTeamMemberId]
-      : undefined;
-    return buildAddServiceCatalog(locationServiceCatalog, memberItems);
-  }, [
-    addServiceTeamMemberId,
-    catalogByTeamMemberId,
-    hasAssignableTeamMembers,
-    locationServiceCatalog,
-  ]);
+  /** Full location catalog — do not filter by team-member slots in the add modal. */
+  const addServiceCatalog = React.useMemo(
+    () => buildAddServiceCatalog(locationServiceCatalog),
+    [locationServiceCatalog],
+  );
 
   const additionalGuests = React.useMemo(
     () => people.filter(isAdditionalGuest),
     [people],
   );
   const canAddFixedLocationGuest =
-    !isCompanyClient &&
     !isDesiredLocation &&
     additionalGuests.length < FIXED_LOCATION_MAX_GUESTS;
   const serviceAssignees = React.useMemo(() => {
@@ -1810,7 +1803,8 @@ export function useClientBookingCreatePage() {
 
     if (isModel && !isCompanyClient) return;
     if (isPlanning && (!isCompanyClient || !bookingProjectEnabled)) return;
-    if (isGuest && isCompanyClient) return;
+    // Desired + company uses Model, not Guest; Fixed Location allows Guest for all clients.
+    if (isGuest && isCompanyClient && isDesiredLocation) return;
 
     if (isNotes) {
       const existing = people.find(isNotesPerson);
@@ -1909,6 +1903,35 @@ export function useClientBookingCreatePage() {
       return prev.filter((u) => u.id !== uploadId);
     });
   };
+
+  const setBookingProjectEnabledWithCleanup = React.useCallback(
+    (enabled: boolean) => {
+      setBookingProjectEnabled(enabled);
+      if (enabled) return;
+
+      setProjectDescription("");
+      setProjectUploads((prev) => {
+        for (const u of prev) {
+          if (u.previewUrl?.startsWith("blob:")) {
+            URL.revokeObjectURL(u.previewUrl);
+          }
+        }
+        return [];
+      });
+      setPeople((prev) => {
+        const next = prev.filter((p) => !isPlanningPerson(p));
+        setSelectedPersonId((current) => {
+          if (current && next.some((p) => p.id === current)) return current;
+          return next.find((p) => p.isRequester)?.id ?? next[0]?.id ?? "";
+        });
+        return next;
+      });
+      setPlanningPersonId(null);
+      setPlanningActivity("");
+      setPlanningDuration("");
+    },
+    [isPlanningPerson],
+  );
 
   const deleteGuest = (guestId: string) => {
     const person = people.find((p) => p.id === guestId);
@@ -2130,7 +2153,7 @@ export function useClientBookingCreatePage() {
       ...(clientNote.trim() ? { clientNote: clientNote.trim() } : {}),
       ...(isDesiredLocation
         ? {
-            ...(isCompanyClient
+            ...(isCompanyClient && bookingProjectEnabled
               ? {
                   projectDetails: {
                     description: projectDescriptionForDraft,
@@ -2165,9 +2188,9 @@ export function useClientBookingCreatePage() {
     const prepaymentPercent = parsePrepaymentPercent(
       businessProfile?.prepaymentLabel,
     );
-    // Fixed location: client must prepay before booking when the pro requires it.
-    // Desired location: % is shown as "after acceptance" (pay after pro accepts).
-    const requiresPrepayment = !isDesiredLocation && prepaymentPercent > 0;
+    // Both locations surface Pay Now when the pro configures a prepayment %.
+    // Fixed still blocks Book Now until paid; Desired can send the request first.
+    const requiresPrepayment = prepaymentPercent > 0;
 
     // EBR suggest-edit: update existing booking draft and return to details (no new booking).
     if (isEbrSuggest) {
@@ -2261,7 +2284,7 @@ export function useClientBookingCreatePage() {
         kind: inferProjectUploadKind(u.name, u.file?.type),
       }));
       let projectDetailsUploads = localUploads;
-      if (isDesiredLocation && isCompanyClient && projectUploads.length > 0) {
+      if (isDesiredLocation && isCompanyClient && bookingProjectEnabled && projectUploads.length > 0) {
         const filesToUpload = (
           await Promise.all(projectUploads.map((u) => fileFromProjectUpload(u)))
         ).filter((file): file is File => Boolean(file));
@@ -2306,7 +2329,7 @@ export function useClientBookingCreatePage() {
         ...(clientNote.trim() ? { clientNote: clientNote.trim() } : {}),
         ...(isDesiredLocation
           ? {
-              ...(isCompanyClient
+              ...(isCompanyClient && bookingProjectEnabled
                 ? {
                     projectDetails: {
                       description: projectDescriptionForDraft,
@@ -2353,7 +2376,6 @@ export function useClientBookingCreatePage() {
         draft: payload,
         createdAt: new Date().toISOString(),
         requiresPrepayment,
-        // Keep % for desired "after acceptance" note even when pay-before is off.
         prepaymentPercent: prepaymentPercent > 0 ? prepaymentPercent : 0,
         prepaid: false,
         bookingRequestSent: false,
@@ -2516,6 +2538,8 @@ export function useClientBookingCreatePage() {
     isDesiredLocation,
     minimumTimeslotNotice,
     isCompanyClient,
+    bookingProjectEnabled,
+    setBookingProjectEnabled: setBookingProjectEnabledWithCleanup,
     showProjectDetails,
     canAddPlanningParticipant,
     getParticipantLabel,

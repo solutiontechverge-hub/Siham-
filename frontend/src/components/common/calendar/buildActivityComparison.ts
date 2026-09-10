@@ -455,6 +455,21 @@ export function findActivityComparisonItem<
   if (mode) {
     const byMode = withComparison.find((item) => item.comparison?.mode === mode);
     if (byMode) return byMode;
+    // Edited hover asks for er/ebr — don't fall back to silent Updated rows.
+    if (mode === "er" || mode === "ebr") {
+      const editRow = withComparison.find(
+        (item) =>
+          item.comparison?.mode === "er" || item.comparison?.mode === "ebr",
+      );
+      if (editRow) return editRow;
+      const editKind = withComparison.find(
+        (item) =>
+          item.kind === "edit_request_sent" ||
+          item.kind === "edit_request_suggest" ||
+          item.kind === "edit_request_accepted",
+      );
+      if (editKind) return editKind;
+    }
   }
 
   // Prefer the drill-in "sent" / "updated" entries over suggest/accepted.

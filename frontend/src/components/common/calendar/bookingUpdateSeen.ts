@@ -87,7 +87,12 @@ export function hasUnseenBookingUpdate(input: {
   if (!editedBy || editedBy === input.viewer) return false;
 
   const seen = loadSeen()[storageKey(input.viewer, ref)];
-  return toMs(input.updatedAt) > toMs(seen);
+  const updatedMs = toMs(input.updatedAt);
+  const seenMs = toMs(seen);
+  // Older clients stamped Date.now() when updatedAt was missing; that future
+  // stamp permanently hid Updated. Treat stamps newer than the booking as unseen.
+  if (seenMs > updatedMs) return true;
+  return updatedMs > seenMs;
 }
 
 /**
@@ -110,7 +115,7 @@ export function shouldShowSilentUpdatedTag(input: {
   });
 }
 
-/** Call when the viewer opens booking details / drawer. */
+/** Call when the viewer leaves booking details after seeing Updated chips. */
 export function markBookingUpdateSeen(
   viewer: BookingUpdateViewer,
   bookingRef: string | null | undefined,
@@ -119,12 +124,97 @@ export function markBookingUpdateSeen(
   const ref = String(bookingRef ?? "")
     .replace(/^#/, "")
     .trim();
-  if (!ref) return;
-  const stamp = updatedAt?.trim() || new Date().toISOString();
+  // Never invent Date.now() — a missing stamp would permanently hide future Updated tags.
+  const stamp = updatedAt?.trim();
+  if (!ref || !stamp) return;
   const all = loadSeen();
   const key = storageKey(viewer, ref);
   if (all[key] === stamp) return;
   all[key] = stamp;
   saveSeen(all);
   bumpSeenVersion();
+}
+
+const pendingSeenTimers = new Map<string, number>();
+
+function visitSessionKey(viewer: BookingUpdateViewer, bookingRef: string) {
+  return `mollure:silent_visit:${viewer}:${bookingRef.replace(/^#/, "").trim()}`;
+}
+
+/**
+ * Keep Updated chips for this browser tab visit even if React Strict Mode
+ * remounts the page (which would otherwise clear localStorage-seen mid-visit).
+ */
+export function rememberSilentUpdateVisit(
+  viewer: BookingUpdateViewer,
+  bookingRef: string | null | undefined,
+  updatedAt?: string | null,
+): void {
+  if (typeof window === "undefined") return;
+  const ref = String(bookingRef ?? "")
+    .replace(/^#/, "")
+    .trim();
+  if (!ref) return;
+  window.sessionStorage.setItem(
+    visitSessionKey(viewer, ref),
+    updatedAt?.trim() || "1",
+  );
+}
+
+export function hasRememberedSilentUpdateVisit(
+  viewer: BookingUpdateViewer,
+  bookingRef: string | null | undefined,
+  updatedAt?: string | null,
+): boolean {
+  if (typeof window === "undefined") return false;
+  const ref = String(bookingRef ?? "")
+    .replace(/^#/, "")
+    .trim();
+  if (!ref) return false;
+  const stored = window.sessionStorage.getItem(visitSessionKey(viewer, ref));
+  if (!stored) return false;
+  const stamp = updatedAt?.trim() || "1";
+  return stored === stamp || stored === "1";
+}
+
+/**
+ * Mark seen shortly after leaving the details page.
+ * Cancels if the same page remounts quickly (React Strict Mode).
+ */
+export function scheduleMarkBookingUpdateSeen(
+  viewer: BookingUpdateViewer,
+  bookingRef: string | null | undefined,
+  updatedAt?: string | null,
+): void {
+  if (typeof window === "undefined") return;
+  const ref = String(bookingRef ?? "")
+    .replace(/^#/, "")
+    .trim();
+  const stamp = updatedAt?.trim();
+  if (!ref || !stamp) return;
+  const key = `${viewer}:${ref}`;
+  const existing = pendingSeenTimers.get(key);
+  if (existing) window.clearTimeout(existing);
+  const timer = window.setTimeout(() => {
+    pendingSeenTimers.delete(key);
+    markBookingUpdateSeen(viewer, ref, stamp);
+    window.sessionStorage.removeItem(visitSessionKey(viewer, ref));
+  }, 400);
+  pendingSeenTimers.set(key, timer);
+}
+
+export function cancelScheduledMarkBookingUpdateSeen(
+  viewer: BookingUpdateViewer,
+  bookingRef: string | null | undefined,
+): void {
+  if (typeof window === "undefined") return;
+  const ref = String(bookingRef ?? "")
+    .replace(/^#/, "")
+    .trim();
+  if (!ref) return;
+  const key = `${viewer}:${ref}`;
+  const existing = pendingSeenTimers.get(key);
+  if (!existing) return;
+  window.clearTimeout(existing);
+  pendingSeenTimers.delete(key);
 }

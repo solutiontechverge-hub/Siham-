@@ -782,17 +782,29 @@ const toMutationError = (error: FetchBaseQueryError): MutationError => {
     return error.error ? error : { ...error, error: fallbackMessage };
   }
 
+  const rawData =
+    typeof error.data === "object" && error.data !== null
+      ? (error.data as {
+          message?: string;
+          data?: { errors?: Array<{ message?: string; msg?: string }>; error?: string };
+          errors?: Array<{ message?: string; msg?: string }>;
+        })
+      : null;
   const message =
-    typeof error.data === "object" &&
-    error.data !== null &&
-    "message" in error.data &&
-    typeof error.data.message === "string"
-      ? error.data.message
+    typeof rawData?.message === "string" && rawData.message.trim()
+      ? rawData.message
       : fallbackMessage;
+  const nestedErrors = rawData?.data?.errors ?? rawData?.errors;
 
   return {
     status: error.status,
-    data: { message },
+    data: {
+      message,
+      ...(Array.isArray(nestedErrors) ? { errors: nestedErrors } : {}),
+      ...(typeof rawData?.data?.error === "string"
+        ? { data: { error: rawData.data.error } }
+        : {}),
+    },
   };
 };
 
@@ -1249,9 +1261,11 @@ export const businessApi = baseApi.injectEndpoints({
         if (payload.notification_event) body.notification_event = payload.notification_event;
         if (payload.notify_incoming_er) body.notify_incoming_er = true;
         if (payload.initiated_by) body.initiated_by = payload.initiated_by;
-        if (payload.notes !== undefined) body.notes = payload.notes ?? "";
+        // Only send notes when we have a real string — never coerce null → "" (wipes meta).
+        if (typeof payload.notes === "string") body.notes = payload.notes;
         if (payload.total_price !== undefined && payload.total_price !== null && payload.total_price !== "") {
-          body.total_price = Number(payload.total_price);
+          const total = Number(payload.total_price);
+          if (Number.isFinite(total)) body.total_price = total;
         }
         if (payload.booking_date) body.booking_date = payload.booking_date;
         if (payload.start_time) body.start_time = payload.start_time;

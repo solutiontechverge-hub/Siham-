@@ -78,11 +78,9 @@ export function isClientListVisibleBooking(record: ClientBookingRecord): boolean
 
 function isWaitingForPrepayment(record: ClientBookingRecord): boolean {
   if (!record.requiresPrepayment || record.prepaid) return false;
-  return (
-    record.status === "requested" ||
-    record.status === "br_accepted" ||
-    record.status === "confirmed"
-  );
+  const status = normalizeStatus(record);
+  // Icon while BR is out (requested) or after accept awaiting pay (br_accepted).
+  return status === "requested" || status === "br_accepted";
 }
 
 function normalizeStatus(record: ClientBookingRecord): ClientBookingStatus {

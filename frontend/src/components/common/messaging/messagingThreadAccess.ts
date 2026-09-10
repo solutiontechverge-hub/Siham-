@@ -2,7 +2,13 @@ import type { MessagingStore, MessagingThread } from "./messagingTypes";
 import { isMessageFromClient } from "./messagingUnread";
 import { normalizeBookingIdQuery } from "./messagingStorage";
 
-const BOOKING_REPLY_STATUSES = new Set(["requested", "confirmed", "completed", "in_progress"]);
+const BOOKING_REPLY_STATUSES = new Set([
+  "requested",
+  "br_accepted",
+  "confirmed",
+  "completed",
+  "in_progress",
+]);
 
 export function threadHasClientMessage(store: MessagingStore, threadId: string) {
   const messages = store.messagesByThreadId[threadId] ?? [];
@@ -17,7 +23,7 @@ export function threadHasActiveBooking(store: MessagingStore, threadId: string) 
   return BOOKING_REPLY_STATUSES.has(thread.bookingStatus);
 }
 
-/** Professional may reply after client initiates or when a requested/confirmed/completed booking exists. */
+/** Professional may reply after client initiates or when a linked live booking exists. */
 export function canProfessionalReply(store: MessagingStore, threadId?: string) {
   if (!threadId) return false;
   return threadHasClientMessage(store, threadId) || threadHasActiveBooking(store, threadId);

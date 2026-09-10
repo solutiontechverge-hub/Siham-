@@ -398,6 +398,12 @@ export function clientSuggestEbrChanges(
     clientNote: payload.clientNote?.trim() || undefined,
     editedServiceIds: payload.editedServiceIds ?? prev?.editedServiceIds,
     editedProductIds: payload.editedProductIds ?? prev?.editedProductIds,
+    addedServiceIds: payload.addedServiceIds ?? prev?.addedServiceIds,
+    cancelledServiceIds:
+      payload.cancelledServiceIds ?? prev?.cancelledServiceIds,
+    addedProductIds: payload.addedProductIds ?? prev?.addedProductIds,
+    cancelledProductIds:
+      payload.cancelledProductIds ?? prev?.cancelledProductIds,
     suggestedServices: payload.suggestedServices ?? prev?.suggestedServices,
     suggestedProducts: payload.suggestedProducts ?? prev?.suggestedProducts,
   };

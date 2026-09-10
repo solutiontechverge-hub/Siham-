@@ -479,4 +479,77 @@ assert.deepEqual(
   { phoneUpdated: false, guestIds: [], serviceIds: [] },
 );
 
+assert.equal(
+  isSilentSafeBookingChange({
+    previousServices: original,
+    currentServices: original,
+    previousGuests: [
+      {
+        ...guestReorderPrev[0],
+        products: [
+          {
+            id: "hrr",
+            name: "hrr",
+            price: 2,
+            quantity: 1,
+            unitPrice: 22,
+            guestId: "g-model",
+          },
+        ],
+      },
+    ],
+    currentGuests: [
+      {
+        ...guestReorderNext[0],
+        name: "umer arshad",
+        products: [
+          {
+            id: "hrr",
+            name: "hrr",
+            price: 2,
+            quantity: 1,
+            unitPrice: 22,
+            guestId: "g-model",
+          },
+        ],
+      },
+    ],
+    previousPhoneCode: "+31",
+    currentPhoneCode: "+31",
+    previousPhoneNumber: "600000000",
+    currentPhoneNumber: "600000000",
+    previousProducts: [
+      { id: "oil", name: "Oil", price: 10, quantity: 1, unitPrice: 10 },
+    ],
+    currentProducts: [
+      { id: "oil", name: "Oil", price: 10, quantity: 1, unitPrice: 10 },
+    ],
+    scheduleChanged: false,
+  }),
+  true,
+);
+
+{
+  const fields = detectSilentUpdatedFields({
+    snapshot: {
+      phoneCode: "+31",
+      phoneNumber: "600000000",
+      guests: guestReorderPrev,
+      services: original,
+    },
+    currentPhoneCode: "+31",
+    currentPhoneNumber: "600000000",
+    currentGuests: [
+      {
+        ...guestReorderNext[0],
+        name: "umer arshad",
+      },
+    ],
+    currentServices: original,
+  });
+  assert.equal(fields.phoneUpdated, false);
+  assert.deepEqual(fields.guestIds, ["g-model"]);
+  assert.deepEqual(fields.serviceIds.slice().sort(), ["brow", "eyelash"]);
+}
+
 console.log("bookingRequestNegotiation.tags.test.ts passed");

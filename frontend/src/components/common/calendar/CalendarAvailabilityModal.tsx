@@ -141,6 +141,8 @@ export default function CalendarAvailabilityModal({
             label="Team Member"
             value={draft.teamIds}
             multiple
+            selectAll
+            selectAllLabel="All"
             placeholder="Select Team Member"
             renderValue={(selected) => {
               const ids = selected as readonly string[];
@@ -162,6 +164,8 @@ export default function CalendarAvailabilityModal({
             label="Location"
             value={draft.locations}
             multiple
+            selectAll
+            selectAllLabel="All"
             placeholder="Select Location"
             renderValue={(selected) => {
               const locs = selected as readonly string[];
