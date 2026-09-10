@@ -8,7 +8,8 @@ import { alpha, useTheme } from "@mui/material/styles";
 import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import { BodyText } from "../../ui/typography";
 import {
-  calendarBookingStatusLabel,
+  professionalCalendarDisplayStatus,
+  professionalCalendarStatusLabel,
   statusChipSx,
 } from "./bookingStatus";
 
@@ -123,7 +124,7 @@ export default function CalendarTeamMemberBookingsPopover({
         >
           {bookings.map((booking) => {
             const clientName = booking.showClientName?.trim() || "Client";
-            const statusLabel = calendarBookingStatusLabel(booking);
+            const statusLabel = professionalCalendarStatusLabel(booking);
             return (
               <ButtonBase
                 key={booking.id}
@@ -174,7 +175,7 @@ export default function CalendarTeamMemberBookingsPopover({
                   variant="outlined"
                   label={statusLabel}
                   sx={{
-                    ...statusChipSx(booking.status),
+                    ...statusChipSx(professionalCalendarDisplayStatus(booking)),
                     height: 20,
                     flexShrink: 0,
                     "& .MuiChip-label": {

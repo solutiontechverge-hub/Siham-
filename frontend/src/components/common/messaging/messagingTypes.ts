@@ -11,6 +11,7 @@ export type MessagingBookingStatus =
   | "completed"
   | "confirmed"
   | "requested"
+  | "br_accepted"
   | "in_progress"
   | "cancelled"
   | "invalid"

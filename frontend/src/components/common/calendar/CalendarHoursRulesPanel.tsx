@@ -45,8 +45,8 @@ import type { PublicBusinessHoursEntry } from "./CalendarPublicBusinessHoursModa
 import {
   locationHasPublicHoursConfigured,
   offLabelForLocation,
+  preferredScheduleForLocation,
   scheduleLabelForType,
-  scheduleTypeForLocation,
   variableNoteForLocation,
 } from "./CalendarPublicBusinessHoursModal";
 import CalendarServiceOrderCard from "./CalendarServiceOrderCard";
@@ -426,13 +426,12 @@ function formatHoursTimeSpan(entry: PublicBusinessHoursEntry): {
 function formatHoursLabel(entry: PublicBusinessHoursEntry): string {
   const { start, end, dateSpan, fromLabel } = formatHoursTimeSpan(entry);
   const offLabel = offLabelForLocation(entry.location);
+  const dayLabel = entry.day || "Day";
 
   if (entry.notAvailable) {
-    if (dateSpan) {
-      const dayPrefix = entry.day ? `${entry.day} ` : "";
-      return `${dayPrefix}${dateSpan} (${offLabel})`;
-    }
-    return `${entry.day || "Day"} (${offLabel})`;
+    // Weekly public hours are day-based (no date-range picker).
+    if (!dateSpan) return `${dayLabel} (${offLabel})`;
+    return `${entry.day ? `${entry.day} ` : ""}${dateSpan} (${offLabel})`;
   }
 
   if (isSingleDateEntry(entry)) {
@@ -445,7 +444,7 @@ function formatHoursLabel(entry: PublicBusinessHoursEntry): string {
     return `${day} ${dateSpan} (${start} - ${end})`;
   }
 
-  return `${entry.day || "Today"} (${start} - ${end})`;
+  return `${dayLabel} (${start} - ${end})`;
 }
 
 function formatGroupedHoursLabel(
@@ -456,15 +455,16 @@ function formatGroupedHoursLabel(
   const daySpan = formatWeekdaySpan(days);
   const prefix = daySpan ? `${daySpan} ` : "";
 
+  // Prefer weekday spans for the current weekly public-hours model.
+  if (!dateSpan || (!entry.dateFrom && !entry.dateTo)) {
+    return `${daySpan || entry.day || "Today"} (${start} - ${end})`;
+  }
+
   if (isRangeEntry(entry) && dateSpan) {
     return `${prefix}${dateSpan} (${start} - ${end})`.trim();
   }
 
-  if (dateSpan) {
-    return `${prefix}${dateSpan} (${start} - ${end})`.trim();
-  }
-
-  return `${daySpan || entry.day || "Today"} (${start} - ${end})`;
+  return `${prefix}${dateSpan} (${start} - ${end})`.trim();
 }
 
 function latestByKey(items: IndexedHoursEntry[]): IndexedHoursEntry[] {
@@ -653,12 +653,12 @@ function LocationHoursBlock({
 }) {
   const m = useTheme().palette.mollure;
   const configured = locationHasPublicHoursConfigured(entries, location);
-  const scheduleType = scheduleTypeForLocation(entries, location);
+  // Settings cards are location-scoped: FL = Fixed schedule, DL = Variable schedule.
   const scheduleLabel = scheduleLabelForType(
-    scheduleType || (location === "DL" ? "variable" : "fixed"),
+    preferredScheduleForLocation(location),
   );
   const variableNote = variableNoteForLocation(entries, location);
-  const showInfo = scheduleType === "variable";
+  const showInfo = preferredScheduleForLocation(location) === "variable";
   const infoTitle =
     variableNote || "Variable schedule — add a note when editing.";
 

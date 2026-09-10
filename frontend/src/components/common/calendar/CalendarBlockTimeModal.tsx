@@ -196,6 +196,8 @@ export default function CalendarBlockTimeModal({
               label="Team Member"
               value={draft.teamIds}
               multiple={!isEdit}
+              selectAll={!isEdit}
+              selectAllLabel="All"
               placeholder="Select Team Member"
               renderValue={(selected) => {
                 const ids = selected as readonly string[];
@@ -220,6 +222,8 @@ export default function CalendarBlockTimeModal({
             label="Location"
             value={draft.locations}
             multiple
+            selectAll
+            selectAllLabel="All"
             placeholder="Select Location"
             renderValue={(selected) => {
               const locs = selected as readonly string[];

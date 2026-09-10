@@ -818,6 +818,8 @@ export default function AppTimePicker({
       <Dialog
         open={open}
         onClose={closePicker}
+        // Nested inside AppModal (also a Dialog) — keep the wheel above the parent.
+        sx={{ zIndex: (theme) => theme.zIndex.modal + 4 }}
         PaperProps={{
           elevation: 8,
           sx: {

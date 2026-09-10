@@ -6,6 +6,8 @@ import {
   DEFAULT_RESPONSE_WINDOW_MINUTES,
   buildResponseDeadline,
   isResponseTimeConfigured,
+  isResponseWindowOverdue,
+  resolveEffectiveRespondByMs,
   shouldShowExpiredResponseBanner,
 } from "./bookingResponseDeadline";
 import { resolveProfessionalBookingActions } from "./bookingStatusActions";
@@ -79,6 +81,44 @@ assert.equal(
     blank,
   ),
   false,
+);
+
+// Dynamic: live template length overrides stamped snapshot.
+const started = Date.parse("2026-01-01T12:00:00.000Z");
+const dynamicFields = {
+  responseStartedAt: "2026-01-01T12:00:00.000Z",
+  respondBy: "2026-01-01T12:30:00.000Z",
+  responseWindowMinutes: 30,
+  responseStatus: "overdue_response" as const,
+};
+const nowAt40 = new Date(started + 40 * 60_000);
+assert.equal(
+  isResponseWindowOverdue(dynamicFields, nowAt40, { hours: 0, minutes: 30 }),
+  true,
+);
+assert.equal(
+  isResponseWindowOverdue(dynamicFields, nowAt40, { hours: 1, minutes: 0 }),
+  false,
+);
+assert.equal(
+  resolveEffectiveRespondByMs(dynamicFields, { hours: 1, minutes: 0 }),
+  started + 60 * 60_000,
+);
+assert.equal(
+  shouldShowExpiredResponseBanner(
+    { status: "Requested", bookingScenario: "BR", details: dynamicFields },
+    { hours: 1, minutes: 0 },
+    nowAt40,
+  ),
+  false,
+);
+assert.equal(
+  shouldShowExpiredResponseBanner(
+    { status: "Requested", bookingScenario: "BR", details: dynamicFields },
+    { hours: 0, minutes: 15 },
+    nowAt40,
+  ),
+  true,
 );
 
 const outgoingBr = {

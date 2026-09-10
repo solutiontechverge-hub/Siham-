@@ -76,6 +76,7 @@ type Props = {
   /** BR/EBR/ER response window elapsed. */
   responseOverdue?: boolean;
   messagingHref?: string;
+  onWaitingForPrepaymentClick?: () => void;
 };
 
 export default function ClientBookingDetailsHeader({
@@ -109,6 +110,7 @@ export default function ClientBookingDetailsHeader({
   onEditTagSignpostClick,
   responseOverdue = false,
   messagingHref,
+  onWaitingForPrepaymentClick,
 }: Props) {
   const m = useTheme().palette.mollure;
   const router = useRouter();
@@ -436,6 +438,7 @@ export default function ClientBookingDetailsHeader({
               erSignpostTitle={erSignpostTitle}
               onErClick={onErClick}
               responseOverdue={responseOverdue}
+              onWaitingForPrepaymentClick={onWaitingForPrepaymentClick}
             />
           </Stack>
         </Stack>

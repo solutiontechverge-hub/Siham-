@@ -143,15 +143,14 @@ export function useActiveClientBooking() {
       return enrichClientBookingRecord({
         ...fromApi,
         draft,
-        prepaid: Boolean(fromApi.prepaid || sessionRecord.prepaid),
+        // Do not keep a stale session "prepaid" when the API still says unpaid —
+        // that made clients think they paid while professional Accept stayed blocked.
+        prepaid: Boolean(fromApi.prepaid),
         incomingEditRequest: fromApi.incomingEditRequest ?? sessionRecord.incomingEditRequest,
       });
     }
 
     if (fromApi) {
-      if (sessionRecord && sameBooking(fromApi, sessionRecord) && sessionRecord.prepaid && !fromApi.prepaid) {
-        return enrichClientBookingRecord({ ...fromApi, prepaid: true });
-      }
       return enrichClientBookingRecord(fromApi);
     }
 

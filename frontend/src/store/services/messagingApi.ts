@@ -35,11 +35,12 @@ export const messagingApi = baseApi.injectEndpoints({
         bookingRef: string;
         businessSetupId: string;
       },
-      { bookingRef: string }
+      { bookingRef: string; customerId?: string }
     >({
-      query: ({ bookingRef }) => {
+      query: ({ bookingRef, customerId }) => {
         const params = new URLSearchParams();
         params.set("bookingRef", bookingRef);
+        if (customerId?.trim()) params.set("customerId", customerId.trim());
         return {
           url: `/api/messaging/open-for-booking?${params.toString()}`,
           method: "GET",
@@ -53,7 +54,6 @@ export const messagingApi = baseApi.injectEndpoints({
           businessSetupId: string;
         }>,
       ) => response.data,
-      invalidatesTags: ["Messaging"],
     }),
     getMessagingProfessionals: build.query<
       MessagingProfessionalsResponse,

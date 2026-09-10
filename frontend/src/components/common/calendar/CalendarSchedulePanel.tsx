@@ -35,6 +35,7 @@ import type {
   CalendarResource,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import {
+  calendarEntryIdFromBlockId,
   createEmptyBlockTimeDraft,
   dedupeCalendarBlocks,
   formatLongDateUtc,
@@ -50,6 +51,7 @@ import {
   findBookingsInTimeslot,
   findConflictingAvailabilityRow,
   makeScheduleRowId,
+  removeScheduleAvailabilityForMemberLocation,
   splitScheduleRowForDate,
   type ScheduleActiveBooking,
 } from "./calendar-schedule.utils";
@@ -77,7 +79,14 @@ type CalendarSchedulePanelProps = {
 type ScheduleStatusTab = "active" | "archived";
 
 type DeleteTarget =
-  { kind: "availability"; id: string } | { kind: "blocked"; id: string } | null;
+  | {
+      kind: "availability";
+      id: string;
+      resourceId: string;
+      location: CalendarBookingLocation;
+    }
+  | { kind: "blocked"; id: string; resourceId: string }
+  | null;
 
 const DAY_ABBR: Record<string, string> = {
   Monday: "Mon",
@@ -129,7 +138,7 @@ const defaultBlockDraft = (
   dateIso: string,
 ): BlockTimeDraft & { activity?: string } => ({
   ...createEmptyBlockTimeDraft(
-    resources[0]?.id ? [resources[0].id] : [],
+    resources.map((resource) => resource.id),
     locations,
     dateIso,
   ),
@@ -386,12 +395,17 @@ export default function CalendarSchedulePanel({
     setAvailabilityOpen(true);
   };
 
-  const openEditAvailability = (row: ScheduleAvailabilityRow) => {
+  const openEditAvailability = (
+    row: ScheduleAvailabilityRow,
+    resourceId: string,
+    location: CalendarBookingLocation,
+  ) => {
     setAvailabilityMode("edit");
     setEditingRowId(row.id);
     setAvailabilityDraft({
-      teamIds: [...row.resourceIds],
-      locations: [...row.locations],
+      // Edit only the member + location that was clicked (dynamic per professional).
+      teamIds: [resourceId],
+      locations: [location],
       dateFrom: row.dateFrom,
       dateTo: row.dateTo || row.dateFrom,
       dayFrom: row.dayFrom,
@@ -453,6 +467,39 @@ export default function CalendarSchedulePanel({
       nextRows = scheduleRows.flatMap((row) =>
         row.id === original.id ? split : [row],
       );
+    } else if (availabilityMode === "edit" && editingRowId && original) {
+      // Shared "All" rows: update only the edited member/location slice.
+      const otherResourceIds = original.resourceIds.filter(
+        (id) => !nextRow.resourceIds.includes(id),
+      );
+      const leftoverLocations = original.locations.filter(
+        (location) => !nextRow.locations.includes(location),
+      );
+      const rebuilt: ScheduleAvailabilityRow[] = [];
+      if (otherResourceIds.length) {
+        rebuilt.push({ ...original, resourceIds: otherResourceIds });
+      }
+      if (leftoverLocations.length && nextRow.resourceIds.length === 1) {
+        const memberId = nextRow.resourceIds[0];
+        if (original.resourceIds.includes(memberId)) {
+          rebuilt.push({
+            ...original,
+            id: otherResourceIds.length ? makeScheduleRowId() : original.id,
+            resourceIds: [memberId],
+            locations: leftoverLocations,
+          });
+        }
+      }
+      rebuilt.push({
+        ...nextRow,
+        id:
+          rebuilt.some((row) => row.id === original.id)
+            ? makeScheduleRowId()
+            : original.id,
+      });
+      nextRows = scheduleRows.flatMap((row) =>
+        row.id === original.id ? rebuilt : [row],
+      );
     } else if (availabilityMode === "edit" && editingRowId) {
       nextRows = scheduleRows.map((row) =>
         row.id === editingRowId ? nextRow : row,
@@ -460,15 +507,23 @@ export default function CalendarSchedulePanel({
     } else {
       nextRows = [...scheduleRows, nextRow];
     }
-    await onSaveScheduleRows(nextRows);
-    setAvailabilityOpen(false);
+    try {
+      await onSaveScheduleRows(nextRows);
+      setAvailabilityOpen(false);
+    } catch {
+      // Keep modal open so the user can retry.
+    }
   };
 
   const commitBlocked = async (
     draft: BlockTimeDraft & { activity?: string },
   ) => {
-    await onCreateBlockedTime(draft);
-    setBlockOpen(false);
+    try {
+      await onCreateBlockedTime(draft);
+      setBlockOpen(false);
+    } catch {
+      // Keep modal open so the user can retry.
+    }
   };
 
   const applyBlocked = async () => {
@@ -529,22 +584,55 @@ export default function CalendarSchedulePanel({
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
-    if (deleteTarget.kind === "availability") {
-      await onSaveScheduleRows(
-        scheduleRows.filter((row) => row.id !== deleteTarget.id),
-      );
-    } else if (onDeleteBlockedEntry) {
-      const target =
-        blocks.find((block) => block.id === deleteTarget.id) ?? null;
-      const twins = target
-        ? siblingCalendarBlocks(blocks, target)
-        : [{ id: deleteTarget.id } as CalendarBlock];
-      for (const twin of twins) {
-        const rawId = twin.id.replace(/^blk-/, "");
-        await onDeleteBlockedEntry(rawId);
+    try {
+      if (deleteTarget.kind === "availability") {
+        const nextRows = removeScheduleAvailabilityForMemberLocation(
+          scheduleRows,
+          deleteTarget.id,
+          deleteTarget.resourceId,
+          deleteTarget.location,
+        );
+        await onSaveScheduleRows(nextRows);
+      } else if (onDeleteBlockedEntry) {
+        const target =
+          blocks.find(
+            (block) =>
+              block.id === deleteTarget.id &&
+              block.resourceId === deleteTarget.resourceId,
+          ) ?? null;
+        const twins = target
+          ? siblingCalendarBlocks(blocks, target).filter(
+              (block) => block.resourceId === deleteTarget.resourceId,
+            )
+          : blocks.filter(
+              (block) =>
+                block.id === deleteTarget.id &&
+                block.resourceId === deleteTarget.resourceId,
+            );
+        const deleteIds = twins.length
+          ? twins.map((twin) => twin.id)
+          : [deleteTarget.id];
+        // Prefer persisted UUIDs; local optimistic ids are cleaned up without API.
+        const uniqueApiIds = Array.from(
+          new Set(
+            deleteIds
+              .map((id) => calendarEntryIdFromBlockId(id))
+              .filter((id): id is string => Boolean(id)),
+          ),
+        );
+        if (uniqueApiIds.length) {
+          for (const entryId of uniqueApiIds) {
+            await onDeleteBlockedEntry(entryId);
+          }
+        } else {
+          for (const blockId of deleteIds) {
+            await onDeleteBlockedEntry(blockId);
+          }
+        }
       }
+    } finally {
+      setDeleteTarget(null);
     }
-    setDeleteTarget(null);
   };
 
   const rowActions = (onEdit: (() => void) | null, onDelete: () => void) => (
@@ -780,11 +868,18 @@ export default function CalendarSchedulePanel({
                                 {isArchived
                                   ? "—"
                                   : rowActions(
-                                      () => openEditAvailability(row),
+                                      () =>
+                                        openEditAvailability(
+                                          row,
+                                          resource.id,
+                                          location,
+                                        ),
                                       () =>
                                         setDeleteTarget({
                                           kind: "availability",
                                           id: row.id,
+                                          resourceId: resource.id,
+                                          location,
                                         }),
                                     )}
                               </TableCell>
@@ -830,6 +925,7 @@ export default function CalendarSchedulePanel({
                                     setDeleteTarget({
                                       kind: "blocked",
                                       id: block.id,
+                                      resourceId: resource.id,
                                     }),
                                   )}
                             </TableCell>

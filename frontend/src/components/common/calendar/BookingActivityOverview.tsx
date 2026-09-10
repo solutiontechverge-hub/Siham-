@@ -570,6 +570,53 @@ function ComparisonPanel({ comparison }: { comparison: ActivityComparison }) {
   );
 }
 
+function ComparisonEventHeader({ item }: { item: BookingActivityItem }) {
+  const m = useTheme().palette.mollure;
+  const meta = [item.dateLabel, item.timeLabel].filter(Boolean).join(" · ");
+
+  return (
+    <Box
+      sx={{
+        borderRadius: "12px",
+        border: `1px solid ${alpha(m.navy, 0.08)}`,
+        bgcolor: "#fff",
+        px: 1.75,
+        py: 1.25,
+      }}
+    >
+      <Typography
+        sx={{
+          fontSize: 11,
+          fontWeight: 700,
+          color: alpha(m.navy, 0.48),
+          mb: 0.2,
+        }}
+      >
+        {item.actorLabel}
+      </Typography>
+      <Typography
+        sx={{
+          fontSize: 13,
+          fontWeight: 900,
+          color: alpha(m.navy, 0.88),
+          lineHeight: 1.3,
+        }}
+      >
+        {item.title}
+        {meta ? (
+          <Box
+            component="span"
+            sx={{ fontWeight: 700, color: alpha(m.navy, 0.48) }}
+          >
+            {" · "}
+            {meta}
+          </Box>
+        ) : null}
+      </Typography>
+    </Box>
+  );
+}
+
 function EbrActivityDetails({
   item,
   relatedItems,
@@ -580,15 +627,26 @@ function EbrActivityDetails({
   const m = useTheme().palette.mollure;
   const comparison = item.comparison;
 
+  // Comparison drill-in: compact event header + change rows only (no full timeline).
+  if (comparison) {
+    return (
+      <Stack spacing={1.5}>
+        <ComparisonEventHeader item={item} />
+        <ComparisonPanel comparison={comparison} />
+        <Typography
+          sx={{ fontSize: 11.5, color: alpha(m.navy, 0.45), lineHeight: 1.45 }}
+        >
+          Read-only details. No actions are available on this screen.
+        </Typography>
+      </Stack>
+    );
+  }
+
   return (
     <Stack spacing={1.5}>
-      {!comparison || item.kind !== "booking_updated" ? (
-        <TimelineList items={relatedItems} allowArrows={false} />
-      ) : null}
+      <TimelineList items={relatedItems} allowArrows={false} />
 
-      {comparison ? <ComparisonPanel comparison={comparison} /> : null}
-
-      {!comparison && (item.detailLines?.length ?? 0) > 0 ? (
+      {(item.detailLines?.length ?? 0) > 0 ? (
         <Box
           sx={{
             borderRadius: "12px",

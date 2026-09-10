@@ -182,6 +182,18 @@ export function siblingCalendarBlocks<T extends CalendarBlock>(
   return blocks.filter((block) => calendarBlockLogicalKey(block) === key);
 }
 
+const CALENDAR_ENTRY_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** Resolve a persisted calendar_entries UUID from a UI block id (`blk-<uuid>`). */
+export function calendarEntryIdFromBlockId(blockId: string): string | null {
+  const raw = String(blockId ?? "").trim();
+  if (!raw) return null;
+  const withoutPrefix = raw.startsWith("blk-") ? raw.slice(4) : raw;
+  if (!withoutPrefix || withoutPrefix.startsWith("local-")) return null;
+  return CALENDAR_ENTRY_UUID_RE.test(withoutPrefix) ? withoutPrefix : null;
+}
+
 export function calendarBlockOverlapsBooking(
   block: Pick<CalendarBlock, "resourceId" | "date" | "start" | "end">,
   booking: {

@@ -18,6 +18,20 @@ export function toPrepaymentIconVariant(
   return "canceled_or_invalid";
 }
 
+/** Confirmed prepaid is status, not an action — only pending pay / refund. */
+export function isActionRequiredPrepaymentStatus(
+  status: CalendarPrepaymentStatus | undefined,
+): status is Exclude<CalendarPrepaymentStatus, "confirmed"> {
+  return status === "pending" || status === "canceled" || status === "invalid";
+}
+
+export function actionRequiredPrepaymentIconVariant(
+  variant: PrepaymentStatusIconVariant | undefined,
+): PrepaymentStatusIconVariant | undefined {
+  if (variant === "pending" || variant === "canceled_or_invalid") return variant;
+  return undefined;
+}
+
 /** Map API `prepayment_status` → calendar icon status. */
 export function mapApiPrepaymentStatus(
   apiStatus?: string | null,

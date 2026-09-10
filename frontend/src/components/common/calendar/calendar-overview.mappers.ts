@@ -557,7 +557,10 @@ export function mapCalendarBookingToEvent(
                             ? { endTime: service.endTime }
                             : {}),
                           ...(service.teamMemberId
-                            ? { staffResourceId: String(service.teamMemberId) }
+                            ? {
+                                teamMemberId: String(service.teamMemberId),
+                                staffResourceId: String(service.teamMemberId),
+                              }
                             : {}),
                           guestId: personId,
                         }));
@@ -606,6 +609,42 @@ export function mapCalendarBookingToEvent(
   };
 }
 
+function normalizeOverviewBookingCode(value: string | null | undefined) {
+  return String(value ?? "")
+    .trim()
+    .replace(/^#+/, "")
+    .toLowerCase();
+}
+
+function overviewSlotKey(
+  event: Pick<CalendarEvent, "date" | "start" | "end" | "resourceId">,
+) {
+  return `${event.date}|${event.start}|${event.end}|${event.resourceId}`;
+}
+
+/** Drop SQL/join duplicates so one booking cannot become two overview sources. */
+function dedupeOverviewBookingEvents(
+  events: readonly CalendarEvent[],
+): CalendarEvent[] {
+  const seenIds = new Set<string>();
+  const seenCodes = new Set<string>();
+  const out: CalendarEvent[] = [];
+  for (const event of events) {
+    const id = String(event.id ?? "").trim();
+    if (id) {
+      if (seenIds.has(id)) continue;
+      seenIds.add(id);
+    }
+    const code = normalizeOverviewBookingCode(event.bookingCode);
+    if (code) {
+      if (seenCodes.has(code)) continue;
+      seenCodes.add(code);
+    }
+    out.push(event);
+  }
+  return out;
+}
+
 export function mergeCalendarOverviewEvents(
   entries: readonly CalendarEntry[],
   bookings: readonly CalendarBooking[],
@@ -615,28 +654,26 @@ export function mergeCalendarOverviewEvents(
     .filter((entry) => entry.status !== "blocked")
     .map((entry) => mapCalendarEntryToOverviewEvent(entry, fallbackResourceId));
 
-  const bookingEvents = bookings
-    .map((booking) => mapCalendarBookingToEvent(booking, fallbackResourceId))
-    .filter((event) => !event.details?.hiddenForProfessional);
+  const bookingEvents = dedupeOverviewBookingEvents(
+    bookings
+      .map((booking) => mapCalendarBookingToEvent(booking, fallbackResourceId))
+      .filter((event) => !event.details?.hiddenForProfessional),
+  );
 
   const bookingCodes = new Set(
     bookingEvents
-      .map((event) => String(event.bookingCode ?? "").trim())
+      .map((event) => normalizeOverviewBookingCode(event.bookingCode))
       .filter(Boolean),
   );
   const bookingKeys = new Set(
-    bookingEvents.map(
-      (event) => `${event.date}|${event.start}|${event.end}|${event.resourceId}`,
-    ),
+    bookingEvents.map((event) => overviewSlotKey(event)),
   );
 
   // Prefer booking rows over mirrored calendar entries (same of/ol code / same slot).
   const dedupedEntries = entryEvents.filter((event) => {
-    const code = String(event.bookingCode ?? "").trim();
+    const code = normalizeOverviewBookingCode(event.bookingCode);
     if (code && bookingCodes.has(code)) return false;
-    return !bookingKeys.has(
-      `${event.date}|${event.start}|${event.end}|${event.resourceId}`,
-    );
+    return !bookingKeys.has(overviewSlotKey(event));
   });
 
   return [...dedupedEntries, ...bookingEvents];

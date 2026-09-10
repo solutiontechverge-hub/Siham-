@@ -91,7 +91,7 @@ export default function MessagingPageView({
   React.useEffect(() => {
     if (!isCompactLayout) return;
     if (
-      (navigation?.bookingRef || navigation?.threadId) &&
+      (navigation?.bookingRef || navigation?.threadId || navigation?.seedThread) &&
       inbox.activeThread
     ) {
       setMobileChatOpen(true);
@@ -100,6 +100,7 @@ export default function MessagingPageView({
     inbox.activeThread,
     isCompactLayout,
     navigation?.bookingRef,
+    navigation?.seedThread,
     navigation?.threadId,
   ]);
 
@@ -239,19 +240,21 @@ export default function MessagingPageView({
             composerDisabled={audience === "professional" && !inbox.canReply}
             composerDisabledHint={
               audience === "professional" && !inbox.canReply
-                ? "Reply when the client messages first, or when a requested, confirmed, or completed booking exists."
+                ? "Reply when the client messages first, or when a requested, accepted, confirmed, or completed booking exists."
                 : undefined
             }
             peerReadAt={inbox.peerReadAt}
             emptyStateMessage={
               !inbox.activeThread
-                ? audience === "professional"
-                  ? inbox.search.trim()
-                    ? "No client conversations match your search. Try a client name or booking ID."
-                    : "No conversations yet. Clients appear here after they message you, or when they have a requested, confirmed, or completed booking."
-                  : inbox.search.trim()
-                    ? "No professionals match your search. Try a name or booking ID (e.g. B500844)."
-                    : "Browse professionals on the left and tap one to start chatting."
+                ? inbox.openedFromBooking
+                  ? "Opening this booking conversation…"
+                  : audience === "professional"
+                    ? inbox.search.trim()
+                      ? "No client conversations match your search. Try a client name or booking ID."
+                      : "No conversations yet. Clients appear here after they message you, or when they have a requested, confirmed, or completed booking."
+                    : inbox.search.trim()
+                      ? "No professionals match your search. Try a name or booking ID (e.g. B500844)."
+                      : "Browse professionals on the left and tap one to start chatting."
                 : "Select a conversation to start messaging"
             }
           />

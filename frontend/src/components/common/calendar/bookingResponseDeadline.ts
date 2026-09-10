@@ -1,5 +1,7 @@
 /**
  * Response-time / late-response helpers for BR / EBR / ER negotiation windows.
+ * Window length is always resolved from the live business template (flat 30-minute
+ * default when unset). Stored respondBy / responseWindowMinutes are snapshots only.
  */
 
 export type ResponseWindowInput = {
@@ -60,6 +62,52 @@ export function resolveResponseWindowMinutes(
   return configuredResponseWindowMinutes(input) ?? DEFAULT_RESPONSE_WINDOW_MINUTES;
 }
 
+/**
+ * Effective wait length for a booking. Live template always wins when supplied
+ * (blank → 30). Without a live input, fall back to the stamped snapshot.
+ */
+export function resolveEffectiveResponseWindowMinutes(
+  fields?: ResponseDeadlineFields | null,
+  liveWindow?: ResponseWindowInput | null,
+): number {
+  if (liveWindow !== undefined) {
+    return resolveResponseWindowMinutes(liveWindow);
+  }
+  const stamped = Number(fields?.responseWindowMinutes);
+  if (Number.isFinite(stamped) && stamped > 0) return stamped;
+  return DEFAULT_RESPONSE_WINDOW_MINUTES;
+}
+
+/** Due instant from responseStartedAt + live/effective window (dynamic). */
+export function resolveEffectiveRespondByMs(
+  fields?: ResponseDeadlineFields | null,
+  liveWindow?: ResponseWindowInput | null,
+): number | null {
+  if (!fields) return null;
+
+  const windowMinutes = resolveEffectiveResponseWindowMinutes(fields, liveWindow);
+
+  if (fields.responseStartedAt) {
+    const start = Date.parse(fields.responseStartedAt);
+    if (Number.isFinite(start)) return start + windowMinutes * 60_000;
+  }
+
+  if (fields.respondBy) {
+    const due = Date.parse(fields.respondBy);
+    if (!Number.isFinite(due)) return null;
+    // No startedAt: shift frozen due when live window differs from stamped.
+    if (liveWindow !== undefined) {
+      const stamped = Number(fields.responseWindowMinutes);
+      if (Number.isFinite(stamped) && stamped > 0 && stamped !== windowMinutes) {
+        return due - stamped * 60_000 + windowMinutes * 60_000;
+      }
+    }
+    return due;
+  }
+
+  return null;
+}
+
 /** Notes already carry a response window — do not invent one for older bookings. */
 export function hasStoredResponseDeadline(
   fields?: ResponseDeadlineFields | null,
@@ -85,16 +133,12 @@ export function buildResponseDeadline(
 }
 
 export function restartResponseDeadline(
-  fields?: ResponseDeadlineFields | null,
+  _fields?: ResponseDeadlineFields | null,
   windowInput?: ResponseWindowInput | null,
   startedAt: Date = new Date(),
 ): ResponseDeadline {
-  const configured = configuredResponseWindowMinutes(windowInput);
-  const fieldMinutes = Number(fields?.responseWindowMinutes);
-  const fromFields = fieldMinutes > 0 ? fieldMinutes : null;
-  const windowMinutes =
-    configured ?? fromFields ?? DEFAULT_RESPONSE_WINDOW_MINUTES;
-  return buildResponseDeadline({ hours: 0, minutes: windowMinutes }, startedAt);
+  // Always restart from the live template (or flat 30-minute default).
+  return buildResponseDeadline(windowInput, startedAt);
 }
 
 /** Original BR, EBR, or Confirmed ER still waiting on a response. */
@@ -106,35 +150,29 @@ export function isPendingResponseNegotiation(
   return event.status === "Confirmed" && event.bookingScenario === "ER";
 }
 
-/** Expiry banner: pending BR/EBR/ER with a stored deadline that has elapsed. */
+/** Expiry banner: pending BR/EBR/ER whose live window has elapsed. */
 export function shouldShowExpiredResponseBanner(
   event: PendingNegotiationEvent,
-  _responseTimeInput?: ResponseWindowInput | null,
+  responseTimeInput?: ResponseWindowInput | null,
   now: Date = new Date(),
 ): boolean {
   if (!isPendingResponseNegotiation(event)) return false;
   if (!hasStoredResponseDeadline(event?.details)) return false;
-  return isResponseWindowOverdue(event?.details, now);
+  return isResponseWindowOverdue(event?.details, now, responseTimeInput);
 }
 
 export function isResponseWindowOverdue(
   fields?: ResponseDeadlineFields | null,
   now: Date = new Date(),
+  liveWindow?: ResponseWindowInput | null,
 ): boolean {
   if (!fields) return false;
-  if (fields.responseStatus === "overdue_response") return true;
-  if (fields.respondBy) {
-    const due = Date.parse(fields.respondBy);
-    if (Number.isFinite(due) && now.getTime() > due) return true;
+
+  const dueMs = resolveEffectiveRespondByMs(fields, liveWindow);
+  if (dueMs != null) {
+    return now.getTime() > dueMs;
   }
-  if (fields.responseStartedAt && fields.responseWindowMinutes) {
-    const start = Date.parse(fields.responseStartedAt);
-    if (
-      Number.isFinite(start) &&
-      now.getTime() > start + fields.responseWindowMinutes * 60_000
-    ) {
-      return true;
-    }
-  }
-  return false;
+
+  // Legacy stamp with no reconstructable start/due.
+  return fields.responseStatus === "overdue_response";
 }
