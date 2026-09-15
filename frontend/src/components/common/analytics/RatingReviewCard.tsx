@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  mollureBodyMutedSx,
+  mollureBodySx,
+  mollureLabelSx,
+} from "../../../theme/mollureHierarchy";
+
 import * as React from "react";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
@@ -217,9 +223,7 @@ export default function RatingReviewCard({
           <BodyText
             sx={{
               mt: 1.05,
-              fontSize: 12.5,
-              fontWeight: 700,
-              color: alpha(m.navy, 0.55),
+              ...mollureBodyMutedSx(m.navy),
               lineHeight: 1.55,
             }}
           >
@@ -324,21 +328,17 @@ export default function RatingReviewCard({
                 >
                   <MenuItem
                     onClick={handleEditReply}
-                    sx={{
-                      fontSize: 12.5,
-                      fontWeight: 800,
+                    sx={mollureLabelSx(m.navy, {
                       color: alpha(m.navy, 0.7),
-                    }}
+                    })}
                   >
                     Edit
                   </MenuItem>
                   <MenuItem
                     onClick={handleDeleteReply}
-                    sx={{
-                      fontSize: 12.5,
-                      fontWeight: 800,
+                    sx={mollureLabelSx(m.navy, {
                       color: alpha(m.navy, 0.7),
-                    }}
+                    })}
                   >
                     Delete
                   </MenuItem>
@@ -374,10 +374,10 @@ export default function RatingReviewCard({
                     borderRadius: "10px",
                   },
                   "& .MuiOutlinedInput-input": {
-                    fontSize: 12.5,
-                    fontWeight: 700,
-                    color: alpha(m.navy, 0.68),
-                    py: 1.15,
+                    ...mollureBodySx(m.navy, {
+                      color: alpha(m.navy, 0.68),
+                      py: 1.15,
+                    }),
                   },
                 }}
               />

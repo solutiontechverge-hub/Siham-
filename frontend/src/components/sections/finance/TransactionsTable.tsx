@@ -17,6 +17,11 @@ import {
 } from "@mui/material";
 import { alpha, type Theme } from "@mui/material/styles";
 import {
+  mollureBodySx,
+  mollureLabelSx,
+  mollureTableHeaderSx,
+} from "../../../theme/mollureHierarchy";
+import {
   formatEntryIdDisplay,
   formatTransactionDate,
   formatTransactionStatusLabel,
@@ -149,11 +154,7 @@ export default function TransactionsTable({
                 >
                   <BodyText
                     component="span"
-                    sx={{
-                      fontSize: 11.5,
-                      fontWeight: 800,
-                      color: alpha(m.navy, 0.62),
-                    }}
+                    sx={mollureTableHeaderSx(m.navy)}
                   >
                     {h}
                   </BodyText>
@@ -205,27 +206,22 @@ export default function TransactionsTable({
                         type="button"
                         underline="hover"
                         onClick={() => onEntryClick(row)}
-                        sx={{
-                          fontSize: 12.5,
-                          fontWeight: 800,
+                        sx={mollureLabelSx(theme.palette.mollure.navy, {
                           color: theme.palette.primary.main,
                           border: 0,
                           bgcolor: "transparent",
                           p: 0,
                           cursor: "pointer",
+                          fontFamily: "inherit",
                           textAlign: "left",
-                        }}
+                        })}
                       >
                         {entryDisplay}
                       </MuiLink>
                     ) : (
                       <BodyText
                         component="span"
-                        sx={{
-                          fontSize: 12.5,
-                          fontWeight: 800,
-                          color: alpha(m.navy, 0.78),
-                        }}
+                        sx={mollureLabelSx(m.navy)}
                       >
                         {entryDisplay}
                       </BodyText>
@@ -235,11 +231,9 @@ export default function TransactionsTable({
                     <Stack spacing={0.35}>
                       <BodyText
                         component="span"
-                        sx={{
-                          fontSize: 12.5,
-                          fontWeight: 700,
+                        sx={mollureBodySx(m.navy, {
                           color: alpha(m.navy, 0.75),
-                        }}
+                        })}
                       >
                         {dateDisplay}
                       </BodyText>
@@ -352,13 +346,10 @@ export default function TransactionsTable({
                       >
                         <BodyText
                           component="span"
-                          sx={{
-                            fontSize: 12.5,
-                            fontWeight: 800,
-                            color: alpha(m.navy, 0.78),
+                          sx={mollureLabelSx(m.navy, {
                             borderBottom: `1px dashed ${alpha(m.navy, 0.25)}`,
                             cursor: "help",
-                          }}
+                          })}
                         >
                           {row.netAmount}
                         </BodyText>
@@ -366,11 +357,7 @@ export default function TransactionsTable({
                     ) : (
                       <BodyText
                         component="span"
-                        sx={{
-                          fontSize: 12.5,
-                          fontWeight: 800,
-                          color: alpha(m.navy, 0.78),
-                        }}
+                        sx={mollureLabelSx(m.navy)}
                       >
                         {row.netAmount}
                       </BodyText>
@@ -379,11 +366,9 @@ export default function TransactionsTable({
                   <TableCell sx={{ verticalAlign: "top", maxWidth: 200 }}>
                     <BodyText
                       component="div"
-                      sx={{
-                        fontSize: 12.5,
-                        fontWeight: 800,
+                      sx={mollureLabelSx(m.navy, {
                         color: alpha(m.navy, 0.82),
-                      }}
+                      })}
                     >
                       {row.methodTitle}
                     </BodyText>

@@ -652,12 +652,31 @@ export function mergeCalendarOverviewEvents(
 ): CalendarEvent[] {
   const entryEvents = entries
     .filter((entry) => entry.status !== "blocked")
-    .map((entry) => mapCalendarEntryToOverviewEvent(entry, fallbackResourceId));
+    .map((entry) => mapCalendarEntryToOverviewEvent(entry, fallbackResourceId))
+    .filter((event) => !event.details?.hiddenForProfessional);
 
-  const bookingEvents = dedupeOverviewBookingEvents(
-    bookings
-      .map((booking) => mapCalendarBookingToEvent(booking, fallbackResourceId))
-      .filter((event) => !event.details?.hiddenForProfessional),
+  const mappedBookings = dedupeOverviewBookingEvents(
+    bookings.map((booking) =>
+      mapCalendarBookingToEvent(booking, fallbackResourceId),
+    ),
+  );
+
+  // Soft-deleted bookings must still suppress mirrored calendar entries,
+  // otherwise a deleted booking reappears from the entry row after refetch.
+  const hiddenBookingCodes = new Set(
+    mappedBookings
+      .filter((event) => event.details?.hiddenForProfessional)
+      .map((event) => normalizeOverviewBookingCode(event.bookingCode))
+      .filter(Boolean),
+  );
+  const hiddenBookingKeys = new Set(
+    mappedBookings
+      .filter((event) => event.details?.hiddenForProfessional)
+      .map((event) => overviewSlotKey(event)),
+  );
+
+  const bookingEvents = mappedBookings.filter(
+    (event) => !event.details?.hiddenForProfessional,
   );
 
   const bookingCodes = new Set(
@@ -672,8 +691,11 @@ export function mergeCalendarOverviewEvents(
   // Prefer booking rows over mirrored calendar entries (same of/ol code / same slot).
   const dedupedEntries = entryEvents.filter((event) => {
     const code = normalizeOverviewBookingCode(event.bookingCode);
-    if (code && bookingCodes.has(code)) return false;
-    return !bookingKeys.has(overviewSlotKey(event));
+    if (code && (bookingCodes.has(code) || hiddenBookingCodes.has(code))) {
+      return false;
+    }
+    const key = overviewSlotKey(event);
+    return !bookingKeys.has(key) && !hiddenBookingKeys.has(key);
   });
 
   return [...dedupedEntries, ...bookingEvents];

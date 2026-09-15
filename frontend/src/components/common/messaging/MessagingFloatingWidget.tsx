@@ -1,11 +1,11 @@
 "use client";
 
 import * as React from "react";
+import dynamic from "next/dynamic";
 import ChatBubbleRoundedIcon from "@mui/icons-material/ChatBubbleRounded";
 import { Badge, Box, Fab, Modal, Paper } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { usePathname } from "next/navigation";
-import MessagingPageView from "./MessagingPageView";
 import { useMessagingWidget } from "./MessagingWidgetContext";
 import type { MessagingAudience } from "./messagingRoutes";
 import { useClientMessagingUnread } from "./useClientMessagingUnread";
@@ -19,6 +19,10 @@ import {
   upsertThreadIntoStore,
 } from "./messagingStorage";
 import { markAllThreadsReadForAudience } from "./messagingUnread";
+
+const MessagingPageView = dynamic(() => import("./MessagingPageView"), {
+  ssr: false,
+});
 
 export type MessagingFloatingWidgetProps = {
   audience: MessagingAudience;

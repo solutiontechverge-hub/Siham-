@@ -14,15 +14,16 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import AppModal, {
-  MessagingModalCancelButton,
-  MessagingModalPrimaryButton,
-} from "../AppModal";
+import MessagingDangerModal from "./MessagingDangerModal";
 import {
   MESSAGING_REPORT_REASONS,
   type MessagingReportPayload,
   type MessagingReportReasonId,
 } from "./messagingReportReasons";
+import {
+  mollureBodySx,
+  mollureSectionTitleSx,
+} from "../../../theme/mollureHierarchy";
 
 export type { MessagingReportPayload };
 
@@ -64,58 +65,36 @@ export default function MessagingReportDialog({
     Boolean(reasonId) && (!isOther || otherText.trim().length > 0);
 
   return (
-    <AppModal
-      contentSx={{ px: 2.5 }}
-      footerVariant="actions"
+    <MessagingDangerModal
       open={open}
-      title={title}
       onClose={onClose}
-      maxWidth="sm"
+      title={title}
       embedded={embedded}
-      headerTone="danger"
-      footer={
-        <>
-          <MessagingModalCancelButton onClick={onClose} />
-          <MessagingModalPrimaryButton
-            label="Report"
-            disabled={!canSubmit}
-            onClick={() => {
-              if (!selectedReason) return;
-              onSubmit({
-                reasonId: selectedReason.id,
-                reasonLabel: selectedReason.label,
-                otherText: isOther ? otherText.trim() : undefined,
-              });
-              onClose();
-            }}
-          />
-        </>
-      }
+      maxWidth="sm"
+      primaryLabel="Report"
+      primaryDisabled={!canSubmit}
+      onPrimary={() => {
+        if (!selectedReason) return;
+        onSubmit({
+          reasonId: selectedReason.id,
+          reasonLabel: selectedReason.label,
+          otherText: isOther ? otherText.trim() : undefined,
+        });
+        onClose();
+      }}
     >
       <Stack alignItems="center" spacing={1.5} sx={{ mb: 2.5 }}>
         <ReportProblemRoundedIcon sx={{ fontSize: 56, color: "#E53935" }} />
         <Typography
           align="center"
-          sx={{
-            fontWeight: 900,
-            fontSize: 15,
-            color: alpha(m.navy, 0.82),
-            px: 1,
-          }}
+          sx={mollureSectionTitleSx(m.navy, { px: 1 })}
         >
           Please tell us why you&apos;re reporting this user
         </Typography>
       </Stack>
 
       <FormControl fullWidth size="small">
-        <Typography
-          sx={{
-            fontSize: 13,
-            fontWeight: 700,
-            color: alpha(m.navy, 0.72),
-            mb: 0.75,
-          }}
-        >
+        <Typography sx={mollureBodySx(m.navy, { mb: 0.75 })}>
           Reason
         </Typography>
         <Select
@@ -222,6 +201,6 @@ export default function MessagingReportDialog({
           }}
         />
       </Collapse>
-    </AppModal>
+    </MessagingDangerModal>
   );
 }

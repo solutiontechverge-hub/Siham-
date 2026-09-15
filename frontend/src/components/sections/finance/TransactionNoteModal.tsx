@@ -1,11 +1,16 @@
 "use client";
 
+import { mollureLabelSx } from "../../../theme/mollureHierarchy";
+
 import AppButton from "../../common/AppButton";
 import * as React from "react";
 import { Stack } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
+import { useTheme } from "@mui/material/styles";
 import MollureFormField from "../../common/MollureFormField";
 import AppModal from "../../common/AppModal";
+import { ModalCancelApplyFooter } from "../../common/FinanceDrawerFooter";
+import { mollureWhiteFieldInputSx } from "../../common/mollureFormSx";
+import { INPUT_LIMITS, parseText } from "../../../lib/inputSchema";
 
 type TransactionNoteModalProps = {
   open: boolean;
@@ -32,9 +37,13 @@ export default function TransactionNoteModal({
   }, [initialNote, open]);
 
   const handleSave = () => {
-    const trimmed = note.trim();
-    if (!trimmed) return;
-    onSave(trimmed);
+    const parsed = parseText(note, {
+      label: "Note",
+      min: 1,
+      max: INPUT_LIMITS.textLong,
+    });
+    if (!parsed.ok) return;
+    onSave(parsed.value);
     onClose();
   };
 
@@ -57,36 +66,24 @@ export default function TransactionNoteModal({
                 onDelete();
                 onClose();
               }}
-              sx={{
-                textTransform: "none",
-                fontWeight: 800,
-                fontSize: 12.5,
-                color: "#C62828",
-                minWidth: 0,
-                p: 0,
-                "&:hover": {
+              sx={mollureLabelSx(m.navy, { textTransform: "none", color: "#C62828", minWidth: 0, p: 0, "&:hover": {
                   bgcolor: "transparent",
                   textDecoration: "underline",
-                },
-              }}
+                } })}
             >
               Delete Note
             </AppButton>
           ) : (
             <span />
           )}
-          <Stack direction="row" spacing={1}>
-            <AppButton tone="secondary" onClick={onClose}>
-              Cancel
-            </AppButton>
-            <AppButton
-              tone="primary"
-              onClick={handleSave}
-              disabled={!note.trim()}
-            >
-              Save
-            </AppButton>
-          </Stack>
+          <ModalCancelApplyFooter
+            onCancel={onClose}
+            onPrimary={handleSave}
+            primaryLabel="Save"
+            primaryDisabled={!note.trim()}
+            buttonSx={{}}
+            stackSx={{ px: 0, py: 0 }}
+          />
         </Stack>
       }
     >
@@ -99,12 +96,7 @@ export default function TransactionNoteModal({
           multiline
           minRows={5}
           fullWidth
-          sx={{
-            "& .MuiOutlinedInput-root": {
-              bgcolor: "#fff",
-              borderRadius: "10px",
-            },
-          }}
+          sx={mollureWhiteFieldInputSx}
         />
       </Stack>
     </AppModal>

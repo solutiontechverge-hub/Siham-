@@ -1,5 +1,5 @@
 import express from "express";
-import { body } from "express-validator";
+import { body, param } from "express-validator";
 import {
   createBooking,
   createBookingNotification,
@@ -39,6 +39,20 @@ import { authenticateUser, authorizeRoles } from "../middleware/auth.middleware.
 import { validateRequest } from "../middleware/validate.middleware.js";
 import { upload } from "../middleware/upload.middleware.js";
 import { messagingUpload } from "../middleware/messagingUpload.middleware.js";
+import {
+  validateImageUploadContent,
+  validateMessagingUploadContent,
+} from "../middleware/validateUploadContent.middleware.js";
+import { sendCaughtError } from "../utils/httpError.js";
+import {
+  cocBody,
+  emailBody,
+  personNameBody,
+  textBody,
+  uuidParam,
+  vatBody,
+  LIMITS,
+} from "../validators/fields.js";
 
 const router = express.Router();
 const locationModes = ["fixed", "desired", "both"];
@@ -140,6 +154,7 @@ router.post(
   "/setup/media",
   requireProfessional,
   upload.array("business_media", 10),
+  validateImageUploadContent,
   uploadBusinessMedia,
 );
 
@@ -150,6 +165,7 @@ router.patch(
     { name: "profile_photo", maxCount: 1 },
     { name: "personal_document", maxCount: 5 },
   ]),
+  validateMessagingUploadContent,
   (req, res, next) => {
     if (typeof req.body?.assigned_services === "string" && req.body.assigned_services.trim()) {
       try {
@@ -175,6 +191,22 @@ router.patch(
     }
     return next();
   },
+  [
+    uuidParam("id"),
+    textBody("full_name", { optional: true, max: LIMITS.personName }),
+    personNameBody("first_name", { optional: true }),
+    personNameBody("last_name", { optional: true }),
+    emailBody("email", { optional: true }),
+    textBody("contact_number", { optional: true, max: LIMITS.phone }),
+    textBody("emergency_contact_name", { optional: true, max: LIMITS.personName }),
+    textBody("emergency_contact_number", { optional: true, max: LIMITS.phone }),
+    textBody("personal_note", { optional: true, max: LIMITS.textLong }),
+    body("assigned_services")
+      .optional({ values: "falsy" })
+      .isArray()
+      .withMessage("assigned_services must be an array."),
+  ],
+  validateRequest,
   updateTeamMember,
 );
 
@@ -277,6 +309,7 @@ const businessSetupValidators = [
 const saveBusinessSetupHandlers = [
   requireProfessional,
   upload.any(),
+  validateImageUploadContent,
   parseBusinessSetupBody,
   ...businessSetupValidators,
   validateRequest,
@@ -313,8 +346,9 @@ router.post(
       .trim()
       .isIn(calendarStatuses)
       .withMessage("status must be requested, cancelled, completed, confirmed, or blocked."),
-    body("title").trim().notEmpty().withMessage("title is required."),
-    body("unique_code").optional({ values: "falsy" }).trim(),
+    textBody("title", { min: 1, max: LIMITS.textShort, label: "title" }),
+    textBody("unique_code", { optional: true, max: 64, label: "unique_code" }),
+    textBody("notes", { optional: true, max: LIMITS.textLong, label: "notes" }),
     body("team_member_id")
       .optional({ values: "falsy" })
       .isUUID()
@@ -337,6 +371,7 @@ router.patch(
   "/calendar/:id/status",
   requireProfessional,
   [
+    uuidParam("id"),
     body("status")
       .trim()
       .isIn(calendarStatuses)
@@ -350,12 +385,14 @@ router.put(
   "/calendar/:id",
   requireProfessional,
   [
+    uuidParam("id"),
     body("status")
       .optional({ values: "falsy" })
       .trim()
       .isIn(calendarStatuses)
       .withMessage("status must be requested, cancelled, completed, confirmed, or blocked."),
-    body("title").optional({ values: "falsy" }).trim(),
+    textBody("title", { optional: true, max: LIMITS.textShort, label: "title" }),
+    textBody("notes", { optional: true, max: LIMITS.textLong, label: "notes" }),
     body("team_member_id")
       .optional({ values: "falsy" })
       .isUUID()
@@ -378,6 +415,8 @@ router.put(
 router.delete(
   "/calendar/:id",
   requireProfessional,
+  [uuidParam("id")],
+  validateRequest,
   deleteCalendarEntry,
 );
 
@@ -388,15 +427,12 @@ router.post(
   (req, res, next) => {
     messagingUpload.array("files", 8)(req, res, (error) => {
       if (error) {
-        return res.status(400).json({
-          success: false,
-          message: error.message || "Failed to upload booking attachments.",
-          data: null,
-        });
+        return sendCaughtError(res, error, { fallbackMessage: "Failed to upload booking attachments." });
       }
       return next();
     });
   },
+  validateMessagingUploadContent,
   uploadBookingAttachments,
 );
 
@@ -434,7 +470,7 @@ router.patch(
       .trim()
       .isIn(bookingStatuses)
       .withMessage("status must be requested, br_accepted, cancelled, completed, confirmed, in_progress, no_show, or invalid."),
-    body("notes").optional({ values: "falsy" }).isString().withMessage("notes must be a string."),
+    textBody("notes", { optional: true, max: LIMITS.textLong, label: "notes" }),
     body("total_price")
       .optional({ values: "falsy" })
       .isFloat({ min: 0 })
@@ -459,18 +495,33 @@ router.patch(
   updateBookingStatus,
 );
 
-router.get("/bookings/:id/activity", getBookingActivity);
+router.get(
+  "/bookings/:id/activity",
+  [uuidParam("id")],
+  validateRequest,
+  getBookingActivity,
+);
 
-router.post("/bookings/:id/notifications", createBookingNotification);
+router.post(
+  "/bookings/:id/notifications",
+  [
+    uuidParam("id"),
+    textBody("event", { optional: true, max: 64, label: "event" }),
+    textBody("message", { optional: true, max: LIMITS.textLong, label: "message" }),
+  ],
+  validateRequest,
+  createBookingNotification,
+);
 
 router.post(
   "/bookings/:id/edit-request",
   [
+    uuidParam("id"),
     body("action")
       .trim()
       .isIn(["send", "accept", "reject"])
       .withMessage("action must be send, accept, or reject."),
-    body("note").optional({ values: "falsy" }).isString().withMessage("note must be a string."),
+    textBody("note", { optional: true, max: LIMITS.textLong, label: "note" }),
   ],
   validateRequest,
   manageBookingEditRequest,
@@ -479,6 +530,7 @@ router.post(
 router.patch(
   "/bookings/:id",
   [
+    uuidParam("id"),
     body("status")
       .optional({ values: "falsy" })
       .trim()
@@ -489,7 +541,7 @@ router.patch(
       .trim()
       .isIn(["paid", "pending", "failed", "required"])
       .withMessage("prepayment_status must be paid, pending, failed, or required."),
-    body("notes").optional({ values: "null" }).isString().withMessage("notes must be a string."),
+    textBody("notes", { optional: true, max: LIMITS.textLong, label: "notes" }),
     body("total_price")
       .optional({ values: "falsy" })
       .isFloat({ min: 0 })
@@ -526,8 +578,58 @@ router.post(
       .trim()
       .isIn(["individual", "company"])
       .withMessage("client_kind must be individual or company."),
-    body("email").optional({ values: "falsy" }).isEmail().withMessage("email must be valid."),
-    body("mollure_user_id").optional({ values: "falsy" }).isUUID().withMessage("mollure_user_id must be a UUID."),
+    body("email")
+      .optional({ values: "falsy" })
+      .trim()
+      .isLength({ max: 254 })
+      .isEmail()
+      .withMessage("email must be valid."),
+    body("mollure_user_id")
+      .optional({ values: "falsy" })
+      .isUUID()
+      .withMessage("mollure_user_id must be a UUID."),
+    body("first_name")
+      .optional({ values: "falsy" })
+      .trim()
+      .isLength({ max: 80 })
+      .matches(/^[A-Za-zÀ-ÖØ-öø-ÿ' -]+$/)
+      .withMessage("first_name format is invalid."),
+    body("last_name")
+      .optional({ values: "falsy" })
+      .trim()
+      .isLength({ max: 80 })
+      .matches(/^[A-Za-zÀ-ÖØ-öø-ÿ' -]+$/)
+      .withMessage("last_name format is invalid."),
+    body("legal_name")
+      .optional({ values: "falsy" })
+      .trim()
+      .isLength({ max: 120 })
+      .withMessage("legal_name is too long."),
+    body("coc")
+      .optional({ values: "falsy" })
+      .trim()
+      .matches(/^\d{8}$/)
+      .withMessage("coc must be exactly 8 digits."),
+    body("vat")
+      .optional({ values: "falsy" })
+      .trim()
+      .matches(/^NL\d{9}B\d{2}$/i)
+      .withMessage("vat must match NL#########B##."),
+    body("phone")
+      .optional({ values: "falsy" })
+      .trim()
+      .isLength({ max: 32 })
+      .withMessage("phone is too long."),
+    body("country_code")
+      .optional({ values: "falsy" })
+      .trim()
+      .isLength({ max: 8 })
+      .withMessage("country_code is too long."),
+    body("technical_note")
+      .optional({ values: "falsy" })
+      .isString()
+      .isLength({ max: 5000 })
+      .withMessage("technical_note is too long."),
   ],
   validateRequest,
   createProfessionalClient,
@@ -535,23 +637,66 @@ router.post(
 router.patch(
   "/clients/:id",
   requireProfessional,
+  [
+    uuidParam("id"),
+    emailBody("email", { optional: true }),
+    personNameBody("first_name", { optional: true }),
+    personNameBody("last_name", { optional: true }),
+    textBody("legal_name", { optional: true, max: LIMITS.personName }),
+    cocBody("coc", { optional: true }),
+    vatBody("vat", { optional: true }),
+    textBody("contact_person_name", { optional: true, max: LIMITS.personName }),
+    textBody("phone", { optional: true, max: LIMITS.phone }),
+    textBody("country_code", { optional: true, max: 8 }),
+    textBody("gender", { optional: true, max: 32 }),
+    body("date_of_birth")
+      .optional({ values: "falsy" })
+      .trim()
+      .matches(/^\d{4}-\d{2}-\d{2}$/)
+      .withMessage("date_of_birth must be YYYY-MM-DD."),
+    emailBody("detail_email", { optional: true }),
+    textBody("business_address", { optional: true, max: LIMITS.textMedium }),
+    textBody("residential_address", { optional: true, max: LIMITS.textMedium }),
+    textBody("street", { optional: true, max: LIMITS.textShort }),
+    textBody("street_number", { optional: true, max: 20 }),
+    textBody("postal_code", { optional: true, max: 12 }),
+    textBody("province", { optional: true, max: LIMITS.textShort }),
+    textBody("municipality", { optional: true, max: LIMITS.textShort }),
+    textBody("technical_note", { optional: true, max: LIMITS.textLong }),
+  ],
   validateRequest,
   updateProfessionalClient,
 );
 router.patch(
   "/clients/:id/technical-note",
   requireProfessional,
-  [body("technical_note").optional().isString()],
+  [
+    param("id").isUUID().withMessage("id must be a valid UUID."),
+    body("technical_note")
+      .optional()
+      .isString()
+      .isLength({ max: 5000 })
+      .withMessage("technical_note is too long."),
+  ],
   validateRequest,
   updateProfessionalClientTechnicalNote,
 );
 router.patch(
   "/clients/:id/block",
   requireProfessional,
-  [body("is_blocked").isBoolean().withMessage("is_blocked must be a boolean.")],
+  [
+    param("id").isUUID().withMessage("id must be a valid UUID."),
+    body("is_blocked").isBoolean().withMessage("is_blocked must be a boolean."),
+  ],
   validateRequest,
   setProfessionalClientBlocked,
 );
-router.delete("/clients/:id", requireProfessional, deleteProfessionalClient);
+router.delete(
+  "/clients/:id",
+  requireProfessional,
+  [param("id").isUUID().withMessage("id must be a valid UUID.")],
+  validateRequest,
+  deleteProfessionalClient,
+);
 
 export default router;

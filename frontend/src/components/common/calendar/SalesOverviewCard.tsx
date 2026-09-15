@@ -15,6 +15,11 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import { mollureSectionTitleSx, mollureLabelSx, mollureBodySx } from "../../../theme/mollureHierarchy";
+import {
+  formatCompactEuro,
+  formatFinanceDueDate,
+} from "../booking-finance/formatBookingFinance";
 import type {
   SalesLineItem,
   SalesOverviewCardData,
@@ -49,23 +54,6 @@ type SalesOverviewCardProps = {
   ) => void;
 };
 
-function formatEur(amount: number): string {
-  const rounded = Math.round((amount + Number.EPSILON) * 100) / 100;
-  const abs = Math.abs(rounded);
-  const text = Number.isInteger(abs) ? String(abs) : abs.toFixed(2);
-  return `${rounded < 0 ? "-" : ""}€${text}`;
-}
-
-function formatDueDateDisplay(iso?: string | null): string {
-  if (!iso) return "";
-  const d = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return iso;
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
-}
-
 function MethodDateLine({
   methodDateLine,
   dueDate,
@@ -78,7 +66,7 @@ function MethodDateLine({
   const m = useTheme().palette.mollure;
   if (!methodDateLine && !dueDate) return null;
 
-  const dueLabel = formatDueDateDisplay(dueDate);
+  const dueLabel = formatFinanceDueDate(dueDate);
   const showCalendar = Boolean(dueDate && dueLabel);
   const line =
     methodDateLine ||
@@ -109,19 +97,17 @@ function LineRow({ line }: { line: SalesLineItem }) {
   return (
     <Stack direction="row" justifyContent="space-between" spacing={1.5}>
       <Typography
-        sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.72) }}
+        sx={mollureBodySx(m.navy)}
       >
         {line.label}
       </Typography>
       <Typography
-        sx={{
-          fontSize: 12.5,
-          fontWeight: 800,
+        sx={mollureLabelSx(m.navy, {
           color: line.amount < 0 ? alpha(m.navy, 0.55) : alpha(m.navy, 0.82),
           flexShrink: 0,
-        }}
+        })}
       >
-        {formatEur(line.amount)}
+        {formatCompactEuro(line.amount)}
       </Typography>
     </Stack>
   );
@@ -428,7 +414,7 @@ function SubSummaryCard({
         <Typography
           sx={{ fontSize: 22, fontWeight: 900, color: m.teal, lineHeight: 1.1 }}
         >
-          {formatEur(sub.highlightAmount)}
+          {formatCompactEuro(sub.highlightAmount)}
         </Typography>
       </Stack>
 
@@ -586,7 +572,7 @@ export default function SalesOverviewCard({
         sx={{ mb: 1.1 }}
       >
         <Typography
-          sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}
+          sx={mollureSectionTitleSx(m.navy)}
         >
           {card.title}
         </Typography>
@@ -707,7 +693,7 @@ export default function SalesOverviewCard({
               card.kind === "reissued_invoice" ? m.teal : alpha(m.navy, 0.88),
           }}
         >
-          {formatEur(card.total)}
+          {formatCompactEuro(card.total)}
         </Typography>
       </Stack>
 
@@ -719,14 +705,14 @@ export default function SalesOverviewCard({
           sx={{ mb: 0.55 }}
         >
           <Typography
-            sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.62) }}
+            sx={mollureBodySx(m.navy)}
           >
             {row.label}
           </Typography>
           <Typography
-            sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.72) }}
+            sx={mollureLabelSx(m.navy)}
           >
-            {formatEur(row.amount)}
+            {formatCompactEuro(row.amount)}
           </Typography>
         </Stack>
       ))}
@@ -745,7 +731,7 @@ export default function SalesOverviewCard({
         <Typography
           sx={{ fontSize: 28, fontWeight: 900, color: m.teal, lineHeight: 1.1 }}
         >
-          {formatEur(card.highlightAmount)}
+          {formatCompactEuro(card.highlightAmount)}
         </Typography>
       </Box>
 

@@ -10,6 +10,7 @@ import MollureFormField from "../MollureFormField";
 import { MollureLabeledSelect } from "../MollureLabeledFields";
 import AppDrawer from "../AppDrawer";
 import TeamMemberAssignedServicesPanel from "./TeamMemberAssignedServicesPanel";
+import { FinanceDrawerActionsFooter } from "../FinanceDrawerFooter";
 import {
   addTeamMemberServiceSelection,
   buildTeamCategoryOptions,
@@ -25,6 +26,7 @@ import {
   PROFILE_IMAGE_INVALID_MESSAGE,
 } from "../../../lib/profileImageUpload";
 import { useSnackbar } from "../AppSnackbar";
+import { mollureWhiteFieldInputSx } from "../mollureFormSx";
 
 type BusinessTeamMemberFormModalProps = {
   open: boolean;
@@ -66,9 +68,7 @@ export default function BusinessTeamMemberFormModal({
   const theme = useTheme();
   const m = theme.palette.mollure;
   const { showSnackbar } = useSnackbar();
-  const fieldInputSx = {
-    "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" },
-  } as const;
+  const fieldInputSx = mollureWhiteFieldInputSx;
 
   const categoryOptions = React.useMemo(
     () => buildTeamCategoryOptions(businessCategories, serviceContext),
@@ -119,33 +119,16 @@ export default function BusinessTeamMemberFormModal({
   }, [businessCategories, draft, serviceContext]);
 
   const footer = (
-    <Stack
-      direction="row"
-      spacing={1.25}
-      justifyContent="flex-end"
-      sx={{ px: 2.5, py: 1.75 }}
-    >
-      <AppButton
-        tone="secondary"
-        onClick={onClose}
-        disabled={disabled}
-        sx={{
-          px: 3,
-        }}
-      >
-        {businessTeamMemberModalCopy.cancelLabel}
-      </AppButton>
-      <AppButton
-        tone="primary"
-        onClick={onSubmit}
-        disabled={disabled || !canSubmit}
-        sx={{
-          px: 4,
-        }}
-      >
-        {submitLabel}
-      </AppButton>
-    </Stack>
+    <FinanceDrawerActionsFooter
+      onCancel={onClose}
+      onPrimary={onSubmit}
+      cancelLabel={businessTeamMemberModalCopy.cancelLabel}
+      primaryLabel={submitLabel}
+      cancelDisabled={disabled}
+      primaryDisabled={disabled || !canSubmit}
+      cancelSx={{ px: 3 }}
+      primarySx={{ px: 4 }}
+    />
   );
 
   return (

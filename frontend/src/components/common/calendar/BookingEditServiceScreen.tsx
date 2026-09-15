@@ -1,125 +1,415 @@
 "use client";
 
 import * as React from "react";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import {
   Avatar,
   Box,
   ButtonBase,
-  ClickAwayListener,
   InputAdornment,
   Stack,
+  Tooltip,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import AppSearchField from "../AppSearchField";
+import { mollureSectionTitleSx, mollureLabelSx } from "../../../theme/mollureHierarchy";
 import AppSelect from "../AppSelect";
 import AppTextField from "../AppTextField";
-import AppTimePicker from "../AppTimePicker";
 import { BodyText } from "../../ui/typography";
 import {
-  addMinutesToTime,
   formatTimeWindowDurationLabel,
   positiveMinutesBetweenTimes,
   type BookingServiceEditDraft,
 } from "../../../data/bookingServiceEdit.data";
 import { sanitizeDecimalInput } from "../../../lib/field-input";
+import {
+  fmtMinToTime,
+  minutesSinceMidnight,
+  pad2,
+} from "./calendar.utils";
+import {
+  BOOKING_CATALOG_DISCOUNT_TYPE_OPTIONS,
+  BOOKING_CATALOG_PRICE_TYPE_OPTIONS,
+} from "../../../data/bookingUniqueItem.data";
 
-export type BookingEditServiceStaffOption = {
+export type BookingEditServiceSlotMember = {
   id: string;
   name: string;
   avatarText?: string;
   photoSrc?: string;
-  /** 0–100, shown as “N% availability”. */
-  availabilityPercent?: number;
 };
 
-export type BookingEditServiceTimeSlot = {
+export type BookingEditServiceAvailabilitySlot = {
   time: string;
   status: "available" | "occupied";
+  /** Members free at this slot — shown as avatars next to Available. */
+  availableMembers: readonly BookingEditServiceSlotMember[];
+};
+
+export type BookingEditServiceMemberAvailability = BookingEditServiceSlotMember & {
+  availableForWindow: boolean;
+  slots: readonly { time: string; status: "available" | "occupied" }[];
 };
 
 type BookingEditServiceScreenProps = {
   draft: BookingServiceEditDraft;
-  staffOptions?: readonly BookingEditServiceStaffOption[];
   errors?: Partial<
     Record<"name" | "durationMins" | "startTime" | "endTime" | "price", string>
   >;
   onChange: (patch: Partial<BookingServiceEditDraft>) => void;
   disabled?: boolean;
-  /** Available/Occupied rows under Start Time — only for manual booking add. */
-  showStartTime?: boolean;
-  /** Optional Available/Occupied rows under Start Time. */
-  startTimeSlots?: readonly BookingEditServiceTimeSlot[];
   /**
-   * Show professional assign UI only when client has not already assigned one.
-   * When false, section is hidden (staff already set on the service).
+   * Time-slot availability after End Time (info only).
+   * Each row: time + Available/Occupied + avatars of free members.
    */
-  showStaffAssign?: boolean;
+  availabilitySlots?: readonly BookingEditServiceAvailabilitySlot[];
+  /** When false, hide the availability section. */
+  showAvailability?: boolean;
 };
 
-const priceTypeOptions = [
-  { label: "Fixed price", value: "fixed" },
-  { label: "Starting from", value: "starting_from" },
+function slotsToMemberAvailability(
+  slots: readonly BookingEditServiceAvailabilitySlot[],
+  startTime: string,
+  endTime: string,
+): BookingEditServiceMemberAvailability[] {
+  const byId = new Map<
+    string,
+    {
+      member: BookingEditServiceSlotMember;
+      slots: { time: string; status: "available" | "occupied" }[];
+    }
+  >();
+
+  for (const slot of slots) {
+    for (const member of slot.availableMembers) {
+      let row = byId.get(member.id);
+      if (!row) {
+        row = { member, slots: [] };
+        byId.set(member.id, row);
+      }
+      row.slots.push({ time: slot.time, status: slot.status });
+    }
+  }
+
+  const startMin = minutesSinceMidnight(startTime);
+  const endMin = minutesSinceMidnight(endTime);
+  const hasWindow =
+    Number.isFinite(startMin) && Number.isFinite(endMin) && endMin > startMin;
+
+  return Array.from(byId.values()).map(({ member, slots: memberSlots }) => ({
+    ...member,
+    slots: memberSlots,
+    availableForWindow: hasWindow
+      ? memberSlots.some((slot) => {
+          const t = minutesSinceMidnight(slot.time);
+          return (
+            slot.status === "available" &&
+            Number.isFinite(t) &&
+            t >= startMin &&
+            t < endMin
+          );
+        })
+      : memberSlots.some((slot) => slot.status === "available"),
+  }));
+}
+
+const HOUR_12_OPTIONS = Array.from({ length: 12 }, (_, i) => {
+  const hour = i + 1;
+  return { label: String(hour), value: String(hour) };
+});
+
+const MINUTE_OPTIONS = Array.from({ length: 60 }, (_, minute) => ({
+  label: pad2(minute),
+  value: pad2(minute),
+}));
+
+const PERIOD_OPTIONS = [
+  { label: "AM", value: "AM" },
+  { label: "PM", value: "PM" },
 ];
 
-const discountTypeOptions = [
-  { label: "Fixed discount", value: "fixed" },
-  { label: "Percentage discount", value: "percentage" },
-];
+type TimeParts = {
+  hour12: string;
+  minute: string;
+  period: "" | "AM" | "PM";
+};
+
+function emptyTimeParts(): TimeParts {
+  return { hour12: "", minute: "", period: "" };
+}
+
+function parseTimeParts(value: string): TimeParts {
+  if (!value.trim()) return emptyTimeParts();
+  const total = minutesSinceMidnight(value);
+  if (!Number.isFinite(total)) return emptyTimeParts();
+  const hour24 = Math.floor(total / 60) % 24;
+  const minute = total % 60;
+  const period: "AM" | "PM" = hour24 >= 12 ? "PM" : "AM";
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  return {
+    hour12: String(hour12),
+    minute: pad2(minute),
+    period,
+  };
+}
+
+function partsToHhmm(parts: TimeParts): string | null {
+  const hour12 = Number.parseInt(parts.hour12, 10);
+  const minute = Number.parseInt(parts.minute, 10);
+  const period = parts.period === "PM" || parts.period === "AM" ? parts.period : null;
+  if (!Number.isFinite(hour12) || hour12 < 1 || hour12 > 12) return null;
+  if (!Number.isFinite(minute) || minute < 0 || minute > 59) return null;
+  if (!period) return null;
+  let hour24 = hour12 % 12;
+  if (period === "PM") hour24 += 12;
+  return fmtMinToTime(hour24 * 60 + minute);
+}
+
+function formatClockAmPm(value: string): string {
+  const parts = parseTimeParts(value);
+  if (!parts.hour12 || !parts.minute || !parts.period) return value;
+  return `${parts.hour12}:${parts.minute} ${parts.period}`;
+}
+
+function TimeAmPmFields({
+  label,
+  value,
+  onChange,
+  disabled,
+  error,
+  helperText,
+}: {
+  label: string;
+  value: string;
+  onChange: (next: string) => void;
+  disabled?: boolean;
+  error?: boolean;
+  helperText?: string;
+}) {
+  const m = useTheme().palette.mollure;
+  const parts = parseTimeParts(value);
+
+  const commit = (patch: Partial<TimeParts>) => {
+    const next: TimeParts = {
+      hour12: patch.hour12 ?? parts.hour12,
+      minute: patch.minute ?? parts.minute,
+      period: patch.period ?? parts.period,
+    };
+    if (!next.hour12) next.hour12 = "12";
+    if (!next.minute) next.minute = "00";
+    if (!next.period) next.period = "AM";
+    const hhmm = partsToHhmm(next);
+    if (hhmm) onChange(hhmm);
+  };
+
+  return (
+    <Stack spacing={0.75}>
+      <BodyText
+        sx={mollureLabelSx(m.navy, {
+          color: alpha(m.navy, 0.72),
+        })}
+      >
+        {label}
+      </BodyText>
+      <Stack direction="row" spacing={1}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <AppSelect
+            label="Hours"
+            placeholder="—"
+            value={parts.hour12}
+            onChange={(e) => commit({ hour12: String(e.target.value) })}
+            options={HOUR_12_OPTIONS}
+            fullWidth
+            disabled={disabled}
+            error={error}
+          />
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <AppSelect
+            label="Minutes"
+            placeholder="—"
+            value={parts.minute}
+            onChange={(e) => commit({ minute: String(e.target.value) })}
+            options={MINUTE_OPTIONS}
+            fullWidth
+            disabled={disabled}
+            error={error}
+          />
+        </Box>
+        <Box sx={{ flex: 0.7, minWidth: 0 }}>
+          <AppSelect
+            label="AM/PM"
+            placeholder="—"
+            value={parts.period}
+            onChange={(e) =>
+              commit({ period: String(e.target.value) as "AM" | "PM" })
+            }
+            options={PERIOD_OPTIONS}
+            fullWidth
+            disabled={disabled}
+            error={error}
+          />
+        </Box>
+      </Stack>
+      {helperText ? (
+        <BodyText
+          sx={{
+            fontSize: 11.5,
+            fontWeight: 600,
+            color: error
+              ? "error.main"
+              : (theme) => alpha(theme.palette.mollure.navy, 0.5),
+          }}
+        >
+          {helperText}
+        </BodyText>
+      ) : null}
+    </Stack>
+  );
+}
+
+function MemberAvailabilityCard({
+  member,
+  m,
+}: {
+  member: BookingEditServiceMemberAvailability;
+  m: { navy: string; teal: string };
+}) {
+  return (
+    <Box
+      sx={{
+        borderRadius: "10px",
+        border: `1px solid ${alpha(m.navy, 0.1)}`,
+        bgcolor: "#fff",
+        overflow: "hidden",
+      }}
+    >
+      <Stack
+        direction="row"
+        spacing={1.25}
+        alignItems="center"
+        sx={{ px: 1.25, py: 1, bgcolor: alpha(m.navy, 0.02) }}
+      >
+        <Avatar
+          src={member.photoSrc || undefined}
+          alt=""
+          sx={{
+            width: 32,
+            height: 32,
+            fontSize: 12,
+            fontWeight: 800,
+            bgcolor: alpha(m.navy, 0.08),
+            color: alpha(m.navy, 0.7),
+          }}
+        >
+          {member.avatarText ?? member.name.slice(0, 1)}
+        </Avatar>
+        <BodyText
+          sx={{
+            flex: 1,
+            minWidth: 0,
+            ...mollureLabelSx(m.navy),
+          }}
+        >
+          {member.name}
+        </BodyText>
+      </Stack>
+
+      {member.slots.length === 0 ? (
+        <BodyText
+          sx={{
+            px: 1.5,
+            py: 1.1,
+            fontSize: 12,
+            fontWeight: 700,
+            color: alpha(m.navy, 0.45),
+          }}
+        >
+          No schedule for this day
+        </BodyText>
+      ) : (
+        member.slots.map((slot, index) => {
+          const occupied = slot.status === "occupied";
+          return (
+            <Box
+              key={`${member.id}-${slot.time}-${index}`}
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                px: 1.5,
+                py: 0.9,
+                borderTop: `1px solid ${alpha(m.navy, 0.06)}`,
+              }}
+            >
+              <BodyText
+                component="span"
+                sx={{
+                  fontSize: 13,
+                  fontWeight: 800,
+                  color: alpha(m.navy, occupied ? 0.42 : 0.78),
+                }}
+              >
+                {formatClockAmPm(slot.time)}
+              </BodyText>
+              <BodyText
+                component="span"
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 800,
+                  color: occupied ? "#E67E22" : "#2ECC71",
+                }}
+              >
+                {occupied ? "Occupied" : "Available"}
+              </BodyText>
+            </Box>
+          );
+        })
+      )}
+    </Box>
+  );
+}
 
 export default function BookingEditServiceScreen({
   draft,
-  staffOptions = [],
   errors = {},
   onChange,
   disabled = false,
-  showStartTime = false,
-  startTimeSlots = [],
-  showStaffAssign = true,
+  availabilitySlots = [],
+  showAvailability = true,
 }: BookingEditServiceScreenProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
-  const [staffQuery, setStaffQuery] = React.useState("");
-  const [staffMenuOpen, setStaffMenuOpen] = React.useState(false);
-  const hasStaffSelected = Boolean(draft.staffResourceId);
-  const selectedStaff = React.useMemo(
-    () => staffOptions.find((staff) => staff.id === draft.staffResourceId),
-    [staffOptions, draft.staffResourceId],
+  const [allInfoOpen, setAllInfoOpen] = React.useState(false);
+
+  const hasTimeWindow = Boolean(draft.startTime.trim() && draft.endTime.trim());
+
+  const memberAvailability = React.useMemo(
+    () =>
+      slotsToMemberAvailability(
+        availabilitySlots,
+        draft.startTime,
+        draft.endTime,
+      ),
+    [availabilitySlots, draft.startTime, draft.endTime],
   );
 
-  const filteredStaff = React.useMemo(() => {
-    const q = staffQuery.trim().toLowerCase();
-    if (!q) return staffOptions;
-    return staffOptions.filter((staff) =>
-      staff.name.toLowerCase().includes(q),
-    );
-  }, [staffOptions, staffQuery]);
+  const availableForWindow = React.useMemo(
+    () => memberAvailability.filter((member) => member.availableForWindow),
+    [memberAvailability],
+  );
 
-  const closeStaffMenu = () => setStaffMenuOpen(false);
-  const openStaffMenu = () => setStaffMenuOpen(true);
+  /** When times are set and someone is free → show only them. Else dropdown with all info. */
+  const showFilteredAvailable = hasTimeWindow && availableForWindow.length > 0;
+  const dropdownMembers = memberAvailability;
 
-  const handleSelectStaff = (staffId: string) => {
-    onChange({ staffResourceId: staffId });
-    setStaffQuery("");
-    setStaffMenuOpen(false);
-  };
+  React.useEffect(() => {
+    if (!showFilteredAvailable) setAllInfoOpen(true);
+    else setAllInfoOpen(false);
+  }, [showFilteredAvailable, draft.startTime, draft.endTime]);
 
   const handleStartTimeChange = (value: string) => {
     const next: Partial<BookingServiceEditDraft> = { startTime: value };
     if (draft.endTime) {
-      const mins = positiveMinutesBetweenTimes(value, draft.endTime);
-      next.durationMins = mins > 0 ? String(mins) : "";
-    }
-    onChange(next);
-  };
-
-  const handleOccupancySlotClick = (value: string) => {
-    const duration = Number.parseInt(draft.durationMins, 10);
-    const next: Partial<BookingServiceEditDraft> = { startTime: value };
-    if (Number.isFinite(duration) && duration > 0) {
-      next.endTime = addMinutesToTime(value, duration);
-      next.durationMins = String(duration);
-    } else if (draft.endTime) {
       const mins = positiveMinutesBetweenTimes(value, draft.endTime);
       next.durationMins = mins > 0 ? String(mins) : "";
     }
@@ -145,7 +435,7 @@ export default function BookingEditServiceScreen({
   return (
     <Stack spacing={1.6}>
       <BodyText
-        sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 15 }}
+        sx={mollureSectionTitleSx(m.navy)}
       >
         Edit Service
       </BodyText>
@@ -161,63 +451,69 @@ export default function BookingEditServiceScreen({
         helperText={errors.name}
       />
 
-      <Stack direction="row" spacing={1.25}>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <AppTimePicker
-            label="Start Time"
-            value={draft.startTime}
-            onChange={handleStartTimeChange}
-            minuteStep={15}
-            fullWidth
-            disabled={disabled}
-            error={Boolean(errors.startTime)}
-            helperText={errors.startTime}
-          />
-        </Box>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <AppTimePicker
-            label="End Time"
-            value={draft.endTime}
-            onChange={handleEndTimeChange}
-            minuteStep={15}
-            fullWidth
-            disabled={disabled}
-            error={Boolean(errors.endTime)}
-            helperText={errors.endTime}
-          />
-        </Box>
-      </Stack>
+      <TimeAmPmFields
+        label="Start Time"
+        value={draft.startTime}
+        onChange={handleStartTimeChange}
+        disabled={disabled}
+        error={Boolean(errors.startTime)}
+        helperText={errors.startTime}
+      />
 
-      {showStartTime && startTimeSlots.length > 0 ? (
-        <Box
-          sx={{
-            borderRadius: "10px",
-            border: `1px solid ${alpha(m.navy, 0.1)}`,
-            bgcolor: "#fff",
-            overflow: "hidden",
-          }}
-        >
-          {startTimeSlots.map((slot, index) => {
-            const occupied = slot.status === "occupied";
-            const selected = draft.startTime === slot.time;
-            return (
+      <TimeAmPmFields
+        label="End Time"
+        value={draft.endTime}
+        onChange={handleEndTimeChange}
+        disabled={disabled}
+        error={Boolean(errors.endTime)}
+        helperText={errors.endTime}
+      />
+
+      {showAvailability && memberAvailability.length > 0 ? (
+        <Stack spacing={1}>
+          <BodyText
+            sx={{
+              ...mollureLabelSx(m.navy),
+            }}
+          >
+            Availability
+          </BodyText>
+
+          {showFilteredAvailable ? (
+            <Stack spacing={1}>
+              <BodyText
+                sx={{
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.5),
+                }}
+              >
+                Team members available for {formatClockAmPm(draft.startTime)}–
+                {formatClockAmPm(draft.endTime)}
+              </BodyText>
+              {availableForWindow.map((member) => (
+                <MemberAvailabilityCard key={member.id} member={member} m={m} />
+              ))}
+            </Stack>
+          ) : (
+            <Box
+              sx={{
+                borderRadius: "10px",
+                border: `1px solid ${alpha(m.navy, 0.1)}`,
+                bgcolor: "#fff",
+                overflow: "hidden",
+              }}
+            >
               <ButtonBase
-                key={slot.time}
-                disabled={disabled || occupied}
-                onClick={() => handleOccupancySlotClick(slot.time)}
+                onClick={() => setAllInfoOpen((open) => !open)}
                 sx={{
                   width: "100%",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
                   px: 1.5,
-                  py: 1.05,
-                  borderBottom:
-                    index < startTimeSlots.length - 1
-                      ? `1px solid ${alpha(m.navy, 0.06)}`
-                      : "none",
-                  bgcolor: selected ? alpha(m.teal, 0.06) : "#fff",
-                  "&.Mui-disabled": { opacity: 1 },
+                  py: 1.15,
+                  textAlign: "left",
                 }}
               >
                 <BodyText
@@ -225,25 +521,45 @@ export default function BookingEditServiceScreen({
                   sx={{
                     fontSize: 13,
                     fontWeight: 800,
-                    color: alpha(m.navy, occupied ? 0.42 : 0.78),
+                    color: alpha(m.navy, 0.78),
                   }}
                 >
-                  {slot.time}
+                  {hasTimeWindow
+                    ? "No one available — all team members"
+                    : "All team members"}
                 </BodyText>
-                <BodyText
-                  component="span"
+                <ExpandMoreRoundedIcon
                   sx={{
-                    fontSize: 12,
-                    fontWeight: 800,
-                    color: occupied ? "#E67E22" : "#2ECC71",
+                    fontSize: 22,
+                    color: alpha(m.navy, 0.45),
+                    transform: allInfoOpen ? "rotate(180deg)" : "none",
+                    transition: "transform 0.15s ease",
+                  }}
+                />
+              </ButtonBase>
+
+              {allInfoOpen ? (
+                <Stack
+                  spacing={1}
+                  sx={{
+                    px: 1.25,
+                    pb: 1.25,
+                    borderTop: `1px solid ${alpha(m.navy, 0.06)}`,
+                    pt: 1.1,
                   }}
                 >
-                  {occupied ? "Occupied" : "Available"}
-                </BodyText>
-              </ButtonBase>
-            );
-          })}
-        </Box>
+                  {dropdownMembers.map((member) => (
+                    <MemberAvailabilityCard
+                      key={member.id}
+                      member={member}
+                      m={m}
+                    />
+                  ))}
+                </Stack>
+              ) : null}
+            </Box>
+          )}
+        </Stack>
       ) : null}
 
       <AppTextField
@@ -258,41 +574,43 @@ export default function BookingEditServiceScreen({
       />
 
       <Stack direction="row" spacing={1} alignItems="center">
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <AppSelect
-              label="Price type"
-              placeholder="Select price type"
-              value={draft.priceType || "fixed"}
-              onChange={(e) =>
-                onChange({
-                  priceType: String(
-                    e.target.value,
-                  ) as BookingServiceEditDraft["priceType"],
-                })
-              }
-              options={priceTypeOptions}
-              fullWidth
-              disabled={disabled}
-            />
-          </Box>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <AppTextField
-              label="Price"
-              placeholder="0"
-              value={draft.price}
-              onChange={(e) => onChange({ price: sanitizeDecimalInput(e.target.value) })}
-              fullWidth
-              disabled={disabled}
-              error={Boolean(errors.price)}
-              helperText={errors.price}
-              inputProps={{ inputMode: "decimal" }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">€</InputAdornment>
-                ),
-              }}
-            />
-          </Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <AppSelect
+            label="Price type"
+            placeholder="Select price type"
+            value={draft.priceType || "fixed"}
+            onChange={(e) =>
+              onChange({
+                priceType: String(
+                  e.target.value,
+                ) as BookingServiceEditDraft["priceType"],
+              })
+            }
+            options={BOOKING_CATALOG_PRICE_TYPE_OPTIONS}
+            fullWidth
+            disabled={disabled}
+          />
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <AppTextField
+            label="Price"
+            placeholder="0"
+            value={draft.price}
+            onChange={(e) =>
+              onChange({ price: sanitizeDecimalInput(e.target.value) })
+            }
+            fullWidth
+            disabled={disabled}
+            error={Boolean(errors.price)}
+            helperText={errors.price}
+            inputProps={{ inputMode: "decimal" }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">€</InputAdornment>
+              ),
+            }}
+          />
+        </Box>
       </Stack>
 
       <Box
@@ -305,9 +623,7 @@ export default function BookingEditServiceScreen({
       >
         <BodyText
           sx={{
-            fontSize: 12.5,
-            fontWeight: 900,
-            color: alpha(m.navy, 0.76),
+            ...mollureLabelSx(m.navy),
             mb: 1.25,
           }}
         >
@@ -325,7 +641,7 @@ export default function BookingEditServiceScreen({
                   ) as BookingServiceEditDraft["discountType"],
                 })
               }
-              options={discountTypeOptions}
+              options={BOOKING_CATALOG_DISCOUNT_TYPE_OPTIONS}
               fullWidth
               disabled={disabled}
             />
@@ -336,7 +652,9 @@ export default function BookingEditServiceScreen({
               placeholder="0"
               value={draft.discountAmount}
               onChange={(e) =>
-                onChange({ discountAmount: sanitizeDecimalInput(e.target.value) })
+                onChange({
+                  discountAmount: sanitizeDecimalInput(e.target.value),
+                })
               }
               fullWidth
               disabled={disabled}
@@ -358,167 +676,6 @@ export default function BookingEditServiceScreen({
           </Box>
         </Stack>
       </Box>
-
-      {showStaffAssign ? (
-        <ClickAwayListener onClickAway={closeStaffMenu}>
-        <Stack spacing={0.85}>
-          {!hasStaffSelected ? (
-            <Stack
-              direction="row"
-              spacing={1}
-              alignItems="center"
-              sx={{
-                px: 1.25,
-                py: 1,
-                borderRadius: "10px",
-                bgcolor: alpha(m.teal, 0.08),
-                border: `1px solid ${alpha(m.teal, 0.18)}`,
-              }}
-            >
-              <InfoOutlinedIcon sx={{ fontSize: 18, color: m.teal }} />
-              <BodyText
-                sx={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: alpha(m.navy, 0.72),
-                  lineHeight: 1.3,
-                }}
-              >
-                Client Hasn&apos;t Selected Any Team Member
-              </BodyText>
-            </Stack>
-          ) : null}
-
-          <AppSearchField
-            fullWidth
-            placeholder="Select Team Member"
-            value={staffMenuOpen ? staffQuery : selectedStaff?.name ?? ""}
-            onChange={(e) => {
-              setStaffQuery(e.target.value);
-              openStaffMenu();
-            }}
-            onFocus={openStaffMenu}
-            onClick={openStaffMenu}
-            onClear={() => {
-              setStaffQuery("");
-              if (!staffMenuOpen) {
-                onChange({ staffResourceId: "" });
-              }
-              openStaffMenu();
-            }}
-            disabled={disabled}
-            sx={{
-              "& .MuiOutlinedInput-root": {
-                bgcolor: "#fff",
-              },
-            }}
-          />
-
-          {staffMenuOpen && filteredStaff.length > 0 ? (
-            <Box
-              sx={{
-                borderRadius: "10px",
-                border: `1px solid ${alpha(m.navy, 0.1)}`,
-                bgcolor: "#fff",
-                overflow: "hidden",
-              }}
-            >
-              {filteredStaff.map((staff, index) => {
-                const selected = draft.staffResourceId === staff.id;
-                const availability =
-                  typeof staff.availabilityPercent === "number"
-                    ? Math.round(staff.availabilityPercent)
-                    : null;
-                return (
-                  <ButtonBase
-                    key={staff.id}
-                    disabled={disabled}
-                    onClick={() => handleSelectStaff(staff.id)}
-                    sx={{
-                      width: "100%",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1.25,
-                      px: 1.25,
-                      py: 1,
-                      borderBottom:
-                        index < filteredStaff.length - 1
-                          ? `1px solid ${alpha(m.navy, 0.06)}`
-                          : "none",
-                      bgcolor: selected ? alpha(m.teal, 0.06) : "#fff",
-                      textAlign: "left",
-                    }}
-                  >
-                    <Avatar
-                      src={staff.photoSrc || undefined}
-                      alt=""
-                      sx={{
-                        width: 34,
-                        height: 34,
-                        fontSize: 12,
-                        fontWeight: 800,
-                        bgcolor: alpha(m.navy, 0.08),
-                        color: alpha(m.navy, 0.7),
-                      }}
-                    >
-                      {staff.avatarText ?? staff.name.slice(0, 1)}
-                    </Avatar>
-                    <BodyText
-                      component="span"
-                      sx={{
-                        flex: 1,
-                        minWidth: 0,
-                        fontSize: 12.5,
-                        fontWeight: 800,
-                        color: alpha(m.navy, 0.78),
-                      }}
-                    >
-                      {staff.name}
-                    </BodyText>
-                    {availability != null ? (
-                      <Stack
-                        alignItems="flex-end"
-                        spacing={0.35}
-                        sx={{ minWidth: 72 }}
-                      >
-                        <Box
-                          sx={{
-                            width: 56,
-                            height: 4,
-                            borderRadius: 99,
-                            bgcolor: alpha(m.navy, 0.08),
-                            overflow: "hidden",
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              width: `${Math.max(0, Math.min(100, availability))}%`,
-                              height: "100%",
-                              bgcolor: m.teal,
-                            }}
-                          />
-                        </Box>
-                        <BodyText
-                          component="span"
-                          sx={{
-                            fontSize: 10.5,
-                            fontWeight: 700,
-                            color: alpha(m.navy, 0.48),
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {availability}% availability
-                        </BodyText>
-                      </Stack>
-                    ) : null}
-                  </ButtonBase>
-                );
-              })}
-            </Box>
-          ) : null}
-        </Stack>
-        </ClickAwayListener>
-      ) : null}
     </Stack>
   );
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { mollureBodySx, mollureLabelSx } from "../../../theme/mollureHierarchy";
+
 import * as React from "react";
 import { Box, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -25,6 +27,7 @@ import type {
   FinanceInvoiceSettings,
   FinanceInvoiceTemplateType,
 } from "./useFinanceInvoiceSettings";
+import { mollureWhiteFieldInputSx } from "../mollureFormSx";
 
 export type { FinanceProfessionalBusinessOverride };
 
@@ -96,9 +99,7 @@ export default function FinanceDocumentPreviewDrawer({
     });
   }, [documentType, open, row]);
 
-  const fieldSx = {
-    "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" },
-  } as const;
+  const fieldSx = mollureWhiteFieldInputSx;
 
   return (
     <AppDrawer
@@ -131,9 +132,7 @@ export default function FinanceDocumentPreviewDrawer({
               >
                 <BodyText
                   sx={{
-                    fontSize: 12.5,
-                    fontWeight: 700,
-                    color: alpha(m.navy, 0.72),
+                    ...mollureBodySx(m.navy),
                   }}
                 >
                   This client is registered on Mollure. Invoice client details
@@ -151,9 +150,7 @@ export default function FinanceDocumentPreviewDrawer({
                   border: `1px solid ${alpha(m.navy, 0.08)}`,
                 }}
               >
-                <BodyText
-                  sx={{ fontWeight: 900, color: alpha(m.navy, 0.78), mb: 1.25 }}
-                >
+                <BodyText sx={mollureLabelSx(m.navy, { mb: 1.25 })}>
                   {resolvedInvoiceType === "company"
                     ? "Edit company client details"
                     : "Edit client details"}

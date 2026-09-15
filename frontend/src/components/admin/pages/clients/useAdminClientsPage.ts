@@ -8,6 +8,7 @@ import { exportClientsToExcel } from "../../exportClientsExcel";
 import { exportClientsToPdf } from "../../exportClientsPdf";
 import { INITIAL_VISIBLE, PAGE_SIZE } from "./adminClients.data";
 import type { ClientModal, SortOption } from "./adminClients.types";
+import { INPUT_LIMITS, parseText } from "../../../../lib/inputSchema";
 
 type MockClient = AdminClient;
 
@@ -174,8 +175,13 @@ export function useAdminClientsPage() {
 
   const handleSaveNote = async () => {
     if (!activeClient) return;
-    const trimmedNote = draftNote.trim();
-    await updateAdminClient({ id: activeClient.id, note: trimmedNote });
+    const parsed = parseText(draftNote, {
+      required: false,
+      label: "Note",
+      max: INPUT_LIMITS.textLong,
+    });
+    if (!parsed.ok) return;
+    await updateAdminClient({ id: activeClient.id, note: parsed.value });
     closeModal();
   };
 

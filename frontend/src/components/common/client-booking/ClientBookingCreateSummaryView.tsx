@@ -1,13 +1,9 @@
 "use client";
 
 import * as React from "react";
-import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
-import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
-import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
 import {
   Box,
-  Chip,
   CircularProgress,
   Container,
   Divider,
@@ -18,11 +14,7 @@ import {
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  fmtMinutesToTimeLabel,
-  parseTimeLabelToMinutes,
-  serviceTimeRangeLabel,
-} from "../../../app/clients/booking/booking-time";
+import { parseTimeLabelToMinutes } from "../../../app/clients/booking/booking-time";
 import { parseBookingListTab } from "../../../app/clients/booking/bookingPillTabs";
 import {
   getActiveBookingSession,
@@ -39,10 +31,6 @@ import {
 } from "../../../store/services/businessApi";
 import { useSyncFinanceTransactionFromBookingMutation } from "../../../store/services/financeApi";
 import { useSnackbar } from "../AppSnackbar";
-import AppButton from "../AppButton";
-import AppCountryPhoneFields from "../AppCountryPhoneFields";
-import AppDropdown from "../AppDropdown";
-import AppTextField from "../AppTextField";
 import {
   isAddressInOperatingArea,
   resolveDesiredVisitMunicipalityOptions,
@@ -52,10 +40,12 @@ import {
   getPhoneValidationErrors,
   splitContactPhone,
 } from "../../../lib/phone-validation";
-import { buildBookingSummarySections, bookingParticipantDisplayHeading, participantHeadingOrdinal, participantOrdinals, planningScheduleMeta, resolveTeamMemberFirstName } from "./buildBookingSummarySections";
-import { locationModeChipSx } from "./locationModeChipSx";
-import BookingSummaryNote from "./BookingSummaryNote";
-import BookingTotalPriceCard from "../calendar/BookingTotalPriceCard";
+import {
+  INPUT_LIMITS,
+  parsePhoneDigits,
+  parseText,
+} from "../../../lib/inputSchema";
+import { buildBookingSummarySections } from "./buildBookingSummarySections";
 import {
   partitionBookingProducts,
   summarizeClientBookingPrice,
@@ -66,35 +56,21 @@ import {
   parseCalendarEntryNotes,
   resolveKilometerAllowanceAmount,
 } from "../calendar/bookingEventDetails";
-import BookingLineAmount from "../calendar/BookingLineAmount";
-import { ServiceSummaryMetaLine } from "../ServiceSummaryMetaLine";
 import { usePublicFinanceSettings } from "../finance-documents/usePublicFinanceSettings";
 import {
   checkoutPaymentMethodSupportsPayNow,
   isOfflinePaymentMethod,
   resolveCheckoutPaymentOptions,
 } from "./checkoutPaymentOptions";
-import {
-  clientLineDiscountLabel,
-} from "../../../data/bookingLinePricing";
+import ClientBookingCreateSummaryCheckoutPanel from "./ClientBookingCreateSummaryCheckoutPanel";
+import ClientBookingCreateSummaryContactPanel from "./ClientBookingCreateSummaryContactPanel";
+import ClientBookingCreateSummaryServiceCard from "./ClientBookingCreateSummaryServiceCard";
 import ClientBookingProjectDetailsCard from "./ClientBookingProjectDetailsCard";
 import StripePrepaymentDialog from "./StripePrepaymentDialog";
 import { useActiveClientBooking } from "./useActiveClientBooking";
 import { useClientBookingDraft } from "./useClientBookingDraft";
 import { useClientRequesterProfile } from "./useClientRequesterProfile";
 import type { ClientBookingDesiredLocation } from "./types";
-
-function roleLabelForSection(section: {
-  isRequester?: boolean;
-  participantType?: string;
-}) {
-  if (section.participantType === "planning") return "PLANNING";
-  if (section.participantType === "model") return "MODEL";
-  if (section.participantType === "buffer") return "BUFFER";
-  if (section.participantType === "guest") return "GUEST";
-  if (section.isRequester) return "CLIENT";
-  return "CLIENT";
-}
 
 export default function ClientBookingCreateSummaryView() {
   const router = useRouter();
@@ -307,12 +283,6 @@ export default function ClientBookingCreateSummaryView() {
   const checkoutLines = withoutItemizedBookingSummaryLines(checkoutPrice.lines);
   const { products: catalogProducts, uniqueItems: catalogUniqueItems } =
     partitionBookingProducts(draft?.products);
-  const catalogHeadingSx = {
-    fontWeight: 800,
-    fontSize: 12,
-    color: alpha(m.navy, 0.55),
-    mb: 1,
-  } as const;
   const checkoutTotal =
     checkoutPrice.breakdown.bookingTotal > 0
       ? checkoutPrice.breakdown.bookingTotal
@@ -335,16 +305,37 @@ export default function ClientBookingCreateSummaryView() {
       });
       return false;
     }
+    const phoneDigits = parsePhoneDigits(phone.replace(/\D/g, ""), {
+      required: true,
+    });
+    if (!phoneDigits.ok) {
+      showSnackbar({ severity: "error", message: phoneDigits.error });
+      return false;
+    }
     if (isDesired) {
-      const incomplete =
-        !address.street.trim() ||
-        !address.number.trim() ||
-        !address.postalCode.trim() ||
-        !address.municipality.trim();
-      if (incomplete) {
+      const addressParsed = {
+        street: parseText(address.street, {
+          label: "Street",
+          max: INPUT_LIMITS.textShort,
+        }),
+        number: parseText(address.number, {
+          label: "Street number",
+          max: INPUT_LIMITS.streetNumber,
+        }),
+        postalCode: parseText(address.postalCode, {
+          label: "Postal code",
+          max: INPUT_LIMITS.postalCode,
+        }),
+        municipality: parseText(address.municipality, {
+          label: "Municipality",
+          max: INPUT_LIMITS.textShort,
+        }),
+      };
+      const firstAddressError = Object.values(addressParsed).find((r) => !r.ok);
+      if (firstAddressError && !firstAddressError.ok) {
         showSnackbar({
           severity: "error",
-          message: "Please complete Contact & Address Details.",
+          message: firstAddressError.error,
         });
         return false;
       }
@@ -698,21 +689,6 @@ export default function ClientBookingCreateSummaryView() {
     );
   }
 
-  let serviceCursor = bookingStartMinutes;
-  const addressFieldLabelSx = {
-    fontSize: 12,
-    fontWeight: 900,
-    color: alpha(m.navy, 0.65),
-    mb: 0.75,
-  } as const;
-  const addressFieldInputSx = {
-    "& .MuiOutlinedInput-root": {
-      height: 40,
-      minHeight: 40,
-      alignItems: "center",
-    },
-  } as const;
-
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "mollure.pageBg", py: { xs: 2.5, md: 3.5 } }}>
       <Container maxWidth="lg" sx={{ maxWidth: { lg: 1100 } }}>
@@ -754,454 +730,19 @@ export default function ClientBookingCreateSummaryView() {
           </Box>
           <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
 
-          <Box sx={{ px: { xs: 2.25, md: 3.5 }, py: 2 }}>
-            <Box
-              sx={{
-                borderRadius: "12px",
-                border: `1px solid ${alpha(m.navy, 0.18)}`,
-                bgcolor: "#fff",
-                overflow: "hidden",
-              }}
-            >
-          <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 2, pb: 1.25 }}>
-            <Typography
-              sx={{
-                fontWeight: 700,
-                fontSize: "30px",
-                color: alpha(m.navy, 0.72),
-                textAlign: "center",
-                lineHeight: 1.2,
-              }}
-            >
-              Service Summary
-            </Typography>
-          </Box>
-          <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
-          <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 1.35, pb: 1.5 }}>
-            <Typography
-              sx={{
-                fontWeight: 900,
-                fontSize: 18,
-                color: alpha(m.navy, 0.88),
-                lineHeight: 1.2,
-              }}
-            >
-              {shop.shopName}
-            </Typography>
-
-            <Stack
-              direction="row"
-              alignItems="center"
-              justifyContent="space-between"
-              spacing={2}
-              sx={{ mt: 0.85 }}
-            >
-              <Stack
-                direction="row"
-                alignItems="center"
-                spacing={0.6}
-                sx={{ minWidth: 0, flexShrink: 0 }}
-              >
-                <AccessTimeRoundedIcon
-                  sx={{ fontSize: 16, color: m.teal, flexShrink: 0 }}
-                />
-                <Typography
-                  sx={{
-                    fontWeight: 800,
-                    color: alpha(m.teal, 0.95),
-                    fontSize: 12.5,
-                    whiteSpace: { xs: "normal", sm: "nowrap" },
-                    lineHeight: 1.2,
-                  }}
-                >
-                  {dateLabel} ({fmtMinutesToTimeLabel(bookingStartMinutes)}-
-                  {fmtMinutesToTimeLabel(bookingEndMinutes)})
-                </Typography>
-              </Stack>
-
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 0.5,
-                  ml: "auto",
-                  maxWidth: { xs: "46%", sm: "50%" },
-                  flex: "0 1 auto",
-                  minWidth: 0,
-                }}
-              >
-                <LocationOnOutlinedIcon
-                  sx={{
-                    fontSize: 16,
-                    width: 16,
-                    height: 16,
-                    color: alpha(m.navy, 0.45),
-                    flexShrink: 0,
-                    display: "block",
-                  }}
-                />
-                <Typography
-                  component="span"
-                  sx={{
-                    fontWeight: 700,
-                    color: alpha(m.navy, 0.55),
-                    fontSize: 12,
-                    lineHeight: 1.2,
-                    minWidth: 0,
-                  }}
-                >
-                  {addressLabel}
-                </Typography>
-              </Box>
-            </Stack>
-
-            <Chip
-              label={isDesired ? "Desired Location" : "Fixed Location"}
-              size="small"
-              sx={{ ...locationModeChipSx, mt: 0.75 }}
-            />
-          </Box>
-
-          <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
-
-          <Box sx={{ px: { xs: 2, md: 2.5 }, py: 1.75 }}>
-            {summarySections.length > 0 ? (
-              <Typography sx={catalogHeadingSx}>Service</Typography>
-            ) : null}
-            <Stack spacing={1.5} divider={<Divider sx={{ borderColor: alpha(m.navy, 0.08) }} />}>
-              {summarySections.map((section) => {
-                const roleLabel = roleLabelForSection(section);
-                const ordinals = participantOrdinals(summarySections);
-                const heading = bookingParticipantDisplayHeading(
-                  section,
-                  participantHeadingOrdinal(section, ordinals),
-                );
-                const planningMeta = planningScheduleMeta(section);
-                return (
-                  <Box key={section.key}>
-                    <Stack
-                      direction="row"
-                      alignItems="center"
-                      spacing={0.75}
-                      sx={{ mb: 0.75 }}
-                    >
-                      <Typography
-                        sx={{
-                          fontWeight: 900,
-                          fontSize: 13,
-                          color: alpha(m.navy, 0.78),
-                          lineHeight: 1,
-                          display: "flex",
-                          alignItems: "center",
-                        }}
-                      >
-                        {heading}
-                      </Typography>
-                      {section.title &&
-                      section.title !== heading &&
-                      section.participantType !== "planning" &&
-                      section.participantType !== "buffer" &&
-                      section.participantType !== "requester" &&
-                      !section.isRequester ? (
-                        <Typography
-                          sx={{
-                            fontWeight: 800,
-                            fontSize: 12.5,
-                            color: alpha(m.navy, 0.62),
-                            lineHeight: 1,
-                          }}
-                        >
-                          {section.title}
-                        </Typography>
-                      ) : null}
-                      {section.isRequester ||
-                      section.participantType === "requester" ? (
-                      <Typography
-                        sx={{
-                          fontWeight: 800,
-                          fontSize: 10.5,
-                          color: "primary.light",
-                          textTransform: "uppercase",
-                          letterSpacing: 0.3,
-                          lineHeight: 1,
-                          display: "flex",
-                          alignItems: "center",
-                        }}
-                      >
-                        {roleLabel}
-                      </Typography>
-                      ) : null}
-                    </Stack>
-
-                    <Stack spacing={0.85}>
-                      {section.planningItem ||
-                      planningMeta.timeRange ||
-                      section.participantType === "buffer" ||
-                      section.participantType === "planning" ? (
-                        <Box
-                          sx={{
-                            borderRadius: "10px",
-                            border: `1px solid ${alpha(m.navy, 0.06)}`,
-                            px: 1.25,
-                            py: 1,
-                            bgcolor: alpha(m.navy, 0.015),
-                          }}
-                        >
-                          <Stack
-                            direction="row"
-                            alignItems="center"
-                            justifyContent="space-between"
-                            spacing={1}
-                          >
-                            <Box sx={{ minWidth: 0, flex: 1 }}>
-                              {section.planningItem?.activity &&
-                              section.planningItem.activity.toLowerCase() !==
-                                "buffer" &&
-                              section.planningItem.activity !== heading ? (
-                                <Typography
-                                  sx={{
-                                    fontSize: 13,
-                                    fontWeight: 900,
-                                    color: alpha(m.navy, 0.82),
-                                    lineHeight: 1.2,
-                                  }}
-                                >
-                                  {section.planningItem.activity}
-                                </Typography>
-                              ) : null}
-                              {planningMeta.timeRange ||
-                              planningMeta.durationLabel ? (
-                                <ServiceSummaryMetaLine
-                                  timeRange={planningMeta.timeRange}
-                                  durationLabel={planningMeta.durationLabel}
-                                  staffName={section.teamMemberLabel}
-                                />
-                              ) : section.planningItem?.duration ? (
-                                <Typography
-                                  sx={{
-                                    mt: section.planningItem.activity ? 0.3 : 0,
-                                    fontSize: 11,
-                                    fontWeight: 700,
-                                    color: alpha(m.navy, 0.48),
-                                  }}
-                                >
-                                  {section.planningItem.duration}
-                                </Typography>
-                              ) : null}
-                            </Box>
-                          </Stack>
-                        </Box>
-                      ) : null}
-                      {section.items.map((item) => {
-                        const start = serviceCursor;
-                        serviceCursor += item.durationMins;
-                        const tmName =
-                          resolveTeamMemberFirstName(
-                            item.teamMemberId,
-                            draft.teamMembers,
-                            item.teamMemberName,
-                          ) || section.teamMemberLabel;
-                        return (
-                          <Box
-                            key={item.id}
-                            sx={{
-                              borderRadius: "10px",
-                              border: `1px solid ${alpha(m.navy, 0.06)}`,
-                              px: 1.25,
-                              py: 1,
-                              bgcolor: alpha(m.navy, 0.015),
-                            }}
-                          >
-                            <Stack
-                              direction="row"
-                              alignItems="center"
-                              justifyContent="space-between"
-                              spacing={1}
-                            >
-                              <Box sx={{ minWidth: 0, flex: 1 }}>
-                                <Typography
-                                  sx={{
-                                    fontSize: 13,
-                                    fontWeight: 900,
-                                    color: alpha(m.navy, 0.82),
-                                    lineHeight: 1.2,
-                                  }}
-                                >
-                                  {item.name}
-                                </Typography>
-                                <Typography
-                                  sx={{
-                                    mt: 0.3,
-                                    fontSize: 11,
-                                    fontWeight: 700,
-                                    color: alpha(m.navy, 0.48),
-                                  }}
-                                >
-                                  {serviceTimeRangeLabel(start, item.durationMins)}{" "}
-                                  • {item.durationMins} Mins
-                                </Typography>
-                                {tmName ? (
-                                  <Box
-                                    sx={{
-                                      mt: 0.55,
-                                      display: "inline-flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      gap: 0.5,
-                                      height: 24,
-                                      px: 0.9,
-                                      borderRadius: "8px",
-                                      border: `1px solid ${alpha(m.navy, 0.12)}`,
-                                      bgcolor: "#fff",
-                                      lineHeight: 0,
-                                    }}
-                                  >
-                                    <Box
-                                      sx={{
-                                        width: 13,
-                                        height: 13,
-                                        display: "grid",
-                                        placeItems: "center",
-                                        flexShrink: 0,
-                                        lineHeight: 0,
-                                      }}
-                                    >
-                                      <PersonOutlineRoundedIcon
-                                        sx={{
-                                          fontSize: 13,
-                                          color: alpha(m.navy, 0.4),
-                                          display: "block",
-                                        }}
-                                      />
-                                    </Box>
-                                    <Typography
-                                      sx={{
-                                        fontSize: 11,
-                                        fontWeight: 700,
-                                        color: alpha(m.navy, 0.55),
-                                        lineHeight: 1,
-                                        display: "flex",
-                                        alignItems: "center",
-                                      }}
-                                    >
-                                      {tmName}
-                                    </Typography>
-                                  </Box>
-                                ) : null}
-                              </Box>
-                              <BookingLineAmount
-                                amount={item.price}
-                                originalAmount={item.originalPrice}
-                                discountLabel={clientLineDiscountLabel(item)}
-                              />
-                            </Stack>
-                          </Box>
-                        );
-                      })}
-                    </Stack>
-                  </Box>
-                );
-              })}
-            </Stack>
-            {catalogProducts.length > 0 ? (
-              <Box sx={{ mt: 2 }}>
-                <Typography sx={catalogHeadingSx}>Product</Typography>
-                <Stack spacing={1}>
-                  {catalogProducts.map((product) => (
-                    <Box
-                      key={product.id}
-                      sx={{
-                        borderRadius: "10px",
-                        border: `1px solid ${alpha(m.navy, 0.06)}`,
-                        px: 1.25,
-                        py: 1,
-                        bgcolor: alpha(m.navy, 0.015),
-                      }}
-                    >
-                      <Stack
-                        direction="row"
-                        alignItems="center"
-                        justifyContent="space-between"
-                        spacing={1}
-                      >
-                        <Typography
-                          sx={{
-                            fontSize: 13,
-                            fontWeight: 900,
-                            color: alpha(m.navy, 0.82),
-                            lineHeight: 1.2,
-                            minWidth: 0,
-                          }}
-                        >
-                          {product.quantity > 1
-                            ? `${product.name} ×${product.quantity}`
-                            : product.name}
-                        </Typography>
-                        <BookingLineAmount
-                          amount={product.price}
-                          originalAmount={product.originalPrice}
-                          discountLabel={clientLineDiscountLabel(product)}
-                        />
-                      </Stack>
-                    </Box>
-                  ))}
-                </Stack>
-              </Box>
-            ) : null}
-            {catalogUniqueItems.length > 0 ? (
-              <Box sx={{ mt: 2 }}>
-                <Typography sx={catalogHeadingSx}>Unique item</Typography>
-                <Stack spacing={1}>
-                  {catalogUniqueItems.map((item) => (
-                    <Box
-                      key={item.id}
-                      sx={{
-                        borderRadius: "10px",
-                        border: `1px solid ${alpha(m.navy, 0.06)}`,
-                        px: 1.25,
-                        py: 1,
-                        bgcolor: alpha(m.navy, 0.015),
-                      }}
-                    >
-                      <Stack
-                        direction="row"
-                        alignItems="center"
-                        justifyContent="space-between"
-                        spacing={1}
-                      >
-                        <Typography
-                          sx={{
-                            fontSize: 13,
-                            fontWeight: 900,
-                            color: alpha(m.navy, 0.82),
-                            lineHeight: 1.2,
-                            minWidth: 0,
-                          }}
-                        >
-                          {item.quantity > 1
-                            ? `${item.name} ×${item.quantity}`
-                            : item.name}
-                        </Typography>
-                        <BookingLineAmount
-                          amount={item.price}
-                          originalAmount={item.originalPrice}
-                          discountLabel={clientLineDiscountLabel(item)}
-                        />
-                      </Stack>
-                    </Box>
-                  ))}
-                </Stack>
-              </Box>
-            ) : null}
-            {draft?.clientNote?.trim() ? (
-              <Box sx={{ mt: 1.5 }}>
-                <BookingSummaryNote note={draft.clientNote} />
-              </Box>
-            ) : null}
-          </Box>
-
-            </Box>
-          </Box>
+          <ClientBookingCreateSummaryServiceCard
+            shopName={shop.shopName}
+            dateLabel={dateLabel}
+            bookingStartMinutes={bookingStartMinutes}
+            bookingEndMinutes={bookingEndMinutes}
+            addressLabel={addressLabel}
+            isDesired={isDesired}
+            summarySections={summarySections}
+            teamMembers={draft.teamMembers}
+            catalogProducts={catalogProducts}
+            catalogUniqueItems={catalogUniqueItems}
+            clientNote={draft.clientNote}
+          />
 
           {draft.projectDetails &&
           (Boolean(draft.projectDetails.description?.trim()) ||
@@ -1212,233 +753,38 @@ export default function ClientBookingCreateSummaryView() {
           ) : null}
 
           <Box sx={{ px: { xs: 2.25, md: 3.5 }, pt: 0.25, pb: 2.25 }}>
-          <Box
-            sx={{
-              borderRadius: "10px",
-              border: `1px solid ${alpha(m.navy, 0.22)}`,
-              bgcolor: "#fff",
-              px: { xs: 1.5, md: 2 },
-              py: 1.75,
-            }}
-          >
-          <Typography
-            sx={{
-              fontWeight: 900,
-              fontSize: 14,
-              color: alpha(m.navy, 0.78),
-              mb: 1.5,
-            }}
-          >
-            {isDesired ? "Contact & Address Details" : "Contact"}
-          </Typography>
-
-          <Stack spacing={1.35} sx={{ width: "100%" }}>
-            <AppCountryPhoneFields
+            <ClientBookingCreateSummaryContactPanel
+              isDesired={isDesired}
               countryCode={countryCode}
               phone={phone}
               onCountryCodeChange={setCountryCode}
               onPhoneChange={setPhone}
-              label="Contact Number"
-              phonePlaceholder={
-                hasProfilePhone ? "Phone number" : "Enter your phone number"
-              }
-              required
-              disabled={hasProfilePhone}
-              validateOnBlur={!hasProfilePhone}
-              countryCodeWidth={140}
+              hasProfilePhone={hasProfilePhone}
+              address={address}
+              onAddressChange={setAddress}
+              municipalityOptions={municipalityOptions}
             />
 
-            {isDesired ? (
-              <Box
-                sx={{
-                  width: "100%",
-                  display: "grid",
-                  gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-                  columnGap: 1.25,
-                  rowGap: 1.35,
-                }}
-              >
-                <Box>
-                  <Typography sx={addressFieldLabelSx}>Street Address</Typography>
-                  <AppTextField
-                    value={address.street}
-                    onChange={(e) =>
-                      setAddress((prev) => ({
-                        ...prev,
-                        street: e.target.value,
-                      }))
-                    }
-                    placeholder="Churchill-laan"
-                    fullWidth
-                    size="small"
-                    sx={addressFieldInputSx}
-                  />
-                </Box>
-                <Box>
-                  <Typography sx={addressFieldLabelSx}>Street Number</Typography>
-                  <AppTextField
-                    value={address.number}
-                    onChange={(e) =>
-                      setAddress((prev) => ({
-                        ...prev,
-                        number: e.target.value,
-                      }))
-                    }
-                    placeholder="34234"
-                    fullWidth
-                    size="small"
-                    sx={addressFieldInputSx}
-                  />
-                </Box>
-                <Box>
-                  <Typography sx={addressFieldLabelSx}>Postal Code</Typography>
-                  <AppTextField
-                    value={address.postalCode}
-                    onChange={(e) =>
-                      setAddress((prev) => ({
-                        ...prev,
-                        postalCode: e.target.value,
-                      }))
-                    }
-                    placeholder="1234 AB"
-                    fullWidth
-                    size="small"
-                    sx={addressFieldInputSx}
-                  />
-                </Box>
-                <Box>
-                  <Typography sx={addressFieldLabelSx}>Municipality</Typography>
-                  <AppDropdown
-                    value={address.municipality}
-                    onChange={(val) =>
-                      setAddress((prev) => ({
-                        ...prev,
-                        municipality: String(val ?? ""),
-                        province: "",
-                      }))
-                    }
-                    options={[
-                      ...(address.municipality &&
-                      !municipalityOptions.includes(address.municipality)
-                        ? [
-                            {
-                              value: address.municipality,
-                              label: address.municipality,
-                            },
-                          ]
-                        : []),
-                      ...municipalityOptions.map((muni) => ({
-                        value: muni,
-                        label: muni,
-                      })),
-                    ]}
-                    placeholder="Municipality"
-                    fullWidth
-                    size="small"
-                    sx={addressFieldInputSx}
-                  />
-                </Box>
-              </Box>
-            ) : null}
-          </Stack>
-          </Box>
-
-          <Box sx={{ px: 0, pt: 1.75 }}>
-            <BookingTotalPriceCard
-              totalPrice={checkoutPrice.displayTotal}
+            <ClientBookingCreateSummaryCheckoutPanel
+              displayTotal={checkoutPrice.displayTotal}
               originalPrice={checkoutPrice.originalPrice}
               discountAmount={checkoutPrice.breakdown.discountAmount}
               lines={checkoutLines}
-              prepaidPercent={
-                showPrepayRow ? prepaymentPercent : undefined
+              showPrepayRow={showPrepayRow}
+              prepaymentPercent={prepaymentPercent}
+              prepayAmount={prepayAmount}
+              remainingAfterPrepayment={
+                checkoutPrice.breakdown.remainingAfterPrepayment
               }
-              prepaidAmount={showPrepayRow ? prepayAmount : 0}
-              remainingAmount={
-                showPrepayRow
-                  ? checkoutPrice.breakdown.remainingAfterPrepayment
-                  : undefined
-              }
-              prepaidAction={
-                showPayNowAction ? (
-                  <Typography
-                    component="button"
-                    type="button"
-                    onClick={() => void handlePayNow()}
-                    disabled={isPaying}
-                    sx={{
-                      border: 0,
-                      bgcolor: "transparent",
-                      p: 0,
-                      cursor: isPaying ? "wait" : "pointer",
-                      color: m.teal,
-                      fontWeight: 900,
-                      fontSize: 12.5,
-                      fontFamily: "inherit",
-                      opacity: isPaying ? 0.7 : 1,
-                      "&:hover": { color: m.tealDark },
-                    }}
-                  >
-                    {isPaying ? "Preparing…" : "Pay Now"}
-                  </Typography>
-                ) : showPrepayRow && isPrepaymentPaid ? (
-                  <Typography
-                    sx={{
-                      fontWeight: 800,
-                      fontSize: 12,
-                      color: m.teal,
-                    }}
-                  >
-                    Paid
-                  </Typography>
-                ) : undefined
-              }
+              showPayNowAction={showPayNowAction}
+              isPaying={isPaying}
+              onPayNow={() => void handlePayNow()}
+              isPrepaymentPaid={isPrepaymentPaid}
+              isDesired={isDesired}
+              isSubmitting={isSubmitting}
+              mustPayBeforeBooking={mustPayBeforeBooking}
+              onSubmit={() => void onSubmit()}
             />
-            {isDesired && showPrepayRow && !isPrepaymentPaid ? (
-              <Typography
-                sx={{
-                  mt: 0.85,
-                  fontWeight: 700,
-                  fontSize: 11.5,
-                  color: alpha(m.navy, 0.5),
-                }}
-              >
-                You can Pay Now, or send the request and pay after the professional accepts.
-              </Typography>
-            ) : null}
-          </Box>
-
-          <AppButton
-            tone="primary"
-            fullWidth
-            disabled={isSubmitting || mustPayBeforeBooking}
-            onClick={() => void onSubmit()}
-            sx={{ mt: 2.25, height: 44 }}
-          >
-            {isSubmitting ? (
-              <>
-                <CircularProgress size={18} sx={{ mr: 1, color: "inherit" }} />
-                {isDesired ? "Sending…" : "Booking…"}
-              </>
-            ) : isDesired ? (
-              "Send Booking Request"
-            ) : (
-              "Book Now"
-            )}
-          </AppButton>
-
-          {mustPayBeforeBooking ? (
-            <Typography
-              sx={{
-                mt: 1,
-                textAlign: "center",
-                fontSize: 12,
-                fontWeight: 700,
-                color: alpha(m.navy, 0.5),
-              }}
-            >
-              Complete prepayment with Pay Now to enable booking.
-            </Typography>
-          ) : null}
           </Box>
         </Paper>
       </Container>

@@ -1,5 +1,7 @@
 "use client";
 
+import { mollureLabelSx } from "../../../theme/mollureHierarchy";
+
 import * as React from "react";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import DragIndicatorRoundedIcon from "@mui/icons-material/DragIndicatorRounded";
@@ -35,6 +37,12 @@ type SelectedProductItem = {
   discount?: BookingLineDiscount | null;
 };
 
+export type BookingDrawerStaffInfo = {
+  name?: string;
+  photoSrc?: string | null;
+  avatarText?: string;
+};
+
 type BookingDrawerSelectedItemsSectionProps = {
   services: readonly BookingServiceLineItem[];
   products: readonly SelectedProductItem[];
@@ -45,6 +53,10 @@ type BookingDrawerSelectedItemsSectionProps = {
   nested?: boolean;
   showRemoveButtons?: boolean;
   resolveStaffName?: (staffResourceId?: string) => string | undefined;
+  /** Richer staff lookup (photo + initials). Falls back to resolveStaffName. */
+  resolveStaff?: (staffResourceId?: string) => BookingDrawerStaffInfo | undefined;
+  /** Open team member profile / details when staff row is clicked. */
+  onStaffClick?: (staffResourceId: string) => void;
   resolveServiceEditTag?: (serviceId: string) => BookingEditTagResult;
   resolveProductEditTag?: (productId: string) => BookingEditTagResult;
   editTagSignpostTitle?: string;
@@ -62,6 +74,20 @@ type BookingDrawerSelectedItemsSectionProps = {
   onEditUniqueItem?: (item: SelectedProductItem) => void;
 };
 
+function serviceStaffId(service: BookingServiceLineItem) {
+  return String(
+    service.staffResourceId ||
+      service.teamMemberId ||
+      "",
+  ).trim();
+}
+
+function firstName(value: string | undefined) {
+  const name = value?.trim();
+  if (!name) return "";
+  return name.split(/\s+/)[0] ?? "";
+}
+
 export default function BookingDrawerSelectedItemsSection({
   services,
   products,
@@ -70,6 +96,8 @@ export default function BookingDrawerSelectedItemsSection({
   nested = false,
   showRemoveButtons = false,
   resolveStaffName,
+  resolveStaff,
+  onStaffClick,
   resolveServiceEditTag,
   resolveProductEditTag,
   editTagSignpostTitle,
@@ -92,6 +120,28 @@ export default function BookingDrawerSelectedItemsSection({
   const didDragServiceRef = React.useRef(false);
   const canReorderServices =
     Boolean(onReorderServices) && services.length > 1;
+
+  const resolveServiceStaff = (service: BookingServiceLineItem) => {
+    const staffId = serviceStaffId(service);
+    const fromResolve = staffId ? resolveStaff?.(staffId) : undefined;
+    const nameFromMap = staffId ? resolveStaffName?.(staffId)?.trim() : "";
+    const displayName =
+      firstName(fromResolve?.name) ||
+      firstName(nameFromMap) ||
+      firstName(service.teamMemberName ?? undefined) ||
+      (staffId ? "" : "Unassigned") ||
+      "Unassigned";
+    return {
+      staffId,
+      staffName: displayName,
+      staffPhotoSrc: fromResolve?.photoSrc,
+      staffInitials: fromResolve?.avatarText,
+      onStaffClick:
+        staffId && onStaffClick
+          ? () => onStaffClick(staffId)
+          : undefined,
+    };
+  };
 
   if (!services.length && !products.length && !uniqueItems.length && !cancelledServices.length)
     return null;
@@ -145,7 +195,7 @@ export default function BookingDrawerSelectedItemsSection({
       {services.length > 0 || cancelledServices.length > 0 ? (
         <Stack spacing={0.75}>
           <BodyText
-            sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.72) }}
+            sx={mollureLabelSx(m.navy)}
           >
             Service
           </BodyText>
@@ -153,11 +203,7 @@ export default function BookingDrawerSelectedItemsSection({
             const editTags = normalizeBookingEditTags(
               resolveServiceEditTag?.(service.id),
             );
-            const staffName =
-              resolveStaffName?.(
-                service.staffResourceId ||
-                  (service as { teamMemberId?: string }).teamMemberId,
-              )?.trim() || "Unassigned";
+            const staff = resolveServiceStaff(service);
 
             return (
               <Box
@@ -244,7 +290,7 @@ export default function BookingDrawerSelectedItemsSection({
                         service.endTime,
                       )}
                       durationLabel={`${service.durationMins} Mins`}
-                      staffName={staffName}
+                      staffName={staff.staffName}
                     />
                     {editTags.length ? (
                       <BookingChangeTags
@@ -355,7 +401,7 @@ export default function BookingDrawerSelectedItemsSection({
       {products.length > 0 ? (
         <Stack spacing={0.75}>
           <BodyText
-            sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.72) }}
+            sx={mollureLabelSx(m.navy)}
           >
             Product
           </BodyText>
@@ -438,7 +484,7 @@ export default function BookingDrawerSelectedItemsSection({
       {uniqueItems.length > 0 ? (
         <Stack spacing={0.75}>
           <BodyText
-            sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.72) }}
+            sx={mollureLabelSx(m.navy)}
           >
             Unique item
           </BodyText>

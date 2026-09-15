@@ -5,6 +5,7 @@ import {
   generateAdminRefreshToken,
 } from "../helpers/jwt.helper.js";
 import { logAdminActivityFromRequest } from "../services/adminActivity.service.js";
+import { sendCaughtError } from "../utils/httpError.js";
 
 export const adminLogin = async (req, res) => {
   try {
@@ -102,13 +103,7 @@ export const adminLogin = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to login.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to login." });
   }
 };
 
@@ -135,10 +130,6 @@ export const adminMe = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to load admin session.",
-      data: { error: error.message },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to load admin session." });
   }
 };

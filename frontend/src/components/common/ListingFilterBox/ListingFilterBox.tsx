@@ -102,6 +102,27 @@ export default function ListingFilterBox({
   const set = (patch: Partial<ListingFilterValues>) =>
     onChange({ ...values, ...patch });
 
+  const arrowAdornment = (
+    <Box sx={{ display: "flex", alignItems: "center", pr: 0.25 }}>
+      <Image src={ArrowDown} alt="" width={16} height={16} />
+    </Box>
+  );
+
+  const placeholderValue = (selected: unknown, placeholder: string) =>
+    selected ? (
+      (selected as any)
+    ) : (
+      <BodyText
+        sx={{
+          color: alpha(tokens.navy, 0.55),
+          fontSize: "1.05rem",
+          fontWeight: 500,
+        }}
+      >
+        {placeholder}
+      </BodyText>
+    );
+
   const dateTimeDisplay = formatListingDateTimeDisplay(values.dateTime);
 
   return (
@@ -127,11 +148,7 @@ export default function ListingFilterBox({
             onClick={(e) => setCalendarAnchor(e.currentTarget)}
             InputProps={{
               readOnly: true,
-              endAdornment: (
-                <Box sx={{ display: "flex", alignItems: "center", pr: 0.25 }}>
-                  <Image src={ArrowDown} alt="" width={16} height={16} />
-                </Box>
-              ),
+              endAdornment: arrowAdornment,
             }}
             sx={{
               cursor: "pointer",
@@ -156,30 +173,14 @@ export default function ListingFilterBox({
               set({ category: next, categories: next ? [next] : [] });
             }}
             InputProps={{
-              endAdornment: (
-                <Box sx={{ display: "flex", alignItems: "center", pr: 0.25 }}>
-                  <Image src={ArrowDown} alt="" width={16} height={16} />
-                </Box>
-              ),
+              endAdornment: arrowAdornment,
             }}
             sx={lineFieldSx}
             SelectProps={{
               displayEmpty: true,
               IconComponent: () => null,
               renderValue: (selected) =>
-                selected ? (
-                  (selected as any)
-                ) : (
-                  <BodyText
-                    sx={{
-                      color: alpha(tokens.navy, 0.55),
-                      fontSize: "1.05rem",
-                      fontWeight: 500,
-                    }}
-                  >
-                    Select Category
-                  </BodyText>
-                ),
+                placeholderValue(selected, "Select Category"),
             }}
           >
             <MenuItem value="">
@@ -236,30 +237,14 @@ export default function ListingFilterBox({
               set({ municipality: next, municipalities: next ? [next] : [] });
             }}
             InputProps={{
-              endAdornment: (
-                <Box sx={{ display: "flex", alignItems: "center", pr: 0.25 }}>
-                  <Image src={ArrowDown} alt="" width={16} height={16} />
-                </Box>
-              ),
+              endAdornment: arrowAdornment,
             }}
             sx={lineFieldSx}
             SelectProps={{
               displayEmpty: true,
               IconComponent: () => null,
               renderValue: (selected) =>
-                selected ? (
-                  (selected as any)
-                ) : (
-                  <BodyText
-                    sx={{
-                      color: alpha(tokens.navy, 0.55),
-                      fontSize: "1.05rem",
-                      fontWeight: 500,
-                    }}
-                  >
-                    Select Municipality
-                  </BodyText>
-                ),
+                placeholderValue(selected, "Select Municipality"),
             }}
           >
             <MenuItem value="">

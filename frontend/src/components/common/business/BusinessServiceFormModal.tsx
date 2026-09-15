@@ -1,6 +1,7 @@
 "use client";
 
-import AppButton from "../AppButton";
+import { mollureBodySx } from "../../../theme/mollureHierarchy";
+
 import * as React from "react";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import {
@@ -15,6 +16,12 @@ import { alpha, useTheme } from "@mui/material/styles";
 import AppDatePicker from "../AppDatePicker";
 import MollureFormField from "../MollureFormField";
 import AppDrawer from "../AppDrawer";
+import { FinanceDrawerActionsFooter } from "../FinanceDrawerFooter";
+import {
+  mollureTwoColumnCellSx,
+  mollureTwoColumnRowSx,
+  mollureWhiteFieldInputSx,
+} from "../mollureFormSx";
 import {
   businessServiceModalCopy,
   businessServiceModalDiscountTypes,
@@ -64,48 +71,19 @@ export default function BusinessServiceFormModal({
       ? businessServiceModalCopy.subserviceInfoLabel
       : businessServiceModalCopy.serviceInfoLabel;
 
-  const fieldInputSx = {
-    "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" },
-  } as const;
-
-  const twoColumnRowSx = {
-    display: "flex",
-    flexDirection: { xs: "column", sm: "row" },
-    gap: 1.5,
-    width: "100%",
-    alignItems: "stretch",
-  } as const;
-
-  const twoColumnCellSx = { flex: 1, minWidth: 0, width: "100%" } as const;
+  const fieldInputSx = mollureWhiteFieldInputSx;
 
   const footer = (
-    <Stack
-      direction="row"
-      spacing={1.25}
-      justifyContent="flex-end"
-      sx={{ px: 2.5, py: 1.75 }}
-    >
-      <AppButton
-        tone="secondary"
-        onClick={onClose}
-        disabled={disabled}
-        sx={{
-          px: 3,
-        }}
-      >
-        {businessServiceModalCopy.cancelLabel}
-      </AppButton>
-      <AppButton
-        tone="primary"
-        onClick={onSubmit}
-        disabled={disabled || !canSubmit}
-        sx={{
-          px: 4,
-        }}
-      >
-        {submitLabel}
-      </AppButton>
-    </Stack>
+    <FinanceDrawerActionsFooter
+      onCancel={onClose}
+      onPrimary={onSubmit}
+      cancelLabel={businessServiceModalCopy.cancelLabel}
+      primaryLabel={submitLabel}
+      cancelDisabled={disabled}
+      primaryDisabled={disabled || !canSubmit}
+      cancelSx={{ px: 3 }}
+      primarySx={{ px: 4 }}
+    />
   );
 
   return (
@@ -126,11 +104,7 @@ export default function BusinessServiceFormModal({
         <Stack spacing={2} sx={{ width: "100%", alignItems: "stretch" }}>
           {mode === "subservice" && !readOnly ? (
             <Typography
-              sx={{
-                fontSize: 12.5,
-                color: alpha(m.navy, 0.62),
-                lineHeight: 1.45,
-              }}
+              sx={mollureBodySx(m.navy, { color: alpha(m.navy, 0.62), lineHeight: 1.45 })}
             >
               {businessServiceModalCopy.customServiceHint}
             </Typography>
@@ -158,13 +132,11 @@ export default function BusinessServiceFormModal({
             sx={fieldInputSx}
           />
 
-          <Box sx={twoColumnRowSx}>
-            <Box sx={twoColumnCellSx}>
+          <Box sx={mollureTwoColumnRowSx}>
+            <Box sx={mollureTwoColumnCellSx}>
               <Typography
                 sx={{
-                  fontSize: 12.5,
-                  fontWeight: 700,
-                  color: alpha(m.navy, 0.72),
+                  ...mollureBodySx(m.navy),
                   mb: 0.75,
                 }}
               >
@@ -237,12 +209,10 @@ export default function BusinessServiceFormModal({
                 />
               </Box>
             </Box>
-            <Box sx={twoColumnCellSx}>
+            <Box sx={mollureTwoColumnCellSx}>
               <Typography
                 sx={{
-                  fontSize: 12.5,
-                  fontWeight: 700,
-                  color: alpha(m.navy, 0.72),
+                  ...mollureBodySx(m.navy),
                   mb: 0.75,
                 }}
               >
@@ -317,8 +287,8 @@ export default function BusinessServiceFormModal({
             </Box>
           </Box>
 
-          <Box sx={twoColumnRowSx}>
-            <Box sx={twoColumnCellSx}>
+          <Box sx={mollureTwoColumnRowSx}>
+            <Box sx={mollureTwoColumnCellSx}>
               <MollureFormField
                 select
                 label={businessServiceModalCopy.priceTypeLabel}
@@ -340,7 +310,7 @@ export default function BusinessServiceFormModal({
                 ))}
               </MollureFormField>
             </Box>
-            <Box sx={twoColumnCellSx}>
+            <Box sx={mollureTwoColumnCellSx}>
               <MollureFormField
                 label={businessServiceModalCopy.priceLabel}
                 placeholder="0"
@@ -406,8 +376,8 @@ export default function BusinessServiceFormModal({
               {businessServiceModalCopy.offerDiscountTitle}
             </Typography>
             <Stack spacing={1.5} sx={{ width: "100%", alignItems: "stretch" }}>
-              <Box sx={twoColumnRowSx}>
-                <Box sx={twoColumnCellSx}>
+              <Box sx={mollureTwoColumnRowSx}>
+                <Box sx={mollureTwoColumnCellSx}>
                   <MollureFormField
                     select
                     label={businessServiceModalCopy.discountTypeLabel}
@@ -429,7 +399,7 @@ export default function BusinessServiceFormModal({
                     ))}
                   </MollureFormField>
                 </Box>
-                <Box sx={twoColumnCellSx}>
+                <Box sx={mollureTwoColumnCellSx}>
                   <MollureFormField
                     label={businessServiceModalCopy.discountAmountLabel}
                     placeholder="0"
@@ -509,8 +479,8 @@ export default function BusinessServiceFormModal({
                 </Box>
               </Box>
 
-              <Box sx={twoColumnRowSx}>
-                <Box sx={twoColumnCellSx}>
+              <Box sx={mollureTwoColumnRowSx}>
+                <Box sx={mollureTwoColumnCellSx}>
                   <AppDatePicker
                     label={businessServiceModalCopy.discountStartLabel}
                     value={draft.discountStartDate}
@@ -520,7 +490,7 @@ export default function BusinessServiceFormModal({
                     max={draft.discountEndDate || undefined}
                   />
                 </Box>
-                <Box sx={twoColumnCellSx}>
+                <Box sx={mollureTwoColumnCellSx}>
                   <AppDatePicker
                     label={businessServiceModalCopy.discountEndLabel}
                     value={draft.discountEndDate}

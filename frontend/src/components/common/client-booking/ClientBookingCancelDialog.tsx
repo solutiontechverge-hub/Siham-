@@ -1,13 +1,12 @@
 "use client";
 
+import { mollureBodyMutedSx, mollureLabelSx } from "../../../theme/mollureHierarchy";
+
 import * as React from "react";
 import { Box, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import AppModal, {
-  MessagingModalCancelButton,
-  MessagingModalPrimaryButton,
-} from "../AppModal";
 import AppTextField from "../AppTextField";
+import MessagingDangerModal from "../messaging/MessagingDangerModal";
 
 type Props = {
   open: boolean;
@@ -28,27 +27,18 @@ export default function ClientBookingCancelDialog({
   }, [open]);
 
   return (
-    <AppModal
-      contentSx={{ px: 2.5 }}
-      footerVariant="actions"
+    <MessagingDangerModal
       open={open}
-      title="Cancel booking"
       onClose={onClose}
+      title="Cancel booking"
       maxWidth="sm"
-      headerTone="danger"
-      footer={
-        <>
-          <MessagingModalCancelButton onClick={onClose} label="Keep booking" />
-          <MessagingModalPrimaryButton
-            tone="danger"
-            label="Cancel booking"
-            onClick={() => {
-              onConfirm(reason.trim());
-              onClose();
-            }}
-          />
-        </>
-      }
+      cancelLabel="Keep booking"
+      primaryLabel="Cancel booking"
+      primaryTone="danger"
+      onPrimary={() => {
+        onConfirm(reason.trim());
+        onClose();
+      }}
     >
       <Box sx={{ py: 1.5 }}>
         <Typography
@@ -62,13 +52,7 @@ export default function ClientBookingCancelDialog({
           Are you sure you want to cancel this booking?
         </Typography>
         <Typography
-          sx={{
-            mt: 1.25,
-            fontWeight: 700,
-            fontSize: 12.5,
-            color: alpha(m.navy, 0.55),
-            lineHeight: 1.6,
-          }}
+          sx={mollureBodyMutedSx(m.navy, { mt: 1.25, fontWeight: 700, lineHeight: 1.6 })}
         >
           This action cannot be undone. Any prepayment or deposit may be subject
           to the professional&apos;s cancellation policy, including
@@ -77,12 +61,7 @@ export default function ClientBookingCancelDialog({
         </Typography>
         <Box sx={{ mt: 2 }}>
           <Typography
-            sx={{
-              mb: 0.75,
-              fontWeight: 800,
-              fontSize: 12.5,
-              color: alpha(m.navy, 0.7),
-            }}
+            sx={mollureLabelSx(m.navy, { mb: 0.75, color: alpha(m.navy, 0.7) })}
           >
             Reason (optional)
           </Typography>
@@ -96,6 +75,6 @@ export default function ClientBookingCancelDialog({
           />
         </Box>
       </Box>
-    </AppModal>
+    </MessagingDangerModal>
   );
 }

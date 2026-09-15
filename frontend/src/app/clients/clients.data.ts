@@ -1,5 +1,8 @@
 import { clientsShellHeader, marketingShellFooter } from "../../data/marketingShell.data";
 import { netherlandsCities } from "../../data/netherlandsCities.data";
+import { netherlandsProvinces } from "../../data/netherlandsLocations.data";
+
+export { netherlandsProvinces };
 
 export type ClientFeatureIconKey =
   | "location"
@@ -49,21 +52,6 @@ export const clientHomeServiceCategories = [
   "Hair removal",
   "Face treatment",
   "Body treatment",
-] as const;
-
-export const netherlandsProvinces = [
-  "Drenthe",
-  "Flevoland",
-  "Friesland",
-  "Gelderland",
-  "Groningen",
-  "Limburg",
-  "Noord-Brabant",
-  "Noord-Holland",
-  "Overijssel",
-  "Utrecht",
-  "Zeeland",
-  "Zuid-Holland",
 ] as const;
 
 export const clientsPageData = {

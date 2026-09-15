@@ -15,6 +15,13 @@ import {
   TableRow,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import {
+  mollureBodyMutedSx,
+  mollureBodySx,
+  mollurePageTitleSx,
+  mollureSectionTitleSx,
+  mollureTableHeaderSx,
+} from "../../../theme/mollureHierarchy";
 import { useRouter } from "next/navigation";
 import type { ProfessionalFixedLocationRatingReviewAnalyticsData } from "../../../app/professionals/fixed-location/analytics/ratingReviewAnalytics.data";
 import { ratingReviewAnalyticsHref } from "../../../app/professionals/fixed-location/analytics/ratingReviewRoutes";
@@ -86,7 +93,7 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({
     <Box sx={{ px: 2.25, pb: 2.5 }}>
       <Box sx={{ pt: 2.25, pb: 1.4 }}>
         <BodyText
-          sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}
+          sx={mollureSectionTitleSx(m.navy)}
         >
           {overview.title}
         </BodyText>
@@ -126,27 +133,14 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({
               "&:hover": { bgcolor: alpha(m.teal, 0.04) },
             }}
           >
-            <BodyText
-              sx={{
-                fontSize: 12,
-                fontWeight: 700,
-                color: alpha(m.navy, 0.55),
-                mb: 0.5,
-              }}
-            >
+            <BodyText sx={mollureBodyMutedSx(m.navy, { mb: 0.5 })}>
               Overall Rating (Avg.):
             </BodyText>
             <Stack direction="row" alignItems="center" spacing={0.6}>
               <StarRoundedIcon
                 sx={{ fontSize: 22, color: theme.palette.warning.main }}
               />
-              <BodyText
-                sx={{
-                  fontSize: 18,
-                  fontWeight: 900,
-                  color: alpha(m.navy, 0.82),
-                }}
-              >
+              <BodyText sx={mollurePageTitleSx(m.navy)}>
                 {overallRating.toFixed(1)}/
                 {ratingOutOf.toFixed(1)}
               </BodyText>
@@ -165,19 +159,10 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({
               gap: 0.5,
             }}
           >
-            <BodyText
-              sx={{
-                fontSize: 12,
-                fontWeight: 700,
-                color: alpha(m.navy, 0.55),
-                mb: 0.5,
-              }}
-            >
+            <BodyText sx={mollureBodyMutedSx(m.navy, { mb: 0.5 })}>
               Total Reviews:
             </BodyText>
-            <BodyText
-              sx={{ fontSize: 18, fontWeight: 900, color: alpha(m.navy, 0.82) }}
-            >
+            <BodyText sx={mollurePageTitleSx(m.navy)}>
               {totalReviews}
             </BodyText>
           </Box>
@@ -193,7 +178,7 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({
 
       <Box sx={{ pt: 2.7, pb: 1.4 }}>
         <BodyText
-          sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}
+          sx={mollureSectionTitleSx(m.navy)}
         >
           {analytics42.title}
         </BodyText>
@@ -231,11 +216,7 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({
                 >
                   <BodyText
                     component="span"
-                    sx={{
-                      fontSize: 11.5,
-                      fontWeight: 800,
-                      color: alpha(m.navy, 0.62),
-                    }}
+                    sx={mollureTableHeaderSx(m.navy)}
                   >
                     {h}
                   </BodyText>
@@ -256,11 +237,10 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({
                 <TableCell sx={{ py: 1.1 }}>
                   <BodyText
                     component="span"
-                    sx={{
-                      fontSize: 12.5,
+                    sx={mollureBodySx(m.navy, {
                       fontWeight: r.isTotal ? 900 : 700,
                       color: alpha(m.navy, r.isTotal ? 0.82 : 0.65),
-                    }}
+                    })}
                   >
                     {r.category}
                   </BodyText>
@@ -268,11 +248,10 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({
                 <TableCell sx={{ py: 1.1 }}>
                   <BodyText
                     component="span"
-                    sx={{
-                      fontSize: 12.5,
+                    sx={mollureBodySx(m.navy, {
                       fontWeight: r.isTotal ? 900 : 700,
                       color: alpha(m.navy, r.isTotal ? 0.82 : 0.65),
-                    }}
+                    })}
                   >
                     {r.range}
                   </BodyText>
@@ -280,11 +259,10 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({
                 <TableCell sx={{ py: 1.1 }}>
                   <BodyText
                     component="span"
-                    sx={{
-                      fontSize: 12.5,
+                    sx={mollureBodySx(m.navy, {
                       fontWeight: r.isTotal ? 900 : 700,
                       color: alpha(m.navy, r.isTotal ? 0.82 : 0.65),
-                    }}
+                    })}
                   >
                     {r.count}
                   </BodyText>
@@ -292,11 +270,10 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({
                 <TableCell sx={{ py: 1.1 }}>
                   <BodyText
                     component="span"
-                    sx={{
-                      fontSize: 12.5,
+                    sx={mollureBodySx(m.navy, {
                       fontWeight: r.isTotal ? 900 : 700,
                       color: alpha(m.navy, r.isTotal ? 0.82 : 0.65),
-                    }}
+                    })}
                   >
                     {r.sharePct}%
                   </BodyText>
@@ -304,11 +281,10 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({
                 <TableCell sx={{ py: 1.1 }}>
                   <BodyText
                     component="span"
-                    sx={{
-                      fontSize: 12.5,
+                    sx={mollureBodySx(m.navy, {
                       fontWeight: r.isTotal ? 900 : 700,
                       color: alpha(m.navy, r.isTotal ? 0.82 : 0.65),
-                    }}
+                    })}
                   >
                     {r.repliedTo}
                   </BodyText>
@@ -348,7 +324,7 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({
 
       <Box sx={{ pt: 2.7, pb: 1.4 }}>
         <BodyText
-          sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}
+          sx={mollureSectionTitleSx(m.navy)}
         >
           {analytics43.title}
         </BodyText>
@@ -385,11 +361,7 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({
                 >
                   <BodyText
                     component="span"
-                    sx={{
-                      fontSize: 11.5,
-                      fontWeight: 800,
-                      color: alpha(m.navy, 0.62),
-                    }}
+                    sx={mollureTableHeaderSx(m.navy)}
                   >
                     {h}
                   </BodyText>
@@ -419,11 +391,10 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({
                   <TableCell key={ci} sx={{ py: 1.1 }}>
                     <BodyText
                       component="span"
-                      sx={{
-                        fontSize: 12.5,
+                      sx={mollureBodySx(m.navy, {
                         fontWeight: r.isTotal ? 900 : 700,
                         color: alpha(m.navy, r.isTotal ? 0.82 : 0.65),
-                      }}
+                      })}
                     >
                       {val}
                     </BodyText>

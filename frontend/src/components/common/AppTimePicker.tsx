@@ -39,7 +39,7 @@ export type AppTimePickerProps = {
   error?: boolean;
   helperText?: React.ReactNode;
   sx?: SxProps<Theme>;
-  /** Analog MUI clock face. Use `wheel` for Availability / Block Time. */
+  /** Analog MUI clock face (default). Use `wheel` for scroll columns (e.g. Block Time). */
   variant?: "wheel" | "clock";
 };
 

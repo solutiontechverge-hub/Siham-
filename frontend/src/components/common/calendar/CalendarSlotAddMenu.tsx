@@ -1,6 +1,7 @@
 "use client";
 
 import { Menu, MenuItem } from "@mui/material";
+import { CALENDAR_ADD_MENU_ITEMS } from "./calendarAddMenuItems";
 
 export type CalendarSlotAddAction = "booking" | "blocked";
 
@@ -9,11 +10,6 @@ type CalendarSlotAddMenuProps = {
   onClose: () => void;
   onSelect: (action: CalendarSlotAddAction) => void;
 };
-
-const menuItems = [
-  { label: "Booking", key: "booking" as const },
-  { label: "Blocked time", key: "blocked" as const },
-];
 
 export default function CalendarSlotAddMenu({
   anchorPosition,
@@ -28,7 +24,7 @@ export default function CalendarSlotAddMenu({
       anchorPosition={anchorPosition ?? undefined}
       transformOrigin={{ vertical: "top", horizontal: "left" }}
     >
-      {menuItems.map((item) => (
+      {CALENDAR_ADD_MENU_ITEMS.map((item) => (
         <MenuItem
           key={item.key}
           onClick={() => {

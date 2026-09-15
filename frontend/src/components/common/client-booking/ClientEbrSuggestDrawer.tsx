@@ -1,5 +1,7 @@
 "use client";
 
+import { mollureBodyMutedSx, mollureLabelSx } from "../../../theme/mollureHierarchy";
+
 import AppButton from "../AppButton";
 import * as React from "react";
 import { Box, Stack, Typography } from "@mui/material";
@@ -64,12 +66,7 @@ export default function ClientEbrSuggestDrawer({
 
         <Box>
           <Typography
-            sx={{
-              fontWeight: 900,
-              fontSize: 12.5,
-              color: alpha(m.navy, 0.7),
-              mb: 1,
-            }}
+            sx={mollureLabelSx(m.navy, { fontWeight: 900, color: alpha(m.navy, 0.7), mb: 1 })}
           >
             Current services
           </Typography>
@@ -115,9 +112,7 @@ export default function ClientEbrSuggestDrawer({
             ) : (
               <Typography
                 sx={{
-                  fontSize: 12.5,
-                  fontWeight: 700,
-                  color: alpha(m.navy, 0.45),
+                  ...mollureBodyMutedSx(m.navy),
                 }}
               >
                 No services yet

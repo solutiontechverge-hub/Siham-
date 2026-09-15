@@ -1,5 +1,7 @@
 "use client";
 
+import { mollureLabelSx, mollureBodyMutedSx } from "../../../theme/mollureHierarchy";
+
 import * as React from "react";
 import { Box, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -7,6 +9,7 @@ import AppModal, {
   MessagingModalCancelButton,
   MessagingModalPrimaryButton,
 } from "../AppModal";
+import { FinancePreviewLabelValueRow } from "../finance-documents/FinancePreviewRows";
 import type { BusinessPublicProfilePolicySection } from "../../../data/businessPublicProfile.data";
 import type { CancellationFeeSettlement } from "./settleCancellationFee";
 
@@ -95,14 +98,7 @@ export default function ClientBookingCancelFeeDialog({
                   py: 1.25,
                 }}
               >
-                <Typography
-                  sx={{
-                    fontWeight: 900,
-                    fontSize: 12.5,
-                    color: alpha(m.navy, 0.78),
-                    mb: 0.5,
-                  }}
-                >
+                <Typography sx={{ ...mollureLabelSx(m.navy), mb: 0.5 }}>
                   {section.title}
                 </Typography>
                 {section.fields?.map((field) => (
@@ -142,9 +138,7 @@ export default function ClientBookingCancelFeeDialog({
           ) : policyInstruction ? (
             <Typography
               sx={{
-                fontSize: 12.5,
-                fontWeight: 600,
-                color: alpha(m.navy, 0.55),
+                ...mollureBodyMutedSx(m.navy),
                 lineHeight: 1.55,
               }}
             >
@@ -153,9 +147,7 @@ export default function ClientBookingCancelFeeDialog({
           ) : (
             <Typography
               sx={{
-                fontSize: 12.5,
-                fontWeight: 600,
-                color: alpha(m.navy, 0.55),
+                ...mollureBodyMutedSx(m.navy),
                 lineHeight: 1.55,
               }}
             >
@@ -177,36 +169,42 @@ export default function ClientBookingCancelFeeDialog({
           }}
         >
           <Stack spacing={0.65}>
-            <Row label="Booking total" value={money(settlement.bookingTotal)} />
-            <Row
+            <FinancePreviewLabelValueRow
+              label="Booking total"
+              value={money(settlement.bookingTotal)}
+              variant="fee"
+            />
+            <FinancePreviewLabelValueRow
               label={
                 feeApplies
                   ? `Cancellation fee (${settlement.feePercent}%)`
                   : "Cancellation fee"
               }
               value={money(settlement.cancellationFee)}
-              emphasize
+              variant="feeEmphasize"
             />
             {settlement.prepaidPaid > 0 ? (
-              <Row
+              <FinancePreviewLabelValueRow
                 label="Applied from prepayment"
                 value={`− ${money(settlement.appliedFromPrepaid)}`}
+                variant="fee"
               />
             ) : null}
             {settlement.refundAmount > 0 ? (
-              <Row
+              <FinancePreviewLabelValueRow
                 label="Refund to you"
                 value={money(settlement.refundAmount)}
+                variant="fee"
               />
             ) : null}
-            <Row
+            <FinancePreviewLabelValueRow
               label={
                 settlement.amountDueNow > 0
                   ? "Amount to pay now"
                   : "Amount due now"
               }
               value={money(settlement.amountDueNow)}
-              emphasize
+              variant="feeEmphasize"
             />
           </Stack>
         </Box>
@@ -214,10 +212,10 @@ export default function ClientBookingCancelFeeDialog({
         <Typography
           sx={{
             mt: 1.5,
-            fontSize: 11.5,
-            fontWeight: 600,
-            color: alpha(m.navy, 0.5),
-            lineHeight: 1.5,
+            ...mollureBodyMutedSx(m.navy, {
+              fontSize: 11.5,
+              lineHeight: 1.5,
+            }),
           }}
         >
           Keep booking leaves this booking unchanged. Confirming cancels the
@@ -232,40 +230,5 @@ export default function ClientBookingCancelFeeDialog({
         </Typography>
       </Box>
     </AppModal>
-  );
-}
-
-function Row({
-  label,
-  value,
-  emphasize = false,
-}: {
-  label: string;
-  value: string;
-  emphasize?: boolean;
-}) {
-  const m = useTheme().palette.mollure;
-  return (
-    <Stack
-      direction="row"
-      justifyContent="space-between"
-      alignItems="center"
-      spacing={1}
-    >
-      <Typography
-        sx={{
-          fontSize: 12,
-          fontWeight: emphasize ? 900 : 700,
-          color: alpha(m.navy, emphasize ? 0.78 : 0.55),
-        }}
-      >
-        {label}
-      </Typography>
-      <Typography
-        sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.82) }}
-      >
-        {value}
-      </Typography>
-    </Stack>
   );
 }

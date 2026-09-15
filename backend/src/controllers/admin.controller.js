@@ -5,6 +5,7 @@ import {
   logAdminActivityFromRequest,
 } from "../services/adminActivity.service.js";
 import { buildPaginationMeta, parseListPagination } from "../utils/pagination.js";
+import { sendCaughtError } from "../utils/httpError.js";
 
 const PRESETS = new Set(["today", "7d", "30d", "year", "custom"]);
 
@@ -492,11 +493,7 @@ export const getAdminDashboard = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to load admin dashboard.",
-      data: { error: error.message },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to load admin dashboard." });
   }
 };
 
@@ -537,11 +534,7 @@ export const getAdminActivityLog = async (req, res) => {
       }),
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to load admin activity log.",
-      data: { error: error.message },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to load admin activity log." });
   }
 };
 
@@ -595,10 +588,6 @@ export const createAdminActivityLog = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to record admin activity.",
-      data: { error: error.message },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to record admin activity." });
   }
 };

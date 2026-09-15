@@ -14,6 +14,12 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import {
+  mollureSectionTitleSx,
+  mollureLabelSx,
+  mollureBodySx,
+  mollureBodyMutedSx,
+} from "../../theme/mollureHierarchy";
 import AdminSectionCard from "./AdminSectionCard";
 import { ADMIN_CARD_PADDING as pad } from "./adminCardPadding";
 import { AdminSectionLink } from "./AdminDashboardHeader";
@@ -45,7 +51,7 @@ export function TopProfessionalsWidget({
     >
       <Stack spacing={0.75}>
         {rows.length === 0 ? (
-          <Typography sx={{ fontSize: 12, color: tokens.bodyText, py: 1 }}>
+          <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText, py: 1 })}>
             No online bookings in this range.
           </Typography>
         ) : null}
@@ -83,7 +89,7 @@ export function TopProfessionalsWidget({
             </Box>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography
-                sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}
+                sx={mollureLabelSx(tokens.navy, { fontWeight: 600, color: tokens.navy })}
                 noWrap
               >
                 {pro.name}
@@ -93,12 +99,11 @@ export function TopProfessionalsWidget({
               </Typography>
             </Box>
             <Typography
-              sx={{
-                fontSize: 12,
+              sx={mollureBodySx(tokens.navy, {
                 fontWeight: 700,
                 color: tokens.teal,
                 flexShrink: 0,
-              }}
+              })}
             >
               {pro.bookings}
             </Typography>
@@ -140,7 +145,7 @@ export function ActivityLogWidget({
     >
       <Stack spacing={0}>
         {rows.length === 0 ? (
-          <Typography sx={{ fontSize: 12, color: tokens.bodyText, py: 1 }}>
+          <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText, py: 1 })}>
             No recent activity.
           </Typography>
         ) : null}
@@ -170,17 +175,17 @@ export function ActivityLogWidget({
             </Stack>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography
-                sx={{ fontSize: 11, fontWeight: 600, color: tokens.navy }}
+                sx={mollureLabelSx(tokens.navy, { fontSize: 11, fontWeight: 600, color: tokens.navy })}
               >
                 {item.admin}
               </Typography>
               <Typography
-                sx={{
+                sx={mollureBodyMutedSx(tokens.navy, {
                   fontSize: 11,
                   color: tokens.bodyText,
                   mt: 0.15,
                   lineHeight: 1.35,
-                }}
+                })}
               >
                 {item.action}{" "}
                 <Box
@@ -234,12 +239,11 @@ export function SummaryOverviewWidget({
                 }}
               >
                 <Typography
-                  sx={{
-                    fontSize: 12,
+                  sx={mollureLabelSx(tokens.navy, {
                     fontWeight: 600,
                     color: tokens.navy,
                     lineHeight: 1.3,
-                  }}
+                  })}
                 >
                   {row.label}
                 </Typography>
@@ -254,7 +258,10 @@ export function SummaryOverviewWidget({
                 }}
               >
                 <Typography
-                  sx={{ fontSize: 15, fontWeight: 700, color: tokens.tealDark }}
+                  sx={mollureSectionTitleSx(tokens.navy, {
+                    fontWeight: 700,
+                    color: tokens.tealDark,
+                  })}
                 >
                   {row.value}
                 </Typography>
@@ -267,11 +274,11 @@ export function SummaryOverviewWidget({
                 }}
               >
                 <Typography
-                  sx={{
+                  sx={mollureBodyMutedSx(tokens.navy, {
                     fontSize: 11,
                     color: tokens.bodyText,
                     lineHeight: 1.35,
-                  }}
+                  })}
                 >
                   {row.breakdown}
                 </Typography>
@@ -310,7 +317,7 @@ export function SystemStatusWidget({
               }}
             >
               <Typography
-                sx={{ fontSize: 12, fontWeight: 500, color: tokens.navy }}
+                sx={mollureBodySx(tokens.navy, { fontWeight: 500, color: tokens.navy })}
               >
                 {item.label}
               </Typography>
@@ -325,11 +332,11 @@ export function SystemStatusWidget({
                   />
                 )}
                 <Typography
-                  sx={{
+                  sx={mollureLabelSx(tokens.navy, {
                     fontSize: 11,
                     fontWeight: 600,
                     color: ok ? tokens.teal : tokens.requestAccent,
-                  }}
+                  })}
                 >
                   {item.status}
                 </Typography>
@@ -388,12 +395,11 @@ export function QuickLinksWidget() {
             </Box>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography
-                sx={{
-                  fontSize: 12,
+                sx={mollureLabelSx(tokens.navy, {
                   fontWeight: 600,
                   color: tokens.navy,
                   lineHeight: 1.2,
-                }}
+                })}
               >
                 {link.title}
               </Typography>

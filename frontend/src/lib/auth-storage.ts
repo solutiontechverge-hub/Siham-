@@ -5,6 +5,14 @@ const REFRESH_TOKEN_KEY = "mollure_refresh_token";
 const USER_KEY = "mollure_user";
 const REMEMBER_KEY = "mollure_remember";
 
+export const SIGNUP_EMAIL_KEY = "mollure_signup_email";
+export const SIGNUP_USER_TYPE_KEY = "mollure_signup_user_type";
+export const CLIENT_PROFILE_KEY = "mollure:client_profile";
+export const SIGNUP_AUDIENCE_KEY = "mollure:signup_audience";
+export const RESET_EMAIL_KEY = "mollure_reset_email";
+export const RESET_USER_ID_KEY = "mollure_reset_user_id";
+export const VERIFY_RESULT_KEY = "mollure_verify_result";
+
 type PersistAuthSessionPayload = {
   accessToken: string;
   refreshToken: string;

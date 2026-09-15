@@ -2,7 +2,7 @@ import type { BookingDrawerParticipantKind } from "./BookingDrawerParticipantAct
 
 export const DEFAULT_FIXED_LOCATION_MAX_GUESTS = 1;
 
-/** Sticky footer actions: FL guest; DL model (+ planning/buffer on project). */
+/** Sticky footer: FL guest; DL guest (no project) / model+planning (project) + buffer. */
 export function resolveBookingDrawerParticipantKinds({
   location,
   projectEnabled,
@@ -19,5 +19,5 @@ export function resolveBookingDrawerParticipantKinds({
   }
   if (location !== "DL") return [];
   if (projectEnabled) return ["model", "planning", "buffer"];
-  return ["model", "buffer"];
+  return ["guest", "buffer"];
 }

@@ -4,6 +4,7 @@ import AppButton from "../AppButton";
 import { Box, Stack, Typography } from "@mui/material";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { alpha, useTheme } from "@mui/material/styles";
+import { mollureLabelSx } from "../../../theme/mollureHierarchy";
 
 type Props = {
   message?: string;
@@ -39,12 +40,10 @@ export default function BookingResponseExpiryBanner({
         />
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography
-            sx={{
-              fontWeight: 800,
-              fontSize: 12.5,
+            sx={mollureLabelSx(m.navy, {
               color: alpha(m.navy, 0.82),
               lineHeight: 1.45,
-            }}
+            })}
           >
             {message}
           </Typography>

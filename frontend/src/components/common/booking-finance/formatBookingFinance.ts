@@ -1,7 +1,26 @@
+import { roundBookingMoney } from "../../../data/bookingLinePricing";
+
 export function formatFinanceEuro(amount: number): string {
-  const rounded = Math.round((amount + Number.EPSILON) * 100) / 100;
+  const rounded = roundBookingMoney(amount);
   const abs = Math.abs(rounded).toFixed(2);
   return rounded < 0 ? `-€${abs}` : `€${abs}`;
+}
+
+/** Compact € label — drops trailing `.00` (sales/checkout cards). */
+export function formatCompactEuro(amount: number): string {
+  const rounded = roundBookingMoney(amount);
+  const abs = Math.abs(rounded);
+  const text = Number.isInteger(abs) ? String(abs) : abs.toFixed(2);
+  return `${rounded < 0 ? "-" : ""}€${text}`;
+}
+
+/** Day-only ISO → `dd/mm/yyyy`; empty input → empty string. */
+export function formatFinanceDueDate(iso?: string | null): string {
+  if (!iso) return "";
+  const dayOnly = iso.length <= 10 ? `${iso}T00:00:00` : iso;
+  const d = new Date(dayOnly);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-GB");
 }
 
 export function formatFinancePercent(percent: number): string {

@@ -1,10 +1,19 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
-import ClientBookingCreateView from "./ClientBookingCreateView";
-import ClientBookingListView from "./ClientBookingListView";
+import DynamicChunkFallback from "../../../components/common/DynamicChunkFallback";
 import ClientBookingPageShell from "./ClientBookingPageShell";
 import { parseBookingListTab } from "./bookingPillTabs";
+
+const ClientBookingCreateView = dynamic(() => import("./ClientBookingCreateView"), {
+  ssr: false,
+  loading: () => <DynamicChunkFallback />,
+});
+const ClientBookingListView = dynamic(() => import("./ClientBookingListView"), {
+  ssr: false,
+  loading: () => <DynamicChunkFallback />,
+});
 
 export default function ClientBookingPageView() {
   const searchParams = useSearchParams();

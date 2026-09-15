@@ -11,7 +11,7 @@ export async function saveMessagingAttachments(userId, files = []) {
 
   const saved = [];
   for (const file of files) {
-    const ext = path.extname(file.originalname || "").toLowerCase() || "";
+    const ext = file.detectedExt || path.extname(file.originalname || "").toLowerCase() || "";
     const filename = `${randomUUID()}${ext}`;
     const absolutePath = path.join(userDir, filename);
     await fs.writeFile(absolutePath, file.buffer);

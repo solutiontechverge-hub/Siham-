@@ -1,5 +1,12 @@
 "use client";
 
+import {
+  mollureLabelSx,
+  mollureBodyMutedSx,
+  mollurePageTitleSx,
+  mollureTableHeaderSx,
+} from "../../../theme/mollureHierarchy";
+
 import AppButton from "../AppButton";
 import * as React from "react";
 import Image from "next/image";
@@ -18,7 +25,6 @@ import type {
   TransactionRow,
 } from "../../../app/professionals/fixed-location/finance/data/transactions";
 import type {
-  ProfessionalProfile,
   ProfileResponse,
 } from "../../../store/services/profileApi";
 import { useSnackbar } from "../AppSnackbar";
@@ -31,12 +37,17 @@ import {
   formatCurrencyValue,
   getInvoiceLineItemCellValue,
   getInvoiceLineItemColumns,
+  getProfessionalProfile,
   parseCurrencyValue,
   professionalBusinessInfoLines,
   resolveInvoiceLineItemLayout,
   resolveProfessionalBusinessDisplay,
+  financeMutedTextSx,
+  financePreviewCardSx,
   toInvoiceDisplayLineItems,
 } from "./financeDocumentUtils";
+import FinanceInfoBlock from "./FinanceInfoBlock";
+import { FinanceMutedLines } from "./FinancePreviewRows";
 import type {
   FinanceInvoiceSettings,
   FinanceInvoiceTemplateType,
@@ -51,11 +62,6 @@ type Props = {
   professionalBusinessOverride?: FinanceProfessionalBusinessOverride | null;
   clientPartyOverride?: TransactionDocumentParty | null;
 };
-
-function getProfessionalProfile(profileData?: ProfileResponse | null) {
-  if (!profileData || profileData.user_type !== "professional") return null;
-  return profileData.profile as ProfessionalProfile | null;
-}
 
 export default function FinanceInvoicePreview({
   row,
@@ -314,14 +320,7 @@ export default function FinanceInvoicePreview({
   ]);
 
   return (
-    <Box
-      sx={{
-        borderRadius: "10px",
-        border: `1px solid ${alpha(m.navy, 0.1)}`,
-        bgcolor: "#fff",
-        p: 2,
-      }}
-    >
+    <Box sx={financePreviewCardSx(m.navy, 2)}>
       <Box
         sx={{
           display: "grid",
@@ -331,18 +330,14 @@ export default function FinanceInvoicePreview({
         }}
       >
         <Box>
-          <SubHeading
-            sx={{ fontSize: 18, fontWeight: 900, color: alpha(m.navy, 0.86) }}
-          >
-            Invoice
-          </SubHeading>
+          <SubHeading sx={mollurePageTitleSx(m.navy)}>Invoice</SubHeading>
           <BodyText
-            sx={{ mt: 0.5, fontSize: 12.5, color: alpha(m.navy, 0.62) }}
+            sx={financeMutedTextSx(m.navy, { mt: 0.5 })}
           >
             Service Date: {serviceDate}
           </BodyText>
           <BodyText
-            sx={{ mt: 0.2, fontSize: 12.5, color: alpha(m.navy, 0.62) }}
+            sx={financeMutedTextSx(m.navy, { mt: 0.2 })}
           >
             Due Date: {dueDate}
           </BodyText>
@@ -370,52 +365,38 @@ export default function FinanceInvoicePreview({
           ) : null}
         </Box>
         <Box sx={{ textAlign: { xs: "left", sm: "right" }, mt: { xs: 1.5, sm: 0 } }}>
-          <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62) }}>
+          <BodyText sx={financeMutedTextSx(m.navy)}>
             Invoice Date: {invoiceDate}
           </BodyText>
           <BodyText
-            sx={{ mt: 0.2, fontSize: 12.5, color: alpha(m.navy, 0.62) }}
+            sx={financeMutedTextSx(m.navy, { mt: 0.2 })}
           >
             Invoice Number: {documentNumber}
           </BodyText>
         </Box>
       </Box>
 
-      <BodyText sx={{ mt: 1.4, fontSize: 12.5, color: alpha(m.navy, 0.62) }}>
+      <BodyText sx={financeMutedTextSx(m.navy, { mt: 1.4 })}>
         {penaltySummary}
       </BodyText>
 
       <Stack spacing={1.25} sx={{ mt: 2 }}>
-        <InfoBlock title="Professional's Business Info">
-          {professionalLines.map((line) => (
-            <BodyText
-              key={line}
-              sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62) }}
-            >
-              {line}
-            </BodyText>
-          ))}
-        </InfoBlock>
-        <InfoBlock title={clientInfoTitle}>
-          {clientLines.map((line) => (
-            <BodyText
-              key={line}
-              sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62) }}
-            >
-              {line}
-            </BodyText>
-          ))}
+        <FinanceInfoBlock title="Professional's Business Info">
+          <FinanceMutedLines lines={professionalLines} navy={m.navy} />
+        </FinanceInfoBlock>
+        <FinanceInfoBlock title={clientInfoTitle}>
+          <FinanceMutedLines lines={clientLines} navy={m.navy} />
           {invoiceType === "company" ? (
             <>
-              <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62) }}>
+              <BodyText sx={financeMutedTextSx(m.navy)}>
                 Client VAT No: {clientParty?.vatNumber || "-"}
               </BodyText>
-              <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62) }}>
+              <BodyText sx={financeMutedTextSx(m.navy)}>
                 Client COC No: {clientParty?.cocNumber || "-"}
               </BodyText>
             </>
           ) : null}
-        </InfoBlock>
+        </FinanceInfoBlock>
       </Stack>
 
       <Box sx={{ mt: 2 }}>
@@ -427,9 +408,7 @@ export default function FinanceInvoicePreview({
                   key={column.key}
                   align={column.align === "right" ? "right" : "left"}
                   sx={{
-                    fontSize: 12,
-                    fontWeight: 900,
-                    color: alpha(m.navy, 0.65),
+                    ...mollureTableHeaderSx(m.navy),
                     borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
                   }}
                 >
@@ -445,7 +424,9 @@ export default function FinanceInvoicePreview({
                   <TableCell
                     key={column.key}
                     align={column.align === "right" ? "right" : "left"}
-                    sx={{ fontSize: 12.5, color: alpha(m.navy, 0.75) }}
+                    sx={mollureBodyMutedSx(m.navy, {
+                      color: alpha(m.navy, 0.75),
+                    })}
                   >
                     {getInvoiceLineItemCellValue(item, column.key)}
                   </TableCell>
@@ -456,14 +437,12 @@ export default function FinanceInvoicePreview({
         </Table>
         <Stack spacing={0.75} sx={{ mt: 1.5 }}>
           <Stack direction="row" justifyContent="space-between">
-            <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.65) }}>
+            <BodyText sx={mollureBodyMutedSx(m.navy, { color: alpha(m.navy, 0.65) })}>
               Total (incl. VAT)
             </BodyText>
             <BodyText
               sx={{
-                fontSize: 12.5,
-                fontWeight: 900,
-                color: alpha(m.navy, 0.78),
+                ...mollureLabelSx(m.navy),
               }}
             >
               {totalPriceLabel}
@@ -472,14 +451,12 @@ export default function FinanceInvoicePreview({
           {prepaidAmountLabel && prepaidAmountValue > 0 ? (
             <>
               <Stack direction="row" justifyContent="space-between">
-                <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.65) }}>
+                <BodyText sx={mollureBodyMutedSx(m.navy, { color: alpha(m.navy, 0.65) })}>
                   Prepayment
                 </BodyText>
                 <BodyText
                   sx={{
-                    fontSize: 12.5,
-                    fontWeight: 900,
-                    color: alpha(m.navy, 0.78),
+                    ...mollureLabelSx(m.navy),
                   }}
                 >
                   {prepaidAmountLabel}
@@ -487,14 +464,12 @@ export default function FinanceInvoicePreview({
               </Stack>
               {remainingAfterPrepayment ? (
                 <Stack direction="row" justifyContent="space-between">
-                  <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.65) }}>
+                  <BodyText sx={mollureBodyMutedSx(m.navy, { color: alpha(m.navy, 0.65) })}>
                     Remaining
                   </BodyText>
                   <BodyText
                     sx={{
-                      fontSize: 12.5,
-                      fontWeight: 900,
-                      color: alpha(m.navy, 0.78),
+                      ...mollureLabelSx(m.navy),
                     }}
                   >
                     {remainingAfterPrepayment}
@@ -510,33 +485,6 @@ export default function FinanceInvoicePreview({
         <AppButton tone="secondary" onClick={downloadInvoicePdf}>
           Download Invoice
         </AppButton>
-      </Stack>
-    </Box>
-  );
-}
-
-function InfoBlock({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  const m = useTheme().palette.mollure;
-  return (
-    <Box
-      sx={{
-        p: 1.75,
-        borderRadius: "10px",
-        bgcolor: alpha(m.navy, 0.015),
-        border: `1px solid ${alpha(m.navy, 0.08)}`,
-      }}
-    >
-      <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.78) }}>
-        {title}
-      </BodyText>
-      <Stack spacing={0.5} sx={{ mt: 1.1 }}>
-        {children}
       </Stack>
     </Box>
   );

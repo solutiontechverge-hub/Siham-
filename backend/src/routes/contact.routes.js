@@ -3,6 +3,7 @@ import { body } from "express-validator";
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { validateRequest } from "../middleware/validate.middleware.js";
 import { adminReplyContactMessage, createContactMessage } from "../controllers/contact.controller.js";
+import { emailBody, LIMITS, textBody, uuidParam } from "../validators/fields.js";
 
 const router = express.Router();
 
@@ -10,11 +11,15 @@ router.post(
   "/",
   authenticateUser,
   [
-    body("persona").trim().notEmpty().withMessage("persona is required."),
-    body("name").trim().notEmpty().withMessage("name is required."),
-    body("email").trim().isEmail().withMessage("email must be valid."),
-    body("subject").trim().notEmpty().withMessage("subject is required."),
-    body("message").trim().isLength({ min: 10 }).withMessage("message must be at least 10 characters."),
+    textBody("persona", { min: 1, max: 64, label: "persona" }),
+    textBody("name", { min: 1, max: LIMITS.personName, label: "name" }),
+    emailBody("email"),
+    textBody("subject", { min: 1, max: LIMITS.subject, label: "subject" }),
+    textBody("message", {
+      min: LIMITS.messageMin,
+      max: LIMITS.messageMax,
+      label: "message",
+    }),
   ],
   validateRequest,
   createContactMessage,
@@ -23,7 +28,14 @@ router.post(
 router.post(
   "/:id/reply",
   authenticateUser,
-  [body("reply_message").trim().isLength({ min: 1 }).withMessage("reply_message is required.")],
+  [
+    uuidParam("id"),
+    textBody("reply_message", {
+      min: 1,
+      max: LIMITS.messageMax,
+      label: "reply_message",
+    }),
+  ],
   validateRequest,
   adminReplyContactMessage,
 );

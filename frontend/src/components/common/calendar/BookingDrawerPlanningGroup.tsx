@@ -1,5 +1,7 @@
 "use client";
 
+import { mollureLabelSx } from "../../../theme/mollureHierarchy";
+
 import * as React from "react";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import DragIndicatorRoundedIcon from "@mui/icons-material/DragIndicatorRounded";
@@ -129,9 +131,7 @@ export default function BookingDrawerPlanningGroup({
                   ) : null}
                   <BodyText
                     sx={{
-                      fontSize: 12.5,
-                      fontWeight: 900,
-                      color: alpha(m.navy, 0.82),
+                      ...mollureLabelSx(m.navy),
                     }}
                   >
                     Planning

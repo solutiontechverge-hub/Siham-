@@ -7,6 +7,7 @@ import {
 } from "../services/s3-upload.service.js";
 import { updateProfessionalValidation } from "../services/authEmail.service.js";
 import { logAdminActivityFromRequest } from "../services/adminActivity.service.js";
+import { logError, sendCaughtError } from "../utils/httpError.js";
 
 const SALT_ROUNDS = 12;
 
@@ -101,13 +102,7 @@ export const getProfile = async (req, res) => {
       data: result.rows[0],
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch profile.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to fetch profile." });
   }
 };
 
@@ -242,6 +237,7 @@ export const updateProfile = async (req, res) => {
     });
   } catch (error) {
     if (error.code === "23505") {
+      logError("updateProfile", error);
       return res.status(409).json({
         success: false,
         message: "Email is already in use.",
@@ -249,13 +245,7 @@ export const updateProfile = async (req, res) => {
       });
     }
 
-    return res.status(500).json({
-      success: false,
-      message: "Failed to update profile.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to update profile." });
   }
 };
 
@@ -314,10 +304,6 @@ export const setProfessionalValidation = async (req, res) => {
       data: result,
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to update professional validation.",
-      data: { error: error.message },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to update professional validation." });
   }
 };

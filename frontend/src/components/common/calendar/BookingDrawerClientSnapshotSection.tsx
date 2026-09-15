@@ -1,5 +1,7 @@
 "use client";
 
+import { mollureLabelSx } from "../../../theme/mollureHierarchy";
+
 import * as React from "react";
 import { Avatar, Box, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -248,9 +250,7 @@ export default function BookingDrawerClientSnapshotSection({
                 {person.planningActivity?.trim() ? (
                   <Typography
                     sx={{
-                      fontSize: 12.5,
-                      fontWeight: 900,
-                      color: alpha(m.navy, 0.82),
+                      ...mollureLabelSx(m.navy),
                     }}
                   >
                     {person.planningActivity}
@@ -303,9 +303,7 @@ export default function BookingDrawerClientSnapshotSection({
                       <Box sx={{ minWidth: 0 }}>
                         <Typography
                           sx={{
-                            fontSize: 12.5,
-                            fontWeight: 900,
-                            color: alpha(m.navy, 0.82),
+                            ...mollureLabelSx(m.navy),
                           }}
                         >
                           {service.name}
@@ -321,9 +319,7 @@ export default function BookingDrawerClientSnapshotSection({
                       </Box>
                       <Typography
                         sx={{
-                          fontSize: 12.5,
-                          fontWeight: 900,
-                          color: alpha(m.navy, 0.82),
+                          ...mollureLabelSx(m.navy),
                         }}
                       >
                         €{service.price}

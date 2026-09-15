@@ -37,7 +37,7 @@ assert.deepEqual(
     projectEnabled: false,
     extraGuestCount: 0,
   }),
-  ["model", "buffer"],
+  ["guest", "buffer"],
 );
 
 assert.deepEqual(

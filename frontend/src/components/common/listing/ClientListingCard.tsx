@@ -19,10 +19,15 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import {
+  mollureBodyMutedSx,
+  mollureBodySx,
+} from "../../../theme/mollureHierarchy";
 import Image from "next/image";
 import type { ListingCardData } from "../../../app/clients/listing/listing.data";
 import { resolveBusinessOfferingFlags } from "../../../data/businessPublicProfile.data";
 import { clientReviewsHref } from "../../../data/clientProfessionalReviews";
+import { SELECTED_SHOP_KEY } from "../../../app/clients/booking/clientBookingSession";
 import AppCard from "../AppCard";
 
 function toImageSrc(img: ListingCardData["image"]) {
@@ -134,7 +139,7 @@ export default function ClientListingCard({
         locationMode: mode,
       };
       window.sessionStorage.setItem(
-        "mollure:selected_shop",
+        SELECTED_SHOP_KEY,
         JSON.stringify(payload),
       );
     } catch {
@@ -341,15 +346,13 @@ export default function ClientListingCard({
           </Typography>
 
           <Typography
-            sx={{
-              fontSize: 12.5,
-              color: alpha(tokens.navy, 0.55),
+            sx={mollureBodyMutedSx(tokens.navy, {
               lineHeight: 1.3,
               minHeight: "1.3em",
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
-            }}
+            })}
           >
             {item.subtitle || "\u00a0"}
           </Typography>
@@ -365,14 +368,12 @@ export default function ClientListingCard({
               sx={{ fontSize: 15, color: alpha(tokens.navy, 0.78) }}
             />
             <Typography
-              sx={{
-                fontSize: 12.5,
-                fontWeight: 700,
+              sx={mollureBodySx(tokens.navy, {
                 color: alpha(tokens.navy, 0.78),
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
-              }}
+              })}
             >
               {item.municipalityLabel}
             </Typography>

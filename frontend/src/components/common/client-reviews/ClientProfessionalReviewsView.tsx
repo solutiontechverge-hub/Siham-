@@ -15,6 +15,10 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import {
+  mollureLabelSx,
+  mollurePageTitleSx,
+} from "../../../theme/mollureHierarchy";
 import { useRouter } from "next/navigation";
 import type {
   BusinessPublicProfileData,
@@ -33,6 +37,7 @@ import type { ProfessionalReviewItem } from "../../../app/professionals/fixed-lo
 import RatingReviewCard from "../RatingReviewCard";
 import ClientReviewsFilterPanel from "./ClientReviewsFilterPanel";
 import { useAppSelector } from "../../../store/hooks";
+import { INPUT_LIMITS, parseText } from "../../../lib/inputSchema";
 import {
   useDeleteReviewReplyMutation,
   useGetReviewsQuery,
@@ -151,10 +156,19 @@ export default function ClientProfessionalReviewsView({
 
   const handleSendReply = async (reviewId: string, message: string) => {
     if (!canReplyAsProfessional) return;
+    const parsed = parseText(message, {
+      label: "Reply",
+      min: 1,
+      max: INPUT_LIMITS.messageMax,
+    });
+    if (!parsed.ok) {
+      showSnackbar({ severity: "error", message: parsed.error });
+      throw new Error(parsed.error);
+    }
     try {
       await replyToReview({
         reviewId,
-        message,
+        message: parsed.value,
         authorName: reviewerName,
       }).unwrap();
       showSnackbar({ severity: "success", message: "Reply sent." });
@@ -219,14 +233,14 @@ export default function ClientProfessionalReviewsView({
           >
             <ArrowBackRoundedIcon sx={{ fontSize: 20 }} />
           </IconButton>
-          <Typography
-            sx={{ fontWeight: 900, fontSize: 18, color: alpha(m.navy, 0.88) }}
-          >
+          <Typography sx={mollurePageTitleSx(m.navy)}>
             Reviews &amp; Ratings
           </Typography>
         </Stack>
         <Typography
-          sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.55) }}
+          sx={mollureLabelSx(m.navy, {
+            color: alpha(m.navy, 0.55),
+          })}
         >
           {categoryLabel} | {scopeLabel}
         </Typography>

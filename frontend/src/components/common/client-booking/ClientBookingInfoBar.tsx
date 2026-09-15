@@ -1,5 +1,7 @@
 "use client";
 
+import { mollureBodySx } from "../../../theme/mollureHierarchy";
+
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import PhoneOutlinedIcon from "@mui/icons-material/PhoneOutlined";
 import { Box, Chip, Grid, Stack } from "@mui/material";
@@ -140,12 +142,7 @@ export default function ClientBookingInfoBar({
               sx={{ fontSize: 16, color: alpha(m.navy, 0.45) }}
             />
             <BodyText
-              sx={{
-                m: 0,
-                fontWeight: 700,
-                fontSize: 12.5,
-                color: alpha(m.navy, 0.62),
-              }}
+              sx={mollureBodySx(m.navy, { m: 0, color: alpha(m.navy, 0.62) })}
             >
               {phone?.trim() || "—"}
             </BodyText>

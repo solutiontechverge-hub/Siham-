@@ -7,10 +7,8 @@ import {
   formatLinkableBookingLabel,
   type LinkableBooking,
 } from "./messagingBookingsMock";
-import AppModal, {
-  MessagingModalCancelButton,
-  MessagingModalPrimaryButton,
-} from "../AppModal";
+import ModalActionsFormDialog from "../ModalActionsFormDialog";
+import { mollureBodyMutedSx, mollureBodySx } from "../../../theme/mollureHierarchy";
 
 type Props = {
   open: boolean;
@@ -40,45 +38,29 @@ export default function MessagingLinkBookingDialog({
   const selected = bookings.find((b) => b.id === selectedId);
 
   return (
-    <AppModal
-      contentSx={{ px: 2.5 }}
-      footerVariant="actions"
+    <ModalActionsFormDialog
       open={open}
-      title="Link to Booking"
       onClose={onClose}
+      title="Link to Booking"
       embedded={embedded}
-      footer={
-        <>
-          <MessagingModalCancelButton onClick={onClose} />
-          <MessagingModalPrimaryButton
-            label="Link"
-            disabled={!selected || loading}
-            onClick={() => {
-              if (selected) {
-                onSubmit(selected);
-                onClose();
-              }
-            }}
-          />
-        </>
-      }
+      confirmLabel="Link"
+      primaryDisabled={!selected || loading}
+      onConfirm={() => {
+        if (selected) {
+          onSubmit(selected);
+          onClose();
+        }
+      }}
     >
-      <Typography
-        sx={{
-          fontSize: 12.5,
-          fontWeight: 600,
-          color: alpha(m.navy, 0.5),
-          mb: 2,
-        }}
-      >
+      <Typography sx={mollureBodyMutedSx(m.navy, { mb: 2 })}>
         Select One Booking To Link This Conversation To
       </Typography>
       {loading && bookings.length === 0 ? (
-        <Typography sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.45) }}>
+        <Typography sx={mollureBodyMutedSx(m.navy, { fontWeight: 700 })}>
           Loading bookings…
         </Typography>
       ) : bookings.length === 0 ? (
-        <Typography sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.45) }}>
+        <Typography sx={mollureBodyMutedSx(m.navy, { fontWeight: 700 })}>
           No bookings available to link.
         </Typography>
       ) : (
@@ -106,9 +88,7 @@ export default function MessagingLinkBookingDialog({
                 <Box sx={{ minWidth: 0, flex: 1 }}>
                   <Typography
                     sx={{
-                      fontSize: 12.5,
-                      fontWeight: 700,
-                      color: alpha(m.navy, 0.72),
+                      ...mollureBodySx(m.navy),
                     }}
                   >
                     {formatLinkableBookingLabel(booking)}
@@ -142,6 +122,6 @@ export default function MessagingLinkBookingDialog({
           })}
         </Stack>
       )}
-    </AppModal>
+    </ModalActionsFormDialog>
   );
 }

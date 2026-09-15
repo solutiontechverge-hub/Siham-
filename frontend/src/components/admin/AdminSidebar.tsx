@@ -28,6 +28,11 @@ import { queueSnackbarFlash } from "../../lib/snackbarFlash";
 import { useAppDispatch } from "../../store/hooks";
 import { clearAuthSession } from "../../store/slices/authSlice";
 import {
+  mollureLabelSx,
+  mollureBodySx,
+  mollureBodyMutedSx,
+} from "../../theme/mollureHierarchy";
+import {
   adminDashboardNavItem,
   adminNavSections,
   type AdminNavItem,
@@ -92,7 +97,11 @@ function NavLink({
         sx={{ fontSize: 20, color: active ? tokens.teal : tokens.footerMuted }}
       />
       <Typography
-        sx={{ fontSize: 13.5, fontWeight: active ? 600 : 500, flex: 1 }}
+        sx={mollureBodySx(tokens.navy, {
+          fontWeight: active ? 600 : 500,
+          flex: 1,
+          color: "inherit",
+        })}
       >
         {item.label}
       </Typography>
@@ -215,13 +224,13 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                 sx={{ px: 1.25, py: 0.75 }}
               >
                 <Typography
-                  sx={{
+                  sx={mollureBodyMutedSx(tokens.navy, {
                     fontSize: 11,
                     fontWeight: 600,
                     letterSpacing: "0.08em",
                     textTransform: "uppercase",
                     color: tokens.footerMuted,
-                  }}
+                  })}
                 >
                   {section.label}
                 </Typography>
@@ -271,10 +280,11 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           sx={{
             alignSelf: "stretch",
             borderColor: alpha(tokens.white, 0.18),
-            color: tokens.footerText,
             textTransform: "none",
-            fontWeight: 600,
-            fontSize: 12.5,
+            ...mollureLabelSx(tokens.navy, {
+              fontWeight: 600,
+              color: tokens.footerText,
+            }),
             px: 1.75,
             "&:hover": {
               borderColor: alpha(tokens.white, 0.28),
@@ -299,12 +309,18 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           />
           <Stack spacing={1}>
             <Typography
-              sx={{ fontSize: 13.5, fontWeight: 600, color: tokens.white }}
+              sx={mollureLabelSx(tokens.navy, {
+                fontWeight: 600,
+                color: tokens.white,
+              })}
             >
               Need Help?
             </Typography>
             <Typography
-              sx={{ fontSize: 12, lineHeight: 1.5, color: tokens.footerMuted }}
+              sx={mollureBodyMutedSx(tokens.navy, {
+                lineHeight: 1.5,
+                color: tokens.footerMuted,
+              })}
             >
               If you have any questions or need support, feel free to contact
               us.
@@ -315,10 +331,11 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               sx={{
                 alignSelf: "flex-start",
                 borderColor: tokens.teal,
-                color: tokens.teal,
                 textTransform: "none",
-                fontWeight: 600,
-                fontSize: 12.5,
+                ...mollureLabelSx(tokens.navy, {
+                  fontWeight: 600,
+                  color: tokens.teal,
+                }),
                 px: 1.75,
                 "&:hover": {
                   borderColor: tokens.teal,

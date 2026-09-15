@@ -1,9 +1,7 @@
 "use client";
 
 import AppButton from "../../components/common/AppButton";
-import * as React from "react";
 import Image from "next/image";
-import { useSearchParams } from "next/navigation";
 import {
   Box,
   Checkbox,
@@ -12,10 +10,7 @@ import {
   Paper,
   Stack,
 } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
-import { getApiErrorMessage } from "../../lib/api-error";
-import { useAuthSessionLogin } from "../../hooks/useAuthSessionLogin";
-import { useAdminLoginMutation } from "../../store/services/adminApi";
+import { alpha } from "@mui/material/styles";
 import { SignupBg, SignupLs, SignupRs } from "../../../images";
 import {
   MarketingSiteHeader,
@@ -25,45 +20,22 @@ import {
 import GuestGuard from "../../components/common/auth/GuestGuard";
 import { authLoginHeaderClient } from "../../data/marketingShell.data";
 import { BodyText, SubHeading } from "../../components/ui/typography";
-import { useSnackbar } from "../../components/common/AppSnackbar";
+import { adminAuthLoginCopy } from "./adminAuthLogin.data";
+import { useAdminAuthLoginShell } from "./useAdminAuthLoginShell";
 
 export default function AdminAuthLoginShell() {
-  const theme = useTheme();
-  const m = theme.palette.mollure;
-  const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect");
-  const { showSnackbar } = useSnackbar();
-  const { completeLogin } = useAuthSessionLogin();
-  const [email, setEmail] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [remember, setRemember] = React.useState(false);
-  const rememberRef = React.useRef(remember);
-  rememberRef.current = remember;
-  const [login, { isLoading }] = useAdminLoginMutation();
-
-  const cardBorder = m.cardBorder ?? alpha(m.navy, 0.12);
-
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    try {
-      const rememberMe = rememberRef.current;
-      const result = await login({
-        email: email.trim().toLowerCase(),
-        password,
-      }).unwrap();
-
-      completeLogin(result.data, rememberMe, redirectTo || "/admin/dashboard");
-    } catch (error) {
-      showSnackbar({
-        severity: "error",
-        message: getApiErrorMessage(
-          error,
-          "Login failed. Please check your admin credentials.",
-        ),
-      });
-    }
-  };
+  const {
+    m,
+    cardBorder,
+    email,
+    setEmail,
+    password,
+    setPassword,
+    remember,
+    setRemember,
+    isLoading,
+    handleSubmit,
+  } = useAdminAuthLoginShell();
 
   return (
     <GuestGuard>
@@ -180,7 +152,7 @@ export default function AdminAuthLoginShell() {
                         color: m.navy,
                       }}
                     >
-                      Admin Sign In
+                      {adminAuthLoginCopy.title}
                     </SubHeading>
                     <BodyText
                       sx={{
@@ -190,8 +162,7 @@ export default function AdminAuthLoginShell() {
                         lineHeight: 1.45,
                       }}
                     >
-                      Sign in with your Mollure admin credentials to manage the
-                      platform.
+                      {adminAuthLoginCopy.subtitle}
                     </BodyText>
                   </Box>
 
@@ -199,8 +170,8 @@ export default function AdminAuthLoginShell() {
                     <Stack spacing={2}>
                       <MollureAuthLabeledField
                         type="email"
-                        fieldLabel="Admin Email"
-                        placeholder="admin@molur.com"
+                        fieldLabel={adminAuthLoginCopy.emailLabel}
+                        placeholder={adminAuthLoginCopy.emailPlaceholder}
                         value={email}
                         onChange={(event) => setEmail(event.target.value)}
                         required
@@ -209,8 +180,8 @@ export default function AdminAuthLoginShell() {
 
                       <MollureAuthLabeledPasswordField
                         typeWhenHidden="password"
-                        fieldLabel="Password"
-                        placeholder="Enter Password Here"
+                        fieldLabel={adminAuthLoginCopy.passwordLabel}
+                        placeholder={adminAuthLoginCopy.passwordPlaceholder}
                         value={password}
                         onChange={(event) => setPassword(event.target.value)}
                         required
@@ -233,7 +204,9 @@ export default function AdminAuthLoginShell() {
                             onChange={(event) =>
                               setRemember(event.target.checked)
                             }
-                            inputProps={{ "aria-label": "Remember Me" }}
+                            inputProps={{
+                              "aria-label": adminAuthLoginCopy.rememberMe,
+                            }}
                             sx={{
                               color: alpha(m.navy, 0.35),
                               "&.Mui-checked": { color: m.teal },
@@ -248,7 +221,7 @@ export default function AdminAuthLoginShell() {
                               color: alpha(m.navy, 0.52),
                             }}
                           >
-                            Remember Me
+                            {adminAuthLoginCopy.rememberMe}
                           </BodyText>
                         }
                       />
@@ -264,7 +237,9 @@ export default function AdminAuthLoginShell() {
                           minHeight: 44,
                         }}
                       >
-                        {isLoading ? "Signing in..." : "Sign In"}
+                        {isLoading
+                          ? adminAuthLoginCopy.submitting
+                          : adminAuthLoginCopy.submit}
                       </AppButton>
                     </Stack>
                   </Box>

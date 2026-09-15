@@ -1,5 +1,7 @@
 "use client";
 
+import { mollureSectionTitleSx, mollureLabelSx } from "../../../theme/mollureHierarchy";
+
 import AppButton from "../AppButton";
 import * as React from "react";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
@@ -63,7 +65,7 @@ export default function ClientBookingChangeResponsePanel({
               >
                 Payment Summary
               </Typography>
-              <Typography sx={{ fontWeight: 1000, fontSize: 15 }}>
+              <Typography sx={mollureSectionTitleSx(m.navy, { fontWeight: 1000 })}>
                 €{total.toFixed(2)}
               </Typography>
             </Box>
@@ -75,11 +77,7 @@ export default function ClientBookingChangeResponsePanel({
                 sx={{ mb: 0.75 }}
               >
                 <Typography
-                  sx={{
-                    fontWeight: 800,
-                    fontSize: 12.5,
-                    color: alpha(m.navy, 0.72),
-                  }}
+                  sx={mollureLabelSx(m.navy, { color: alpha(m.navy, 0.72) })}
                 >
                   Prepayment
                 </Typography>
@@ -184,7 +182,7 @@ export default function ClientBookingChangeResponsePanel({
           >
             Payment Summary
           </Typography>
-          <Typography sx={{ fontWeight: 1000, fontSize: 15 }}>
+          <Typography sx={mollureSectionTitleSx(m.navy, { fontWeight: 1000 })}>
             €{total.toFixed(2)}
           </Typography>
         </Box>
@@ -196,11 +194,7 @@ export default function ClientBookingChangeResponsePanel({
             sx={{ mb: prepaymentPaid ? 0.75 : 0 }}
           >
             <Typography
-              sx={{
-                fontWeight: 800,
-                fontSize: 12.5,
-                color: alpha(m.navy, 0.72),
-              }}
+              sx={mollureLabelSx(m.navy, { color: alpha(m.navy, 0.72) })}
             >
               Prepayment
             </Typography>

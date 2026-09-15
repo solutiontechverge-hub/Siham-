@@ -3,6 +3,10 @@
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import { Box, Menu, MenuItem, Paper } from "@mui/material";
 import { alpha, type Theme } from "@mui/material/styles";
+import {
+  mollureMenuItemSx,
+  mollureMenuPaperSx,
+} from "../../../../../components/common/mollureFormSx";
 import CancelPendingPaymentModal from "../../../../../components/sections/finance/CancelPendingPaymentModal";
 import ManualEntryDrawer from "../../../../../components/sections/finance/ManualEntryDrawer";
 import RefundSalesDrawer from "../../../../../components/sections/finance/RefundSalesDrawer";
@@ -13,7 +17,7 @@ import {
   useProfessionalBusinessOverride,
   resolveInvoiceTemplateType,
 } from "../../../../../components/common/finance-documents";
-import TransactionsHeader from "../../../../../components/sections/finance/TransactionsHeader";
+import MollureCardHeader from "../../../../../components/common/MollureCardHeader";
 import TransactionsTable from "../../../../../components/sections/finance/TransactionsTable";
 import TransactionsToolbar from "../../../../../components/sections/finance/TransactionsToolbar";
 import {
@@ -98,9 +102,10 @@ export default function FinanceOverviewPageView() {
         overflow: "hidden",
       }}
     >
-      <TransactionsHeader
+      <MollureCardHeader
         title="Transaction overview"
         subtitle="A complete overview of all transactions — accurate data here improves your Analytics page."
+        tone="tinted"
       />
       <Box sx={{ height: 1, bgcolor: alpha(m.navy, 0.06) }} />
 
@@ -134,14 +139,7 @@ export default function FinanceOverviewPageView() {
         open={Boolean(addAnchor)}
         onClose={closeAddMenus}
         PaperProps={{
-          sx: {
-            borderRadius: "10px",
-            border: `1px solid ${alpha(m.navy, 0.1)}`,
-            boxShadow: "0 14px 30px rgba(16,35,63,0.12)",
-            mt: 0.75,
-            minWidth: 220,
-            p: 0.5,
-          },
+          sx: mollureMenuPaperSx(m.navy, { minWidth: 220 }),
         }}
       >
         {ADD_MENU_ITEMS.map((opt) => (
@@ -161,14 +159,7 @@ export default function FinanceOverviewPageView() {
         open={Boolean(moreAnchor)}
         onClose={closeMoreMenus}
         PaperProps={{
-          sx: {
-            borderRadius: "10px",
-            border: `1px solid ${alpha(m.navy, 0.1)}`,
-            boxShadow: "0 14px 30px rgba(16,35,63,0.12)",
-            mt: 0.75,
-            minWidth: 220,
-            p: 0.5,
-          },
+          sx: mollureMenuPaperSx(m.navy, { minWidth: 220 }),
         }}
       >
         {actionMenuItems.map((opt) =>
@@ -177,16 +168,11 @@ export default function FinanceOverviewPageView() {
               key={opt.id}
               onMouseEnter={(e) => openActionExportMenu(e.currentTarget)}
               onClick={(e) => openActionExportMenu(e.currentTarget)}
-              sx={{
-                borderRadius: "8px",
-                fontSize: 12.5,
-                fontWeight: 700,
-                color: alpha(m.navy, 0.75),
-                my: 0.25,
+              sx={mollureMenuItemSx(m.navy, {
                 display: "flex",
                 justifyContent: "space-between",
                 gap: 1,
-              }}
+              })}
             >
               {opt.label}
               <ChevronRightRoundedIcon
@@ -198,13 +184,7 @@ export default function FinanceOverviewPageView() {
               key={opt.id}
               disabled={opt.requiresSelection && selectedCount === 0}
               onClick={() => handleActionMenuAction(opt.id)}
-              sx={{
-                borderRadius: "8px",
-                fontSize: 12.5,
-                fontWeight: 700,
-                color: alpha(m.navy, 0.75),
-                my: 0.25,
-              }}
+              sx={mollureMenuItemSx(m.navy)}
             >
               {opt.label}
             </MenuItem>
@@ -221,27 +201,14 @@ export default function FinanceOverviewPageView() {
         MenuListProps={{ sx: { py: 0.5 } }}
         disableAutoFocusItem
         PaperProps={{
-          sx: {
-            borderRadius: "10px",
-            border: `1px solid ${alpha(m.navy, 0.1)}`,
-            boxShadow: "0 14px 30px rgba(16,35,63,0.12)",
-            ml: 0.25,
-            minWidth: 200,
-            p: 0.5,
-          },
+          sx: mollureMenuPaperSx(m.navy, { minWidth: 200, ml: 0.25 }),
         }}
       >
         {ACTION_EXPORT_ITEMS.map((opt) => (
           <MenuItem
             key={opt.id}
             onClick={() => handleActionExportAction(opt.id)}
-            sx={{
-              borderRadius: "8px",
-              fontSize: 12.5,
-              fontWeight: 700,
-              color: alpha(m.navy, 0.75),
-              my: 0.25,
-            }}
+            sx={mollureMenuItemSx(m.navy)}
           >
             {opt.label}
           </MenuItem>

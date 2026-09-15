@@ -124,6 +124,13 @@ export type BookingTimelineCardProps = {
   actionRailSx?: SxProps<Theme>;
   titleLineClamp?: number;
   titleBold?: boolean;
+  /**
+   * Optional body slot (e.g. multi-service sub-cards). When set, title/time
+   * body text is skipped; header badges, location, and action rail stay as-is.
+   */
+  bodyContent?: React.ReactNode;
+  /** Place action rail on the start (left) or end (right) edge. */
+  actionRailSide?: "start" | "end";
 };
 
 function resolvePattern(
@@ -394,6 +401,8 @@ export default function BookingTimelineCard({
   title,
   titleLineClamp = 2,
   titleBold = false,
+  bodyContent,
+  actionRailSide = "end",
 }: BookingTimelineCardProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -449,6 +458,8 @@ export default function BookingTimelineCard({
     Boolean(profileAction?.name || profileAction?.icon);
   const visibleMessageAction = messageAction?.show ? messageAction : null;
 
+  const railAtStart = actionRailSide === "start";
+
   return (
     <Box
       onClick={onClick}
@@ -459,10 +470,11 @@ export default function BookingTimelineCard({
           width: "100%",
           borderRadius: "4px",
           border: `1px solid ${resolvedBorder}`,
-          borderLeft: `4px solid ${lineColor}`,
+          borderLeft: railAtStart ? undefined : `4px solid ${lineColor}`,
+          borderRight: railAtStart ? `4px solid ${lineColor}` : undefined,
           overflow: "hidden",
           display: "grid",
-          gridTemplateColumns: "1fr 66px",
+          gridTemplateColumns: railAtStart ? "66px 1fr" : "1fr 66px",
           cursor: onClick ? "pointer" : "default",
           boxShadow: "0 3px 10px rgba(16, 35, 63, 0.045)",
           transition:
@@ -491,6 +503,7 @@ export default function BookingTimelineCard({
             pl: "8px",
             pointerEvents: "none",
             overflow: "hidden",
+            order: 1,
           },
           ...(Array.isArray(contentSx) ? contentSx : [contentSx]),
         ]}
@@ -617,66 +630,124 @@ export default function BookingTimelineCard({
               </Box>
             </Tooltip>
           ) : null}
+          {bodyContent && timeLabel ? (
+            <BodyText
+              sx={{
+                fontSize: 12,
+                fontWeight: 500,
+                color: "#667085",
+                lineHeight: "16px",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                minWidth: 0,
+              }}
+            >
+              {timeLabel}
+            </BodyText>
+          ) : null}
+          {bodyContent && locationLabel ? (
+            <Box
+              sx={{
+                display: "inline-flex",
+                alignItems: "center",
+                flexShrink: 0,
+                ml: "auto",
+                color: "#667085",
+                fontSize: 12,
+                lineHeight: "16px",
+              }}
+            >
+              {locationLabel}
+            </Box>
+          ) : null}
         </Stack>
 
-        <BodyText
-          sx={{
-            fontSize: 14,
-            fontWeight: titleBold ? 900 : 500,
-            color: "#3B3E45",
-            lineHeight: "16px",
-            overflow: "hidden",
-            position: "absolute",
-            top: 28,
-            left: 8,
-            right: 6,
-            display: "-webkit-box",
-            WebkitLineClamp: titleLineClamp,
-            WebkitBoxOrient: "vertical",
-          }}
-        >
-          {title}
-        </BodyText>
-        <BodyText
-          sx={{
-            fontSize: 14,
-            fontWeight: 500,
-            color: "#3B3E45",
-            lineHeight: "16px",
-            position: "absolute",
-            top: 44,
-            left: 8,
-            right: paymentDue?.dateLabel ? 118 : 6,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {timeLabel}
-        </BodyText>
-        {notePreview?.trim() ? (
-          <BodyText
+        {bodyContent ? (
+          <Box
             sx={{
-              fontSize: 11,
-              fontWeight: 800,
-              color: alpha(m.navy, 0.62),
-              lineHeight: "14px",
               position: "absolute",
-              top: 62,
+              top: 28,
               left: 8,
               right: 6,
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
+              bottom: locationLabel ? 18 : 6,
+              minHeight: 0,
               overflow: "hidden",
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
+              pointerEvents: "auto",
             }}
           >
-            {notePreview.trim()}
-          </BodyText>
-        ) : null}
-        {paymentDue?.dateLabel ? (
+            {bodyContent}
+          </Box>
+        ) : (
+          <Stack
+            spacing={0.2}
+            sx={{
+              position: "absolute",
+              top: 28,
+              left: 8,
+              right: paymentDue?.dateLabel ? 118 : 6,
+              bottom: locationLabel ? 18 : 6,
+              minHeight: 0,
+              overflow: "hidden",
+            }}
+          >
+            <BodyText
+              title={typeof title === "string" ? title : undefined}
+              sx={{
+                fontSize: 14,
+                fontWeight: titleBold ? 900 : 500,
+                color: "#3B3E45",
+                lineHeight: "16px",
+                overflow: "hidden",
+                display: "-webkit-box",
+                WebkitLineClamp: titleLineClamp,
+                WebkitBoxOrient: "vertical",
+                wordBreak: "break-word",
+                overflowWrap: "anywhere",
+                flexShrink: 0,
+              }}
+            >
+              {title}
+            </BodyText>
+            {timeLabel ? (
+              <BodyText
+                sx={{
+                  fontSize: 14,
+                  fontWeight: 500,
+                  color: "#3B3E45",
+                  lineHeight: "16px",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  flexShrink: 0,
+                  minWidth: 0,
+                }}
+              >
+                {timeLabel}
+              </BodyText>
+            ) : null}
+            {notePreview?.trim() ? (
+              <BodyText
+                sx={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: alpha(m.navy, 0.62),
+                  lineHeight: "14px",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                  flexShrink: 0,
+                }}
+              >
+                {notePreview.trim()}
+              </BodyText>
+            ) : null}
+          </Stack>
+        )}
+        {paymentDue?.dateLabel && !bodyContent ? (
           <Tooltip
             title={`${paymentDue.label || "Reissue Invoice"} · ${paymentDue.dateLabel}`}
             placement="top"
@@ -738,28 +809,22 @@ export default function BookingTimelineCard({
           </Tooltip>
         ) : null}
         {locationLabel ? (
-          <Stack
-            direction="row"
-            spacing="2px"
-            alignItems="center"
+          <Box
             sx={{
               position: "absolute",
               left: 8,
               bottom: 1,
               height: 16,
+              zIndex: 2,
+              display: "inline-flex",
+              alignItems: "center",
+              color: "#667085",
+              fontSize: 12,
+              lineHeight: "16px",
             }}
           >
-            <BodyText
-              sx={{
-                fontSize: 12,
-                fontWeight: 400,
-                color: "#667085",
-                lineHeight: "16px",
-              }}
-            >
-              {locationLabel}
-            </BodyText>
-          </Stack>
+            {locationLabel}
+          </Box>
         ) : null}
       </Box>
 
@@ -773,7 +838,13 @@ export default function BookingTimelineCard({
             justifyItems: "center",
             alignItems: "center",
             py: "9px",
-            borderLeft: `1px solid ${alpha(m.navy, 0.06)}`,
+            order: railAtStart ? 0 : 2,
+            borderLeft: railAtStart
+              ? undefined
+              : `1px solid ${alpha(m.navy, 0.06)}`,
+            borderRight: railAtStart
+              ? `1px solid ${alpha(m.navy, 0.06)}`
+              : undefined,
             bgcolor: alpha("#fff", 0.24),
             pointerEvents: "auto",
           },
@@ -791,7 +862,10 @@ export default function BookingTimelineCard({
             <StickyNote2OutlinedIcon sx={{ fontSize: 15, color: m.teal }} />,
           )}
           {showProfile ? (
-            <Tooltip title={profileAction?.tooltip ?? ""} placement="left">
+            <Tooltip
+              title={profileAction?.tooltip ?? ""}
+              placement={railAtStart ? "right" : "left"}
+            >
               <Box
                 component="button"
                 onClick={stopCardClick(profileAction?.onClick)}
@@ -841,7 +915,7 @@ export default function BookingTimelineCard({
           {visibleMessageAction ? (
             <Tooltip
               title={visibleMessageAction.tooltip ?? ""}
-              placement="left"
+              placement={railAtStart ? "right" : "left"}
             >
               <Box
                 component="button"

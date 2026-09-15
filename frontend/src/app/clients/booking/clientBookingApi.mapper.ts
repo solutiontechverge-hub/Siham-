@@ -22,14 +22,10 @@ import {
 } from "../../../data/bookingChronologicalBlocks";
 import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
 import { inferProjectUploadKind, isProjectUploadImage } from "../../../lib/projectUploadMedia";
+import { isUuid } from "../../../lib/uuid";
 import type { BusinessSetupListing, CalendarBooking, CreateBookingRequest } from "../../../store/services/businessApi";
 import { mapApiBookingStatusToClient, mapClientStatusToApi } from "./clientBookingStatus";
 import { effectiveServiceAmount } from "../../../data/bookingLinePricing";
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-function isUuid(value: string | null | undefined): value is string {
-  return Boolean(value && UUID_RE.test(value));
-}
 
 function withClientDiscountFields(service: {
   price: number;

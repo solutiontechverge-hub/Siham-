@@ -22,6 +22,7 @@ import { MollureLabeledSelect } from "../MollureLabeledFields";
 import AppPillTabs from "../AppPillTabs";
 import TeamMemberAssignedServicesPanel from "../business/TeamMemberAssignedServicesPanel";
 import { useSnackbar } from "../AppSnackbar";
+import { mollureWhiteFieldInputSx } from "../mollureFormSx";
 import { getApiErrorMessage } from "../../../lib/api-error";
 import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
 import {
@@ -254,9 +255,7 @@ export default function CalendarTeamMemberProfileDrawer({
     }
   };
 
-  const fieldInputSx = {
-    "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" },
-  } as const;
+  const fieldInputSx = mollureWhiteFieldInputSx;
 
   return (
     <AppDrawer

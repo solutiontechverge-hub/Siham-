@@ -16,7 +16,6 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   ListingFilterBox,
@@ -38,7 +37,6 @@ import {
 } from "./useClientListingPage";
 import { useListingCards } from "./use-listing-cards";
 import { ListingBG } from "../../../../images";
-import { useAppSelector } from "../../../store/hooks";
 import { marketingShellFooter } from "../../../data/marketingShell.data";
 
 function toSrc(img: any) {
@@ -63,18 +61,6 @@ export default function ClientListingPageView() {
   const { filters: filterData, toolbar } = listingPageData;
   const { cards, isLoading, isError, error } = useListingCards();
   const state = useClientListingState(cards, urlFilters, searchKey);
-  const user = useAppSelector((s) => s.auth.user);
-  const displayName =
-    ((user as any)?.display_name as string | undefined) ||
-    `${(user as any)?.first_name ?? ""} ${(user as any)?.last_name ?? ""}`.trim();
-  const [avatarUrl, setAvatarUrl] = React.useState<string | undefined>(
-    undefined,
-  );
-  const [snackbarOpen, setSnackbarOpen] = React.useState(false);
-  const [filtersDrawerOpen, setFiltersDrawerOpen] = React.useState(false);
-  const [sortMenuAnchor, setSortMenuAnchor] =
-    React.useState<null | HTMLElement>(null);
-  const sortMenuOpen = Boolean(sortMenuAnchor);
 
   const toolbarButtonSx = {
     height: 40,
@@ -98,42 +84,23 @@ export default function ClientListingPageView() {
     },
   };
 
-  React.useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem("mollure:client_profile");
-      if (!raw) return;
-      const data = JSON.parse(raw) as {
-        avatar_url?: string | null;
-        email?: string;
-      };
-      const authedEmail = user?.email?.trim().toLowerCase();
-      const persistedEmail = data?.email?.trim().toLowerCase();
-      if (authedEmail && persistedEmail && authedEmail === persistedEmail) {
-        if (typeof data.avatar_url === "string" && data.avatar_url)
-          setAvatarUrl(data.avatar_url);
-      }
-    } catch {
-      // ignore
-    }
-  }, [user?.email]);
-
   return (
     <Box sx={{ ...stickyFooterPageSx, bgcolor: "#fff" }}>
       <MollureMarketingHeader
         navItems={[]}
         isAuthed
-        userLabel={user?.email ?? ""}
-        userName={displayName}
-        userAvatarSrc={avatarUrl}
+        userLabel={state.user?.email ?? ""}
+        userName={state.displayName}
+        userAvatarSrc={state.avatarUrl}
         homeHref="/"
       />
 
       <MollureSnackbar
-        open={snackbarOpen}
-        message="Added to the favourites"
+        open={state.snackbarOpen}
+        message={state.snackbarMessage}
         severity="success"
         autoHideDuration={2500}
-        onClose={() => setSnackbarOpen(false)}
+        onClose={() => state.setSnackbarOpen(false)}
       />
 
       {/* Hero with BG + Filter Box */}
@@ -187,15 +154,10 @@ export default function ClientListingPageView() {
           flexWrap="wrap"
           sx={{ mb: 2 }}
         >
-          {/*
-            Toolbar controls must match the compact design:
-            same height/shape/typography for Filters + Sort.
-          */}
-          {/** shared sizing tokens */}
           <AppButton
             variant="outlined"
             endIcon={<TuneRoundedIcon />}
-            onClick={() => setFiltersDrawerOpen(true)}
+            onClick={state.openFiltersDrawer}
             sx={toolbarButtonSx}
           >
             {toolbar.filterLabel}
@@ -204,19 +166,19 @@ export default function ClientListingPageView() {
           <AppButton
             variant="outlined"
             endIcon={<SwapVertRoundedIcon />}
-            onClick={(event) => setSortMenuAnchor(event.currentTarget)}
+            onClick={(event) => state.setSortMenuAnchor(event.currentTarget)}
             aria-haspopup="listbox"
-            aria-expanded={sortMenuOpen ? "true" : "false"}
-            aria-controls={sortMenuOpen ? "listing-sort-menu" : undefined}
+            aria-expanded={state.sortMenuOpen ? "true" : "false"}
+            aria-controls={state.sortMenuOpen ? "listing-sort-menu" : undefined}
             sx={toolbarButtonSx}
           >
             {toolbar.sortLabel}
           </AppButton>
           <Menu
             id="listing-sort-menu"
-            anchorEl={sortMenuAnchor}
-            open={sortMenuOpen}
-            onClose={() => setSortMenuAnchor(null)}
+            anchorEl={state.sortMenuAnchor}
+            open={state.sortMenuOpen}
+            onClose={() => state.setSortMenuAnchor(null)}
             anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
             transformOrigin={{ vertical: "top", horizontal: "right" }}
             slotProps={{
@@ -237,7 +199,7 @@ export default function ClientListingPageView() {
                 onClick={() => {
                   state.setSort(opt.value as ListingSortValue);
                   state.setPage(1);
-                  setSortMenuAnchor(null);
+                  state.setSortMenuAnchor(null);
                 }}
                 sx={{
                   fontSize: 13,
@@ -259,16 +221,16 @@ export default function ClientListingPageView() {
             {typeof error === "object" && error && "data" in error
               ? String(
                   (error as { data?: { message?: string } }).data?.message ??
-                    "Unable to load listings.",
+                    listingPageData.loadErrorFallback,
                 )
-              : "Unable to load listings."}
+              : listingPageData.loadErrorFallback}
           </Alert>
         ) : state.items.length === 0 ? (
           <Box sx={{ py: 6, textAlign: "center" }}>
             <Typography
               sx={{ color: alpha(tokens.navy, 0.65), fontWeight: 600 }}
             >
-              No professionals found. Try adjusting your filters.
+              {listingPageData.emptyResultsMessage}
             </Typography>
           </Box>
         ) : (
@@ -286,11 +248,7 @@ export default function ClientListingPageView() {
                   item={item}
                   visibleLocationModes={state.appliedFilters.locationModes}
                   isFavorite={Boolean(state.favorites[item.id])}
-                  onToggleFavorite={() => {
-                    const wasFavorite = Boolean(state.favorites[item.id]);
-                    state.toggleFavorite(item.id);
-                    if (!wasFavorite) setSnackbarOpen(true);
-                  }}
+                  onToggleFavorite={() => state.toggleFavorite(item.id)}
                 />
               </Grid>
             ))}
@@ -310,21 +268,12 @@ export default function ClientListingPageView() {
       </Container>
 
       <ListingFiltersDrawer
-        open={filtersDrawerOpen}
-        onClose={() => {
-          state.cancelDrawerFilters();
-          setFiltersDrawerOpen(false);
-        }}
+        open={state.filtersDrawerOpen}
+        onClose={state.closeFiltersDrawer}
         filters={state.drawerFilters}
         onChange={state.setDrawerFilters}
-        onApply={(next) => {
-          state.applyDrawerFilters(next);
-          setFiltersDrawerOpen(false);
-        }}
-        onCancel={() => {
-          state.cancelDrawerFilters();
-          setFiltersDrawerOpen(false);
-        }}
+        onApply={state.applyAndCloseDrawer}
+        onCancel={state.closeFiltersDrawer}
       />
 
       <MarketingSiteFooter

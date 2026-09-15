@@ -20,6 +20,9 @@ import {
 } from "recharts";
 import { Box, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
+import {
+  mollureBodyMutedSx,
+} from "../../theme/mollureHierarchy";
 import { ADMIN_CHART_COLORS, ADMIN_CHART_SERIES } from "./adminChartColors";
 import AdminSectionCard from "./AdminSectionCard";
 
@@ -372,7 +375,7 @@ export function AdminDonutChart({
             >
               {total.toLocaleString()}
             </Typography>
-            <Typography sx={{ fontSize: 11, color: tokens.slate }}>
+            <Typography sx={mollureBodyMutedSx(tokens.navy, { fontSize: 11, color: tokens.slate })}>
               Total
             </Typography>
           </Box>

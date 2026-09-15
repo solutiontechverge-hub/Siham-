@@ -4,6 +4,7 @@ import { Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { AppButton } from "../common";
 import type { AdminUser } from "./adminMockData";
+import { mollureLabelSx } from "../../theme/mollureHierarchy";
 
 /** Identical box for every row action — no tone/presetSize (those change height/width). */
 const rootSx = {
@@ -17,8 +18,6 @@ const rootSx = {
   maxHeight: 32,
   px: 0,
   py: 0,
-  fontSize: 12,
-  fontWeight: 600,
   lineHeight: "30px",
   borderRadius: "8px",
   borderWidth: 1,
@@ -49,6 +48,7 @@ export default function AdminUserRowActions({
   onDelete,
 }: AdminUserRowActionsProps) {
   const tokens = useTheme().palette.mollure;
+  const labelType = mollureLabelSx(tokens.navy, { fontWeight: 600 });
 
   return (
     <Stack
@@ -64,6 +64,7 @@ export default function AdminUserRowActions({
         onClick={() => onEdit(user)}
         sx={{
           ...rootSx,
+          ...labelType,
           borderColor: tokens.teal,
           color: tokens.teal,
           bgcolor: "#fff",
@@ -83,6 +84,7 @@ export default function AdminUserRowActions({
           onClick={() => onDisable(user)}
           sx={{
             ...rootSx,
+            ...labelType,
             borderColor: alpha(tokens.navy, 0.22),
             color: alpha(tokens.navy, 0.78),
             bgcolor: "#fff",
@@ -102,6 +104,7 @@ export default function AdminUserRowActions({
           onClick={() => onDelete(user)}
           sx={{
             ...rootSx,
+            ...labelType,
             borderColor: alpha("#E85D5D", 0.7),
             color: "#E85D5D",
             bgcolor: "#fff",

@@ -4,7 +4,10 @@ import * as React from "react";
 import { Box, Chip, Stack, Tooltip } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import CalendarBookingCard from "./CalendarBookingCard";
-import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
+import type {
+  CalendarEvent,
+  CalendarResource,
+} from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { ResponseWindowInput } from "./bookingResponseDeadline";
 import { resolveSameTimeStackChip } from "./calendar-overlap.utils";
 import { teamSharedBookingTooltip } from "./teamMemberBookings";
@@ -70,6 +73,8 @@ export type CalendarBookingTicketStackProps = {
   rowPx: number;
   slotHeight?: number;
   teamMemberNameById?: ReadonlyMap<string, string>;
+  teamResources?: readonly CalendarResource[];
+  actionRailSide?: "start" | "end";
   getServiceColor: (event: CalendarEvent) => string | undefined;
   getStatusColor?: (event: CalendarEvent) => string | undefined;
   onOpen: (event: CalendarEvent) => void;
@@ -77,6 +82,7 @@ export type CalendarBookingTicketStackProps = {
   onOpenNotes: (event: CalendarEvent) => void;
   onOpenClient: (event: CalendarEvent, anchorEl: HTMLElement) => void;
   onOpenMessages: (event: CalendarEvent) => void;
+  onOpenSplitWithTeamMember?: (event: CalendarEvent, partnerId: string) => void;
   responseTimeConfigured?: boolean;
   responseTime?: ResponseWindowInput | null;
 };
@@ -87,6 +93,8 @@ export default function CalendarBookingTicketStack({
   rowPx,
   slotHeight,
   teamMemberNameById,
+  teamResources,
+  actionRailSide = "end",
   getServiceColor,
   getStatusColor,
   onOpen,
@@ -94,6 +102,7 @@ export default function CalendarBookingTicketStack({
   onOpenNotes,
   onOpenClient,
   onOpenMessages,
+  onOpenSplitWithTeamMember,
   responseTimeConfigured,
   responseTime,
 }: CalendarBookingTicketStackProps) {
@@ -206,6 +215,8 @@ export default function CalendarBookingTicketStack({
                   positioned={false}
                   dense={isDense}
                   teamMemberNameById={teamMemberNameById}
+                  teamResources={teamResources}
+                  actionRailSide={actionRailSide}
                   serviceColor={getServiceColor(event)}
                   statusColor={getStatusColor?.(event)}
                   onOpen={() => onOpen(event)}
@@ -213,6 +224,12 @@ export default function CalendarBookingTicketStack({
                   onOpenNotes={() => onOpenNotes(event)}
                   onOpenClient={(anchorEl) => onOpenClient(event, anchorEl)}
                   onOpenMessages={() => onOpenMessages(event)}
+                  onOpenSplitWithTeamMember={
+                    onOpenSplitWithTeamMember
+                      ? (partnerId) =>
+                          onOpenSplitWithTeamMember(event, partnerId)
+                      : undefined
+                  }
                   responseTimeConfigured={responseTimeConfigured}
                   responseTime={responseTime}
                 />

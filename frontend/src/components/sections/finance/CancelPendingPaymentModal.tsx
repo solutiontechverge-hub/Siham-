@@ -1,11 +1,9 @@
 "use client";
 
-import AppButton from "../../common/AppButton";
-import * as React from "react";
 import ReportProblemRoundedIcon from "@mui/icons-material/ReportProblemRounded";
-import { Box, Stack, Typography } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
 import AppModal from "../../common/AppModal";
+import ModalConfirmBody from "../../common/ModalConfirmBody";
+import { ModalCancelApplyFooter } from "../../common/FinanceDrawerFooter";
 
 export type CancelPendingPaymentModalProps = {
   open: boolean;
@@ -24,36 +22,6 @@ export default function CancelPendingPaymentModal({
   message = "This will cancel the pending payment and cannot be undone.",
   confirmLabel = "Confirm",
 }: CancelPendingPaymentModalProps) {
-  const m = useTheme().palette.mollure;
-
-  const footer = (
-    <Stack
-      direction="row"
-      spacing={1}
-      justifyContent="center"
-      sx={{ px: 2.5, py: 2 }}
-    >
-      <AppButton
-        tone="secondary"
-        onClick={onClose}
-        sx={{
-          height: 40,
-        }}
-      >
-        Cancel
-      </AppButton>
-      <AppButton
-        tone="danger"
-        onClick={onConfirm}
-        sx={{
-          height: 40,
-        }}
-      >
-        {confirmLabel}
-      </AppButton>
-    </Stack>
-  );
-
   return (
     <AppModal
       open={open}
@@ -63,37 +31,32 @@ export default function CancelPendingPaymentModal({
       title={title}
       contentMinHeight={220}
       headerTone="danger"
-      footer={footer}
+      footer={
+        <ModalCancelApplyFooter
+          onCancel={onClose}
+          onPrimary={onConfirm}
+          primaryLabel={confirmLabel}
+          primaryTone="danger"
+          justifyContent="center"
+          buttonSx={{ height: 40 }}
+          spacing={1}
+        />
+      }
     >
-      <Box sx={{ px: 2.5, py: 3, textAlign: "center" }}>
-        <Box
-          sx={{
-            width: 52,
-            height: 52,
-            borderRadius: "14px",
-            mx: "auto",
-            mb: 1.5,
-            bgcolor: alpha("#E53935", 0.1),
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
+      <ModalConfirmBody
+        icon={
           <ReportProblemRoundedIcon sx={{ fontSize: 30, color: "#E53935" }} />
-        </Box>
-        <Typography
-          sx={{
-            fontWeight: 900,
-            color: alpha(m.navy, 0.82),
-            fontSize: 15,
-            lineHeight: 1.45,
-            maxWidth: 280,
-            mx: "auto",
-          }}
-        >
-          {message}
-        </Typography>
-      </Box>
+        }
+        iconFrame="rounded"
+        iconColor="#E53935"
+        iconFrameSize={52}
+        bodyMaxWidth={280}
+        bodyOpacity={0.82}
+        py={3}
+        px={2.5}
+        bodySx={{ fontSize: 15, lineHeight: 1.45 }}
+        body={message}
+      />
     </AppModal>
   );
 }

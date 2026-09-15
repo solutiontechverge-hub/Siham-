@@ -10,6 +10,9 @@ type ApiErrorShape = {
   message?: string;
 };
 
+const SERVER_UNREACHABLE =
+  "Unable to connect right now. Please check your connection and try again.";
+
 export const getApiErrorMessage = (
   error: unknown,
   fallbackMessage: string,
@@ -41,7 +44,7 @@ export const getApiErrorMessage = (
   ) {
     const raw = String((error as { error: string }).error).trim();
     if (/failed to fetch|networkerror|load failed/i.test(raw)) {
-      return "Cannot reach the server. Confirm the backend is running (port 5000) and refresh on the current app URL.";
+      return SERVER_UNREACHABLE;
     }
     return raw;
   }
@@ -52,7 +55,7 @@ export const getApiErrorMessage = (
     "status" in error &&
     (error as { status?: unknown }).status === "FETCH_ERROR"
   ) {
-    return "Cannot reach the server. Confirm the backend is running (port 5000) and refresh on the current app URL.";
+    return SERVER_UNREACHABLE;
   }
 
   if (
@@ -63,7 +66,7 @@ export const getApiErrorMessage = (
   ) {
     const msg = (error as ApiErrorShape).message ?? fallbackMessage;
     if (/failed to fetch|networkerror|load failed/i.test(msg)) {
-      return "Cannot reach the server. Confirm the backend is running (port 5000) and refresh on the current app URL.";
+      return SERVER_UNREACHABLE;
     }
     return msg;
   }

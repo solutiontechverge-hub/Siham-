@@ -14,6 +14,11 @@ import {
   Stack,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import {
+  mollureBodyMutedSx,
+  mollureLabelSx,
+  mollurePageTitleSx,
+} from "../../../theme/mollureHierarchy";
 import { BodyText } from "../../ui/typography";
 import { useSnackbar } from "../AppSnackbar";
 import { getApiErrorMessage } from "../../../lib/api-error";
@@ -150,13 +155,11 @@ export default function ClientBookingDetailsHeader({
     void onSendBookingRequest?.();
   };
 
-  const menuItemSx = {
-    fontSize: 12.5,
-    fontWeight: 800,
+  const menuItemSx = mollureLabelSx(m.navy, {
     color: alpha(m.navy, 0.62),
     py: "10px",
     px: 1.5,
-  };
+  });
 
   const displayStatus: ClientBookingStatus = isCancelled
     ? "cancelled"
@@ -260,15 +263,12 @@ export default function ClientBookingDetailsHeader({
         >
           <Box sx={{ minWidth: 0 }}>
             <BodyText
-              sx={{
-                fontWeight: 900,
-                fontSize: 20,
-                lineHeight: 1.25,
-                color:
-                  locationMode === "desired"
-                    ? "#333333"
-                    : alpha(m.navy, 0.88),
-              }}
+              sx={mollurePageTitleSx(
+                m.navy,
+                locationMode === "desired"
+                  ? { lineHeight: 1.25, color: "#333333" }
+                  : { lineHeight: 1.25 },
+              )}
             >
               Booking Details{" "}
               <Box component="span" sx={{ color: m.teal }}>
@@ -283,12 +283,7 @@ export default function ClientBookingDetailsHeader({
                 sx={{ mt: 0.65 }}
               >
                 <BodyText
-                  sx={{
-                    m: 0,
-                    fontSize: 11.5,
-                    fontWeight: 700,
-                    color: alpha(m.navy, 0.55),
-                  }}
+                  sx={mollureBodyMutedSx(m.navy, { m: 0 })}
                 >
                   Booked on{" "}
                   <Box

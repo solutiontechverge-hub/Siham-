@@ -1,23 +1,23 @@
 "use client";
 
+import {
+  mollurePageSubtitleSx,
+  mollurePageTitleSx,
+  mollureSectionTitleSx,
+} from "../../../theme/mollureHierarchy";
+
 import AppButton from "../AppButton";
+import DenseRowIconActions from "../DenseRowIconActions";
 import * as React from "react";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
-import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import {
   Avatar,
   Box,
-  IconButton,
   Paper,
   Popover,
   Stack,
-  Table,
-  TableBody,
   TableCell,
-  TableContainer,
-  TableHead,
   TableRow,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -58,6 +58,14 @@ import {
 import CalendarScheduleConflictDialog, {
   type CalendarScheduleConflictKind,
 } from "./CalendarScheduleConflictDialog";
+import {
+  formatDayRange,
+  formatScheduleTimeRange,
+  scheduleBodyCellSx,
+  ScheduleStatusTabs,
+  ScheduleTableSection,
+  type ScheduleStatusTab,
+} from "./CalendarScheduleShared";
 
 type CalendarSchedulePanelProps = {
   activeDateIso: string;
@@ -76,8 +84,6 @@ type CalendarSchedulePanelProps = {
   onCancelBookingsInSlot?: (bookingIds: string[]) => Promise<void>;
 };
 
-type ScheduleStatusTab = "active" | "archived";
-
 type DeleteTarget =
   | {
       kind: "availability";
@@ -88,32 +94,8 @@ type DeleteTarget =
   | { kind: "blocked"; id: string; resourceId: string }
   | null;
 
-const DAY_ABBR: Record<string, string> = {
-  Monday: "Mon",
-  Tuesday: "Tue",
-  Wednesday: "Wed",
-  Thursday: "Thu",
-  Friday: "Fri",
-  Saturday: "Sat",
-  Sunday: "Sun",
-};
-
-const formatDayRange = (from: string, to: string) =>
-  `${DAY_ABBR[from] ?? from.slice(0, 3)} - ${DAY_ABBR[to] ?? to.slice(0, 3)}`;
-
-const formatScheduleTime = (time: string) => {
-  const [hourRaw, minuteRaw] = time.split(":");
-  const hour = Number(hourRaw);
-  const minute = minuteRaw ?? "00";
-  if (Number.isNaN(hour)) return time;
-  return `${hour}:${minute}`;
-};
-
 const formatTimeRange = (start: string, end: string) =>
-  `${formatScheduleTime(start)} – ${formatScheduleTime(end)}`;
-
-const isDateInRange = (iso: string, from: string, to: string) =>
-  iso >= from && iso <= to;
+  formatScheduleTimeRange(start, end, "en");
 
 const defaultAvailabilityDraft = (
   resources: readonly CalendarResource[],
@@ -144,154 +126,6 @@ const defaultBlockDraft = (
   ),
   activity: "",
 });
-
-function ScheduleStatusTabs({
-  value,
-  onChange,
-}: {
-  value: ScheduleStatusTab;
-  onChange: (next: ScheduleStatusTab) => void;
-}) {
-  const m = useTheme().palette.mollure;
-  const tabs: { id: ScheduleStatusTab; label: string }[] = [
-    { id: "active", label: "Active" },
-    { id: "archived", label: "Archived" },
-  ];
-
-  return (
-    <Box
-      sx={{
-        display: "inline-flex",
-        borderRadius: "8px",
-        bgcolor: "#fff",
-        border: `1px solid ${alpha(m.navy, 0.08)}`,
-        overflow: "hidden",
-        p: 0.35,
-        gap: 0.35,
-      }}
-    >
-      {tabs.map((tab) => {
-        const active = tab.id === value;
-        return (
-          <Box
-            key={tab.id}
-            role="button"
-            tabIndex={0}
-            onClick={() => onChange(tab.id)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") onChange(tab.id);
-            }}
-            sx={{
-              px: 2.5,
-              py: 0.75,
-              borderRadius: "6px",
-              fontSize: 13,
-              fontWeight: active ? 800 : 600,
-              color: alpha(m.navy, active ? 0.82 : 0.55),
-              bgcolor: active ? alpha(m.navy, 0.06) : "transparent",
-              cursor: "pointer",
-              userSelect: "none",
-            }}
-          >
-            {tab.label}
-          </Box>
-        );
-      })}
-    </Box>
-  );
-}
-
-function ScheduleTableSection({
-  title,
-  columns,
-  rows,
-  emptyLabel,
-}: {
-  title: string;
-  columns: readonly string[];
-  rows: React.ReactNode;
-  emptyLabel: string;
-}) {
-  const m = useTheme().palette.mollure;
-
-  const headCellSx = {
-    fontSize: 12,
-    fontWeight: 900,
-    color: alpha(m.navy, 0.62),
-    borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
-    bgcolor: alpha(m.navy, 0.03),
-    py: 1.1,
-    textAlign: "center",
-    whiteSpace: "nowrap",
-    borderLeft: 0,
-    borderRight: 0,
-  } as const;
-
-  const bodyCellSx = {
-    fontSize: 13,
-    fontWeight: 500,
-    color: alpha(m.navy, 0.82),
-    borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
-    py: 1.15,
-    textAlign: "center",
-    verticalAlign: "middle",
-    borderLeft: 0,
-    borderRight: 0,
-  } as const;
-
-  const hasRows = React.Children.count(rows) > 0;
-
-  return (
-    <Box>
-      <BodyText
-        sx={{
-          fontSize: 13,
-          fontWeight: 900,
-          color: alpha(m.navy, 0.58),
-          mb: 0.85,
-        }}
-      >
-        {title}
-      </BodyText>
-      <TableContainer
-        component={Paper}
-        elevation={0}
-        sx={{
-          borderRadius: "8px",
-          overflow: "hidden",
-          boxShadow: "none",
-          border: `1px solid ${alpha(m.navy, 0.06)}`,
-        }}
-      >
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              {columns.map((column) => (
-                <TableCell key={column} sx={headCellSx}>
-                  {column}
-                </TableCell>
-              ))}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {hasRows ? (
-              rows
-            ) : (
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  sx={{ ...bodyCellSx, color: alpha(m.navy, 0.45) }}
-                >
-                  {emptyLabel}
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    </Box>
-  );
-}
 
 export default function CalendarSchedulePanel({
   activeDateIso,
@@ -346,21 +180,39 @@ export default function CalendarSchedulePanel({
 
   const filteredRows = React.useMemo(
     () =>
-      scheduleRows.filter((row) => {
-        if (Boolean(row.archived) !== isArchived) return false;
-        if (isArchived) return true;
-        return isDateInRange(
-          activeDateIso,
-          row.dateFrom,
-          row.dateTo || row.dateFrom,
-        );
-      }),
-    [activeDateIso, isArchived, scheduleRows],
+      scheduleRows.filter(
+        (row) => Boolean(row.archived) === isArchived,
+      ),
+    [isArchived, scheduleRows],
   );
 
   const filteredBlocks = React.useMemo(() => {
     if (isArchived) return [] as CalendarBlock[];
     return blocks.filter((block) => block.date === activeDateIso);
+  }, [activeDateIso, blocks, isArchived]);
+
+  const otherDateBlockedCountByResource = React.useMemo(() => {
+    const counts = new Map<string, number>();
+    if (isArchived) return counts;
+    const onSelected = new Map<string, Set<string>>();
+    const onOther = new Map<string, Set<string>>();
+    for (const block of blocks) {
+      const entryKey = calendarEntryIdFromBlockId(block.id) ?? block.id;
+      const bucket =
+        block.date === activeDateIso ? onSelected : onOther;
+      const set = bucket.get(block.resourceId) ?? new Set<string>();
+      set.add(entryKey);
+      bucket.set(block.resourceId, set);
+    }
+    for (const [resourceId, otherIds] of onOther) {
+      const selectedIds = onSelected.get(resourceId) ?? new Set<string>();
+      let count = 0;
+      for (const id of otherIds) {
+        if (!selectedIds.has(id)) count += 1;
+      }
+      if (count > 0) counts.set(resourceId, count);
+    }
+    return counts;
   }, [activeDateIso, blocks, isArchived]);
 
   // Always list every team member so empty schedules do not look "vanished".
@@ -374,17 +226,7 @@ export default function CalendarSchedulePanel({
     return base.sort((a, b) => a.name.localeCompare(b.name));
   }, [resources, selectedResourceIds]);
 
-  const bodyCellSx = {
-    fontSize: 13,
-    fontWeight: 500,
-    color: alpha(m.navy, 0.82),
-    borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
-    py: 1.15,
-    textAlign: "center",
-    verticalAlign: "middle",
-    borderLeft: 0,
-    borderRight: 0,
-  } as const;
+  const bodyCellSx = scheduleBodyCellSx(m.navy);
 
   const openAddAvailability = () => {
     setAvailabilityMode("add");
@@ -635,29 +477,6 @@ export default function CalendarSchedulePanel({
     }
   };
 
-  const rowActions = (onEdit: (() => void) | null, onDelete: () => void) => (
-    <Stack direction="row" spacing={0.35} justifyContent="center">
-      {onEdit ? (
-        <IconButton
-          size="small"
-          onClick={onEdit}
-          sx={{ width: 28, height: 28, borderRadius: "8px" }}
-        >
-          <EditOutlinedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
-        </IconButton>
-      ) : null}
-      <IconButton
-        size="small"
-        onClick={onDelete}
-        sx={{ width: 28, height: 28, borderRadius: "8px" }}
-      >
-        <DeleteOutlineRoundedIcon
-          sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }}
-        />
-      </IconButton>
-    </Stack>
-  );
-
   return (
     <>
       <Paper
@@ -680,19 +499,10 @@ export default function CalendarSchedulePanel({
                 py: 1.75,
               }}
             >
-              <SubHeading
-                sx={{
-                  fontSize: 22,
-                  fontWeight: 800,
-                  color: alpha(m.navy, 0.9),
-                  lineHeight: 1.2,
-                }}
-              >
+              <SubHeading sx={mollurePageTitleSx(m.navy)}>
                 Team Member schedule
               </SubHeading>
-              <BodyText
-                sx={{ mt: 0.5, fontSize: 13, color: alpha(m.navy, 0.52) }}
-              >
+              <BodyText sx={mollurePageSubtitleSx(m.navy, { mt: 0.5 })}>
                 Set Availability and block a time slot for the team members.
               </BodyText>
             </Box>
@@ -798,6 +608,8 @@ export default function CalendarSchedulePanel({
                     (block) => block.resourceId === resource.id,
                   ),
                 );
+                const otherDateBlockedCount =
+                  otherDateBlockedCountByResource.get(resource.id) ?? 0;
 
                 return (
                   <Box key={resource.id}>
@@ -821,9 +633,7 @@ export default function CalendarSchedulePanel({
                       </Avatar>
                       <BodyText
                         sx={{
-                          fontSize: 14,
-                          fontWeight: 800,
-                          color: alpha(m.navy, 0.86),
+                          ...mollureSectionTitleSx(m.navy),
                         }}
                       >
                         {resource.name}
@@ -833,6 +643,7 @@ export default function CalendarSchedulePanel({
                     <Stack spacing={1.75}>
                       <ScheduleTableSection
                         title="Availability"
+                        bordered
                         columns={[
                           "Location",
                           "Date - Date",
@@ -865,23 +676,27 @@ export default function CalendarSchedulePanel({
                                 </Stack>
                               </TableCell>
                               <TableCell sx={bodyCellSx}>
-                                {isArchived
-                                  ? "—"
-                                  : rowActions(
-                                      () =>
-                                        openEditAvailability(
-                                          row,
-                                          resource.id,
-                                          location,
-                                        ),
-                                      () =>
-                                        setDeleteTarget({
-                                          kind: "availability",
-                                          id: row.id,
-                                          resourceId: resource.id,
-                                          location,
-                                        }),
-                                    )}
+                                {isArchived ? (
+                                  "—"
+                                ) : (
+                                  <DenseRowIconActions
+                                    onEdit={() =>
+                                      openEditAvailability(
+                                        row,
+                                        resource.id,
+                                        location,
+                                      )
+                                    }
+                                    onDelete={() =>
+                                      setDeleteTarget({
+                                        kind: "availability",
+                                        id: row.id,
+                                        resourceId: resource.id,
+                                        location,
+                                      })
+                                    }
+                                  />
+                                )}
                               </TableCell>
                             </TableRow>
                           )),
@@ -890,6 +705,7 @@ export default function CalendarSchedulePanel({
 
                       <ScheduleTableSection
                         title="Blocked Time"
+                        bordered
                         columns={[
                           "Title",
                           "Date - Date",
@@ -897,7 +713,11 @@ export default function CalendarSchedulePanel({
                           "Time - Time",
                           "Action",
                         ]}
-                        emptyLabel="No block time entries"
+                        emptyLabel={
+                          otherDateBlockedCount > 0
+                            ? `No blocked time on ${formatLongDateUtc(activeDateIso)} (${otherDateBlockedCount} on other dates)`
+                            : `No blocked time on ${formatLongDateUtc(activeDateIso)}`
+                        }
                         rows={memberBlocks.map((block) => (
                           <TableRow key={block.id}>
                             <TableCell sx={bodyCellSx}>
@@ -919,15 +739,19 @@ export default function CalendarSchedulePanel({
                             <TableCell sx={bodyCellSx}>
                               {isArchived ||
                               !onDeleteBlockedEntry ||
-                              !block.id.startsWith("blk-")
-                                ? "—"
-                                : rowActions(null, () =>
+                              !block.id.startsWith("blk-") ? (
+                                "—"
+                              ) : (
+                                <DenseRowIconActions
+                                  onDelete={() =>
                                     setDeleteTarget({
                                       kind: "blocked",
                                       id: block.id,
                                       resourceId: resource.id,
-                                    }),
-                                  )}
+                                    })
+                                  }
+                                />
+                              )}
                             </TableCell>
                           </TableRow>
                         ))}

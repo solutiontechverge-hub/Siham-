@@ -1,12 +1,18 @@
 "use client";
 
-import AppButton from "../AppButton";
+import { ModalCancelApplyFooter } from "../FinanceDrawerFooter";
 import * as React from "react";
 import { InputAdornment, MenuItem, Stack, Typography } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
+import { useTheme } from "@mui/material/styles";
 import AppDatePicker from "../AppDatePicker";
 import MollureFormField from "../MollureFormField";
 import AppModal from "../AppModal";
+import { tomorrowIso } from "./calendar.utils";
+import { BOOKING_CATALOG_DISCOUNT_TYPE_OPTIONS } from "../../../data/bookingUniqueItem.data";
+import {
+  mollureBodyMutedSx,
+  mollureBodySx,
+} from "../../../theme/mollureHierarchy";
 
 type SalesOverdueReissueModalProps = {
   open: boolean;
@@ -19,12 +25,6 @@ type SalesOverdueReissueModalProps = {
     dueDate: string;
   }) => void;
 };
-
-function tomorrowIso(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().slice(0, 10);
-}
 
 export default function SalesOverdueReissueModal({
   open,
@@ -62,36 +62,25 @@ export default function SalesOverdueReissueModal({
       title="Reissue overdue invoice"
       maxWidth="xs"
       footer={
-        <Stack
-          direction="row"
+        <ModalCancelApplyFooter
+          onCancel={onClose}
+          onPrimary={() =>
+            onConfirm({
+              penaltyType,
+              penaltyValue: parsed,
+              penaltyAmount,
+              dueDate,
+            })
+          }
+          primaryLabel="Reissue"
+          primaryDisabled={!dueDate}
+          buttonSx={{}}
           spacing={1}
-          justifyContent="flex-end"
-          sx={{ px: 2.5, py: 2 }}
-        >
-          <AppButton tone="secondary" onClick={onClose}>
-            Cancel
-          </AppButton>
-          <AppButton
-            tone="primary"
-            disabled={!dueDate}
-            onClick={() =>
-              onConfirm({
-                penaltyType,
-                penaltyValue: parsed,
-                penaltyAmount,
-                dueDate,
-              })
-            }
-          >
-            Reissue
-          </AppButton>
-        </Stack>
+        />
       }
     >
       <Stack spacing={1.5} sx={{ pt: 0.5 }}>
-        <Typography
-          sx={{ fontSize: 12.5, fontWeight: 650, color: alpha(m.navy, 0.55) }}
-        >
+        <Typography sx={mollureBodyMutedSx(m.navy)}>
           Unpaid amount: €{unpaidAmount.toFixed(2)}
         </Typography>
         <MollureFormField
@@ -102,8 +91,11 @@ export default function SalesOverdueReissueModal({
             setPenaltyType(e.target.value as "fixed" | "percentage")
           }
         >
-          <MenuItem value="fixed">Fixed amount (€)</MenuItem>
-          <MenuItem value="percentage">Percentage (%)</MenuItem>
+          {BOOKING_CATALOG_DISCOUNT_TYPE_OPTIONS.map((option) => (
+            <MenuItem key={option.value} value={option.value}>
+              {option.label}
+            </MenuItem>
+          ))}
         </MollureFormField>
         <MollureFormField
           label={penaltyType === "percentage" ? "Penalty %" : "Penalty amount"}
@@ -117,9 +109,7 @@ export default function SalesOverdueReissueModal({
             ),
           }}
         />
-        <Typography
-          sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.7) }}
-        >
+        <Typography sx={mollureBodySx(m.navy)}>
           Penalty total: €{penaltyAmount.toFixed(2)}
         </Typography>
         <AppDatePicker

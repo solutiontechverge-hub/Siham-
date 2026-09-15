@@ -1,0 +1,419 @@
+"use client";
+
+import * as React from "react";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
+import { Box, IconButton, Stack } from "@mui/material";
+import { alpha } from "@mui/material/styles";
+import {
+  mollureLabelSx,
+  mollureSectionTitleSx,
+} from "../../../../../theme/mollureHierarchy";
+import {
+  BodyText,
+  CardTitle,
+} from "../../../../../components/ui/typography";
+import MollureFormField from "../../../../../components/common/MollureFormField";
+import type { FinanceInvoiceSettings } from "../../../../../components/sections/finance/useFinanceInvoiceSettings";
+import type { InvoiceSettingsSx } from "./invoiceSettings.styles";
+
+export function InvoiceSettingsPayments(props: {
+  m: { navy: string };
+  sx: InvoiceSettingsSx;
+  showDueDateSettings: boolean;
+  paymentsEditing: boolean;
+  setPaymentsEditing: React.Dispatch<React.SetStateAction<boolean>>;
+  settings: Pick<FinanceInvoiceSettings, "paymentTerms" | "reminders">;
+  updatePaymentTerm: (key: keyof FinanceInvoiceSettings["paymentTerms"], value: string) => void;
+  updateReminder: (key: keyof FinanceInvoiceSettings["reminders"], value: string) => void;
+}) {
+  const {
+    m,
+    sx: { sectionCardSx, headerSx, formPanelSx, rowLabelSx },
+    showDueDateSettings,
+    paymentsEditing,
+    setPaymentsEditing,
+    settings,
+    updatePaymentTerm,
+    updateReminder,
+  } = props;
+
+  return (
+            <Box
+              sx={{
+                ...sectionCardSx,
+                boxShadow: "none",
+                display: showDueDateSettings ? "block" : "none",
+              }}
+            >
+              <Box sx={headerSx}>
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                >
+                  <CardTitle sx={mollureSectionTitleSx(m.navy)}>
+                    Payments And Reminders
+                  </CardTitle>
+                  <IconButton
+                    size="small"
+                    onClick={() => setPaymentsEditing((v) => !v)}
+                    sx={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: "8px",
+                      border: `1px solid ${alpha(m.navy, 0.1)}`,
+                      bgcolor: alpha(m.navy, 0.02),
+                      color: alpha(m.navy, 0.55),
+                      "&:hover": { bgcolor: alpha(m.navy, 0.04) },
+                    }}
+                  >
+                    {paymentsEditing ? (
+                      <CheckRoundedIcon sx={{ fontSize: 16 }} />
+                    ) : (
+                      <EditRoundedIcon sx={{ fontSize: 16 }} />
+                    )}
+                  </IconButton>
+                </Stack>
+              </Box>
+              <Box sx={{ p: 2 }}>
+                <Stack spacing={2}>
+                  <Box>
+                    <CardTitle sx={mollureSectionTitleSx(m.navy)}>
+                      Payment Terms
+                    </CardTitle>
+                    <Box sx={{ mt: 1.25, ...formPanelSx, bgcolor: "#fff" }}>
+                      <BodyText sx={mollureLabelSx(m.navy)}>
+                        Original Invoice
+                      </BodyText>
+
+                      <Stack spacing={1.25} sx={{ mt: 1.25 }}>
+                        <Stack
+                          direction={{ xs: "column", md: "row" }}
+                          spacing={1.25}
+                          alignItems={{ md: "flex-start" }}
+                        >
+                          <BodyText sx={rowLabelSx}>Due Date:</BodyText>
+                          <Stack
+                            direction={{ xs: "column", sm: "row" }}
+                            spacing={1.25}
+                            sx={{ flex: 1 }}
+                          >
+                            <MollureFormField
+                              disabled={!paymentsEditing}
+                              value={settings.paymentTerms.originalDueValue}
+                              onChange={(e) =>
+                                updatePaymentTerm(
+                                  "originalDueValue",
+                                  e.target.value,
+                                )
+                              }
+                            />
+                            <MollureFormField
+                              disabled={!paymentsEditing}
+                              value={settings.paymentTerms.originalDueUnit}
+                              onChange={(e) =>
+                                updatePaymentTerm(
+                                  "originalDueUnit",
+                                  e.target.value,
+                                )
+                              }
+                            />
+                          </Stack>
+                        </Stack>
+
+                        <Stack
+                          direction={{ xs: "column", md: "row" }}
+                          spacing={1.25}
+                          alignItems={{ md: "flex-start" }}
+                        >
+                          <BodyText sx={rowLabelSx}>Penalty Fee</BodyText>
+                          <Stack
+                            direction={{ xs: "column", sm: "row" }}
+                            spacing={1.25}
+                            sx={{ flex: 1 }}
+                          >
+                            <MollureFormField
+                              disabled={!paymentsEditing}
+                              value={settings.paymentTerms.originalPenaltyValue}
+                              onChange={(e) =>
+                                updatePaymentTerm(
+                                  "originalPenaltyValue",
+                                  e.target.value,
+                                )
+                              }
+                            />
+                            <MollureFormField
+                              disabled={!paymentsEditing}
+                              value={settings.paymentTerms.originalPenaltyUnit}
+                              onChange={(e) =>
+                                updatePaymentTerm(
+                                  "originalPenaltyUnit",
+                                  e.target.value,
+                                )
+                              }
+                            />
+                          </Stack>
+                        </Stack>
+                      </Stack>
+
+                      <BodyText sx={mollureLabelSx(m.navy, { mt: 2 })}>
+                        First Reissue
+                      </BodyText>
+                      <Stack spacing={1.25} sx={{ mt: 1.25 }}>
+                        <Stack
+                          direction={{ xs: "column", md: "row" }}
+                          spacing={1.25}
+                          alignItems={{ md: "flex-start" }}
+                        >
+                          <BodyText sx={rowLabelSx}>Trigger:</BodyText>
+                          <MollureFormField
+                            disabled={!paymentsEditing}
+                            value={settings.paymentTerms.firstReissueTrigger}
+                            onChange={(e) =>
+                              updatePaymentTerm(
+                                "firstReissueTrigger",
+                                e.target.value,
+                              )
+                            }
+                          />
+                        </Stack>
+
+                        <Stack
+                          direction={{ xs: "column", md: "row" }}
+                          spacing={1.25}
+                          alignItems={{ md: "flex-start" }}
+                        >
+                          <BodyText sx={rowLabelSx}>Due Date:</BodyText>
+                          <Stack
+                            direction={{ xs: "column", sm: "row" }}
+                            spacing={1.25}
+                            sx={{ flex: 1 }}
+                          >
+                            <MollureFormField
+                              disabled={!paymentsEditing}
+                              value={settings.paymentTerms.firstReissueDueValue}
+                              onChange={(e) =>
+                                updatePaymentTerm(
+                                  "firstReissueDueValue",
+                                  e.target.value,
+                                )
+                              }
+                            />
+                            <MollureFormField
+                              disabled={!paymentsEditing}
+                              value={settings.paymentTerms.firstReissueDueUnit}
+                              onChange={(e) =>
+                                updatePaymentTerm(
+                                  "firstReissueDueUnit",
+                                  e.target.value,
+                                )
+                              }
+                            />
+                          </Stack>
+                        </Stack>
+
+                        <Stack
+                          direction={{ xs: "column", md: "row" }}
+                          spacing={1.25}
+                          alignItems={{ md: "flex-start" }}
+                        >
+                          <BodyText sx={rowLabelSx}>Penalty Fee</BodyText>
+                          <Stack
+                            direction={{ xs: "column", sm: "row" }}
+                            spacing={1.25}
+                            sx={{ flex: 1 }}
+                          >
+                            <MollureFormField
+                              disabled={!paymentsEditing}
+                              value={
+                                settings.paymentTerms.firstReissuePenaltyValue
+                              }
+                              onChange={(e) =>
+                                updatePaymentTerm(
+                                  "firstReissuePenaltyValue",
+                                  e.target.value,
+                                )
+                              }
+                            />
+                            <MollureFormField
+                              disabled={!paymentsEditing}
+                              value={
+                                settings.paymentTerms.firstReissuePenaltyUnit
+                              }
+                              onChange={(e) =>
+                                updatePaymentTerm(
+                                  "firstReissuePenaltyUnit",
+                                  e.target.value,
+                                )
+                              }
+                            />
+                          </Stack>
+                        </Stack>
+                      </Stack>
+
+                      <BodyText sx={mollureLabelSx(m.navy, { mt: 2 })}>
+                        Second Reissue
+                      </BodyText>
+                      <Stack spacing={1.25} sx={{ mt: 1.25 }}>
+                        <Stack
+                          direction={{ xs: "column", md: "row" }}
+                          spacing={1.25}
+                          alignItems={{ md: "flex-start" }}
+                        >
+                          <BodyText sx={rowLabelSx}>Trigger:</BodyText>
+                          <MollureFormField
+                            disabled={!paymentsEditing}
+                            value={settings.paymentTerms.secondReissueTrigger}
+                            onChange={(e) =>
+                              updatePaymentTerm(
+                                "secondReissueTrigger",
+                                e.target.value,
+                              )
+                            }
+                          />
+                        </Stack>
+
+                        <Stack
+                          direction={{ xs: "column", md: "row" }}
+                          spacing={1.25}
+                          alignItems={{ md: "flex-start" }}
+                        >
+                          <BodyText sx={rowLabelSx}>Due Date:</BodyText>
+                          <Stack
+                            direction={{ xs: "column", sm: "row" }}
+                            spacing={1.25}
+                            sx={{ flex: 1 }}
+                          >
+                            <MollureFormField
+                              disabled={!paymentsEditing}
+                              value={
+                                settings.paymentTerms.secondReissueDueValue
+                              }
+                              onChange={(e) =>
+                                updatePaymentTerm(
+                                  "secondReissueDueValue",
+                                  e.target.value,
+                                )
+                              }
+                            />
+                            <MollureFormField
+                              disabled={!paymentsEditing}
+                              value={settings.paymentTerms.secondReissueDueUnit}
+                              onChange={(e) =>
+                                updatePaymentTerm(
+                                  "secondReissueDueUnit",
+                                  e.target.value,
+                                )
+                              }
+                            />
+                          </Stack>
+                        </Stack>
+
+                        <Stack
+                          direction={{ xs: "column", md: "row" }}
+                          spacing={1.25}
+                          alignItems={{ md: "flex-start" }}
+                        >
+                          <BodyText sx={rowLabelSx}>Penalty Fee</BodyText>
+                          <Stack
+                            direction={{ xs: "column", sm: "row" }}
+                            spacing={1.25}
+                            sx={{ flex: 1 }}
+                          >
+                            <MollureFormField
+                              disabled={!paymentsEditing}
+                              value={
+                                settings.paymentTerms.secondReissuePenaltyValue
+                              }
+                              onChange={(e) =>
+                                updatePaymentTerm(
+                                  "secondReissuePenaltyValue",
+                                  e.target.value,
+                                )
+                              }
+                            />
+                            <MollureFormField
+                              disabled={!paymentsEditing}
+                              value={
+                                settings.paymentTerms.secondReissuePenaltyUnit
+                              }
+                              onChange={(e) =>
+                                updatePaymentTerm(
+                                  "secondReissuePenaltyUnit",
+                                  e.target.value,
+                                )
+                              }
+                            />
+                          </Stack>
+                        </Stack>
+                      </Stack>
+                    </Box>
+                  </Box>
+
+                  <Box>
+                    <CardTitle sx={mollureSectionTitleSx(m.navy)}>
+                      Invoice Reminders
+                    </CardTitle>
+                    <Box sx={{ mt: 1.25, ...formPanelSx, bgcolor: "#fff" }}>
+                      <Stack
+                        direction={{ xs: "column", md: "row" }}
+                        spacing={1.25}
+                        sx={{ mt: 0.25 }}
+                      >
+                        <BodyText sx={rowLabelSx}>Reminder 1</BodyText>
+                        <Stack
+                          direction={{ xs: "column", sm: "row" }}
+                          spacing={1.25}
+                          sx={{ flex: 1 }}
+                        >
+                          <MollureFormField
+                            disabled={!paymentsEditing}
+                            value={settings.reminders.reminder1Value}
+                            onChange={(e) =>
+                              updateReminder("reminder1Value", e.target.value)
+                            }
+                          />
+                          <MollureFormField
+                            disabled={!paymentsEditing}
+                            value={settings.reminders.reminder1Unit}
+                            onChange={(e) =>
+                              updateReminder("reminder1Unit", e.target.value)
+                            }
+                          />
+                        </Stack>
+                      </Stack>
+                      <Stack
+                        direction={{ xs: "column", md: "row" }}
+                        spacing={1.25}
+                        sx={{ mt: 1.25 }}
+                      >
+                        <BodyText sx={rowLabelSx}>Reminder 2</BodyText>
+                        <Stack
+                          direction={{ xs: "column", sm: "row" }}
+                          spacing={1.25}
+                          sx={{ flex: 1 }}
+                        >
+                          <MollureFormField
+                            disabled={!paymentsEditing}
+                            value={settings.reminders.reminder2Value}
+                            onChange={(e) =>
+                              updateReminder("reminder2Value", e.target.value)
+                            }
+                          />
+                          <MollureFormField
+                            disabled={!paymentsEditing}
+                            value={settings.reminders.reminder2Unit}
+                            onChange={(e) =>
+                              updateReminder("reminder2Unit", e.target.value)
+                            }
+                          />
+                        </Stack>
+                      </Stack>
+                    </Box>
+                  </Box>
+                </Stack>
+              </Box>
+            </Box>
+  );
+}

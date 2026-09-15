@@ -8,22 +8,13 @@ import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText, CardTitle } from "../../ui/typography";
 import { useAppSelector } from "../../../store/hooks";
 import { getPersistedAuthSession } from "../../../lib/auth-storage";
+import { getProfileMenuInitials } from "../profileMenu.shared";
 
 export type AuthAwareHeaderProps = {
   signupLabel?: string;
   signupHref?: string;
   withDivider?: boolean;
 };
-
-function getInitials(emailOrName?: string) {
-  const base = (emailOrName ?? "").trim();
-  if (!base) return "U";
-  const cleaned = base.split("@")[0] ?? base;
-  const parts = cleaned.split(/[._\s-]+/).filter(Boolean);
-  const a = (parts[0]?.[0] ?? "U").toUpperCase();
-  const b = (parts[1]?.[0] ?? "").toUpperCase();
-  return `${a}${b}`.slice(0, 2);
-}
 
 export default function AuthAwareHeader({
   signupLabel = "signup",
@@ -84,7 +75,7 @@ export default function AuthAwareHeader({
                   fontSize: 12,
                 }}
               >
-                {getInitials(userLabel)}
+                {getProfileMenuInitials(userLabel)}
               </Avatar>
             ) : (
               <AppButton

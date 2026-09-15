@@ -3,13 +3,8 @@
 import * as React from "react";
 import { Box, Divider, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-
-function formatEuro(amount: number) {
-  const rounded = Math.round((amount + Number.EPSILON) * 100) / 100;
-  const abs = Math.abs(rounded);
-  const formatted = Number.isInteger(abs) ? `€${abs}` : `€${abs.toFixed(2)}`;
-  return rounded < 0 ? `-${formatted}` : formatted;
-}
+import { mollureSectionTitleSx } from "../../../theme/mollureHierarchy";
+import { formatCompactEuro } from "../booking-finance/formatBookingFinance";
 
 export type BookingPriceSummaryLine = {
   label: string;
@@ -53,11 +48,15 @@ function SummaryRow({
       spacing={1}
     >
       <Typography
-        sx={{
-          fontWeight: emphasize ? 900 : 600,
-          fontSize: emphasize ? 16 : 13,
-          color: emphasize ? m.headingText : alpha(m.navy, muted ? 0.55 : 0.68),
-        }}
+        sx={
+          emphasize
+            ? mollureSectionTitleSx(m.navy, { color: m.headingText })
+            : {
+                fontWeight: 600,
+                fontSize: 13,
+                color: alpha(m.navy, muted ? 0.55 : 0.68),
+              }
+        }
       >
         {label}
       </Typography>
@@ -69,11 +68,15 @@ function SummaryRow({
       >
         {action}
         <Typography
-          sx={{
-            fontWeight: emphasize ? 900 : 700,
-            fontSize: emphasize ? 18 : 13,
-            color: muted ? alpha(m.navy, 0.55) : m.headingText,
-          }}
+          sx={
+            emphasize
+              ? mollureSectionTitleSx(m.navy, { color: m.headingText })
+              : {
+                  fontWeight: 700,
+                  fontSize: 13,
+                  color: muted ? alpha(m.navy, 0.55) : m.headingText,
+                }
+          }
         >
           {value}
         </Typography>
@@ -130,8 +133,8 @@ export default function BookingTotalPriceCard({
               muted={line.kind === "subtract"}
               value={
                 line.kind === "subtract"
-                  ? `-${formatEuro(line.amount)}`
-                  : formatEuro(line.amount)
+                  ? `-${formatCompactEuro(line.amount)}`
+                  : formatCompactEuro(line.amount)
               }
             />
           ))}
@@ -142,14 +145,14 @@ export default function BookingTotalPriceCard({
         <Stack spacing={0.7}>
           <SummaryRow
             label={prepaidLabel}
-            value={formatEuro(prepaidAmount)}
+            value={formatCompactEuro(prepaidAmount)}
             action={prepaidAction}
             muted
           />
           {renderRemaining ? (
             <SummaryRow
               label="Remaining"
-              value={formatEuro(remaining)}
+              value={formatCompactEuro(remaining)}
               muted
             />
           ) : null}
@@ -167,12 +170,10 @@ export default function BookingTotalPriceCard({
         spacing={1.5}
       >
         <Typography
-          sx={{
-            fontWeight: 900,
-            fontSize: 16,
+          sx={mollureSectionTitleSx(m.navy, {
             color: m.headingText,
             flexShrink: 0,
-          }}
+          })}
         >
           Total Price
         </Typography>
@@ -187,18 +188,16 @@ export default function BookingTotalPriceCard({
                 lineHeight: 1.2,
               }}
             >
-              {formatEuro(originalPrice)}
+              {formatCompactEuro(originalPrice)}
             </Typography>
           ) : null}
           <Typography
-            sx={{
-              fontWeight: 900,
-              fontSize: 18,
+            sx={mollureSectionTitleSx(m.navy, {
               color: m.headingText,
               lineHeight: 1.2,
-            }}
+            })}
           >
-            {formatEuro(totalPrice)}
+            {formatCompactEuro(totalPrice)}
           </Typography>
           {discountAmount > 0 ? (
             <Typography
@@ -210,7 +209,7 @@ export default function BookingTotalPriceCard({
                 textAlign: "right",
               }}
             >
-              Discount on total price applied {formatEuro(discountAmount)}
+              Discount on total price applied {formatCompactEuro(discountAmount)}
             </Typography>
           ) : null}
         </Stack>

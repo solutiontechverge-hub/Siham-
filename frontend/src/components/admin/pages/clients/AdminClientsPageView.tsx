@@ -30,6 +30,12 @@ import NoteAddOutlinedIcon from "@mui/icons-material/NoteAddOutlined";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { alpha, useTheme } from "@mui/material/styles";
 import {
+  mollureSectionTitleSx,
+  mollureLabelSx,
+  mollureBodySx,
+  mollureBodyMutedSx,
+} from "../../../../theme/mollureHierarchy";
+import {
   AppButton,
   AppMultiSelect,
   AppPagination,
@@ -85,7 +91,7 @@ function ClientTypeCell({ type }: { type: MockClient["type"] }) {
       >
         {type}
       </Box>
-      <Typography sx={{ fontSize: 12, fontWeight: 500, color: tokens.navy }}>
+      <Typography sx={mollureBodyMutedSx(tokens.navy, { fontWeight: 500, color: tokens.navy })}>
         {isIC ? "Individual Client" : "Company Client"}
       </Typography>
     </Stack>
@@ -103,17 +109,11 @@ function DetailRow({
   return (
     <Stack spacing={0.35}>
       <Typography
-        sx={{
-          fontSize: 11,
-          fontWeight: 600,
-          color: tokens.slate,
-          textTransform: "uppercase",
-          letterSpacing: "0.04em",
-        }}
+        sx={mollureLabelSx(tokens.navy, { fontSize: 11, fontWeight: 600, color: tokens.slate, textTransform: "uppercase", letterSpacing: "0.04em" })}
       >
         {label}
       </Typography>
-      <Typography sx={{ fontSize: 14, color: tokens.navy }}>{value}</Typography>
+      <Typography sx={mollureBodySx(tokens.navy, { color: tokens.navy })}>{value}</Typography>
     </Stack>
   );
 }
@@ -302,11 +302,11 @@ export default function AdminClientsPageView() {
       render: (r) => (
         <Stack spacing={0.25}>
           <Typography
-            sx={{ fontSize: 13, fontWeight: 500, color: tokens.navy }}
+            sx={mollureBodyMutedSx(tokens.navy, { fontWeight: 500, color: tokens.navy })}
           >
             {formatDisplayDate(r.registrationDate)}
           </Typography>
-          <Typography sx={{ fontSize: 11, color: tokens.bodyText }}>
+          <Typography sx={mollureBodyMutedSx(tokens.navy, { fontSize: 11, color: tokens.bodyText })}>
             {r.registrationTime}
           </Typography>
         </Stack>
@@ -334,14 +334,14 @@ export default function AdminClientsPageView() {
           </Avatar>
           <Stack spacing={0.25} sx={{ minWidth: 0 }}>
             <Typography
-              sx={{ fontSize: 13, fontWeight: 600, color: tokens.navy }}
+              sx={mollureLabelSx(tokens.navy, { fontWeight: 600, color: tokens.navy })}
             >
               {r.name}
             </Typography>
-            <Typography sx={{ fontSize: 11, color: tokens.bodyText }}>
+            <Typography sx={mollureBodyMutedSx(tokens.navy, { fontSize: 11, color: tokens.bodyText })}>
               {r.email}
             </Typography>
-            <Typography sx={{ fontSize: 11, color: tokens.bodyText }}>
+            <Typography sx={mollureBodyMutedSx(tokens.navy, { fontSize: 11, color: tokens.bodyText })}>
               {r.phone}
             </Typography>
           </Stack>
@@ -361,11 +361,11 @@ export default function AdminClientsPageView() {
       render: (r) => (
         <Stack spacing={0.25}>
           <Typography
-            sx={{ fontSize: 13, fontWeight: 500, color: tokens.navy }}
+            sx={mollureBodyMutedSx(tokens.navy, { fontWeight: 500, color: tokens.navy })}
           >
             {formatDisplayDate(r.lastBookingDate)}
           </Typography>
-          <Typography sx={{ fontSize: 11, color: tokens.bodyText }}>
+          <Typography sx={mollureBodyMutedSx(tokens.navy, { fontSize: 11, color: tokens.bodyText })}>
             {r.lastBookingTime}
           </Typography>
         </Stack>
@@ -440,17 +440,12 @@ export default function AdminClientsPageView() {
         <Typography
           component={Link}
           href="/admin/dashboard"
-          sx={{
-            fontSize: 12,
-            color: tokens.bodyText,
-            textDecoration: "none",
-            "&:hover": { color: tokens.teal },
-          }}
+          sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText, textDecoration: "none", "&:hover": { color: tokens.teal } })}
         >
           Home
         </Typography>
-        <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>/</Typography>
-        <Typography sx={{ fontSize: 12, color: tokens.navy, fontWeight: 500 }}>
+        <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText })}>/</Typography>
+        <Typography sx={mollureBodyMutedSx(tokens.navy, { fontWeight: 500, color: tokens.navy })}>
           Client Management
         </Typography>
       </Stack>
@@ -630,7 +625,7 @@ export default function AdminClientsPageView() {
 
           {exportNotice ? (
             <Typography
-              sx={{ fontSize: 12, color: tokens.tealDark, fontWeight: 500 }}
+              sx={mollureBodyMutedSx(tokens.navy, { fontWeight: 500, color: tokens.tealDark })}
             >
               {exportNotice}
             </Typography>
@@ -651,7 +646,7 @@ export default function AdminClientsPageView() {
           }}
         >
           <Typography
-            sx={{ fontSize: 13, fontWeight: 600, color: tokens.navy }}
+            sx={mollureLabelSx(tokens.navy, { fontWeight: 600, color: tokens.navy })}
           >
             Total Clients:{" "}
             <Box component="span" sx={{ fontWeight: 700 }}>
@@ -659,23 +654,14 @@ export default function AdminClientsPageView() {
             </Box>
           </Typography>
           <Stack direction="row" alignItems="center" spacing={1}>
-            <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>
+            <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText })}>
               {selected.size} selected
             </Typography>
             {selected.size > 0 ? (
               <Typography
                 component="button"
                 onClick={clearSelection}
-                sx={{
-                  border: 0,
-                  bgcolor: "transparent",
-                  cursor: "pointer",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: tokens.teal,
-                  p: 0,
-                  "&:hover": { textDecoration: "underline" },
-                }}
+                sx={mollureLabelSx(tokens.navy, { fontWeight: 600, border: 0, bgcolor: "transparent", cursor: "pointer", color: tokens.teal, p: 0, "&:hover": { textDecoration: "underline" } })}
               >
                 Clear
               </Typography>
@@ -719,7 +705,7 @@ export default function AdminClientsPageView() {
             borderTop: `1px solid ${tokens.cardBorder}`,
           }}
         >
-          <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>
+          <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText })}>
             Showing {showingFrom.toLocaleString()} to{" "}
             {showingTo.toLocaleString()} of {filtered.length.toLocaleString()}{" "}
             results
@@ -789,13 +775,7 @@ export default function AdminClientsPageView() {
       </AdminSectionCard>
 
       <Typography
-        sx={{
-          textAlign: "center",
-          fontSize: 11,
-          color: tokens.slate,
-          mt: 2.5,
-          pb: 1,
-        }}
+        sx={mollureBodyMutedSx(tokens.navy, { fontSize: 11, textAlign: "center", color: tokens.slate, mt: 2.5, pb: 1 })}
       >
         Â© 2025 Molur. All rights reserved.
       </Typography>
@@ -844,7 +824,7 @@ export default function AdminClientsPageView() {
                   </Avatar>
                   <Box>
                     <Typography
-                      sx={{ fontSize: 16, fontWeight: 600, color: tokens.navy }}
+                      sx={mollureSectionTitleSx(tokens.navy, { fontWeight: 600, color: tokens.navy })}
                     >
                       {activeClient.name}
                     </Typography>
@@ -917,12 +897,7 @@ export default function AdminClientsPageView() {
                 sx={{ fontSize: 56, color: "#E85D5D", mb: 1.75 }}
               />
               <Typography
-                sx={{
-                  fontWeight: 700,
-                  fontSize: 14,
-                  color: alpha(tokens.navy, 0.88),
-                  lineHeight: 1.55,
-                }}
+                sx={mollureBodySx(tokens.navy, { fontSize: 14, color: alpha(tokens.navy, 0.88), lineHeight: 1.55 })}
               >
                 {isDisabling
                   ? `Are you sure you want to disable ${activeClient?.name}? They will no longer be able to book services.`
@@ -964,12 +939,7 @@ export default function AdminClientsPageView() {
                 sx={{ fontSize: 56, color: "#E85D5D", mb: 1.75 }}
               />
               <Typography
-                sx={{
-                  fontWeight: 700,
-                  fontSize: 14,
-                  color: alpha(tokens.navy, 0.88),
-                  lineHeight: 1.55,
-                }}
+                sx={mollureBodySx(tokens.navy, { fontSize: 14, color: alpha(tokens.navy, 0.88), lineHeight: 1.55 })}
               >
                 Are you sure you want to delete {activeClient?.name}? This will
                 permanently remove the client from the list.
@@ -997,7 +967,7 @@ export default function AdminClientsPageView() {
             }
           >
             <Stack spacing={1.5} sx={{ p: 2.5 }}>
-              <Typography sx={{ fontSize: 13, color: tokens.bodyText }}>
+              <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText })}>
                 {activeClient?.name}
               </Typography>
               <AppTextField

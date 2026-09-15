@@ -19,6 +19,11 @@ import EventAvailableOutlinedIcon from "@mui/icons-material/EventAvailableOutlin
 import { alpha, useTheme } from "@mui/material/styles";
 import AdminSectionCard from "../../AdminSectionCard";
 import { ADMIN_CARD_PADDING as pad } from "../../adminCardPadding";
+import {
+  mollureLabelSx,
+  mollureBodySx,
+  mollureBodyMutedSx,
+} from "../../../../theme/mollureHierarchy";
 import { FACTOR_ICONS, IMPACT_STYLES } from "./listing-ranking.data";
 import type { AdminListingRankingPageProps } from "./listing-ranking.types";
 import { useAdminListingRankingPage } from "./useAdminListingRankingPage";
@@ -52,20 +57,24 @@ export default function AdminListingRankingPageView({
             <Typography
               component={Link}
               href="/admin/dashboard"
-              sx={{
-                fontSize: 12,
+              sx={mollureBodyMutedSx(tokens.navy, {
                 color: tokens.bodyText,
                 textDecoration: "none",
                 "&:hover": { color: tokens.teal },
-              }}
+              })}
             >
               Home
             </Typography>
-            <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>
+            <Typography
+              sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText })}
+            >
               /
             </Typography>
             <Typography
-              sx={{ fontSize: 12, color: tokens.navy, fontWeight: 500 }}
+              sx={mollureBodySx(tokens.navy, {
+                color: tokens.navy,
+                fontWeight: 500,
+              })}
             >
               Listing & Ranking Management
             </Typography>
@@ -83,7 +92,10 @@ export default function AdminListingRankingPageView({
               Listing & Ranking Management
             </Typography>
             <Typography
-              sx={{ fontSize: 14, color: tokens.bodyText, maxWidth: 640 }}
+              sx={mollureBodySx(tokens.navy, {
+                color: tokens.bodyText,
+                maxWidth: 640,
+              })}
             >
               Ranking weights are set by the platform. Drag rows to adjust
               factor priority order.
@@ -118,9 +130,10 @@ export default function AdminListingRankingPageView({
                     <TableCell
                       key={col || "drag"}
                       sx={{
-                        fontWeight: 600,
-                        fontSize: 12,
-                        color: tokens.slate,
+                        ...mollureLabelSx(tokens.navy, {
+                          fontWeight: 600,
+                          color: tokens.slate,
+                        }),
                         py: 1.5,
                         px: pad.tableCellX,
                         borderColor: tokens.cardBorder,
@@ -158,8 +171,9 @@ export default function AdminListingRankingPageView({
                       sx={{
                         px: pad.tableCellX,
                         borderColor: tokens.cardBorder,
-                        color: tokens.slate,
-                        fontSize: 13,
+                        ...mollureBodyMutedSx(tokens.navy, {
+                          color: tokens.slate,
+                        }),
                       }}
                     >
                       {index + 1}
@@ -187,11 +201,10 @@ export default function AdminListingRankingPageView({
                           <Icon sx={{ fontSize: 18 }} />
                         </Box>
                         <Typography
-                          sx={{
-                            fontSize: 13,
+                          sx={mollureLabelSx(tokens.navy, {
                             fontWeight: 600,
                             color: tokens.navy,
-                          }}
+                          })}
                         >
                           {factor.label}
                         </Typography>
@@ -205,11 +218,10 @@ export default function AdminListingRankingPageView({
                       }}
                     >
                       <Typography
-                        sx={{
-                          fontSize: 12,
+                        sx={mollureBodyMutedSx(tokens.navy, {
                           color: tokens.bodyText,
                           lineHeight: 1.45,
-                        }}
+                        })}
                       >
                         {factor.description}
                       </Typography>
@@ -263,11 +275,10 @@ export default function AdminListingRankingPageView({
                           }}
                         >
                           <Typography
-                            sx={{
-                              fontSize: 13,
+                            sx={mollureBodySx(tokens.navy, {
                               fontWeight: 500,
                               color: tokens.slate,
-                            }}
+                            })}
                           >
                             {factor.weight}%
                           </Typography>
