@@ -11,6 +11,9 @@ import { useClientBookingCreateContinue } from "./useClientBookingCreatePage.dra
 import {
   getActiveBookingSession,
 } from "./clientBookingSession";
+import {
+  writeClientBookingCreateUiDraft,
+} from "./clientBookingCreateUiDraft";
 import { useSnackbar } from "../../../components/common/AppSnackbar";
 import {
   getServicesForLocationMode,
@@ -151,11 +154,15 @@ export function useClientBookingCreatePage() {
   );
 
   React.useEffect(() => {
-    setPeople((prev) =>
-      prev.map((p) =>
-        p.isRequester ? { ...p, name: requesterDisplayName } : p,
-      ),
-    );
+    setPeople((prev) => {
+      let changed = false;
+      const next = prev.map((p) => {
+        if (!p.isRequester || p.name === requesterDisplayName) return p;
+        changed = true;
+        return { ...p, name: requesterDisplayName };
+      });
+      return changed ? next : prev;
+    });
   }, [requesterDisplayName]);
 
   const [shopTeamMembers, setShopTeamMembers] = React.useState<
@@ -265,12 +272,13 @@ export function useClientBookingCreatePage() {
     [isDesiredLocation],
   );
 
+  const selectedDateISO = toISO(selectedDate);
+
   const catalogByTeamMemberId = React.useMemo<
     Record<string, CatalogService[]>
   >(() => {
     if (!shop?.shopId || !profileHydrated || !businessProfile) return {};
 
-    const bookingDateIso = toISO(selectedDate);
     const locationCatalog = getServicesForLocationMode(
       businessProfile,
       locationMode,
@@ -279,7 +287,7 @@ export function useClientBookingCreatePage() {
       id: s.id,
       name: s.name,
       durationMins: s.durationMins,
-      ...pricePublicProfileServiceOnDate(s, bookingDateIso),
+      ...pricePublicProfileServiceOnDate(s, selectedDateISO),
     }));
     const fallbackByName = new Map(
       fallbackItems.map((item) => [item.name.trim().toLowerCase(), item]),
@@ -309,7 +317,7 @@ export function useClientBookingCreatePage() {
               .toLowerCase(),
           );
           const priced = matched
-            ? pricePublicProfileServiceOnDate(matched, bookingDateIso)
+            ? pricePublicProfileServiceOnDate(matched, selectedDateISO)
             : {
                 price: fallbackMatch?.price ?? 0,
                 originalPrice: fallbackMatch?.originalPrice,
@@ -333,7 +341,7 @@ export function useClientBookingCreatePage() {
     profileHydrated,
     shop?.shopId,
     shopTeamMembers,
-    selectedDate,
+    selectedDateISO,
   ]);
 
   /** Location catalog when the pro has no selectable team members for this mode. */
@@ -344,13 +352,34 @@ export function useClientBookingCreatePage() {
         id: s.id,
         name: s.name,
         durationMins: s.durationMins,
-        ...pricePublicProfileServiceOnDate(s, toISO(selectedDate)),
+        ...pricePublicProfileServiceOnDate(s, selectedDateISO),
       }),
     );
-  }, [businessProfile, locationMode, profileHydrated, selectedDate, shop?.shopId]);
+  }, [
+    businessProfile,
+    locationMode,
+    profileHydrated,
+    selectedDateISO,
+    shop?.shopId,
+  ]);
+
+  // Content key — catalog array identity churn must not re-fire price sync.
+  const locationCatalogPriceKey = React.useMemo(
+    () =>
+      locationServiceCatalog
+        .map(
+          (s) =>
+            `${s.id}:${s.price}:${s.originalPrice ?? ""}:${s.discountPct ?? ""}`,
+        )
+        .join("|"),
+    [locationServiceCatalog],
+  );
+  const locationServiceCatalogRef = React.useRef(locationServiceCatalog);
+  locationServiceCatalogRef.current = locationServiceCatalog;
 
   React.useEffect(() => {
-    if (!locationServiceCatalog.length) return;
+    const catalogList = locationServiceCatalogRef.current;
+    if (!catalogList.length) return;
     setServices((prev) => {
       if (!prev.length) return prev;
       let changed = false;
@@ -360,9 +389,9 @@ export function useClientBookingCreatePage() {
           extractUuidFromSyntheticId(service.id) ||
           service.id;
         const catalog =
-          locationServiceCatalog.find((item) => item.id === catalogId) ||
-          locationServiceCatalog.find((item) => item.id === service.id) ||
-          locationServiceCatalog.find((item) => item.name === service.name);
+          catalogList.find((item) => item.id === catalogId) ||
+          catalogList.find((item) => item.id === service.id) ||
+          catalogList.find((item) => item.name === service.name);
         if (!catalog) return service;
         if (
           catalog.price === service.price &&
@@ -381,7 +410,7 @@ export function useClientBookingCreatePage() {
       });
       return changed ? next : prev;
     });
-  }, [locationServiceCatalog]);
+  }, [locationCatalogPriceKey]);
 
   const isPlanningPerson = React.useCallback(
     (p: BookingPerson) =>
@@ -548,6 +577,7 @@ export function useClientBookingCreatePage() {
     guestNameById,
     teamMemberChipLabelForItems,
     teamMemberFirstName,
+    resolveServiceTeamMemberId,
     resolveServiceTeamMemberName,
     summarySections,
   } = useClientBookingCreateSummary({
@@ -630,6 +660,62 @@ export function useClientBookingCreatePage() {
     hydrationSignatureRef,
   });
 
+  // Autosave create UI so reload / leave restores the same Booking Details state.
+  React.useEffect(() => {
+    if (!profileHydrated || isEbrSuggest || !shop?.shopId) return;
+    if (!services.length && people.length <= 1) return;
+    writeClientBookingCreateUiDraft({
+      shopId: shop.shopId,
+      shopName: shop.shopName,
+      municipalityLabel: shop.municipalityLabel,
+      addressLabel: shop.addressLabel,
+      locationMode: shop.locationMode,
+      hydrationToken: profileHydrationToken,
+      selectedDateISO: toISO(selectedDate),
+      selectedTime,
+      combineServices,
+      people,
+      services,
+      shopTeamMembers,
+      selectedPersonId,
+      selectedTeamMemberId,
+      serviceTab,
+      selectedServiceIds,
+      bookingProjectEnabled,
+      projectDescription,
+      projectUploads: projectUploads.map((u) => ({
+        id: u.id,
+        name: u.name,
+        previewUrl: u.previewUrl,
+      })),
+      clientNote,
+      desiredVisitAddress,
+      total,
+      savedAt: new Date().toISOString(),
+    });
+  }, [
+    bookingProjectEnabled,
+    clientNote,
+    combineServices,
+    desiredVisitAddress,
+    isEbrSuggest,
+    people,
+    profileHydrated,
+    profileHydrationToken,
+    projectDescription,
+    projectUploads,
+    selectedDate,
+    selectedPersonId,
+    selectedServiceIds,
+    selectedTeamMemberId,
+    selectedTime,
+    serviceTab,
+    services,
+    shop,
+    shopTeamMembers,
+    total,
+  ]);
+
     React.useEffect(() => {
     if (!businessProfile || !profileHydrated) return;
     const apiTeam = getTeamForLocationMode(businessProfile, locationMode).map(
@@ -664,13 +750,17 @@ export function useClientBookingCreatePage() {
       return;
     }
     setSelectedTeamMemberId(fallbackId);
-    setServices((prev) =>
-      prev.map((s) => ({
-        ...s,
+    setServices((prev) => {
+      let changed = false;
+      const next = prev.map((s) => {
+        const teamMemberId = s.teamMemberId || fallbackId;
+        if (teamMemberId === s.teamMemberId) return s;
+        changed = true;
         // Stamp TM without moving Unassigned → Assigned.
-        teamMemberId: s.teamMemberId || fallbackId,
-      })),
-    );
+        return { ...s, teamMemberId };
+      });
+      return changed ? next : prev;
+    });
   }, [filteredTeamMembers, selectedTeamMemberId]);
 
   const { onContinue } = useClientBookingCreateContinue({
@@ -903,6 +993,7 @@ export function useClientBookingCreatePage() {
     guestNameById,
     teamMemberChipLabelForItems,
     teamMemberFirstName,
+    resolveServiceTeamMemberId,
     resolveServiceTeamMemberName,
     summarySections,
     applyProfileSelection,

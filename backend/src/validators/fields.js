@@ -16,6 +16,8 @@ export const LIMITS = {
   textShort: 120,
   textMedium: 500,
   textLong: 5000,
+  /** Human optional notes: min when non-empty; no app max (`max: null` on textBody). */
+  notesMin: 5,
   uuid: 36,
 };
 
@@ -65,17 +67,26 @@ export const personNameBody = (field, { optional = false, label } = {}) => {
 
 export const textBody = (
   field,
-  { optional = false, min = 1, max = LIMITS.textMedium, label } = {},
+  { optional = false, min = optional ? 0 : 1, max = LIMITS.textMedium, label } = {},
 ) => {
   const name = label || field;
   const chain = body(field);
   if (optional) chain.optional({ values: "falsy" });
+  const unlimited = max == null;
+  const lengthOpts = unlimited ? { min } : { min, max };
+  const lengthMsg = unlimited
+    ? min > 0
+      ? `${name} must be at least ${min} characters.`
+      : `${name} must be a string.`
+    : min > 0
+      ? `${name} must be ${min}–${max} characters.`
+      : `${name} must be at most ${max} characters.`;
   return chain
     .trim()
     .isString()
     .withMessage(`${name} must be a string.`)
-    .isLength({ min, max })
-    .withMessage(`${name} must be ${min}–${max} characters.`);
+    .isLength(lengthOpts)
+    .withMessage(lengthMsg);
 };
 
 export const otpBody = (field = "otp") =>

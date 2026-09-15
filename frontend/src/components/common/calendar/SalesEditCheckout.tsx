@@ -23,6 +23,7 @@ import {
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useGetBusinessSetupQuery } from "../../../store/services/businessApi";
+import { clientPlatformTagToneColors } from "../ClientPlatformTag";
 import ManualEntryCatalogDrawer, {
   ManualEntryCatalogOpenButton,
 } from "../../sections/finance/ManualEntryCatalogDrawer";
@@ -97,7 +98,7 @@ function collectPeople(card: SalesOverviewCardData): PersonChip[] {
   const people: PersonChip[] = [
     {
       id: card.payerKey || "main",
-      label: card.clientKind === "company" ? "CC Client" : "IC Client",
+      label: card.clientKind === "company" ? "BC Client" : "IC Client",
       name: card.clientName,
       role: "main_client",
     },
@@ -155,7 +156,7 @@ export default function SalesEditCheckout({
   const people = React.useMemo(() => collectPeople(card), [card]);
   const kindBadge =
     clientKind === "company" || card.clientKind === "company"
-      ? "CC Client"
+      ? "BC Client"
       : "IC Client";
 
   const { productOptions, itemOptions, uniqueItemOptions } = React.useMemo(
@@ -412,12 +413,10 @@ export default function SalesEditCheckout({
                     px: 0.7,
                     py: 0.15,
                     borderRadius: "999px",
-                    bgcolor: alpha(m.teal, 0.12),
+                    ...clientPlatformTagToneColors(m, "teal"),
                   }}
                 >
-                  <Typography
-                    sx={{ fontSize: 10.5, fontWeight: 800, color: m.teal }}
-                  >
+                  <Typography sx={{ fontSize: 10.5, fontWeight: 800 }}>
                     {kindBadge}
                   </Typography>
                 </Box>

@@ -18,6 +18,8 @@ export const INPUT_LIMITS = {
   textShort: 120,
   textMedium: 500,
   textLong: 5000,
+  /** Human optional notes: min when non-empty; pass `max: null` for no max. */
+  notesMin: 5,
   coc: 8,
   vat: 14,
   postalCode: 12,
@@ -133,7 +135,8 @@ export function parseText(
     required?: boolean;
     label?: string;
     min?: number;
-    max?: number;
+    /** Pass `null` for no max (notes). */
+    max?: number | null;
     pattern?: RegExp;
     patternMessage?: string;
   } = {},
@@ -141,7 +144,7 @@ export function parseText(
   const label = opts.label ?? "Field";
   const required = opts.required !== false;
   const min = opts.min ?? (required ? 1 : 0);
-  const max = opts.max ?? INPUT_LIMITS.textMedium;
+  const max = opts.max === null ? null : (opts.max ?? INPUT_LIMITS.textMedium);
   const str = asString(raw);
   if (str === null) return { ok: false, error: `${label} must be a string.` };
   const value = str.trim();
@@ -156,7 +159,7 @@ export function parseText(
       error: `${label} must be at least ${min} characters.`,
     };
   }
-  if (value.length > max) {
+  if (max != null && value.length > max) {
     return {
       ok: false,
       error: `${label} must be at most ${max} characters.`,

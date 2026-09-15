@@ -331,9 +331,20 @@ export function useProfessionalFixedLocationCalendarServiceProductScreensService
       ...placeServicesSequentially(untimed, sequentialStart),
     ];
 
+    const draftSiblingServices =
+      selectionTarget === "client"
+        ? bookingGuests.flatMap((guest) => guest.services)
+        : [
+            ...selectedServices,
+            ...bookingGuests
+              .filter((guest) => guest.id !== selectionTarget)
+              .flatMap((guest) => guest.services),
+          ];
+
     assignStaffToPickedServices({
       pickedServices,
       currentServices,
+      draftSiblingServices,
       dateIso: selectedSlot?.date ?? "",
       slotStart: selectedSlot?.start,
       slotLocation,

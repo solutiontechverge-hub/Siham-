@@ -5,9 +5,8 @@ import type {
 } from "../../../../app/professionals/fixed-location/calendar/calendar.data";
 import {
   type Interval,
+  dailyBookingOccupancyRatio,
   intervalsOverlap,
-  mergeIntervals,
-  sumIntervalsMins,
 } from "../calendar.utils";
 
 export type UseProfessionalFixedLocationCalendarTeamMemberPickerArgs = {
@@ -30,23 +29,18 @@ export function useProfessionalFixedLocationCalendarTeamMemberPicker({
   slotLocation,
 }: UseProfessionalFixedLocationCalendarTeamMemberPickerArgs) {
   const getDailyBookingRatio = React.useCallback(
-    (resourceId: string, iso: string) => {
-      const busy = getBusyFor(resourceId, iso);
-      const bookedMins = sumIntervalsMins(mergeIntervals(busy));
-      const availability = getAvailabilityFor(resourceId, iso);
-      const availableMins = sumIntervalsMins(availability);
-      if (availableMins <= 0) {
-        return bookedMins > 0 ? 1 : 0;
-      }
-      return Math.max(0, Math.min(1, bookedMins / availableMins));
-    },
+    (resourceId: string, iso: string) =>
+      dailyBookingOccupancyRatio(
+        getBusyFor(resourceId, iso),
+        getAvailabilityFor(resourceId, iso),
+      ),
     [getAvailabilityFor, getBusyFor],
   );
 
   /**
    * Client-like “most available” pick: lowest day occupancy, free at the slot.
    * Falls back to lowest occupancy when nobody is free (still assign someone).
-   * Optional prefer/only pools support Fixed Location max-3 reuse.
+   * prefer/avoid/only pools support DL sticky reuse and Fixed Location spread + max-3.
    */
   const pickMostAvailableTeamMemberId = React.useCallback(
     (
@@ -56,6 +50,7 @@ export function useProfessionalFixedLocationCalendarTeamMemberPicker({
       extraBusyByMember?: ReadonlyMap<string, readonly Interval[]>,
       options?: {
         preferMemberIds?: readonly string[];
+        avoidMemberIds?: readonly string[];
         onlyMemberIds?: readonly string[];
       },
     ): string => {
@@ -107,6 +102,16 @@ export function useProfessionalFixedLocationCalendarTeamMemberPicker({
         if (freePreferred) return freePreferred.id;
       }
 
+      const avoid = options?.avoidMemberIds?.length
+        ? new Set(options.avoidMemberIds.map(String))
+        : null;
+      if (avoid) {
+        const freeOther = candidates.find(
+          (resource) => !avoid.has(String(resource.id)) && isFree(resource),
+        );
+        if (freeOther) return freeOther.id;
+      }
+
       const free = candidates.find(isFree);
       if (free) return free.id;
 
@@ -128,5 +133,78 @@ export function useProfessionalFixedLocationCalendarTeamMemberPicker({
     ],
   );
 
-  return { getDailyBookingRatio, pickMostAvailableTeamMemberId };
+  /**
+   * Members free for a service window (working hours + not busy).
+   * Always includes `includeMemberIds` (e.g. current assignee) even if busy.
+   */
+  const listAvailableTeamMembersForWindow = React.useCallback(
+    (
+      dateIso: string,
+      startMin: number,
+      durationMins: number,
+      options?: {
+        onlyMemberIds?: readonly string[];
+        includeMemberIds?: readonly string[];
+        extraBusyByMember?: ReadonlyMap<string, readonly Interval[]>;
+      },
+    ): CalendarResource[] => {
+      let candidates = [...resources];
+      if (options?.onlyMemberIds?.length) {
+        const only = new Set(options.onlyMemberIds.map(String));
+        candidates = candidates.filter((resource) =>
+          only.has(String(resource.id)),
+        );
+      }
+
+      const endMin = startMin + Math.max(1, durationMins || 0);
+      const include = new Set(
+        (options?.includeMemberIds ?? []).map(String).filter(Boolean),
+      );
+
+      const isFree = (resource: CalendarResource) => {
+        const locationWindows = slotLocation
+          ? getLocationAvailability(resource.id, dateIso, slotLocation)
+          : [];
+        const working = locationWindows.length
+          ? locationWindows
+          : getAvailabilityFor(resource.id, dateIso);
+        if (!working.length) return false;
+        const withinWorking = working.some(
+          (window) => startMin >= window.startMin && endMin <= window.endMin,
+        );
+        if (!withinWorking) return false;
+        const busy = [
+          ...getBusyFor(resource.id, dateIso),
+          ...(options?.extraBusyByMember?.get(resource.id) ?? []),
+        ];
+        return !busy.some((interval) =>
+          intervalsOverlap({ startMin, endMin }, interval),
+        );
+      };
+
+      const free = candidates.filter(isFree);
+      const byId = new Map(free.map((resource) => [String(resource.id), resource]));
+      for (const id of include) {
+        if (byId.has(id)) continue;
+        const resource = resources.find((item) => String(item.id) === id);
+        if (resource) byId.set(id, resource);
+      }
+      return [...byId.values()].sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+      );
+    },
+    [
+      resources,
+      getAvailabilityFor,
+      getBusyFor,
+      getLocationAvailability,
+      slotLocation,
+    ],
+  );
+
+  return {
+    getDailyBookingRatio,
+    listAvailableTeamMembersForWindow,
+    pickMostAvailableTeamMemberId,
+  };
 }

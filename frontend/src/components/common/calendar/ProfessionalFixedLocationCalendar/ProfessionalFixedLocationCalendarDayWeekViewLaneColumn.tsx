@@ -236,7 +236,8 @@ export default function ProfessionalFixedLocationCalendarDayWeekViewLaneColumn({
         height: rows * rowPx,
         bgcolor: isActiveWeekDay ? alpha(m.teal, 0.02) : "transparent",
         overflow: "visible",
-        scrollSnapAlign: viewMode === "week" ? "start" : undefined,
+        scrollSnapAlign:
+          viewMode === "week" || viewMode === "day" ? "start" : undefined,
         ...(isPastDay ? { opacity: 0.72 } : null),
       }}
     >

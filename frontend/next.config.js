@@ -4,7 +4,6 @@ const path = require("path");
 const nextConfig = {
   // Monorepo: keep file tracing rooted at the workspace package, not a parent lockfile.
   outputFileTracingRoot: path.join(__dirname),
-  // Monorepo + Vercel: eslint-config-next can fail to resolve ./parser.js during remote build.
   // Run `npm run lint:frontend` locally or in CI for lint coverage.
   eslint: {
     ignoreDuringBuilds: true,

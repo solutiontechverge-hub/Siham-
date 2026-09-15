@@ -1,7 +1,15 @@
-import type { Interval } from "../calendar.utils";
-import { minutesSinceMidnight } from "../calendar.utils";
 import type { CalendarBookingLocation } from "../../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { BookingServiceLineItem } from "../../../../data/bookingServiceEdit.data";
+
+type Interval = { startMin: number; endMin: number };
+
+// Local to keep this helper runnable without calendar.utils → theme/MUI.
+function minutesSinceMidnight(time: string): number {
+  const [hours, minutes] = time.split(":").map(Number);
+  return (hours || 0) * 60 + (minutes || 0);
+}
+
+const FL_MAX_DISTINCT = 3;
 
 export type PickMostAvailableTeamMemberId = (
   dateIso: string,
@@ -9,15 +17,44 @@ export type PickMostAvailableTeamMemberId = (
   durationMins: number,
   extraBusyByMember?: ReadonlyMap<string, readonly Interval[]>,
   options?: {
+    /** Soft: try these first when free (DL-style sticky). */
     preferMemberIds?: readonly string[];
+    /** Soft: skip these when other free staff exist (FL spread). */
+    avoidMemberIds?: readonly string[];
+    /** Hard: only consider this pool (FL max-3 cap). */
     onlyMemberIds?: readonly string[];
   },
 ) => string;
+
+function seedDraftBusy(
+  services: readonly BookingServiceLineItem[],
+  skipIds: ReadonlySet<string>,
+  virtualBusy: Map<string, Interval[]>,
+  usedIds: Set<string>,
+  slotStart: string | undefined,
+): void {
+  for (const service of services) {
+    if (skipIds.has(service.id)) continue;
+    const memberId = String(service.staffResourceId || "").trim();
+    if (!memberId) continue;
+    const duration = Math.max(1, service.durationMins || 0);
+    const startMin = minutesSinceMidnight(
+      service.startTime ?? slotStart ?? "00:00",
+    );
+    if (!usedIds.has(memberId) && usedIds.size >= FL_MAX_DISTINCT) continue;
+    const busy = virtualBusy.get(memberId) ?? [];
+    busy.push({ startMin, endMin: startMin + duration });
+    virtualBusy.set(memberId, busy);
+    usedIds.add(memberId);
+  }
+}
 
 /** Mutates `pickedServices` in place — same as prior drawer apply behavior. */
 export function assignStaffToPickedServices(input: {
   pickedServices: BookingServiceLineItem[];
   currentServices: readonly BookingServiceLineItem[];
+  /** Other drawer lines (client + guests) whose windows occupy staff. */
+  draftSiblingServices?: readonly BookingServiceLineItem[];
   dateIso: string;
   slotStart: string | undefined;
   slotLocation: CalendarBookingLocation;
@@ -27,6 +64,7 @@ export function assignStaffToPickedServices(input: {
   const {
     pickedServices,
     currentServices,
+    draftSiblingServices = [],
     dateIso,
     slotStart,
     slotLocation,
@@ -43,6 +81,8 @@ export function assignStaffToPickedServices(input: {
       currentServices.find((service) => service.staffResourceId)
         ?.staffResourceId ||
       pickedServices.find((service) => service.staffResourceId)
+        ?.staffResourceId ||
+      draftSiblingServices.find((service) => service.staffResourceId)
         ?.staffResourceId;
     const totalDuration = Math.max(
       1,
@@ -70,8 +110,13 @@ export function assignStaffToPickedServices(input: {
     return;
   }
 
-  // Fixed Location: per-service, prefer free then occupancy; max 3 distinct.
+  // Fixed Location: per-service free-at-slot + lowest occupancy; spread across
+  // free members (do not sticky-reuse); draft siblings count as busy; max 3 distinct.
   const usedIds = new Set<string>();
+  const pickedIds = new Set(pickedServices.map((service) => service.id));
+  seedDraftBusy(currentServices, pickedIds, virtualBusy, usedIds, slotStart);
+  seedDraftBusy(draftSiblingServices, pickedIds, virtualBusy, usedIds, slotStart);
+
   for (let i = 0; i < pickedServices.length; i += 1) {
     const service = pickedServices[i];
     const duration = Math.max(1, service.durationMins || 0);
@@ -80,7 +125,8 @@ export function assignStaffToPickedServices(input: {
     );
     if (service.staffResourceId) {
       const memberId = service.staffResourceId;
-      const wouldExceedCap = !usedIds.has(memberId) && usedIds.size >= 3;
+      const wouldExceedCap =
+        !usedIds.has(memberId) && usedIds.size >= FL_MAX_DISTINCT;
       if (!wouldExceedCap) {
         const busy = virtualBusy.get(memberId) ?? [];
         busy.push({ startMin, endMin: startMin + duration });
@@ -89,16 +135,17 @@ export function assignStaffToPickedServices(input: {
         continue;
       }
     }
-    const atCap = usedIds.size >= 3;
-    const preferIds = [...usedIds];
+    const atCap = usedIds.size >= FL_MAX_DISTINCT;
+    const usedList = [...usedIds];
     const memberId = pickMostAvailableTeamMemberId(
       dateIso,
       startMin,
       duration,
       virtualBusy,
       {
-        preferMemberIds: preferIds,
-        onlyMemberIds: atCap ? preferIds : undefined,
+        // Spread: avoid already-used while other free staff exist.
+        avoidMemberIds: atCap ? undefined : usedList,
+        onlyMemberIds: atCap ? usedList : undefined,
       },
     );
     if (memberId) {

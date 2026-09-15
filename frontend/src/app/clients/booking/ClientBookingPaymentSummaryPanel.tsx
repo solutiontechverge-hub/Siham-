@@ -49,6 +49,9 @@ export type ClientBookingPaymentSummaryPanelProps = {
   clientNote: string;
   bookServicesAtSameTime: boolean;
   resolveServiceTeamMemberName: (service: Service) => string | undefined;
+  /** Resolve assigned staff id for a service line (public profile open). */
+  resolveServiceTeamMemberId?: (service: Service) => string | undefined;
+  onTeamMemberClick?: (teamMemberId: string) => void;
   total: number;
   allServicesAssigned: boolean;
   servicesCount: number;
@@ -72,6 +75,8 @@ export default function ClientBookingPaymentSummaryPanel({
   clientNote,
   bookServicesAtSameTime,
   resolveServiceTeamMemberName,
+  resolveServiceTeamMemberId,
+  onTeamMemberClick,
   total,
   allServicesAssigned,
   servicesCount,
@@ -159,6 +164,17 @@ export default function ClientBookingPaymentSummaryPanel({
         <Stack spacing={1.25}>
           {isDesiredLocation && desiredTeamMemberFullName ? (
             <Box
+              component={
+                selectedTeamMemberId && onTeamMemberClick ? "button" : "div"
+              }
+              type={
+                selectedTeamMemberId && onTeamMemberClick ? "button" : undefined
+              }
+              onClick={
+                selectedTeamMemberId && onTeamMemberClick
+                  ? () => onTeamMemberClick(selectedTeamMemberId)
+                  : undefined
+              }
               sx={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -172,6 +188,14 @@ export default function ClientBookingPaymentSummaryPanel({
                 px: 1,
                 py: 0,
                 lineHeight: 0,
+                cursor:
+                  selectedTeamMemberId && onTeamMemberClick
+                    ? "pointer"
+                    : "default",
+                "&:hover":
+                  selectedTeamMemberId && onTeamMemberClick
+                    ? { borderColor: alpha(m.teal, 0.45) }
+                    : undefined,
               }}
             >
               <Box
@@ -220,6 +244,20 @@ export default function ClientBookingPaymentSummaryPanel({
             );
             const planningMeta = planningScheduleMeta(section);
             const useGuestCardStyle = !isRequester || isDesiredLocation;
+            const isGuestOrModel =
+              participantType === "guest" || participantType === "model";
+            // Guest/Model: name lives in the header — never a fake person/schedule card.
+            const guestDisplayName = isGuestOrModel
+              ? section.title?.trim() || undefined
+              : undefined;
+            const showGuestDisplayName = Boolean(
+              guestDisplayName &&
+                guestDisplayName.toLowerCase() !== heading.toLowerCase(),
+            );
+            const showSectionSchedule =
+              Boolean(planningItem) ||
+              participantType === "buffer" ||
+              participantType === "planning";
             return (
               <Box key={key}>
                 <Stack
@@ -240,6 +278,18 @@ export default function ClientBookingPaymentSummaryPanel({
                   >
                     {heading}
                   </Typography>
+                  {showGuestDisplayName ? (
+                    <Typography
+                      sx={{
+                        fontWeight: 800,
+                        fontSize: 11,
+                        color: alpha(m.navy, 0.62),
+                        lineHeight: 1,
+                      }}
+                    >
+                      {guestDisplayName}
+                    </Typography>
+                  ) : null}
                   {isRequester ? (
                     <Typography
                       sx={{
@@ -258,10 +308,7 @@ export default function ClientBookingPaymentSummaryPanel({
                   ) : null}
                 </Stack>
                 <Stack spacing={0.75}>
-                  {planningItem ||
-                  planningMeta.timeRange ||
-                  participantType === "buffer" ||
-                  participantType === "planning" ? (
+                  {showSectionSchedule ? (
                     <Box
                       sx={{
                         borderRadius: "10px",
@@ -286,12 +333,10 @@ export default function ClientBookingPaymentSummaryPanel({
                             {planningItem.activity}
                           </Typography>
                         ) : null}
-                        {planningMeta.timeRange ||
-                        planningMeta.durationLabel ? (
+                        {planningMeta.timeRange || planningMeta.durationLabel ? (
                           <ServiceSummaryMetaLine
                             timeRange={planningMeta.timeRange}
                             durationLabel={planningMeta.durationLabel}
-                            staffName={section.teamMemberLabel}
                           />
                         ) : planningItem?.duration ? (
                           <Typography
@@ -320,13 +365,21 @@ export default function ClientBookingPaymentSummaryPanel({
                       : bookServicesAtSameTime
                         ? bookingStartMinutes
                         : sectionStartMinutes + serviceOffset;
-                    const staffName =
-                      !isDesiredLocation && isRequester
-                        ? resolveServiceTeamMemberName(s as Service)
-                        : undefined;
+                    // Same team-member line for client + guest service cards (FL).
+                    const staffName = !isDesiredLocation
+                      ? resolveServiceTeamMemberName(s as Service)
+                      : undefined;
+                    const staffId = !isDesiredLocation
+                      ? resolveServiceTeamMemberId?.(s as Service) ||
+                        String((s as Service).teamMemberId ?? "").trim() ||
+                        undefined
+                      : undefined;
+                    const staffClickable = Boolean(
+                      staffName && staffId && onTeamMemberClick,
+                    );
                     return (
                       <Box
-                        key={s.id}
+                        key={`${s.id}::${s.guestId ?? ""}::${index}`}
                         sx={{
                           borderRadius: "10px",
                           border: useGuestCardStyle
@@ -365,10 +418,35 @@ export default function ClientBookingPaymentSummaryPanel({
                             />
                             {staffName ? (
                               <Stack
+                                component={staffClickable ? "button" : "div"}
+                                type={staffClickable ? "button" : undefined}
                                 direction="row"
                                 alignItems="center"
                                 spacing={0.5}
-                                sx={{ mt: 0.5 }}
+                                onClick={
+                                  staffClickable
+                                    ? (event: React.MouseEvent) => {
+                                        event.stopPropagation();
+                                        onTeamMemberClick?.(staffId!);
+                                      }
+                                    : undefined
+                                }
+                                sx={{
+                                  mt: 0.5,
+                                  p: 0,
+                                  m: 0,
+                                  border: "none",
+                                  bgcolor: "transparent",
+                                  cursor: staffClickable
+                                    ? "pointer"
+                                    : "default",
+                                  textAlign: "left",
+                                  width: "fit-content",
+                                  maxWidth: "100%",
+                                  "&:hover": staffClickable
+                                    ? { color: m.teal }
+                                    : undefined,
+                                }}
                               >
                                 <PersonOutlineRoundedIcon
                                   sx={{
@@ -381,6 +459,9 @@ export default function ClientBookingPaymentSummaryPanel({
                                     fontSize: 11,
                                     fontWeight: 700,
                                     lineHeight: 1,
+                                    ...(staffClickable
+                                      ? { "&:hover": { color: m.teal } }
+                                      : null),
                                   })}
                                 >
                                   {staffName}

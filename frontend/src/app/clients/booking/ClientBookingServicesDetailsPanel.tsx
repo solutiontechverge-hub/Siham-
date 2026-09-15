@@ -285,14 +285,15 @@ export default function ClientBookingServicesDetailsPanel({
       ) : null}
 
       <Stack spacing={1}>
-        {visible.map((s) => {
+        {visible.map((s, i) => {
           const showAssignedServiceCard =
             serviceTab === "assigned" && Boolean(s.guestId);
+          const lineKey = `${s.id}::${s.guestId ?? ""}::${i}`;
 
           if (showAssignedServiceCard) {
             return (
               <Paper
-                key={s.id}
+                key={lineKey}
                 elevation={0}
                 sx={{
                   borderRadius: "10px",
@@ -461,7 +462,7 @@ export default function ClientBookingServicesDetailsPanel({
 
           return (
             <Paper
-              key={s.id}
+              key={lineKey}
               elevation={0}
               sx={{
                 borderRadius: "10px",

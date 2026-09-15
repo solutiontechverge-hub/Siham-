@@ -75,15 +75,18 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsPlanningBlocksB
   | "canEditBookingLineItems"
   | "canMutateDrawerContents"
   | "cancelledServicesForDrawer"
+  | "changeBookingServiceStaff"
   | "drawerOrderedBlocks"
   | "drawerParticipantOrdinals"
   | "drawerPlanningGuests"
   | "editingInlineGuestId"
   | "emptyInlineGuestDraft"
   | "firstDrawerPlanningId"
+  | "getServiceStaffOptions"
   | "incomingRequestEditMode"
   | "isViewingExisting"
   | "m"
+  | "openBookingStaffProfile"
   | "openDrawerLineTagComparison"
   | "openEditBookingProductLine"
   | "openEditBookingUniqueLine"
@@ -94,6 +97,7 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsPlanningBlocksB
   | "reorderClientServices"
   | "reorderDrawerPlanning"
   | "reorderGuestServices"
+  | "resolveBookingStaff"
   | "resolveProductEditTag"
   | "resolveServiceEditTag"
   | "resourceNameById"
@@ -128,15 +132,18 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsPla
     canEditBookingLineItems,
     canMutateDrawerContents,
     cancelledServicesForDrawer,
+    changeBookingServiceStaff,
     drawerOrderedBlocks,
     drawerParticipantOrdinals,
     drawerPlanningGuests,
     editingInlineGuestId,
     emptyInlineGuestDraft,
     firstDrawerPlanningId,
+    getServiceStaffOptions,
     incomingRequestEditMode,
     isViewingExisting,
     m,
+    openBookingStaffProfile,
     openDrawerLineTagComparison,
     openEditBookingProductLine,
     openEditBookingUniqueLine,
@@ -147,6 +154,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsPla
     reorderClientServices,
     reorderDrawerPlanning,
     reorderGuestServices,
+    resolveBookingStaff,
     resolveProductEditTag,
     resolveServiceEditTag,
     resourceNameById,
@@ -590,6 +598,18 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsPla
                       resolveStaffName={(staffResourceId) =>
                         staffResourceId
                           ? resourceNameById.get(staffResourceId)
+                          : undefined
+                      }
+                      resolveStaff={resolveBookingStaff}
+                      onStaffClick={openBookingStaffProfile}
+                      staffOptionsForService={
+                        canEditBookingLineItems
+                          ? getServiceStaffOptions
+                          : undefined
+                      }
+                      onStaffChange={
+                        canEditBookingLineItems
+                          ? changeBookingServiceStaff
                           : undefined
                       }
                       resolveServiceEditTag={resolveServiceEditTag}

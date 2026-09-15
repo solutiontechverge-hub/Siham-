@@ -1,12 +1,20 @@
 import * as React from "react";
 import { alpha } from "@mui/material/styles";
-import { getDefaultCalendarResourceId } from "../calendar.utils";
+import { getCombinedAvailabilityIntervals } from "../calendar-schedule.utils";
+import {
+  dailyBookingOccupancyRatio,
+  getDefaultCalendarResourceId,
+  mergeIntervals,
+  minutesSinceMidnight,
+  parseIsoDate,
+} from "../calendar.utils";
 import { rankResourcesForCalendarDay } from "../teamMemberBookings";
 import {
   TEAM_NAV_SCROLLBAR_PX,
   TEAM_NAV_VISIBLE_SLOTS,
 } from "./professionalFixedLocationCalendar.data";
 import {
+  buildBusyIntervalsForResource,
   buildDayViewMemberColumnSource,
   filterResourcesForVisibleDates,
 } from "./useProfessionalFixedLocationCalendar.helpers";
@@ -18,10 +26,11 @@ export function useProfessionalFixedLocationCalendarTeamLayout({
   events,
   blocks,
   scheduleRows,
+  dateOverrides,
+  dataAvailability,
   filterDrawerResources,
   eventsMatchingDrawerFilters,
   teamAll,
-  filtersAreNarrowing,
   visibleDates,
   viewMode,
   activeDateIso,
@@ -68,27 +77,61 @@ export function useProfessionalFixedLocationCalendarTeamLayout({
       ),
     [filteredResources],
   );
-  const dayRankedResources = React.useMemo(
-    () =>
-      rankResourcesForCalendarDay(
-        filteredResources,
-        filtersAreNarrowing ? eventsMatchingDrawerFilters : events,
+  const dayRankedResources = React.useMemo(() => {
+    // Same occupancy source as header % bars (busy ÷ availability).
+    const getOccupancyRatio = (resourceId: string) => {
+      const busy = buildBusyIntervalsForResource({
+        resourceId,
+        iso: activeDateIso,
+        events,
+        blocks,
+        fallbackTeamMemberId,
+        knownTeamMemberIds,
+      });
+      const fromSchedule = getCombinedAvailabilityIntervals(
+        resourceId,
         activeDateIso,
-        {
-          fallbackTeamMemberId,
-          knownTeamIds: knownTeamMemberIds,
-        },
-      ),
-    [
-      activeDateIso,
-      events,
-      eventsMatchingDrawerFilters,
-      fallbackTeamMemberId,
-      filteredResources,
-      filtersAreNarrowing,
-      knownTeamMemberIds,
-    ],
-  );
+        scheduleRows,
+        dateOverrides ?? [],
+      );
+      if (fromSchedule.length) {
+        return dailyBookingOccupancyRatio(busy, mergeIntervals(fromSchedule));
+      }
+      const av = dataAvailability?.find(
+        (row) => row.resourceId === resourceId,
+      );
+      if (!av) return dailyBookingOccupancyRatio(busy, []);
+      const dow = parseIsoDate(activeDateIso).getUTCDay() as
+        | 0
+        | 1
+        | 2
+        | 3
+        | 4
+        | 5
+        | 6;
+      const windows = av.weekly[dow] ?? [];
+      return dailyBookingOccupancyRatio(
+        busy,
+        mergeIntervals(
+          windows.map((window) => ({
+            startMin: minutesSinceMidnight(window.start),
+            endMin: minutesSinceMidnight(window.end),
+          })),
+        ),
+      );
+    };
+    return rankResourcesForCalendarDay(filteredResources, getOccupancyRatio);
+  }, [
+    activeDateIso,
+    blocks,
+    dataAvailability,
+    dateOverrides,
+    events,
+    fallbackTeamMemberId,
+    filteredResources,
+    knownTeamMemberIds,
+    scheduleRows,
+  ]);
   const teamNavResources =
     viewMode === "day" ? dayRankedResources : alphabeticalResources;
   const defaultDaySelectedResourceId =
@@ -138,20 +181,12 @@ export function useProfessionalFixedLocationCalendarTeamLayout({
         splitScreen,
         resourcesLength: resources.length,
         filteredResources,
-        selectedResourceId,
-        defaultDaySelectedResourceId,
         dayRankedResources,
-        eventsMatchingDrawerFilters,
-        activeDateIso,
       }),
     [
-      activeDateIso,
       resources.length,
       dayRankedResources,
-      defaultDaySelectedResourceId,
-      eventsMatchingDrawerFilters,
       filteredResources,
-      selectedResourceId,
       splitScreen,
       viewMode,
     ],
@@ -280,6 +315,7 @@ export function useProfessionalFixedLocationCalendarTeamLayout({
     overflowX: teamHeaderNeedsScroll ? ("scroll" as const) : ("hidden" as const),
     overflowY: "hidden" as const,
     WebkitOverflowScrolling: "touch" as const,
+    scrollSnapType: teamHeaderNeedsScroll ? ("x mandatory" as const) : ("none" as const),
     ...(teamHeaderNeedsScroll
       ? {
           scrollbarGutter: "stable" as const,

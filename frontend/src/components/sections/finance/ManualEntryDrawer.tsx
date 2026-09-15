@@ -14,6 +14,7 @@ import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import { Box, Chip, Paper, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDrawer from "../../common/AppDrawer";
+import ClientPlatformTag from "../../common/ClientPlatformTag";
 import { FinanceDrawerActionsFooter } from "../../common/FinanceDrawerFooter";
 import AppSearchField from "../../common/AppSearchField";
 import MollureFormField from "../../common/MollureFormField";
@@ -321,25 +322,10 @@ export default function ManualEntryDrawer({
                           >
                             {client.name}
                           </Typography>
-                          {client.tags.includes("Mollure") ? (
-                            <Chip
-                              label="Mollure"
-                              size="small"
-                              sx={{
-                                height: 16,
-                                borderRadius: "999px",
-                                fontWeight: 700,
-                                bgcolor: alpha(m.teal, 0.12),
-                                color: m.teal,
-                                "& .MuiChip-label": {
-                                  fontSize: 9,
-                                  px: 0.65,
-                                  py: 0,
-                                  lineHeight: 1.2,
-                                },
-                              }}
-                            />
-                          ) : null}
+                          <ClientPlatformTag
+                            isMollure={client.tags.includes("Mollure")}
+                            clientKind={client.kind}
+                          />
                         </Stack>
                         <Typography
                           sx={{
@@ -410,23 +396,7 @@ export default function ManualEntryDrawer({
                             >
                               {row.name}
                             </Typography>
-                            <Chip
-                              label="Mollure"
-                              size="small"
-                              sx={{
-                                height: 16,
-                                borderRadius: "999px",
-                                fontWeight: 700,
-                                bgcolor: alpha(m.teal, 0.12),
-                                color: m.teal,
-                                "& .MuiChip-label": {
-                                  fontSize: 9,
-                                  px: 0.65,
-                                  py: 0,
-                                  lineHeight: 1.2,
-                                },
-                              }}
-                            />
+                            <ClientPlatformTag isMollure />
                           </Stack>
                           <Typography
                             sx={{

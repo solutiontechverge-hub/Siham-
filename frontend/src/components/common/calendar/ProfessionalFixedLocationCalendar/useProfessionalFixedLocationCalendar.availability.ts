@@ -130,8 +130,14 @@ export function useProfessionalFixedLocationCalendarAvailability({
         fallbackTeamMemberId,
         knownTeamMemberIds,
       }),
-    // Match prior deps bag exactly (activeResourceId / knownResourceIds unused).
-    [activeResourceId, blocks, events, knownResourceIds],
+    [
+      activeResourceId,
+      blocks,
+      events,
+      fallbackTeamMemberId,
+      knownResourceIds,
+      knownTeamMemberIds,
+    ],
   );
 
   const timelineGridRef = React.useRef<HTMLDivElement | null>(null);

@@ -250,21 +250,14 @@ export function countTeamMemberBookingsOnDate(
   }, 0);
 }
 
-/** Day view: most bookings first; ties and empty days fall back to alphabetical. */
+/** Day view: highest occupancy first; ties / all free → alphabetical by name. */
 export function rankResourcesForCalendarDay(
   resources: readonly CalendarResource[],
-  events: readonly CalendarEvent[],
-  iso: string,
-  options?: {
-    fallbackTeamMemberId?: string;
-    knownTeamIds?: ReadonlySet<string>;
-  },
+  getOccupancyRatio: (resourceId: string) => number,
 ): CalendarResource[] {
   return [...resources].sort((a, b) => {
-    const countDiff =
-      countTeamMemberBookingsOnDate(events, b.id, iso, options) -
-      countTeamMemberBookingsOnDate(events, a.id, iso, options);
-    if (countDiff !== 0) return countDiff;
+    const diff = getOccupancyRatio(b.id) - getOccupancyRatio(a.id);
+    if (diff !== 0) return diff;
     return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
   });
 }

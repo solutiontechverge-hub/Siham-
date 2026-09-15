@@ -174,7 +174,75 @@ export function useProfessionalFixedLocationCalendarDrawerGuestsServices(
     [isDrawerPlanningGuest, selectedSlot?.start],
   );
 
+  const assignServiceStaff = React.useCallback(
+    (serviceId: string, staffResourceId: string) => {
+      const nextId = String(staffResourceId || "").trim();
+      if (!nextId) return;
+      const teamMemberName =
+        args.resourceNameById?.get(nextId) ||
+        args.resources.find((resource) => String(resource.id) === nextId)
+          ?.name ||
+        undefined;
+      const patchOne = (service: BookingServiceLineItem) =>
+        service.id === serviceId
+          ? {
+              ...service,
+              staffResourceId: nextId,
+              teamMemberId: nextId,
+              teamMemberName: teamMemberName ?? service.teamMemberName,
+            }
+          : service;
+      const patchAll = (service: BookingServiceLineItem) => ({
+        ...service,
+        staffResourceId: nextId,
+        teamMemberId: nextId,
+        teamMemberName: teamMemberName ?? service.teamMemberName,
+      });
+      const applyShared = args.slotLocation === "DL";
+
+      setSelectedServices((prev) => {
+        const inClient = prev.some((service) => service.id === serviceId);
+        if (!inClient && !applyShared) return prev;
+        const next = applyShared
+          ? prev.map(patchAll)
+          : inClient
+            ? prev.map(patchOne)
+            : prev;
+        if (inClient || applyShared) patchServiceTimeOverrides(next);
+        return next;
+      });
+
+      setBookingGuests((prev) => {
+        let touched: BookingServiceLineItem[] | null = null;
+        const next = prev.map((guest) => {
+          const hasTarget = guest.services.some(
+            (service) => service.id === serviceId,
+          );
+          if (!hasTarget && !applyShared) return guest;
+          const services = applyShared
+            ? guest.services.map(patchAll)
+            : guest.services.map(patchOne);
+          if (hasTarget) touched = services;
+          return { ...guest, services };
+        });
+        if (touched) patchServiceTimeOverrides(touched);
+        else if (applyShared) {
+          const flat = next.flatMap((guest) => guest.services);
+          if (flat.length) patchServiceTimeOverrides(flat);
+        }
+        return next;
+      });
+    },
+    [
+      args.resourceNameById,
+      args.resources,
+      args.slotLocation,
+      patchServiceTimeOverrides,
+    ],
+  );
+
   return {
+    assignServiceStaff,
     bumpSlotFromServices,
     patchServiceTimeOverrides,
     removeClientService,

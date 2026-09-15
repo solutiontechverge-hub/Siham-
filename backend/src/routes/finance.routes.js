@@ -163,7 +163,7 @@ router.patch(
   [
     uuidParam("id"),
     textBody("status", { optional: true, max: 64 }),
-    textBody("note", { optional: true, max: LIMITS.textLong }),
+    textBody("note", { optional: true, min: LIMITS.notesMin, max: null }),
   ],
   validateRequest,
   updateFinanceTransaction,

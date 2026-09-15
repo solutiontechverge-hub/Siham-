@@ -29,16 +29,21 @@ import {
   getTransactionStatusTone,
   isTransactionClientClickable,
   shouldShowTransactionClientEmail,
+  type TransactionClientType,
   type TransactionRow,
   type TransactionStatus,
 } from "../../../app/professionals/fixed-location/finance/data/transactions";
+import { clientPlatformTagToneColors } from "../../common/ClientPlatformTag";
 import { BodyText } from "../../ui/typography";
 
-function clientTypeChipSx(theme: Theme) {
-  return {
-    bgcolor: alpha(theme.palette.primary.main, 0.1),
-    color: theme.palette.primary.main,
-  };
+function clientTypeChipSx(theme: Theme, clientType?: TransactionClientType) {
+  // Guest stays navy; M / IC / BC use the shared teal hierarchy.
+  const tone = clientType === "guest" ? "navy" : "teal";
+  const { color, bgcolor, border } = clientPlatformTagToneColors(
+    theme.palette.mollure,
+    tone,
+  );
+  return { bgcolor, color, border };
 }
 
 function statusChipSx(status: TransactionStatus, theme: Theme) {
@@ -315,7 +320,7 @@ export default function TransactionsTable({
                                 py: 0,
                                 lineHeight: 1.2,
                               },
-                              ...clientTypeChipSx(theme),
+                              ...clientTypeChipSx(theme, row.clientType),
                             }}
                           />
                         ) : null}

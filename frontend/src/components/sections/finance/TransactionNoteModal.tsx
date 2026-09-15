@@ -39,8 +39,8 @@ export default function TransactionNoteModal({
   const handleSave = () => {
     const parsed = parseText(note, {
       label: "Note",
-      min: 1,
-      max: INPUT_LIMITS.textLong,
+      min: INPUT_LIMITS.notesMin,
+      max: null,
     });
     if (!parsed.ok) return;
     onSave(parsed.value);

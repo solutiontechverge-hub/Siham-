@@ -200,7 +200,7 @@ router.patch(
     textBody("contact_number", { optional: true, max: LIMITS.phone }),
     textBody("emergency_contact_name", { optional: true, max: LIMITS.personName }),
     textBody("emergency_contact_number", { optional: true, max: LIMITS.phone }),
-    textBody("personal_note", { optional: true, max: LIMITS.textLong }),
+    textBody("personal_note", { optional: true, min: LIMITS.notesMin, max: null }),
     body("assigned_services")
       .optional({ values: "falsy" })
       .isArray()
@@ -348,7 +348,7 @@ router.post(
       .withMessage("status must be requested, cancelled, completed, confirmed, or blocked."),
     textBody("title", { min: 1, max: LIMITS.textShort, label: "title" }),
     textBody("unique_code", { optional: true, max: 64, label: "unique_code" }),
-    textBody("notes", { optional: true, max: LIMITS.textLong, label: "notes" }),
+    textBody("notes", { optional: true, min: 0, max: null, label: "notes" }),
     body("team_member_id")
       .optional({ values: "falsy" })
       .isUUID()
@@ -392,7 +392,7 @@ router.put(
       .isIn(calendarStatuses)
       .withMessage("status must be requested, cancelled, completed, confirmed, or blocked."),
     textBody("title", { optional: true, max: LIMITS.textShort, label: "title" }),
-    textBody("notes", { optional: true, max: LIMITS.textLong, label: "notes" }),
+    textBody("notes", { optional: true, min: 0, max: null, label: "notes" }),
     body("team_member_id")
       .optional({ values: "falsy" })
       .isUUID()
@@ -470,7 +470,7 @@ router.patch(
       .trim()
       .isIn(bookingStatuses)
       .withMessage("status must be requested, br_accepted, cancelled, completed, confirmed, in_progress, no_show, or invalid."),
-    textBody("notes", { optional: true, max: LIMITS.textLong, label: "notes" }),
+    textBody("notes", { optional: true, min: 0, max: null, label: "notes" }),
     body("total_price")
       .optional({ values: "falsy" })
       .isFloat({ min: 0 })
@@ -521,7 +521,7 @@ router.post(
       .trim()
       .isIn(["send", "accept", "reject"])
       .withMessage("action must be send, accept, or reject."),
-    textBody("note", { optional: true, max: LIMITS.textLong, label: "note" }),
+    textBody("note", { optional: true, min: LIMITS.notesMin, max: null, label: "note" }),
   ],
   validateRequest,
   manageBookingEditRequest,
@@ -541,7 +541,7 @@ router.patch(
       .trim()
       .isIn(["paid", "pending", "failed", "required"])
       .withMessage("prepayment_status must be paid, pending, failed, or required."),
-    textBody("notes", { optional: true, max: LIMITS.textLong, label: "notes" }),
+    textBody("notes", { optional: true, min: 0, max: null, label: "notes" }),
     body("total_price")
       .optional({ values: "falsy" })
       .isFloat({ min: 0 })
@@ -625,11 +625,11 @@ router.post(
       .trim()
       .isLength({ max: 8 })
       .withMessage("country_code is too long."),
-    body("technical_note")
-      .optional({ values: "falsy" })
-      .isString()
-      .isLength({ max: 5000 })
-      .withMessage("technical_note is too long."),
+    textBody("technical_note", {
+      optional: true,
+      min: LIMITS.notesMin,
+      max: null,
+    }),
   ],
   validateRequest,
   createProfessionalClient,
@@ -662,7 +662,11 @@ router.patch(
     textBody("postal_code", { optional: true, max: 12 }),
     textBody("province", { optional: true, max: LIMITS.textShort }),
     textBody("municipality", { optional: true, max: LIMITS.textShort }),
-    textBody("technical_note", { optional: true, max: LIMITS.textLong }),
+    textBody("technical_note", {
+      optional: true,
+      min: LIMITS.notesMin,
+      max: null,
+    }),
   ],
   validateRequest,
   updateProfessionalClient,
@@ -672,11 +676,11 @@ router.patch(
   requireProfessional,
   [
     param("id").isUUID().withMessage("id must be a valid UUID."),
-    body("technical_note")
-      .optional()
-      .isString()
-      .isLength({ max: 5000 })
-      .withMessage("technical_note is too long."),
+    textBody("technical_note", {
+      optional: true,
+      min: LIMITS.notesMin,
+      max: null,
+    }),
   ],
   validateRequest,
   updateProfessionalClientTechnicalNote,

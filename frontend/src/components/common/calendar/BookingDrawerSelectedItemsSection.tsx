@@ -9,7 +9,10 @@ import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import { Box, IconButton, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../../ui/typography";
-import { ServiceSummaryMetaLine } from "../ServiceSummaryMetaLine";
+import {
+  ServiceSummaryMetaLine,
+  type ServiceSummaryStaffOption,
+} from "../ServiceSummaryMetaLine";
 import {
   getEffectiveServicePrice,
   formatServiceTimeRange,
@@ -55,8 +58,14 @@ type BookingDrawerSelectedItemsSectionProps = {
   resolveStaffName?: (staffResourceId?: string) => string | undefined;
   /** Richer staff lookup (photo + initials). Falls back to resolveStaffName. */
   resolveStaff?: (staffResourceId?: string) => BookingDrawerStaffInfo | undefined;
-  /** Open team member profile / details when staff row is clicked. */
+  /** Open team member profile / details when avatar/name is clicked. */
   onStaffClick?: (staffResourceId: string) => void;
+  /** Available team members for a service (by availability). */
+  staffOptionsForService?: (
+    service: BookingServiceLineItem,
+  ) => readonly ServiceSummaryStaffOption[];
+  /** Persist reassignment from the service-card dropdown. */
+  onStaffChange?: (serviceId: string, staffResourceId: string) => void;
   resolveServiceEditTag?: (serviceId: string) => BookingEditTagResult;
   resolveProductEditTag?: (productId: string) => BookingEditTagResult;
   editTagSignpostTitle?: string;
@@ -98,6 +107,8 @@ export default function BookingDrawerSelectedItemsSection({
   resolveStaffName,
   resolveStaff,
   onStaffClick,
+  staffOptionsForService,
+  onStaffChange,
   resolveServiceEditTag,
   resolveProductEditTag,
   editTagSignpostTitle,
@@ -291,6 +302,16 @@ export default function BookingDrawerSelectedItemsSection({
                       )}
                       durationLabel={`${service.durationMins} Mins`}
                       staffName={staff.staffName}
+                      staffId={staff.staffId || undefined}
+                      staffPhotoSrc={staff.staffPhotoSrc}
+                      staffInitials={staff.staffInitials}
+                      onStaffClick={staff.onStaffClick}
+                      staffOptions={staffOptionsForService?.(service)}
+                      onStaffChange={
+                        onStaffChange
+                          ? (nextId) => onStaffChange(service.id, nextId)
+                          : undefined
+                      }
                     />
                     {editTags.length ? (
                       <BookingChangeTags

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import * as React from "react";
 import { useTheme } from "@mui/material/styles";
@@ -16,6 +16,7 @@ import {
   fmtMinToTime,
   formatMdyDate,
   calendarFiltersAreNarrowing,
+  minutesSinceMidnight,
   type TimelineGridSlotColors,
 } from "../calendar.utils";
 import { useProfessionalBusinessOverride } from "../../finance-documents";
@@ -54,6 +55,7 @@ import { useProfessionalFixedLocationCalendarOpenExistingBooking } from "./usePr
 import { useProfessionalFixedLocationCalendarBookingPersist } from "./useProfessionalFixedLocationCalendar.bookingPersist";
 import { useProfessionalFixedLocationCalendarBookingActions } from "./useProfessionalFixedLocationCalendar.bookingActions";
 import { useProfessionalFixedLocationCalendarOpenBookingDrawer } from "./useProfessionalFixedLocationCalendar.openBookingDrawer";
+import { useProfessionalBookingDrawerDraft } from "./useProfessionalBookingDrawerDraft";
 import { useProfessionalFixedLocationCalendarPersistBookingFromDrawer } from "./useProfessionalFixedLocationCalendar.persistBookingFromDrawer";
 import { useProfessionalFixedLocationCalendarRenderHelpers } from "./useProfessionalFixedLocationCalendar.renderHelpers";
 import { useProfessionalFixedLocationCalendarProjectUploads } from "./useProfessionalFixedLocationCalendar.projectUploads";
@@ -987,6 +989,8 @@ export function useProfessionalFixedLocationCalendar({
     events,
     blocks,
     scheduleRows,
+    dateOverrides,
+    dataAvailability: data.availability,
     filterDrawerResources,
     eventsMatchingDrawerFilters,
     teamAll: appliedFilters.teamAll,
@@ -1185,7 +1189,7 @@ export function useProfessionalFixedLocationCalendar({
     setSlotCalendarTouched,
   });
 
-  const { getDailyBookingRatio, pickMostAvailableTeamMemberId } =
+  const { getDailyBookingRatio, listAvailableTeamMembersForWindow, pickMostAvailableTeamMemberId } =
     useProfessionalFixedLocationCalendarTeamMemberPicker({
       resources: data.resources,
       getAvailabilityFor,
@@ -1193,6 +1197,112 @@ export function useProfessionalFixedLocationCalendar({
       getLocationAvailability,
       slotLocation,
     });
+
+  const resourceById = React.useMemo(() => {
+    const map = new Map<string, (typeof data.resources)[number]>();
+    data.resources.forEach((resource) => map.set(String(resource.id), resource));
+    return map;
+  }, [data.resources]);
+
+  const resolveBookingStaff = React.useCallback(
+    (staffResourceId?: string) => {
+      const id = String(staffResourceId || "").trim();
+      if (!id) return undefined;
+      const resource = resourceById.get(id);
+      if (!resource) return undefined;
+      return {
+        name: resource.name,
+        photoSrc: resource.photoSrc ?? null,
+        avatarText: resource.avatarText,
+      };
+    },
+    [resourceById],
+  );
+
+  const getServiceStaffOptions = React.useCallback(
+    (service: {
+      id?: string;
+      staffResourceId?: string;
+      teamMemberId?: string | null;
+      startTime?: string;
+      durationMins?: number;
+    }) => {
+      const dateIso = selectedSlot?.date;
+      if (!dateIso) return [];
+      const currentId = String(
+        service.staffResourceId || service.teamMemberId || "",
+      ).trim();
+      const startMin = minutesSinceMidnight(
+        service.startTime ?? selectedSlot?.start ?? "00:00",
+      );
+      const durationMins = Math.max(1, service.durationMins || 0);
+
+      const siblingIds = new Set<string>();
+      const extraBusyByMember = new Map<string, { startMin: number; endMin: number }[]>();
+      const considerSibling = (row: {
+        id?: string;
+        staffResourceId?: string;
+        teamMemberId?: string | null;
+        startTime?: string;
+        durationMins?: number;
+      }) => {
+        const id = String(row.staffResourceId || row.teamMemberId || "").trim();
+        if (!id) return;
+        siblingIds.add(id);
+        // Don't treat this service's own window as blocking its current assignee.
+        if (service.id && row.id === service.id) return;
+        if (!row.startTime?.trim()) return;
+        const siblingStart = minutesSinceMidnight(row.startTime);
+        const siblingDuration = Math.max(1, row.durationMins || 0);
+        const busy = extraBusyByMember.get(id) ?? [];
+        busy.push({
+          startMin: siblingStart,
+          endMin: siblingStart + siblingDuration,
+        });
+        extraBusyByMember.set(id, busy);
+      };
+      for (const row of selectedServices) considerSibling(row);
+      for (const guest of bookingGuests) {
+        for (const row of guest.services ?? []) considerSibling(row);
+      }
+
+      // FL: max 3 distinct members — once at cap, only those three are assignable.
+      const atCap = slotLocation === "FL" && siblingIds.size >= 3;
+      const members = listAvailableTeamMembersForWindow(
+        dateIso,
+        startMin,
+        durationMins,
+        {
+          onlyMemberIds: atCap ? [...siblingIds] : undefined,
+          includeMemberIds: currentId ? [currentId] : undefined,
+          extraBusyByMember,
+        },
+      );
+
+      return members.map((member) => ({
+        id: member.id,
+        name: member.name,
+        photoSrc: member.photoSrc ?? null,
+        avatarText: member.avatarText,
+      }));
+    },
+    [
+      bookingGuests,
+      listAvailableTeamMembersForWindow,
+      selectedServices,
+      selectedSlot?.date,
+      selectedSlot?.start,
+      slotLocation,
+    ],
+  );
+
+  const openBookingStaffProfile = React.useCallback(
+    (staffResourceId: string) => {
+      const id = String(staffResourceId || "").trim();
+      if (id) setTeamProfileMemberId(id);
+    },
+    [setTeamProfileMemberId],
+  );
 
   const {
     dayBodyScrollRef,
@@ -1356,6 +1466,95 @@ export function useProfessionalFixedLocationCalendar({
         setSlotDrawerOpen,
       },
     });
+
+  useProfessionalBookingDrawerDraft({
+    editingEventId,
+    slotDrawerOpen,
+    selectedSlot,
+    slotLocation,
+    slotBookingType,
+    slotStatus,
+    slotClientAdded,
+    allowDrawerTimeSelection,
+    slotCalendarTouched,
+    selectedClient,
+    selectedServices,
+    selectedProducts,
+    bookingUniqueItems,
+    bookingGuests,
+    bookingProjectEnabled,
+    bookingProjectDescription,
+    bookingProjectUploads,
+    desiredLocationDraft,
+    showInternalNote,
+    bookingInternalNote,
+    showKilometerAllowance,
+    kilometerAllowanceDraft,
+    showPrepayment,
+    prepaymentPercent,
+    paymentMethod,
+    bookingTotalDiscount,
+    showLateCancellation,
+    lateCancellationFeePercent,
+    lateCancellationFeePercentCeiling,
+    showLateRescheduling,
+    lateRescheduleFeePercent,
+    lateRescheduleFeePercentCeiling,
+    showNoShowFee,
+    noShowFeePercent,
+    noShowFeePercentCeiling,
+    guestDraft,
+    bookingPhoneDraft,
+    nonMollureClientType,
+    nonMollureDraft,
+    selectionTarget,
+    addMenuTarget,
+    setSelectedSlot,
+    setSlotLocation,
+    setSlotBookingType,
+    setSlotStatus,
+    setSlotClientAdded,
+    setAllowDrawerTimeSelection,
+    setSlotCalendarOpen,
+    setSlotCalendarTouched,
+    setSelectedClient,
+    setSelectedServices,
+    setSelectedProducts,
+    setBookingUniqueItems,
+    setBookingGuests,
+    setBookingProjectEnabled,
+    setBookingProjectDescription,
+    setBookingProjectUploads,
+    setDesiredLocationDraft,
+    setShowInternalNote,
+    setBookingInternalNote,
+    setShowKilometerAllowance,
+    setKilometerAllowanceDraft,
+    setShowPrepayment,
+    setPrepaymentPercent,
+    setPaymentMethod,
+    setBookingTotalDiscount,
+    setShowLateCancellation,
+    setLateCancellationFeePercent,
+    setLateCancellationFeePercentCeiling,
+    setShowLateRescheduling,
+    setLateRescheduleFeePercent,
+    setLateRescheduleFeePercentCeiling,
+    setShowNoShowFee,
+    setNoShowFeePercent,
+    setNoShowFeePercentCeiling,
+    setGuestDraft,
+    setBookingPhoneDraft,
+    setNonMollureClientType,
+    setNonMollureDraft,
+    setSelectionTarget,
+    setAddMenuTarget,
+    setSlotBookingScreen,
+    setSlotDrawerTab,
+    setEditingEventId,
+    setIsEditingExisting,
+    setSlotDrawerOpen,
+  });
 
 
   const router = useRouter();
@@ -1559,6 +1758,7 @@ export function useProfessionalFixedLocationCalendar({
     addDlParticipant,
     addInlineGuest,
     applyBufferDraft,
+    assignServiceStaff,
     beginEditBuffer,
     beginEditInlineGuest,
     bumpSlotFromServices,
@@ -1597,10 +1797,20 @@ export function useProfessionalFixedLocationCalendar({
     setEditingBufferId,
     slotLocation,
     resources: data.resources,
+    resourceNameById,
     focusBookingDrawerSection,
     isDrawerPlanningGuest,
     showSnackbar,
   });
+
+  const changeBookingServiceStaff = React.useCallback(
+    (serviceId: string, staffResourceId: string) => {
+      if (!canEditBookingLineItems) return;
+      beginExistingBookingEdit();
+      assignServiceStaff(serviceId, staffResourceId);
+    },
+    [assignServiceStaff, beginExistingBookingEdit, canEditBookingLineItems],
+  );
 
   const {
     renderInlineGuestFields,
@@ -1831,6 +2041,7 @@ export function useProfessionalFixedLocationCalendar({
     cancellationFeeAt,
     cancelledServicesForDrawer,
     categoryOptions,
+    changeBookingServiceStaff,
     chronologicalDrawerGuests,
     clearBookingDrawerNotListedHint,
     clearTimelineHover,
@@ -1915,6 +2126,7 @@ export function useProfessionalFixedLocationCalendar({
     getDailyBookingRatio,
     getFilteredAvailabilityFor,
     getLocationAvailability,
+    getServiceStaffOptions,
     grid,
     guestsTotal,
     handleAcceptConfirmedEr,
@@ -2014,6 +2226,7 @@ export function useProfessionalFixedLocationCalendar({
     openBookingDrawer,
     openBookingLocation,
     openBookingMessages,
+    openBookingStaffProfile,
     openEditBookingProductLine,
     openEditBookingUniqueLine,
     openEditService,
@@ -2084,6 +2297,7 @@ export function useProfessionalFixedLocationCalendar({
     requestedScheduleLabel,
     resetToDefaultTeamMember,
     resetUniqueItemForm,
+    resolveBookingStaff,
     resolveEventCategoryKey,
     resolveEventColors,
     resolveProductEditTag,

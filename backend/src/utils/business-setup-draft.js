@@ -270,11 +270,35 @@ export const applyUnpublishedDraftToSetup = async (setup, queryFn) => {
     next.section_sync_settings = parseJsonValue(draft.section_sync_settings, {});
   }
   if (Array.isArray(draft.team_members) && draft.team_members.length) {
+    // Draft team payloads only carry public template fields (name/photo/services).
+    // Merge onto persisted members so personal info + review stats aren't wiped.
+    const existingById = new Map(
+      (Array.isArray(setup.team_members) ? setup.team_members : []).map((member) => [
+        String(member?.id ?? ""),
+        member,
+      ]),
+    );
     next.team_members = draft.team_members.map((member) => {
       const { photo_upload_key: _photoUploadKey, ...rest } = member || {};
+      const existing = existingById.get(String(rest.id ?? "")) || null;
+      const definedDraft = Object.fromEntries(
+        Object.entries(rest).filter(([, value]) => value !== undefined),
+      );
       return {
-        ...rest,
-        assigned_services: parseJsonArray(rest.assigned_services),
+        ...(existing || {}),
+        ...definedDraft,
+        assigned_services: parseJsonArray(
+          rest.assigned_services !== undefined
+            ? rest.assigned_services
+            : existing?.assigned_services,
+        ),
+        personal_documents: parseJsonArray(
+          rest.personal_documents !== undefined
+            ? rest.personal_documents
+            : existing?.personal_documents,
+        ),
+        rating: rest.rating ?? existing?.rating ?? 0,
+        total_reviews: rest.total_reviews ?? existing?.total_reviews ?? 0,
       };
     });
   }

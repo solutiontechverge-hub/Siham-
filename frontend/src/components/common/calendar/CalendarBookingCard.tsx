@@ -457,6 +457,12 @@ export default function CalendarBookingCard({
       members={otherTeamMembers}
       onSelectMember={onOpenSplitWithTeamMember}
       side={actionRailSide}
+      totalMemberCount={
+        otherTeamMembers.length
+          ? otherTeamMembers.length + 1
+          : undefined
+      }
+      bookingId={bookingRef}
     />
   );
 

@@ -380,9 +380,9 @@ export default function ClientBookingListView({ listTab }: Props) {
                           ) : null}
                           {(b.draft?.services ?? []).length > 0 ? (
                             <Stack spacing={0.35} sx={{ mt: 0.75 }}>
-                              {b.draft!.services.map((s) => (
+                              {b.draft!.services.map((s, i) => (
                                 <Typography
-                                  key={s.id}
+                                  key={`${s.id}::${s.guestId ?? ""}::${i}`}
                                   sx={{
                                     fontSize: 11.5,
                                     fontWeight: 700,

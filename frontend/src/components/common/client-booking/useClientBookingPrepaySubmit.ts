@@ -70,6 +70,7 @@ export function useClientBookingPrepaySubmit(input: {
 
   const { showSnackbar } = useSnackbar();
   const [isSubmittingRequest, setIsSubmittingRequest] = React.useState(false);
+  const paymentSuccessHandledRef = React.useRef(false);
 
   const submitDraftBookingRequest =
     React.useCallback(async (): Promise<boolean> => {
@@ -85,7 +86,9 @@ export function useClientBookingPrepaySubmit(input: {
           createBooking,
         });
         if (!result.ok) {
-          showSnackbar({ severity: "error", message: result.message });
+          if (result.message) {
+            showSnackbar({ severity: "error", message: result.message });
+          }
           return false;
         }
         setActiveBookingSession(result.record);
@@ -178,10 +181,10 @@ export function useClientBookingPrepaySubmit(input: {
             : "Prepayment received.",
       });
     } catch (error) {
-      showSnackbar({
-        severity: "error",
-        message: getApiErrorMessage(error, "Unable to record prepayment."),
-      });
+      const message = getApiErrorMessage(error, "Unable to record prepayment.");
+      if (message) {
+        showSnackbar({ severity: "error", message });
+      }
     }
   }, [
     activeBooking,
@@ -248,8 +251,21 @@ export function useClientBookingPrepaySubmit(input: {
       showSnackbar({ severity: "error", message: "No prepayment amount due." });
       return;
     }
+    if (checkoutPaymentMethodSupportsPayNow(selectedPaymentMethod)) {
+      const submitted = await submitDraftBookingRequest();
+      if (!submitted) return;
+      setStripeDialogOpen(true);
+      return;
+    }
     await completePrepayment();
-  }, [completePrepayment, prepaidAmount, showSnackbar]);
+  }, [
+    completePrepayment,
+    prepaidAmount,
+    selectedPaymentMethod,
+    setStripeDialogOpen,
+    showSnackbar,
+    submitDraftBookingRequest,
+  ]);
 
   const handleSendBookingRequest = React.useCallback(async () => {
     if (isDraft) {
@@ -312,6 +328,8 @@ export function useClientBookingPrepaySubmit(input: {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("payment") !== "success") return;
+    if (paymentSuccessHandledRef.current) return;
+    paymentSuccessHandledRef.current = true;
     void completePrepayment();
     const url = new URL(window.location.href);
     url.searchParams.delete("payment");

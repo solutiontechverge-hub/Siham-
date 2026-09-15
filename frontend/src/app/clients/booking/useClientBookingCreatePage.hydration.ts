@@ -14,6 +14,10 @@ import {
 } from "../../../data/businessPublicProfile.data";
 import { extractUuidFromSyntheticId } from "./clientBookingApi.mapper";
 import { enrichClientBookingRecord } from "./clientBookingDraftCache";
+import {
+  readClientBookingCreateUiDraft,
+  shouldRestoreClientBookingCreateUiDraft,
+} from "./clientBookingCreateUiDraft";
 import { loadPublicProfileBookingSelection } from "../../../data/publicProfileBookingSelection";
 import {
   createNotesPerson,
@@ -117,6 +121,10 @@ export function useClientBookingCreateHydration(
     ebrSuggestBaselineRef,
     hydrationSignatureRef,
   } = args;
+
+  // Date changes must not re-fire hydration (autosave + restore would loop).
+  const selectedDateRef = React.useRef(selectedDate);
+  selectedDateRef.current = selectedDate;
 
   React.useEffect(() => {
     try {
@@ -261,7 +269,7 @@ export function useClientBookingCreateHydration(
     const hydrateFromActiveDraft = (
       existing: NonNullable<ReturnType<typeof enrichClientBookingRecord>>,
       options: { signaturePrefix: string; forceRequesterGuestId: boolean },
-    ) => {
+    ): boolean => {
       const locationMode =
         existing.shop?.locationMode ?? shop?.locationMode ?? "fixed";
       const signature = `${options.signaturePrefix}:${existing.bookingRef}:${existing.draft?.people
@@ -279,7 +287,7 @@ export function useClientBookingCreateHydration(
         existing.draft?.desiredLocation?.province,
         existing.draft?.desiredLocation?.municipality,
       ].join("|")}`;
-      if (hydrationSignatureRef.current === signature) return;
+      if (hydrationSignatureRef.current === signature) return false;
       hydrationSignatureRef.current = signature;
 
       const draftServices: Service[] = (existing.draft?.services ?? []).map(
@@ -433,6 +441,7 @@ export function useClientBookingCreateHydration(
       setSelectedTeamMemberId(firstTm);
       setServiceTab(getPreferredServiceTab(draftServices));
       setProfileHydrated(true);
+      return true;
     };
 
     // Confirmed Edit / EBR must win over leftover profile-selection cache.
@@ -480,6 +489,90 @@ export function useClientBookingCreateHydration(
       }
     }
 
+    // Reload / leave mid-create: restore autosaved UI draft (same Book Now token).
+    // Once any hydration signature is set, only return — never re-apply (autosave
+    // rewrites the draft on every date change and would loop with setState).
+    const createUiDraft = readClientBookingCreateUiDraft();
+    if (
+      shouldRestoreClientBookingCreateUiDraft({
+        draft: createUiDraft,
+        shopId: shop?.shopId,
+        fromProfile,
+        hydrationToken: profileHydrationToken,
+      }) &&
+      createUiDraft
+    ) {
+      if (!shop?.shopId) return;
+      if (hydrationSignatureRef.current) return;
+      const applied = hydrateFromActiveDraft(
+        {
+          id: `bk_create_ui_${createUiDraft.shopId}`,
+          bookingRef: `create-ui:${createUiDraft.shopId}`,
+          status: "draft",
+          createdAt: createUiDraft.savedAt,
+          shop: {
+            shopId: createUiDraft.shopId,
+            shopName: createUiDraft.shopName ?? shop.shopName ?? "Salon",
+            municipalityLabel:
+              createUiDraft.municipalityLabel ?? shop.municipalityLabel,
+            addressLabel: createUiDraft.addressLabel ?? shop.addressLabel,
+            locationMode:
+              createUiDraft.locationMode ?? shop.locationMode ?? "fixed",
+          },
+          draft: {
+            selectedDateISO: createUiDraft.selectedDateISO,
+            selectedTime: createUiDraft.selectedTime,
+            combineServices: createUiDraft.combineServices,
+            people: createUiDraft.people,
+            services: createUiDraft.services,
+            teamMembers: createUiDraft.shopTeamMembers.map(({ id, name }) => ({
+              id,
+              name,
+            })),
+            total: createUiDraft.total,
+            ...(createUiDraft.clientNote.trim()
+              ? { clientNote: createUiDraft.clientNote }
+              : {}),
+            ...(createUiDraft.bookingProjectEnabled
+              ? {
+                  projectDetails: {
+                    description: createUiDraft.projectDescription,
+                    uploads: createUiDraft.projectUploads,
+                  },
+                }
+              : {}),
+            ...(createUiDraft.locationMode === "desired"
+              ? { desiredLocation: createUiDraft.desiredVisitAddress }
+              : {}),
+          },
+        },
+        {
+          // Never include savedAt — autosave rewrites it on every date/time change.
+          signaturePrefix: `createUi:${createUiDraft.shopId}:${createUiDraft.hydrationToken}`,
+          forceRequesterGuestId: false,
+        },
+      );
+      // Only stamp UI-only fields when hydrate actually applied (not on every render).
+      if (applied) {
+        if (createUiDraft.selectedPersonId) {
+          setSelectedPersonId(createUiDraft.selectedPersonId);
+        }
+        if (createUiDraft.selectedTeamMemberId !== undefined) {
+          setSelectedTeamMemberId(createUiDraft.selectedTeamMemberId);
+        }
+        if (createUiDraft.serviceTab) {
+          setServiceTab(createUiDraft.serviceTab);
+        }
+        if (createUiDraft.selectedServiceIds) {
+          setSelectedServiceIds(createUiDraft.selectedServiceIds);
+        }
+        if (createUiDraft.shopTeamMembers.length) {
+          setShopTeamMembers(createUiDraft.shopTeamMembers);
+        }
+      }
+      return;
+    }
+
     if (fromProfile && profileSelection?.services.length) {
       applyProfileIfNeeded(profileSelection);
       return;
@@ -520,7 +613,10 @@ export function useClientBookingCreateHydration(
       businessProfile,
       mode,
     ).map((s) => {
-      const priced = pricePublicProfileServiceOnDate(s, toISO(selectedDate));
+      const priced = pricePublicProfileServiceOnDate(
+        s,
+        toISO(selectedDateRef.current),
+      );
       return {
         id: s.id,
         catalogServiceId: s.id,
@@ -551,7 +647,6 @@ export function useClientBookingCreateHydration(
     isEbrSuggest,
     profileHydrationToken,
     requesterDisplayName,
-    selectedDate,
     setBookingProjectEnabled,
     setClientNote,
     setCombineServices,

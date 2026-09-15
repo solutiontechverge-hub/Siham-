@@ -1,4 +1,4 @@
-import { getApiErrorMessage } from "../../../lib/api-error";
+import { getApiErrorMessage, isApiRequestAborted } from "../../../lib/api-error";
 import { INPUT_LIMITS, parseText } from "../../../lib/inputSchema";
 import { UUID_RE } from "../../../lib/uuid";
 import type { BusinessSetupListing, CreateBookingRequest } from "../../../store/services/businessApi";
@@ -24,7 +24,8 @@ function validateBookingPayloadFields(
     const notes = parseText(String(payload.notes), {
       required: false,
       label: "Notes",
-      max: INPUT_LIMITS.textLong,
+      min: 0,
+      max: null,
     });
     if (!notes.ok) return notes.error;
   }
@@ -218,9 +219,15 @@ export async function submitClientBookingRequest(params: {
     };
     return { ok: true, record: updated };
   } catch (error) {
+    if (isApiRequestAborted(error)) {
+      return { ok: false, message: "" };
+    }
     return {
       ok: false,
-      message: getApiErrorMessage(error, "Unable to send booking request. Please try again."),
+      message: getApiErrorMessage(
+        error,
+        "Unable to send booking request. Please try again.",
+      ),
     };
   }
 }

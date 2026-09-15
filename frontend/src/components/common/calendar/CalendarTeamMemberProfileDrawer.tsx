@@ -12,6 +12,7 @@ import {
   IconButton,
   MenuItem,
   Paper,
+  Rating,
   Stack,
   Typography,
 } from "@mui/material";
@@ -24,7 +25,9 @@ import TeamMemberAssignedServicesPanel from "../business/TeamMemberAssignedServi
 import { useSnackbar } from "../AppSnackbar";
 import { mollureWhiteFieldInputSx } from "../mollureFormSx";
 import { getApiErrorMessage } from "../../../lib/api-error";
+import { INPUT_LIMITS, parseText } from "../../../lib/inputSchema";
 import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
+import { teamMemberRatingFromApi } from "../../../lib/teamMemberReviews";
 import {
   addTeamMemberServiceSelection,
   buildTeamBusinessServiceRefs,
@@ -58,6 +61,10 @@ import {
 
 type LocationTab = "FL" | "DL";
 
+const EMPTY_BUSINESS_CATEGORIES: NonNullable<
+  ReturnType<typeof useGetBusinessCategoriesQuery>["data"]
+>["data"] = [];
+
 type CalendarTeamMemberProfileDrawerProps = {
   open: boolean;
   memberId: string | null;
@@ -84,7 +91,8 @@ export default function CalendarTeamMemberProfileDrawer({
   const [updateTeamMember, { isLoading: isSaving }] = useUpdateTeamMemberMutation();
 
   const setup = setupResponse?.data ?? null;
-  const businessCategories = categoriesResponse?.data ?? [];
+  const businessCategories =
+    categoriesResponse?.data ?? EMPTY_BUSINESS_CATEGORIES;
   const member = React.useMemo(
     () =>
       setup?.team_members?.find((row) => String(row.id) === String(memberId ?? "")) ??
@@ -203,12 +211,27 @@ export default function CalendarTeamMemberProfileDrawer({
   }, [businessCategories, publicDraft, serviceContext]);
 
   const drawerTitle = `${publicDraft.name.trim() || member?.full_name?.trim() || "Team Member"} Profile`;
+  const reviewStats = teamMemberRatingFromApi(
+    member?.rating,
+    member?.total_reviews,
+  );
 
   const handleSave = async () => {
     if (!member?.id) return;
     const fullName = publicDraft.name.trim();
     if (!fullName) {
       showSnackbar({ severity: "warning", message: "Team member name is required." });
+      return;
+    }
+
+    const noteParsed = parseText(personalNote, {
+      required: false,
+      label: "Personal note",
+      min: INPUT_LIMITS.notesMin,
+      max: null,
+    });
+    if (!noteParsed.ok) {
+      showSnackbar({ severity: "error", message: noteParsed.error });
       return;
     }
 
@@ -236,7 +259,7 @@ export default function CalendarTeamMemberProfileDrawer({
         email: email.trim() || null,
         emergency_contact_name: emergencyContactName.trim() || null,
         emergency_contact_number: emergencyContactNumber.trim() || null,
-        personal_note: personalNote.trim() || null,
+        personal_note: noteParsed.value || null,
         personal_documents: personalDocuments,
         profilePhotoFile: pendingPhotoFile,
         personalDocumentFiles:
@@ -427,6 +450,29 @@ export default function CalendarTeamMemberProfileDrawer({
                 fullWidth
                 sx={fieldInputSx}
               />
+
+              <Stack direction="row" spacing={0.5} alignItems="center">
+                <Rating
+                  value={reviewStats.rating}
+                  precision={0.5}
+                  readOnly
+                  size="small"
+                  sx={{
+                    fontSize: 18,
+                    pointerEvents: "none",
+                    "& .MuiRating-iconFilled": { color: m.star },
+                  }}
+                />
+                <Typography
+                  sx={{
+                    fontSize: 12,
+                    color: alpha(m.navy, 0.55),
+                    fontWeight: 600,
+                  }}
+                >
+                  {reviewStats.reviewsLabel}
+                </Typography>
+              </Stack>
 
               {categoryOptions.length > 0 ? (
                 <MollureLabeledSelect

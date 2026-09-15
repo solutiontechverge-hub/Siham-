@@ -1,36 +1,22 @@
-import {
-  collectEventTeamMemberIds,
-  eventBelongsToTeamMember,
-} from "../teamMemberBookings";
+import { eventBelongsToTeamMember } from "../teamMemberBookings";
 import type { CalendarEvent } from "../../../../app/professionals/fixed-location/calendar/calendar.data";
 import { resolveCalendarBookingIdentity } from "../calendar-overlap.utils";
 
 export function buildDayViewMemberColumnSource<
   TResource extends { id: string },
-  TEvent extends Pick<CalendarEvent, "details" | "resourceId"> & {
-    date: string;
-  },
 >(input: {
   viewMode: string;
   splitScreen: { primaryId: string; partnerId: string } | null;
   resourcesLength: number;
   filteredResources: readonly TResource[];
-  selectedResourceId: string;
-  defaultDaySelectedResourceId: string;
   dayRankedResources: readonly TResource[];
-  eventsMatchingDrawerFilters: readonly TEvent[];
-  activeDateIso: string;
 }): TResource[] {
   const {
     viewMode,
     splitScreen,
     resourcesLength,
     filteredResources,
-    selectedResourceId,
-    defaultDaySelectedResourceId,
     dayRankedResources,
-    eventsMatchingDrawerFilters,
-    activeDateIso,
   } = input;
 
   if (viewMode !== "day") return [] as TResource[];
@@ -57,79 +43,22 @@ export function buildDayViewMemberColumnSource<
 
   if (!filteredResources.length) return [] as TResource[];
 
-  const selectedMember =
-    filteredResources.find((resource) => resource.id === selectedResourceId) ??
-    filteredResources.find(
-      (resource) => resource.id === defaultDaySelectedResourceId,
-    ) ??
-    dayRankedResources.find((resource) =>
-      filteredResources.some((row) => row.id === resource.id),
-    ) ??
-    filteredResources[0];
-  const selectedId = String(selectedMember?.id ?? "");
-
-  const bookingTeamIds = (event: TEvent) =>
-    [
-      ...new Set(
-        [
-          ...collectEventTeamMemberIds(event),
-          String(event.resourceId ?? "").trim(),
-        ].filter(Boolean),
-      ),
-    ];
-
-  /** Shared partners for bookings that touch any seed member (dynamic by resource id). */
-  const sharedPartnerIdsFor = (seedIds: ReadonlySet<string>) => {
-    const partnerIds = new Set<string>();
-    if (!seedIds.size) return partnerIds;
-    for (const event of eventsMatchingDrawerFilters) {
-      if (event.date !== activeDateIso) continue;
-      const teamIds = bookingTeamIds(event);
-      if (teamIds.length <= 1) continue;
-      const involvesSeed =
-        teamIds.some((id) => seedIds.has(String(id))) ||
-        [...seedIds].some((id) => eventBelongsToTeamMember(event, id));
-      if (!involvesSeed) continue;
-      for (const teamId of teamIds) {
-        if (
-          filteredResources.some(
-            (resource) => String(resource.id) === String(teamId),
-          )
-        ) {
-          partnerIds.add(String(teamId));
-        }
-      }
-    }
-    return partnerIds;
-  };
-
-  // All filtered members as columns; viewport scrolls to 3 via TEAM_NAV_VISIBLE_SLOTS.
-  const byId = new Map(
-    filteredResources.map((resource) => [String(resource.id), resource]),
-  );
-  const orderedIds: string[] = [];
-  const pushId = (id: string) => {
-    const key = String(id);
-    if (!key || !byId.has(key) || orderedIds.includes(key)) return;
-    orderedIds.push(key);
-  };
-  if (selectedId) pushId(selectedId);
-  for (const id of sharedPartnerIdsFor(
-    new Set(selectedId ? [selectedId] : []),
-  )) {
-    pushId(id);
-  }
+  // Preserve busiest-first (then alpha) from dayRankedResources.
   const filteredIdSet = new Set(
     filteredResources.map((resource) => String(resource.id)),
   );
-  for (const resource of dayRankedResources) {
-    if (filteredIdSet.has(String(resource.id))) pushId(String(resource.id));
-  }
-  for (const resource of filteredResources) pushId(String(resource.id));
-  const widened = sharedPartnerIdsFor(new Set(orderedIds));
-  for (const id of widened) pushId(id);
+  const ranked = dayRankedResources.filter((resource) =>
+    filteredIdSet.has(String(resource.id)),
+  );
+  if (ranked.length === filteredResources.length) return [...ranked];
 
-  return orderedIds.map((id) => byId.get(id)!).filter(Boolean);
+  const seen = new Set(ranked.map((resource) => String(resource.id)));
+  return [
+    ...ranked,
+    ...filteredResources.filter(
+      (resource) => !seen.has(String(resource.id)),
+    ),
+  ];
 }
 
 export function remountDayViewSegmentsOntoVisibleColumns(

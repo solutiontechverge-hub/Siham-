@@ -114,13 +114,21 @@ export function useClientBookingCreateSummary(
     [teamMemberNameById],
   );
 
-  const resolveServiceTeamMemberName = React.useCallback(
+  const resolveServiceTeamMemberId = React.useCallback(
     (service: { teamMemberId?: string | null }) => {
       const id =
         String(service.teamMemberId ?? "").trim() ||
         String(selectedTeamMemberId ?? "").trim() ||
         filteredTeamMembers[0]?.id ||
         "";
+      return id || undefined;
+    },
+    [filteredTeamMembers, selectedTeamMemberId],
+  );
+
+  const resolveServiceTeamMemberName = React.useCallback(
+    (service: { teamMemberId?: string | null }) => {
+      const id = resolveServiceTeamMemberId(service);
       if (!id) return undefined;
       return (
         teamMemberFirstName(id) ||
@@ -130,7 +138,7 @@ export function useClientBookingCreateSummary(
     },
     [
       filteredTeamMembers,
-      selectedTeamMemberId,
+      resolveServiceTeamMemberId,
       teamMemberFirstName,
       teamMemberNameById,
     ],
@@ -182,6 +190,7 @@ export function useClientBookingCreateSummary(
     guestNameById,
     teamMemberChipLabelForItems,
     teamMemberFirstName,
+    resolveServiceTeamMemberId,
     resolveServiceTeamMemberName,
     summarySections,
   };

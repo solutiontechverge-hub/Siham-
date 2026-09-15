@@ -4,8 +4,12 @@ import type {
   CalendarEvent,
   CalendarResource,
   CalendarViewMode,
+  ResourceAvailability,
 } from "../../../../app/professionals/fixed-location/calendar/calendar.data";
-import type { ScheduleAvailabilityRow } from "../calendar-settings.types";
+import type {
+  ScheduleAvailabilityRow,
+  ScheduleDateOverride,
+} from "../calendar-settings.types";
 import { useProfessionalFixedLocationCalendarTeamLayout } from "./useProfessionalFixedLocationCalendar.team.layout";
 import { useProfessionalFixedLocationCalendarTeamMenu } from "./useProfessionalFixedLocationCalendar.team.menu";
 
@@ -14,6 +18,8 @@ export type UseProfessionalFixedLocationCalendarTeamArgs = {
   events: readonly CalendarEvent[];
   blocks: readonly CalendarBlock[];
   scheduleRows: readonly ScheduleAvailabilityRow[];
+  dateOverrides?: readonly ScheduleDateOverride[] | null;
+  dataAvailability?: readonly ResourceAvailability[] | null;
   filterDrawerResources: readonly CalendarResource[];
   eventsMatchingDrawerFilters: readonly CalendarEvent[];
   teamAll: boolean;

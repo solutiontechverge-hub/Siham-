@@ -14,12 +14,16 @@ type Props = {
     ProfessionalFixedLocationCalendarBookingDrawerDetailsPlanningBlocksBag,
     | "beginExistingBookingEdit"
     | "canEditBookingLineItems"
+    | "changeBookingServiceStaff"
+    | "getServiceStaffOptions"
     | "incomingRequestEditMode"
     | "m"
+    | "openBookingStaffProfile"
     | "openDrawerLineTagComparison"
     | "openEditServiceFromLineItem"
     | "removeClientService"
     | "reorderClientServices"
+    | "resolveBookingStaff"
     | "resolveProductEditTag"
     | "resolveServiceEditTag"
     | "resourceNameById"
@@ -39,12 +43,16 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsPla
   const {
     beginExistingBookingEdit,
     canEditBookingLineItems,
+    changeBookingServiceStaff,
+    getServiceStaffOptions,
     incomingRequestEditMode,
     m,
+    openBookingStaffProfile,
     openDrawerLineTagComparison,
     openEditServiceFromLineItem,
     removeClientService,
     reorderClientServices,
+    resolveBookingStaff,
     resolveProductEditTag,
     resolveServiceEditTag,
     resourceNameById,
@@ -110,6 +118,14 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsPla
               staffResourceId
                 ? resourceNameById.get(staffResourceId)
                 : undefined
+            }
+            resolveStaff={resolveBookingStaff}
+            onStaffClick={openBookingStaffProfile}
+            staffOptionsForService={
+              canEditBookingLineItems ? getServiceStaffOptions : undefined
+            }
+            onStaffChange={
+              canEditBookingLineItems ? changeBookingServiceStaff : undefined
             }
             resolveServiceEditTag={resolveServiceEditTag}
             resolveProductEditTag={resolveProductEditTag}

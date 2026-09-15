@@ -95,7 +95,7 @@ router.patch(
   [
     uuidParam("id"),
     enumBody("accountStatus", CLIENT_ACCOUNT_STATUSES, { optional: true }),
-    textBody("note", { optional: true, max: LIMITS.textLong, label: "note" }),
+    textBody("note", { optional: true, min: LIMITS.notesMin, max: null, label: "note" }),
     body("delete")
       .optional()
       .isBoolean()

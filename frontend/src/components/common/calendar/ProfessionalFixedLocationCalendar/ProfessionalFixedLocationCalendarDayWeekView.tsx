@@ -282,6 +282,7 @@ export default function ProfessionalFixedLocationCalendarDayWeekView({ bag }: Pr
                                 : viewMode === "day" && teamHeaderNeedsScroll
                                   ? {
                                       ...teamHeaderScrollOverflowSx,
+                                      scrollSnapType: "x mandatory",
                                       // Header already shows the scrollbar chrome.
                                       scrollbarWidth: "none",
                                       msOverflowStyle: "none",

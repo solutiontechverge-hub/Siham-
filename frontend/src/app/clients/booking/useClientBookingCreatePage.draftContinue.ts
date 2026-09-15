@@ -15,8 +15,10 @@ import {
   rememberCreateReturnHref,
   setActiveBookingSession,
 } from "./clientBookingSession";
+import { clearClientBookingCreateUiDraft } from "./clientBookingCreateUiDraft";
 import { resolveCreateCheckoutPath } from "./resolveCreateBookingStatus";
 import { getApiErrorMessage } from "../../../lib/api-error";
+import { INPUT_LIMITS, parseText } from "../../../lib/inputSchema";
 import {
   fileFromProjectUpload,
   inferProjectUploadKind,
@@ -271,6 +273,17 @@ export function useClientBookingCreateContinue(
     }
     setTimeValidationError(null);
 
+    const noteParsed = parseText(clientNote, {
+      required: false,
+      label: "Note",
+      min: INPUT_LIMITS.notesMin,
+      max: null,
+    });
+    if (!noteParsed.ok) {
+      showSnackbar({ severity: "error", message: noteParsed.error });
+      return;
+    }
+
     const peopleForDraft = (
       planningPersonId != null
         ? people.map((p) =>
@@ -509,6 +522,7 @@ export function useClientBookingCreateContinue(
         bookingRequestSent: false,
       };
       setActiveBookingSession(draftRecord);
+      clearClientBookingCreateUiDraft();
 
       const listTab = parseBookingListTab(searchParams?.get("tab"));
       const checkoutPath = resolveCreateCheckoutPath({

@@ -7,6 +7,7 @@ import { emptyBookingUniqueItemDraft } from "../../../../data/bookingUniqueItem.
 import type { CalendarBookingLocation } from "../../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { SelectedSlot } from "../calendar.utils";
 import type { InlineGuestDraftState } from "./useProfessionalFixedLocationCalendar.types";
+import { clearProfessionalBookingDrawerDraft } from "./professionalBookingDrawerDraft";
 
 /** Drawer-reset setters bag — intentional (ponytail: keep apply colocated). */
 export type UseProfessionalFixedLocationCalendarOpenBookingDrawerArgs = {
@@ -110,6 +111,7 @@ export function useProfessionalFixedLocationCalendarOpenBookingDrawer({
         calendarTouched?: boolean;
       },
     ) => {
+      clearProfessionalBookingDrawerDraft();
       const allowTimeSelection = Boolean(options?.allowTimeSelection);
       const openCalendar = options?.openCalendar ?? allowTimeSelection;
       const calendarTouched = options?.calendarTouched ?? !allowTimeSelection;

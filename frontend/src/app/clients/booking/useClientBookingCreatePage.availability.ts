@@ -130,6 +130,18 @@ export function useClientBookingCreateAvailability(
   }, [availabilityBookableTimes, baseAvailableTimes]);
 
   const lastAutoAssignRef = React.useRef("");
+  const locationCatalogIdsKey = React.useMemo(
+    () => locationServiceCatalog.map((service) => service.id).join(","),
+    [locationServiceCatalog],
+  );
+  const locationServiceCatalogRef = React.useRef(locationServiceCatalog);
+  locationServiceCatalogRef.current = locationServiceCatalog;
+  const selectedDateISO = toISO(selectedDate);
+  const servicesAssignKey = React.useMemo(
+    () =>
+      services.map((service) => `${service.id}:${service.durationMins}`).join(","),
+    [services],
+  );
 
   React.useEffect(() => {
     if (
@@ -144,10 +156,12 @@ export function useClientBookingCreateAvailability(
     const startMin = parseTimeLabelToMinutes(selectedTime);
     if (!startMin) return;
 
+    const catalogList = locationServiceCatalogRef.current;
     const contextKey = [
-      toISO(selectedDate),
+      selectedDateISO,
       selectedTime,
-      services.map((service) => `${service.id}:${service.durationMins}`).join(","),
+      servicesAssignKey,
+      locationCatalogIdsKey,
     ].join("|");
 
     const assignments = autoAssignServicesByAvailability({
@@ -160,7 +174,7 @@ export function useClientBookingCreateAvailability(
         teamMemberId: service.teamMemberId,
       })),
       candidateMemberIds,
-      fallbackCatalogIds: locationServiceCatalog.map((service) => service.id),
+      fallbackCatalogIds: catalogList.map((service) => service.id),
       startMin,
       assignOneMemberForAll: isDesiredLocation,
     });
@@ -199,11 +213,14 @@ export function useClientBookingCreateAvailability(
     candidateMemberIds,
     hasAssignableTeamMembers,
     isDesiredLocation,
-    locationServiceCatalog,
-    selectedDate,
+    locationCatalogIdsKey,
+    selectedDateISO,
     selectedTeamMemberId,
     selectedTime,
     services,
+    servicesAssignKey,
+    setSelectedTeamMemberId,
+    setServices,
   ]);
 
   const getServiceStartMin = React.useCallback(

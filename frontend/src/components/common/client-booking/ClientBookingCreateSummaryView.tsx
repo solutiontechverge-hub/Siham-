@@ -32,6 +32,7 @@ import {
 import { useSyncFinanceTransactionFromBookingMutation } from "../../../store/services/financeApi";
 import { useSnackbar } from "../AppSnackbar";
 import {
+  getTeamForLocationMode,
   isAddressInOperatingArea,
   resolveDesiredVisitMunicipalityOptions,
 } from "../../../data/businessPublicProfile.data";
@@ -65,6 +66,9 @@ import {
 import ClientBookingCreateSummaryCheckoutPanel from "./ClientBookingCreateSummaryCheckoutPanel";
 import ClientBookingCreateSummaryContactPanel from "./ClientBookingCreateSummaryContactPanel";
 import ClientBookingCreateSummaryServiceCard from "./ClientBookingCreateSummaryServiceCard";
+import ClientTeamMemberPublicProfileDrawer, {
+  type ClientTeamMemberPublicProfile,
+} from "./ClientTeamMemberPublicProfileDrawer";
 import ClientBookingProjectDetailsCard from "./ClientBookingProjectDetailsCard";
 import StripePrepaymentDialog from "./StripePrepaymentDialog";
 import { useActiveClientBooking } from "./useActiveClientBooking";
@@ -165,6 +169,9 @@ export default function ClientBookingCreateSummaryView() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isPaying, setIsPaying] = React.useState(false);
   const [stripeDialogOpen, setStripeDialogOpen] = React.useState(false);
+  const [profileMemberId, setProfileMemberId] = React.useState<string | null>(
+    null,
+  );
 
   React.useEffect(() => {
     const visit = draft?.desiredLocation;
@@ -182,6 +189,37 @@ export default function ClientBookingCreateSummaryView() {
     () => buildBookingSummarySections(draft),
     [draft],
   );
+
+  const profileMember = React.useMemo<ClientTeamMemberPublicProfile | null>(() => {
+    const id = String(profileMemberId ?? "").trim();
+    if (!id) return null;
+    const locationTeam = businessProfile
+      ? getTeamForLocationMode(businessProfile, locationMode)
+      : [];
+    const fromProfile =
+      locationTeam.find((row) => row.id === id) ||
+      businessProfile?.teamMembers.find((row) => row.id === id);
+    const fallbackName =
+      draft?.teamMembers?.find((tm) => String(tm.id) === id)?.name?.trim() || "";
+    if (!fromProfile && !fallbackName) return null;
+    const serviceLabels = [
+      ...new Set(
+        (fromProfile?.serviceSlots ?? []).flatMap((slot) =>
+          slot.options
+            .map((opt) => String(opt.label ?? "").trim())
+            .filter(Boolean),
+        ),
+      ),
+    ];
+    return {
+      id,
+      name: fromProfile?.name?.trim() || fallbackName,
+      avatarUrl: fromProfile?.avatarUrl,
+      rating: fromProfile?.rating,
+      reviewsCount: fromProfile?.reviewsCount,
+      serviceLabels: serviceLabels.length ? serviceLabels : undefined,
+    };
+  }, [businessProfile, draft?.teamMembers, locationMode, profileMemberId]);
 
   const bookingStartMinutes = parseTimeLabelToMinutes(
     draft?.selectedTime ?? "12:00 AM",
@@ -397,7 +435,21 @@ export default function ClientBookingCreateSummaryView() {
         : session.shop,
       contactPhone: contactPhoneValue || session.contactPhone,
     };
-    setActiveBookingSession(next);
+    const prevPhone = String(session.contactPhone ?? "").trim();
+    const nextPhone = String(next.contactPhone ?? "").trim();
+    const prevVisit = session.draft?.desiredLocation;
+    const nextVisit = next.draft?.desiredLocation;
+    const visitChanged =
+      isDesired &&
+      (String(prevVisit?.street ?? "") !== String(nextVisit?.street ?? "") ||
+        String(prevVisit?.number ?? "") !== String(nextVisit?.number ?? "") ||
+        String(prevVisit?.postalCode ?? "") !==
+          String(nextVisit?.postalCode ?? "") ||
+        String(prevVisit?.municipality ?? "") !==
+          String(nextVisit?.municipality ?? ""));
+    if (prevPhone !== nextPhone || visitChanged) {
+      setActiveBookingSession(next);
+    }
     return next;
   }, [activeBooking, address, addressLabel, contactPhoneValue, isDesired]);
 
@@ -447,7 +499,9 @@ export default function ClientBookingCreateSummaryView() {
       createBooking,
     });
     if (!result.ok) {
-      showSnackbar({ severity: "error", message: result.message });
+      if (result.message) {
+        showSnackbar({ severity: "error", message: result.message });
+      }
       return null;
     }
     setActiveBookingSession(result.record);
@@ -522,10 +576,10 @@ export default function ClientBookingCreateSummaryView() {
           : "Prepayment received. You can complete your booking.",
       });
     } catch (error) {
-      showSnackbar({
-        severity: "error",
-        message: getApiErrorMessage(error, "Unable to record prepayment."),
-      });
+      const message = getApiErrorMessage(error, "Unable to record prepayment.");
+      if (message) {
+        showSnackbar({ severity: "error", message });
+      }
     }
   }, [
     ensureBookingCreated,
@@ -548,12 +602,15 @@ export default function ClientBookingCreateSummaryView() {
 
     setIsPaying(true);
     try {
-      await completePrepayment();
+      // Create server booking first, then collect card — do not mark paid until Stripe succeeds.
+      const record = await ensureBookingCreated();
+      if (!record) return;
+      setStripeDialogOpen(true);
     } finally {
       setIsPaying(false);
     }
   }, [
-    completePrepayment,
+    ensureBookingCreated,
     isPaying,
     isPrepaymentPaid,
     prepayAmount,
@@ -561,10 +618,13 @@ export default function ClientBookingCreateSummaryView() {
     validateBeforeAction,
   ]);
 
+  const paymentSuccessHandledRef = React.useRef(false);
   React.useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("payment") !== "success") return;
+    if (paymentSuccessHandledRef.current) return;
+    paymentSuccessHandledRef.current = true;
     void completePrepayment();
     const url = new URL(window.location.href);
     url.searchParams.delete("payment");
@@ -626,7 +686,9 @@ export default function ClientBookingCreateSummaryView() {
         createBooking,
       });
       if (!result.ok) {
-        showSnackbar({ severity: "error", message: result.message });
+        if (result.message) {
+          showSnackbar({ severity: "error", message: result.message });
+        }
         return;
       }
       setActiveBookingSession(result.record);
@@ -643,15 +705,15 @@ export default function ClientBookingCreateSummaryView() {
         `/clients/booking/completed?outcome=${outcome}&tab=${encodeURIComponent(listTab)}`,
       );
     } catch (error) {
-      showSnackbar({
-        severity: "error",
-        message: getApiErrorMessage(
-          error,
-          isDesired
-            ? "Unable to send booking request. Please try again."
-            : "Unable to complete booking. Please try again.",
-        ),
-      });
+      const message = getApiErrorMessage(
+        error,
+        isDesired
+          ? "Unable to send booking request. Please try again."
+          : "Unable to complete booking. Please try again.",
+      );
+      if (message) {
+        showSnackbar({ severity: "error", message });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -742,6 +804,9 @@ export default function ClientBookingCreateSummaryView() {
             catalogProducts={catalogProducts}
             catalogUniqueItems={catalogUniqueItems}
             clientNote={draft.clientNote}
+            onTeamMemberClick={(teamMemberId) =>
+              setProfileMemberId(String(teamMemberId).trim() || null)
+            }
           />
 
           {draft.projectDetails &&
@@ -795,6 +860,12 @@ export default function ClientBookingCreateSummaryView() {
         bookingRef={bookingRef}
         onClose={() => setStripeDialogOpen(false)}
         onSuccess={() => void completePrepayment()}
+      />
+      <ClientTeamMemberPublicProfileDrawer
+        open={Boolean(profileMemberId)}
+        onClose={() => setProfileMemberId(null)}
+        shopId={shop?.shopId}
+        member={profileMember}
       />
     </Box>
   );

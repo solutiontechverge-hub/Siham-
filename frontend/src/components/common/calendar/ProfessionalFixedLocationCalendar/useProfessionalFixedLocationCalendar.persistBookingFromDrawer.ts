@@ -37,6 +37,7 @@ import {
   resolveStaffConflictMessage,
   type PersistBookingGuest as BookingGuest,
 } from "./useProfessionalFixedLocationCalendar.persistBookingFromDrawer.helpers";
+import { clearProfessionalBookingDrawerDraft } from "./professionalBookingDrawerDraft";
 import {
   buildPersistBookingTitle,
   buildPersistDrawerDetails,
@@ -736,6 +737,9 @@ export function useProfessionalFixedLocationCalendarPersistBookingFromDrawer({
           });
           setSlotSaveAttempted(false);
           setActiveDateIso(selectedSlot.date);
+          if (isNewManualBooking) {
+            clearProfessionalBookingDrawerDraft();
+          }
           return true;
         } catch (error) {
           showSnackbar({
@@ -772,6 +776,9 @@ export function useProfessionalFixedLocationCalendarPersistBookingFromDrawer({
       });
       setSlotSaveAttempted(false);
       setActiveDateIso(selectedSlot.date);
+      if (isNewManualBooking) {
+        clearProfessionalBookingDrawerDraft();
+      }
       return true;
     }, [
       bookingGuests,

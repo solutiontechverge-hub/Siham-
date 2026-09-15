@@ -733,6 +733,17 @@ export function sumIntervalsMins(intervals: readonly Interval[]) {
   return intervals.reduce((acc, it) => acc + Math.max(0, it.endMin - it.startMin), 0);
 }
 
+/** Busy mins / available mins — same metric as day-view occupancy % bars. */
+export function dailyBookingOccupancyRatio(
+  busy: readonly Interval[],
+  availability: readonly Interval[],
+): number {
+  const bookedMins = sumIntervalsMins(mergeIntervals(busy));
+  const availableMins = sumIntervalsMins(availability);
+  if (availableMins <= 0) return bookedMins > 0 ? 1 : 0;
+  return Math.max(0, Math.min(1, bookedMins / availableMins));
+}
+
 export const blockTitleFromDraft = (draft: BlockTimeDraft) =>
   draft.title === "Custom" ? draft.customTitle?.trim() || "Custom" : draft.title;
 

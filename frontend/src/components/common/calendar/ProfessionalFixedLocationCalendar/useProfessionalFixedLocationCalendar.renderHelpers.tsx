@@ -204,6 +204,7 @@ export function useProfessionalFixedLocationCalendarRenderHelpers(
                 justifyContent: isDayColumnHeader ? "flex-start" : "center",
                 px: isDayColumnHeader ? 0.75 : 1,
                 boxSizing: "border-box",
+                scrollSnapAlign: "start",
                 bgcolor: highlighted
                   ? alpha(m.teal, 0.035)
                   : "#fff",

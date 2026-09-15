@@ -446,11 +446,8 @@ export default function ClientBookingPaymentChronology({
               const isTimedParticipant =
                 section.participantType === "buffer" ||
                 section.participantType === "planning";
-              const showSchedule =
-                isTimedParticipant ||
-                Boolean(activity) ||
-                (services.length > 0 &&
-                  (Boolean(meta.timeRange) || Boolean(meta.durationLabel)));
+              // Guest/Model: identity is the person header; TM belongs on service lines.
+              const showSchedule = isTimedParticipant || Boolean(activity);
               if (!showSchedule) return null;
               return (
                 <Box
@@ -473,13 +470,10 @@ export default function ClientBookingPaymentChronology({
                       {activity}
                     </BodyText>
                   ) : null}
-                  {meta.timeRange ||
-                  meta.durationLabel ||
-                  section.teamMemberLabel ? (
+                  {meta.timeRange || meta.durationLabel ? (
                     <ServiceSummaryMetaLine
                       timeRange={meta.timeRange}
                       durationLabel={meta.durationLabel}
-                      staffName={section.teamMemberLabel}
                     />
                   ) : null}
                   {scheduleChangeTags.length ? (

@@ -39,9 +39,12 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsClientItemsBag 
   | "bookingUniqueItems"
   | "canEditBookingLineItems"
   | "canMutateDrawerContents"
+  | "changeBookingServiceStaff"
+  | "getServiceStaffOptions"
   | "incomingRequestEditMode"
   | "m"
   | "mainCancelledServices"
+  | "openBookingStaffProfile"
   | "openDrawerLineTagComparison"
   | "openEditBookingProductLine"
   | "openEditBookingUniqueLine"
@@ -49,6 +52,7 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsClientItemsBag 
   | "primaryMainClientServices"
   | "removeClientService"
   | "reorderClientServices"
+  | "resolveBookingStaff"
   | "resolveProductEditTag"
   | "resolveServiceEditTag"
   | "resourceNameById"
@@ -76,9 +80,12 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsCli
     bookingUniqueItems,
     canEditBookingLineItems,
     canMutateDrawerContents,
+    changeBookingServiceStaff,
+    getServiceStaffOptions,
     incomingRequestEditMode,
     m,
     mainCancelledServices,
+    openBookingStaffProfile,
     openDrawerLineTagComparison,
     openEditBookingProductLine,
     openEditBookingUniqueLine,
@@ -86,6 +93,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsCli
     primaryMainClientServices,
     removeClientService,
     reorderClientServices,
+    resolveBookingStaff,
     resolveProductEditTag,
     resolveServiceEditTag,
     resourceNameById,
@@ -115,6 +123,14 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsCli
           staffResourceId
             ? resourceNameById.get(staffResourceId)
             : undefined
+        }
+        resolveStaff={resolveBookingStaff}
+        onStaffClick={openBookingStaffProfile}
+        staffOptionsForService={
+          canEditBookingLineItems ? getServiceStaffOptions : undefined
+        }
+        onStaffChange={
+          canEditBookingLineItems ? changeBookingServiceStaff : undefined
         }
         resolveServiceEditTag={resolveServiceEditTag}
         resolveProductEditTag={resolveProductEditTag}

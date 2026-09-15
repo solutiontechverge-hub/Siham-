@@ -12,6 +12,8 @@ import AppCountryPhoneFields from "../../AppCountryPhoneFields";
 
 import AppDropdown from "../../AppDropdown";
 
+import ClientPlatformTag from "../../ClientPlatformTag";
+
 import { GENDER_OPTIONS } from "../../../../lib/gender-options";
 
 import { sanitizeNameInput } from "../../../../lib/field-input";
@@ -46,21 +48,7 @@ export function ProfessionalFixedLocationCalendarBookingDrawerSubScreensNonMollu
           >
             Add Non-Mollure Client
           </BodyText>
-          <Box
-            sx={{
-              px: 1,
-              height: 22,
-              borderRadius: "999px",
-              bgcolor: alpha(m.teal, 0.12),
-              color: m.teal,
-              display: "inline-flex",
-              alignItems: "center",
-              fontSize: 11,
-              fontWeight: 900,
-            }}
-          >
-            CC
-          </Box>
+          <ClientPlatformTag clientKind="company" />
         </Stack>
 
         <Box sx={{ pt: 0.25 }}>

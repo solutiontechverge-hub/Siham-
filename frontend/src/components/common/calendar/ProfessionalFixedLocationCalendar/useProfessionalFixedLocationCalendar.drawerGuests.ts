@@ -70,7 +70,8 @@ export type UseProfessionalFixedLocationCalendarDrawerGuestsArgs = {
   editingBufferId: string | null;
   setEditingBufferId: React.Dispatch<React.SetStateAction<string | null>>;
   slotLocation: CalendarBookingLocation;
-  resources: readonly { id: string }[];
+  resources: readonly { id: string; name?: string }[];
+  resourceNameById?: ReadonlyMap<string, string>;
   focusBookingDrawerSection: (sectionId: string) => void;
   isDrawerPlanningGuest: (guest: CalendarBookingGuestItem) => boolean;
   showSnackbar: (options: ShowSnackbarOptions) => void;
@@ -89,6 +90,7 @@ export function useProfessionalFixedLocationCalendarDrawerGuests(
     addDlParticipant: buffer.addDlParticipant,
     addInlineGuest: inline.addInlineGuest,
     applyBufferDraft: buffer.applyBufferDraft,
+    assignServiceStaff: services.assignServiceStaff,
     beginEditBuffer: buffer.beginEditBuffer,
     beginEditInlineGuest: inline.beginEditInlineGuest,
     bumpSlotFromServices: services.bumpSlotFromServices,

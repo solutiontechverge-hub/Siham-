@@ -22,6 +22,10 @@ import ClientBookingTimeSelectPanel from "./ClientBookingTimeSelectPanel";
 import ClientBookingProjectDetailsPanel from "./ClientBookingProjectDetailsPanel";
 import ClientBookingPeopleSection from "./ClientBookingPeopleSection";
 import ClientBookingPaymentSummaryPanel from "./ClientBookingPaymentSummaryPanel";
+import ClientTeamMemberPublicProfileDrawer, {
+  type ClientTeamMemberPublicProfile,
+} from "../../../components/common/client-booking/ClientTeamMemberPublicProfileDrawer";
+import { getTeamForLocationMode } from "../../../data/businessPublicProfile.data";
 
 export default function ClientBookingCreateView() {
   const page = useClientBookingCreatePage();
@@ -133,8 +137,10 @@ export default function ClientBookingCreateView() {
     total,
     bookingStartMinutes,
     bookingEndMinutes,
+    resolveServiceTeamMemberId,
     resolveServiceTeamMemberName,
     summarySections,
+    businessProfile,
     reorderPeople,
     selectPlanningCard,
     selectNonPlanningPerson,
@@ -149,6 +155,9 @@ export default function ClientBookingCreateView() {
   } = page;
 
   const summaryShopName = shop?.shopName?.trim() || "Salon";
+  const [profileMemberId, setProfileMemberId] = React.useState<string | null>(
+    null,
+  );
   const summaryTeamMemberName = [
     ...new Set(
       page.services
@@ -162,6 +171,46 @@ export default function ClientBookingCreateView() {
       summaryTeamMemberName.split(",")[0]?.trim() ||
       ""
     : "";
+  const openTeamMemberProfile = React.useCallback((teamMemberId: string) => {
+    const id = String(teamMemberId ?? "").trim();
+    if (id) setProfileMemberId(id);
+  }, []);
+  const profileMember = React.useMemo<ClientTeamMemberPublicProfile | null>(() => {
+    const id = String(profileMemberId ?? "").trim();
+    if (!id) return null;
+    const locationTeam = businessProfile
+      ? getTeamForLocationMode(businessProfile, shop?.locationMode ?? "fixed")
+      : [];
+    const fromProfile =
+      locationTeam.find((row) => row.id === id) ||
+      businessProfile?.teamMembers.find((row) => row.id === id);
+    const fallbackName =
+      filteredTeamMembers.find((tm) => tm.id === id)?.name?.trim() ||
+      page.shopTeamMembers.find((tm) => tm.id === id)?.name?.trim() ||
+      "";
+    if (!fromProfile && !fallbackName) return null;
+    const serviceLabels = [
+      ...new Set(
+        (fromProfile?.serviceSlots ?? []).flatMap((slot) =>
+          slot.options.map((opt) => String(opt.label ?? "").trim()).filter(Boolean),
+        ),
+      ),
+    ];
+    return {
+      id,
+      name: fromProfile?.name?.trim() || fallbackName,
+      avatarUrl: fromProfile?.avatarUrl,
+      rating: fromProfile?.rating,
+      reviewsCount: fromProfile?.reviewsCount,
+      serviceLabels: serviceLabels.length ? serviceLabels : undefined,
+    };
+  }, [
+    businessProfile,
+    filteredTeamMembers,
+    page.shopTeamMembers,
+    profileMemberId,
+    shop?.locationMode,
+  ]);
   if (fromProfile && !profileHydrated) {
     return (
       <Box
@@ -378,6 +427,8 @@ export default function ClientBookingCreateView() {
                   clientNote={clientNote}
                   bookServicesAtSameTime={bookServicesAtSameTime}
                   resolveServiceTeamMemberName={resolveServiceTeamMemberName}
+                  resolveServiceTeamMemberId={resolveServiceTeamMemberId}
+                  onTeamMemberClick={openTeamMemberProfile}
                   total={total}
                   allServicesAssigned={allServicesAssigned}
                   servicesCount={page.services.length}
@@ -394,6 +445,12 @@ export default function ClientBookingCreateView() {
           </Box>
         </Paper>
       </Container>
+      <ClientTeamMemberPublicProfileDrawer
+        open={Boolean(profileMemberId)}
+        onClose={() => setProfileMemberId(null)}
+        shopId={shop?.shopId}
+        member={profileMember}
+      />
     </Box>
   );
 }

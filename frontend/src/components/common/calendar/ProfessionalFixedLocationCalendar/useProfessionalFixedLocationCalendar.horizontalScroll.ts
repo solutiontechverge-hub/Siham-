@@ -101,19 +101,41 @@ export function useProfessionalFixedLocationCalendarHorizontalScroll({
   ]);
 
   const scrollTeamNav = React.useCallback(
-    (el: HTMLDivElement | null, direction: -1 | 1) => {
-      if (!el) return;
+    (el: HTMLDivElement | null, direction: -1 | 1): number | undefined => {
+      if (!el) return undefined;
       const step = el.clientWidth / TEAM_NAV_VISIBLE_SLOTS;
-      el.scrollBy({ left: direction * step, behavior: "smooth" });
+      if (step <= 0) return undefined;
+      const maxIndex = Math.max(
+        0,
+        Math.round((el.scrollWidth - el.clientWidth) / step),
+      );
+      const currentIndex = Math.round(el.scrollLeft / step);
+      const nextLeft =
+        Math.max(0, Math.min(maxIndex, currentIndex + direction)) * step;
+      el.scrollTo({ left: nextLeft, behavior: "smooth" });
+      return nextLeft;
     },
     [],
   );
 
   const scrollWeekTeamHeader = React.useCallback(
     (direction: -1 | 1) => {
-      scrollTeamNav(weekTeamHeaderScrollRef.current, direction);
+      const nextLeft = scrollTeamNav(
+        weekTeamHeaderScrollRef.current,
+        direction,
+      );
+      if (
+        typeof nextLeft === "number" &&
+        viewMode === "day" &&
+        teamHeaderNeedsScroll
+      ) {
+        dayBodyScrollRef.current?.scrollTo({
+          left: nextLeft,
+          behavior: "smooth",
+        });
+      }
     },
-    [scrollTeamNav],
+    [scrollTeamNav, teamHeaderNeedsScroll, viewMode],
   );
 
   const weekDayCount = visibleDatesLength;

@@ -58,6 +58,7 @@ type Props = {
   catalogProducts: ClientBookingDraftProduct[];
   catalogUniqueItems: ClientBookingDraftProduct[];
   clientNote?: string;
+  onTeamMemberClick?: (teamMemberId: string) => void;
 };
 
 export default function ClientBookingCreateSummaryServiceCard({
@@ -72,6 +73,7 @@ export default function ClientBookingCreateSummaryServiceCard({
   catalogProducts,
   catalogUniqueItems,
   clientNote,
+  onTeamMemberClick,
 }: Props) {
   const m = useTheme().palette.mollure;
   let serviceCursor = bookingStartMinutes;
@@ -247,7 +249,6 @@ export default function ClientBookingCreateSummaryServiceCard({
 
                   <Stack spacing={0.85}>
                     {section.planningItem ||
-                    planningMeta.timeRange ||
                     section.participantType === "buffer" ||
                     section.participantType === "planning" ? (
                       <Box
@@ -269,7 +270,8 @@ export default function ClientBookingCreateSummaryServiceCard({
                             {section.planningItem?.activity &&
                             section.planningItem.activity.toLowerCase() !==
                               "buffer" &&
-                            section.planningItem.activity !== heading ? (
+                            section.planningItem.activity !== heading &&
+                            section.planningItem.activity !== section.title ? (
                               <Typography
                                 sx={mollureLabelSx(m.navy, {
                                   fontWeight: 900,
@@ -285,7 +287,6 @@ export default function ClientBookingCreateSummaryServiceCard({
                               <ServiceSummaryMetaLine
                                 timeRange={planningMeta.timeRange}
                                 durationLabel={planningMeta.durationLabel}
-                                staffName={section.teamMemberLabel}
                               />
                             ) : section.planningItem?.duration ? (
                               <Typography
@@ -306,12 +307,16 @@ export default function ClientBookingCreateSummaryServiceCard({
                     {section.items.map((item) => {
                       const start = serviceCursor;
                       serviceCursor += item.durationMins;
+                      const tmId = String(item.teamMemberId ?? "").trim();
                       const tmName =
                         resolveTeamMemberFirstName(
                           item.teamMemberId,
                           teamMembers,
                           item.teamMemberName,
                         ) || section.teamMemberLabel;
+                      const tmClickable = Boolean(
+                        tmName && tmId && onTeamMemberClick,
+                      );
                       return (
                         <Box
                           key={item.id}
@@ -352,6 +357,13 @@ export default function ClientBookingCreateSummaryServiceCard({
                               </Typography>
                               {tmName ? (
                                 <Box
+                                  component={tmClickable ? "button" : "div"}
+                                  type={tmClickable ? "button" : undefined}
+                                  onClick={
+                                    tmClickable
+                                      ? () => onTeamMemberClick?.(tmId)
+                                      : undefined
+                                  }
                                   sx={{
                                     mt: 0.55,
                                     display: "inline-flex",
@@ -364,6 +376,13 @@ export default function ClientBookingCreateSummaryServiceCard({
                                     border: `1px solid ${alpha(m.navy, 0.12)}`,
                                     bgcolor: "#fff",
                                     lineHeight: 0,
+                                    cursor: tmClickable ? "pointer" : "default",
+                                    "&:hover": tmClickable
+                                      ? {
+                                          borderColor: alpha(m.teal, 0.45),
+                                          color: m.teal,
+                                        }
+                                      : undefined,
                                   }}
                                 >
                                   <Box

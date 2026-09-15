@@ -15,7 +15,7 @@ export const signupPageData = {
       alt: "Individual Client",
     },
     company: {
-      label: "Company Client (CC)",
+      label: "Company Client (BC)",
       alt: "Company Client",
     },
     professional: {

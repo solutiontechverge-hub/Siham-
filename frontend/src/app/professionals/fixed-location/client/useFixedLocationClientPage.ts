@@ -392,6 +392,20 @@ export function useFixedLocationClientPage() {
       setNonMollureTypeError("Please select a client type");
       return false;
     }
+    const noteParsed = parseText(nonMollureTechnicalNote, {
+      required: false,
+      label: "Technical note",
+      min: INPUT_LIMITS.notesMin,
+      max: null,
+    });
+    if (!noteParsed.ok) {
+      setSnackbar({
+        open: true,
+        message: noteParsed.error,
+        severity: "error",
+      });
+      return false;
+    }
     if (nonMollureClientType === "Individual Client") {
       if (!validateIndividual()) return false;
       const email = indEmail.trim().toLowerCase();
@@ -406,7 +420,7 @@ export function useFixedLocationClientPage() {
           phone: indPhone.trim(),
           gender: indGender || undefined,
           date_of_birth: parseDobForApi(indDob),
-          technical_note: nonMollureTechnicalNote.trim() || undefined,
+          technical_note: noteParsed.value || undefined,
         }).unwrap();
 
         setAddNonMollureOpen(false);
@@ -441,7 +455,7 @@ export function useFixedLocationClientPage() {
           phone: coPhone.trim(),
           business_address: `${coStreet.trim()} ${coStreetNumber.trim()}, ${coMunicipality.trim()} ${coPostal.trim()}`.trim(),
           detail_email: email,
-          technical_note: nonMollureTechnicalNote.trim() || undefined,
+          technical_note: noteParsed.value || undefined,
         }).unwrap();
 
         setAddNonMollureOpen(false);
@@ -624,7 +638,8 @@ export function useFixedLocationClientPage() {
             technicalNote: parseText(editCompanyForm.technicalNote, {
               required: false,
               label: "Technical note",
-              max: INPUT_LIMITS.textLong,
+              min: INPUT_LIMITS.notesMin,
+              max: null,
             }),
           })
         : rejectInvalid({
@@ -645,7 +660,8 @@ export function useFixedLocationClientPage() {
             technicalNote: parseText(editIndividualForm.technicalNote, {
               required: false,
               label: "Technical note",
-              max: INPUT_LIMITS.textLong,
+              min: INPUT_LIMITS.notesMin,
+              max: null,
             }),
           });
 
@@ -721,11 +737,25 @@ export function useFixedLocationClientPage() {
     async (note: string) => {
       if (!viewClientId) return;
       const trimmed = note.trim();
+      const parsed = parseText(trimmed, {
+        required: false,
+        label: "Technical note",
+        min: INPUT_LIMITS.notesMin,
+        max: null,
+      });
+      if (!parsed.ok) {
+        setSnackbar({
+          open: true,
+          message: parsed.error,
+          severity: "error",
+        });
+        return;
+      }
 
       try {
         await updateProfessionalClientTechnicalNote({
           id: viewClientId,
-          technical_note: trimmed,
+          technical_note: parsed.value,
         }).unwrap();
         setSnackbar({ open: true, message: "Technical note saved", severity: "success" });
       } catch (error) {

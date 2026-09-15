@@ -16,6 +16,7 @@ import {
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { mollureSectionTitleSx, mollureLabelSx, mollureBodySx } from "../../../theme/mollureHierarchy";
+import { clientPlatformTagToneColors } from "../ClientPlatformTag";
 import {
   formatCompactEuro,
   formatFinanceDueDate,
@@ -545,7 +546,7 @@ export default function SalesOverviewCard({
   const badge = statusBadgeSx(card.statusBadge, m, card.paymentState);
   const clientBadge =
     card.clientKind === "company"
-      ? "CC Client"
+      ? "BC Client"
       : card.clientKind === "individual"
         ? "IC Client"
         : null;
@@ -604,10 +605,10 @@ export default function SalesOverviewCard({
               px: 0.7,
               py: 0.15,
               borderRadius: "999px",
-              bgcolor: alpha(m.teal, 0.12),
+              ...clientPlatformTagToneColors(m, "teal"),
             }}
           >
-            <Typography sx={{ fontSize: 10.5, fontWeight: 800, color: m.teal }}>
+            <Typography sx={{ fontSize: 10.5, fontWeight: 800 }}>
               {clientBadge}
             </Typography>
           </Box>

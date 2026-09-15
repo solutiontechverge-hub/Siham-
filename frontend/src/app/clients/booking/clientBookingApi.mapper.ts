@@ -315,7 +315,12 @@ export function buildClientBookingApiPayload(input: {
             url: u.url,
             mimeType: u.mimeType,
             kind: u.kind,
-            previewUrl: u.previewUrl,
+            // Omit blob:/data: preview payloads from API notes (keeps POST under body limit).
+            ...(u.url && /^https?:\/\//i.test(u.url)
+              ? { previewUrl: u.url }
+              : u.previewUrl && /^https?:\/\//i.test(u.previewUrl)
+                ? { previewUrl: u.previewUrl }
+                : {}),
           })),
         }
       : undefined,

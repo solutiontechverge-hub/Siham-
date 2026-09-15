@@ -4,6 +4,7 @@ import {
   cacheClientBookingDraftSnapshot,
   enrichClientBookingRecord,
 } from "./clientBookingDraftCache";
+import { clearClientBookingCreateUiDraft } from "./clientBookingCreateUiDraft";
 
 export const CHECKOUT_REF_KEY = "mollure:checkout_booking_ref";
 export const ACTIVE_BOOKING_ID_KEY = "mollure:active_booking_id";
@@ -77,6 +78,7 @@ export function clearActiveBookingSession() {
   window.sessionStorage.removeItem(CHECKOUT_REF_KEY);
   window.sessionStorage.removeItem(ACTIVE_BOOKING_ID_KEY);
   window.sessionStorage.removeItem(ACTIVE_BOOKING_RECORD_KEY);
+  clearClientBookingCreateUiDraft();
 }
 
 export function setActiveBookingSession(record: ClientBookingRecord) {

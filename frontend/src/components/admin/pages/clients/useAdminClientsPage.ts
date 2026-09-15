@@ -178,7 +178,8 @@ export function useAdminClientsPage() {
     const parsed = parseText(draftNote, {
       required: false,
       label: "Note",
-      max: INPUT_LIMITS.textLong,
+      min: INPUT_LIMITS.notesMin,
+      max: null,
     });
     if (!parsed.ok) return;
     await updateAdminClient({ id: activeClient.id, note: parsed.value });

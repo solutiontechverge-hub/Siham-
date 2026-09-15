@@ -57,8 +57,6 @@ import {
 } from "../../adminMockData";
 import { ADMIN_CARD_PADDING as pad } from "../../adminCardPadding";
 import {
-  CC_PURPLE,
-  CC_PURPLE_SOFT,
   CLIENT_TYPE_OPTIONS,
   formatDisplayDate,
   getInitials,
@@ -67,32 +65,18 @@ import {
 } from "./adminClients.data";
 import type { ClientRowActionsProps, SortOption } from "./adminClients.types";
 import { useAdminClientsPage } from "./useAdminClientsPage";
+import ClientPlatformTag from "../../../common/ClientPlatformTag";
 
 function ClientTypeCell({ type }: { type: MockClient["type"] }) {
-  const theme = useTheme();
-  const tokens = theme.palette.mollure;
-  const isIC = type === "IC";
+  const tokens = useTheme().palette.mollure;
 
   return (
     <Stack direction="row" alignItems="center" spacing={1}>
-      <Box
-        sx={{
-          width: 28,
-          height: 28,
-          borderRadius: 1.5,
-          display: "grid",
-          placeItems: "center",
-          bgcolor: isIC ? tokens.mintSoft : CC_PURPLE_SOFT,
-          color: isIC ? tokens.tealDark : CC_PURPLE,
-          fontSize: 10,
-          fontWeight: 700,
-          flexShrink: 0,
-        }}
-      >
-        {type}
-      </Box>
+      <ClientPlatformTag
+        clientKind={type === "IC" ? "individual" : "company"}
+      />
       <Typography sx={mollureBodyMutedSx(tokens.navy, { fontWeight: 500, color: tokens.navy })}>
-        {isIC ? "Individual Client" : "Company Client"}
+        {type === "IC" ? "Individual Client" : "Company Client"}
       </Typography>
     </Stack>
   );
@@ -323,9 +307,8 @@ export default function AdminClientsPageView() {
             sx={{
               width: 36,
               height: 36,
-              bgcolor:
-                r.type === "IC" ? alpha(tokens.teal, 0.14) : CC_PURPLE_SOFT,
-              color: r.type === "IC" ? tokens.tealDark : CC_PURPLE,
+              bgcolor: alpha(tokens.teal, 0.14),
+              color: tokens.tealDark,
               fontSize: 13,
               fontWeight: 700,
             }}
@@ -487,7 +470,7 @@ export default function AdminClientsPageView() {
                 onChange={(values) => {
                   setTypeFilter(values);
                 }}
-                placeholder="All (IC, CC)"
+                placeholder="All (IC, BC)"
                 size="small"
                 sx={{ width: "100%", minWidth: 0, height: 40 }}
               />
@@ -741,17 +724,17 @@ export default function AdminClientsPageView() {
               cardBg: alpha(tokens.teal, 0.04),
             },
             {
-              label: "Total Company Clients (CC)",
+              label: "Total Company Clients (BC)",
               value: totalCC,
               sub: `${ccPct}% of total`,
               icon: BusinessOutlinedIcon,
-              iconBg: CC_PURPLE_SOFT,
-              iconColor: CC_PURPLE,
-              labelColor: CC_PURPLE,
-              cardBg: alpha(CC_PURPLE, 0.05),
+              iconBg: alpha(tokens.teal, 0.14),
+              iconColor: tokens.tealDark,
+              labelColor: tokens.tealDark,
+              cardBg: alpha(tokens.teal, 0.04),
             },
             {
-              label: "Total Clients (IC + CC)",
+              label: "Total Clients (IC + BC)",
               value: totalClients,
               sub: "100% of total",
               icon: GroupsOutlinedIcon,
@@ -809,14 +792,8 @@ export default function AdminClientsPageView() {
                     sx={{
                       width: 48,
                       height: 48,
-                      bgcolor:
-                        activeClient.type === "IC"
-                          ? alpha(tokens.teal, 0.14)
-                          : CC_PURPLE_SOFT,
-                      color:
-                        activeClient.type === "IC"
-                          ? tokens.tealDark
-                          : CC_PURPLE,
+                      bgcolor: alpha(tokens.teal, 0.14),
+                      color: tokens.tealDark,
                       fontWeight: 700,
                     }}
                   >
