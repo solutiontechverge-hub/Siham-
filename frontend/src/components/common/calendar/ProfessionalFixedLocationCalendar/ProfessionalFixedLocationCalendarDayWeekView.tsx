@@ -38,6 +38,8 @@ export type ProfessionalFixedLocationCalendarDayWeekBag = Pick<
   | "dateOverrides"
   | "dayBodyScrollRef"
   | "dayViewBodyGridTemplateColumns"
+  | "dayViewBodyNeedsScroll"
+  | "dayViewBodyScrollContentWidth"
   | "dayViewMemberColumns"
   | "displayedResources"
   | "endMin"
@@ -109,6 +111,8 @@ export default function ProfessionalFixedLocationCalendarDayWeekView({ bag }: Pr
     data,
     dayBodyScrollRef,
     dayViewBodyGridTemplateColumns,
+    dayViewBodyNeedsScroll,
+    dayViewBodyScrollContentWidth,
     dayViewMemberColumns,
     displayedResources,
     hasTeamMembers,
@@ -119,8 +123,6 @@ export default function ProfessionalFixedLocationCalendarDayWeekView({ bag }: Pr
     showNowLine,
     syncDayTeamHorizontalScroll,
     syncWeekHorizontalScroll,
-    teamHeaderNeedsScroll,
-    teamHeaderScrollContentWidth,
     teamHeaderScrollOverflowSx,
     timelineGridRef,
     timelineHeaderPx,
@@ -255,14 +257,14 @@ export default function ProfessionalFixedLocationCalendarDayWeekView({ bag }: Pr
                             ref={
                               viewMode === "week"
                                 ? weekBodyScrollRef
-                                : viewMode === "day" && teamHeaderNeedsScroll
+                                : viewMode === "day" && dayViewBodyNeedsScroll
                                   ? dayBodyScrollRef
                                   : undefined
                             }
                             onScroll={
                               viewMode === "week"
                                 ? () => syncWeekHorizontalScroll("body")
-                                : viewMode === "day" && teamHeaderNeedsScroll
+                                : viewMode === "day" && dayViewBodyNeedsScroll
                                   ? () => syncDayTeamHorizontalScroll("body")
                                   : undefined
                             }
@@ -279,7 +281,7 @@ export default function ProfessionalFixedLocationCalendarDayWeekView({ bag }: Pr
                                       ? "x mandatory"
                                       : "none",
                                   }
-                                : viewMode === "day" && teamHeaderNeedsScroll
+                                : viewMode === "day" && dayViewBodyNeedsScroll
                                   ? {
                                       ...teamHeaderScrollOverflowSx,
                                       scrollSnapType: "x mandatory",
@@ -304,7 +306,7 @@ export default function ProfessionalFixedLocationCalendarDayWeekView({ bag }: Pr
                               width:
                                 viewMode === "week"
                                   ? weekDaysScrollContentWidth
-                                  : teamHeaderScrollContentWidth,
+                                  : dayViewBodyScrollContentWidth,
                               minWidth: "100%",
                               bgcolor: "#fff",
                             }}

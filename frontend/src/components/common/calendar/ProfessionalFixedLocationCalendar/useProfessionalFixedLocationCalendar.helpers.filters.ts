@@ -48,7 +48,7 @@ export function filterResourcesForVisibleDates(input: {
     blocks,
     eventsMatchingDrawerFilters,
   } = input;
-  // Filter "All" → every team member column (viewport scrolls to 3).
+  // Filter "All" → keep every team member in the nav set.
   if (teamAll) return filterDrawerResources as CalendarResource[];
   return filterDrawerResources.filter((resource) => {
     if (

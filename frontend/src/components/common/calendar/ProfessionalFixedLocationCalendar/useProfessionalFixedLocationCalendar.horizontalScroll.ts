@@ -57,35 +57,17 @@ export function useProfessionalFixedLocationCalendarHorizontalScroll({
   }, [refreshHorizontalScrollEdges]);
 
   const syncDayTeamHorizontalScroll = React.useCallback(
-    (source: "header" | "body") => {
-      const header = weekTeamHeaderScrollRef.current;
-      const body = dayBodyScrollRef.current;
-      if (!header || !body || dayScrollSyncLockRef.current) return;
-      dayScrollSyncLockRef.current = true;
-      if (source === "header") {
-        body.scrollLeft = header.scrollLeft;
-      } else {
-        header.scrollLeft = body.scrollLeft;
-      }
+    (_source: "header" | "body") => {
+      // Header (nav) and body (dynamic columns) can have different column counts —
+      // do not sync scrollLeft between them.
       refreshWeekTeamHeaderScrollEdges();
-      requestAnimationFrame(() => {
-        dayScrollSyncLockRef.current = false;
-      });
     },
     [refreshWeekTeamHeaderScrollEdges],
   );
 
   const onTeamHeaderScroll = React.useCallback(() => {
     refreshWeekTeamHeaderScrollEdges();
-    if (viewMode === "day" && teamHeaderNeedsScroll) {
-      syncDayTeamHorizontalScroll("header");
-    }
-  }, [
-    refreshWeekTeamHeaderScrollEdges,
-    syncDayTeamHorizontalScroll,
-    teamHeaderNeedsScroll,
-    viewMode,
-  ]);
+  }, [refreshWeekTeamHeaderScrollEdges]);
 
   React.useEffect(() => {
     const el = weekTeamHeaderScrollRef.current;

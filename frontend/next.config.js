@@ -1,9 +1,14 @@
 /** @type {import('next').NextConfig} */
 const path = require("path");
 
+const monorepoRoot = path.join(__dirname, "..");
+
 const nextConfig = {
-  // Monorepo: keep file tracing rooted at the workspace package, not a parent lockfile.
-  outputFileTracingRoot: path.join(__dirname),
+  // Workspace root (next + deps are hoisted here). Must match turbopack.root.
+  outputFileTracingRoot: monorepoRoot,
+  turbopack: {
+    root: monorepoRoot,
+  },
   // Run `npm run lint:frontend` locally or in CI for lint coverage.
   eslint: {
     ignoreDuringBuilds: true,
@@ -34,7 +39,7 @@ const nextConfig = {
   webpack: (config) => {
     config.resolve.modules = [
       path.resolve(__dirname, "node_modules"),
-      path.resolve(__dirname, "..", "node_modules"),
+      path.resolve(monorepoRoot, "node_modules"),
       ...(config.resolve.modules || ["node_modules"]),
     ];
     return config;
