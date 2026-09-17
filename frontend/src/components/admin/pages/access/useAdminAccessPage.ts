@@ -11,6 +11,11 @@ import {
   useUpdateAdminAccessUserMutation,
 } from "../../../../store/services/adminApi";
 import { useAppSelector } from "../../../../store/hooks";
+import {
+  parseEmail,
+  parseText,
+  rejectInvalid,
+} from "../../../../lib/inputSchema";
 import type { AccessModal, AccessTab, AddModalSource } from "./access.types";
 
 export function useAdminAccessPage() {
@@ -77,15 +82,45 @@ export function useAdminAccessPage() {
   };
 
   const handleCreate = async () => {
-    if (!name.trim() || !email.trim()) return;
-    await createAdminAccessUser({ name: name.trim(), email: email.trim(), role, status });
-    logActivity({ action: "Created admin user", detail: `${name.trim()} (${email.trim()})`, color: "teal", action_type: "created" });
+    const parsed = rejectInvalid({
+      name: parseText(name, { label: "Name", max: 80 }),
+      email: parseEmail(email),
+    });
+    if (!parsed.ok) return;
+    await createAdminAccessUser({
+      name: parsed.values.name,
+      email: parsed.values.email,
+      role,
+      status,
+    });
+    logActivity({
+      action: "Created admin user",
+      detail: `${parsed.values.name} (${parsed.values.email})`,
+      color: "teal",
+      action_type: "created",
+    });
     closeModal();
   };
   const handleUpdate = async () => {
-    if (!selectedUser || !name.trim() || !email.trim()) return;
-    await updateAdminAccessUser({ id: selectedUser.id, name: name.trim(), email: email.trim(), role, status });
-    logActivity({ action: "Updated admin user", detail: `${name.trim()} (${email.trim()})`, color: "navy", action_type: "updated" });
+    if (!selectedUser) return;
+    const parsed = rejectInvalid({
+      name: parseText(name, { label: "Name", max: 80 }),
+      email: parseEmail(email),
+    });
+    if (!parsed.ok) return;
+    await updateAdminAccessUser({
+      id: selectedUser.id,
+      name: parsed.values.name,
+      email: parsed.values.email,
+      role,
+      status,
+    });
+    logActivity({
+      action: "Updated admin user",
+      detail: `${parsed.values.name} (${parsed.values.email})`,
+      color: "navy",
+      action_type: "updated",
+    });
     closeModal();
   };
   const handleDisable = async () => {

@@ -3,6 +3,7 @@ import type {
   CalendarEvent,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { SalesLineItem } from "./salesOverview.types";
+import { roundBookingMoney as roundMoney } from "../../../data/bookingLinePricing";
 
 export type SalesPayerRole = "main_client" | "guest" | "model";
 
@@ -18,10 +19,6 @@ export type SalesPayerShare = {
   lines: SalesLineItem[];
   subtotal: number;
 };
-
-function roundMoney(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
-}
 
 function isPlanningPerson(person: {
   participantType?: string;

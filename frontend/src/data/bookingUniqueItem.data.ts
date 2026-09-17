@@ -22,6 +22,16 @@ export type BookingUniqueItemDraft = {
 /** Common local VAT rate — editable on the Unique Item form. */
 export const DEFAULT_UNIQUE_ITEM_VAT = "21";
 
+export const BOOKING_CATALOG_PRICE_TYPE_OPTIONS: { label: string; value: string }[] = [
+  { label: "Fixed price", value: "fixed" },
+  { label: "Starting from", value: "starting_from" },
+];
+
+export const BOOKING_CATALOG_DISCOUNT_TYPE_OPTIONS: { label: string; value: string }[] = [
+  { label: "Fixed discount", value: "fixed" },
+  { label: "Percentage discount", value: "percentage" },
+];
+
 export const emptyBookingUniqueItemDraft = (): BookingUniqueItemDraft => ({
   productName: "",
   vat: DEFAULT_UNIQUE_ITEM_VAT,

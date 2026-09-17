@@ -15,7 +15,7 @@ export const CLIENT_EXPORT_HEADERS = [
 ] as const;
 
 export function formatClientType(type: MockClient["type"]) {
-  return type === "IC" ? "Individual Client (IC)" : "Company Client (CC)";
+  return type === "IC" ? "Individual Client (IC)" : "Company Client (BC)";
 }
 
 export function formatAccountStatus(status: MockClient["accountStatus"]) {

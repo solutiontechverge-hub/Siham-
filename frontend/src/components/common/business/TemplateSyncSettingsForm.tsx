@@ -12,6 +12,10 @@ import {
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import {
+  mollureBodyMutedSx,
+  mollureLabelSx,
+} from "../../../theme/mollureHierarchy";
+import {
   CONFIGURABLE_SYNC_SECTION_IDS,
   SYNC_SECTION_LABELS,
   TEMPLATE_SYNC_MODE_OPTIONS,
@@ -135,11 +139,9 @@ function ConfigurableSectionBlock({
             label={
               <Box sx={{ pt: 0.35 }}>
                 <Typography
-                  sx={{
-                    fontSize: 12.5,
-                    fontWeight: 800,
+                  sx={mollureLabelSx(m.navy, {
                     color: alpha(m.navy, 0.8),
-                  }}
+                  })}
                 >
                   {option.label}
                 </Typography>
@@ -171,7 +173,10 @@ export default function TemplateSyncSettingsForm({
   return (
     <Stack spacing={1.5}>
       <Typography
-        sx={{ fontSize: 12.5, color: alpha(m.navy, 0.58), lineHeight: 1.5 }}
+        sx={mollureBodyMutedSx(m.navy, {
+          color: alpha(m.navy, 0.58),
+          lineHeight: 1.5,
+        })}
       >
         Choose how Fixed and Desired location templates share information. They
         behave as two separate setups. Only shared sections can sync.

@@ -15,6 +15,7 @@ import messagingRoutes from "./routes/messaging.routes.js";
 import notificationsRoutes from "./routes/notifications.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import reviewRoutes from "./routes/review.routes.js";
+import { logError, clientErrorMessage, clientErrorStatus } from "./utils/httpError.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,7 +26,25 @@ const uploadsDir = getUploadsDir();
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true, limit: "2mb" }));
-app.use("/uploads", express.static(uploadsDir));
+app.use(
+  "/uploads",
+  (_req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
+    next();
+  },
+  express.static(uploadsDir, {
+    setHeaders(res, filePath) {
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      // Force download for non-images so browsers won't execute spoofed HTML/JS.
+      const lower = String(filePath).toLowerCase();
+      if (!/\.(jpe?g|png|gif|webp|heic|heif)$/i.test(lower)) {
+        res.setHeader("Content-Disposition", "attachment");
+      }
+    },
+  }),
+);
 
 // Railway and other platforms often probe `/` — must return 2xx before routes that need DB.
 app.get("/", (_req, res) => {
@@ -37,10 +56,10 @@ app.get("/api/health", async (_req, res) => {
     await query("SELECT 1");
     return res.status(200).json({ status: "ok", database: "connected" });
   } catch (error) {
+    logError("/api/health", error);
     return res.status(503).json({
       status: "degraded",
       database: "unavailable",
-      error: error.message,
     });
   }
 });
@@ -65,12 +84,10 @@ app.use((req, res) => {
 });
 
 app.use((error, _req, res, _next) => {
-  const statusCode =
-    error.code === "LIMIT_FILE_SIZE" || error.message?.includes("allowed") ? 400 : 500;
-
-  res.status(statusCode).json({
+  logError("express", error);
+  res.status(clientErrorStatus(error, 500)).json({
     success: false,
-    message: error.message || "Internal server error.",
+    message: clientErrorMessage(error, "Internal server error."),
     data: null,
   });
 });

@@ -28,6 +28,11 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import ArrowForwardOutlinedIcon from "@mui/icons-material/ArrowForwardOutlined";
 import { alpha, useTheme } from "@mui/material/styles";
 import {
+  mollureLabelSx,
+  mollureBodySx,
+  mollureBodyMutedSx,
+} from "../../../../theme/mollureHierarchy";
+import {
   AppButton,
   AppPagination,
   AppSearchField,
@@ -74,7 +79,7 @@ function StarRating({ value }: { value: number }) {
           />
         ))}
       </Stack>
-      <Typography sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}>
+      <Typography sx={mollureLabelSx(tokens.navy, { fontWeight: 600, color: tokens.navy })}>
         {value.toFixed(1)}
       </Typography>
     </Stack>
@@ -96,7 +101,7 @@ function HighlightedReviewText({
   const parts = text.split(pattern);
 
   return (
-    <Typography sx={{ fontSize: 12, color: tokens.bodyText, lineHeight: 1.5 }}>
+    <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText, lineHeight: 1.5 })}>
       {parts.map((part, i) => {
         const isMatch = keywords.some(
           (k) => k.toLowerCase() === part.toLowerCase(),
@@ -180,20 +185,7 @@ function ReviewsSidebar({
           component="button"
           type="button"
           onClick={() => onTabChange("flagged-keywords")}
-          sx={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 0.5,
-            mt: 1.5,
-            border: "none",
-            background: "none",
-            cursor: "pointer",
-            fontSize: 12,
-            fontWeight: 600,
-            color: tokens.teal,
-            p: 0,
-            "&:hover": { textDecoration: "underline" },
-          }}
+          sx={mollureLabelSx(tokens.navy, { fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 0.5, mt: 1.5, border: "none", background: "none", cursor: "pointer", color: tokens.teal, p: 0, "&:hover": { textDecoration: "underline" } })}
         >
           View all keywords
           <ArrowForwardOutlinedIcon sx={{ fontSize: 14 }} />
@@ -220,11 +212,11 @@ function ReviewsSidebar({
               </Typography>
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Typography
-                  sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}
+                  sx={mollureLabelSx(tokens.navy, { fontWeight: 600, color: tokens.navy })}
                 >
                   {cat.label}
                 </Typography>
-                <Typography sx={{ fontSize: 11, color: tokens.bodyText }}>
+                <Typography sx={mollureBodyMutedSx(tokens.navy, { fontSize: 11, color: tokens.bodyText })}>
                   {ranges[cat.id].min.toFixed(1)} â€“{" "}
                   {ranges[cat.id].max.toFixed(1)}
                 </Typography>
@@ -306,11 +298,11 @@ export default function AdminReviewsPageView({
           </Avatar>
           <Box>
             <Typography
-              sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}
+              sx={mollureLabelSx(tokens.navy, { fontWeight: 600, color: tokens.navy })}
             >
               {r.professional}
             </Typography>
-            <Typography sx={{ fontSize: 10.5, color: tokens.slate }}>
+            <Typography sx={mollureBodyMutedSx(tokens.navy, { fontSize: 10.5, color: tokens.slate })}>
               {r.professionalCategory}
             </Typography>
           </Box>
@@ -337,11 +329,11 @@ export default function AdminReviewsPageView({
           </Avatar>
           <Box>
             <Typography
-              sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}
+              sx={mollureLabelSx(tokens.navy, { fontWeight: 600, color: tokens.navy })}
             >
               {r.client}
             </Typography>
-            <Typography sx={{ fontSize: 10.5, color: tokens.slate }}>
+            <Typography sx={mollureBodyMutedSx(tokens.navy, { fontSize: 10.5, color: tokens.slate })}>
               {r.clientType}
             </Typography>
           </Box>
@@ -368,10 +360,10 @@ export default function AdminReviewsPageView({
       minWidth: 120,
       render: (r) => (
         <Box>
-          <Typography sx={{ fontSize: 12, color: tokens.navy }}>
+          <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.navy })}>
             {formatDisplayDate(r.date)}
           </Typography>
-          <Typography sx={{ fontSize: 10.5, color: tokens.slate }}>
+          <Typography sx={mollureBodyMutedSx(tokens.navy, { fontSize: 10.5, color: tokens.slate })}>
             {r.time}
           </Typography>
         </Box>
@@ -590,7 +582,7 @@ export default function AdminReviewsPageView({
                 alignItems={{ sm: "center" }}
                 justifyContent="space-between"
               >
-                <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>
+                <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText })}>
                   Showing{" "}
                   {filteredReviews.length === 0 ? 0 : (page - 1) * pageSize + 1}{" "}
                   to {Math.min(page * pageSize, filteredReviews.length)} of{" "}
@@ -642,7 +634,7 @@ export default function AdminReviewsPageView({
 
   const renderFlaggedKeywordsTab = () => (
     <AdminSectionCard title="Flagged keyword settings">
-      <Typography sx={{ fontSize: 13, color: tokens.bodyText, mb: 2 }}>
+      <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText, mb: 2 })}>
         Words that automatically flag a review for admin review.
       </Typography>
       <Stack direction="row" spacing={1} sx={{ mb: 2, maxWidth: 480 }}>
@@ -689,12 +681,7 @@ export default function AdminReviewsPageView({
           >
             <Typography sx={{ fontSize: 22 }}>{cat.emoji}</Typography>
             <Typography
-              sx={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: tokens.navy,
-                minWidth: 80,
-              }}
+              sx={mollureLabelSx(tokens.navy, { fontWeight: 600, color: tokens.navy, minWidth: 80 })}
             >
               {cat.label}
             </Typography>
@@ -762,20 +749,15 @@ export default function AdminReviewsPageView({
             <Typography
               component={Link}
               href="/admin/dashboard"
-              sx={{
-                fontSize: 12,
-                color: tokens.bodyText,
-                textDecoration: "none",
-                "&:hover": { color: tokens.teal },
-              }}
+              sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText, textDecoration: "none", "&:hover": { color: tokens.teal } })}
             >
               Home
             </Typography>
-            <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>
+            <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText })}>
               /
             </Typography>
             <Typography
-              sx={{ fontSize: 12, color: tokens.navy, fontWeight: 500 }}
+              sx={mollureBodyMutedSx(tokens.navy, { fontWeight: 500, color: tokens.navy })}
             >
               Rating & Review Management
             </Typography>
@@ -793,7 +775,7 @@ export default function AdminReviewsPageView({
               Rating & Review Management
             </Typography>
             <Typography
-              sx={{ fontSize: 14, color: tokens.bodyText, maxWidth: 640 }}
+              sx={mollureBodySx(tokens.navy, { color: tokens.bodyText, maxWidth: 640 })}
             >
               Manage flagged keywords, review moderation and rating categories.
             </Typography>
@@ -841,13 +823,13 @@ export default function AdminReviewsPageView({
             />
             <Box>
               <Typography
-                sx={{ fontSize: 14, fontWeight: 600, color: tokens.navy }}
+                sx={mollureLabelSx(tokens.navy, { fontWeight: 600, color: tokens.navy })}
               >
                 Are you sure you want to delete this review?
               </Typography>
               {deleteTarget ? (
                 <Typography
-                  sx={{ fontSize: 13, color: tokens.bodyText, mt: 0.75 }}
+                  sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText, mt: 0.75 })}
                 >
                   Review by <strong>{deleteTarget.client}</strong> for{" "}
                   <strong>{deleteTarget.professional}</strong> will be

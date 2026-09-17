@@ -2,6 +2,7 @@ import {
   calculateManualEntryDiscountAmount,
   type ManualEntryDiscount,
 } from "../../sections/finance/manualEntry.data";
+import { roundBookingMoney as roundMoney } from "../../../data/bookingLinePricing";
 
 export type BookingPriceInput = {
   lineSubtotal: number;
@@ -41,13 +42,7 @@ export type BookingPriceBreakdown = {
   remainingAfterPrepayment: number;
 };
 
-export function roundBookingMoney(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
-}
-
-function roundMoney(value: number): number {
-  return roundBookingMoney(value);
-}
+export { roundBookingMoney } from "../../../data/bookingLinePricing";
 
 export type BookingPriceSummaryLine = {
   label: string;

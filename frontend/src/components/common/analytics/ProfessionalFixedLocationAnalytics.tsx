@@ -16,6 +16,12 @@ import {
   TableRow,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import {
+  mollureBodySx,
+  mollureLabelSx,
+  mollureSectionTitleSx,
+  mollureTableHeaderSx,
+} from "../../../theme/mollureHierarchy";
 import { BodyText } from "../../ui/typography";
 import {
   exportProfessionalAnalyticsToExcel,
@@ -169,11 +175,7 @@ function BookingOriginAndTypeTable({
               >
                 <BodyText
                   component="span"
-                  sx={{
-                    fontSize: 11.5,
-                    fontWeight: 800,
-                    color: alpha(m.navy, 0.62),
-                  }}
+                  sx={mollureTableHeaderSx(m.navy)}
                 >
                   {h}
                 </BodyText>
@@ -188,11 +190,10 @@ function BookingOriginAndTypeTable({
               borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
               py: 1.1,
             } as const;
-            const textSx = {
-              fontSize: 12.5,
+            const textSx = mollureBodySx(m.navy, {
               fontWeight: isTotal ? 900 : 700,
               color: alpha(m.navy, isTotal ? 0.78 : 0.7),
-            } as const;
+            });
 
             return (
               <TableRow
@@ -274,11 +275,7 @@ function BookingStatusSummaryTable({
               >
                 <BodyText
                   component="span"
-                  sx={{
-                    fontSize: 11.5,
-                    fontWeight: 800,
-                    color: alpha(m.navy, 0.62),
-                  }}
+                  sx={mollureTableHeaderSx(m.navy)}
                 >
                   {h}
                 </BodyText>
@@ -293,11 +290,10 @@ function BookingStatusSummaryTable({
               borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
               py: 1.1,
             } as const;
-            const textSx = {
-              fontSize: 12.5,
+            const textSx = mollureBodySx(m.navy, {
               fontWeight: isTotal ? 900 : 700,
               color: alpha(m.navy, isTotal ? 0.78 : 0.7),
-            } as const;
+            });
 
             return (
               <TableRow
@@ -364,11 +360,7 @@ function AttendanceNoShowAnalyticsTable({
               >
                 <BodyText
                   component="span"
-                  sx={{
-                    fontSize: 11.5,
-                    fontWeight: 800,
-                    color: alpha(m.navy, 0.62),
-                  }}
+                  sx={mollureTableHeaderSx(m.navy)}
                 >
                   {h}
                 </BodyText>
@@ -383,12 +375,11 @@ function AttendanceNoShowAnalyticsTable({
               borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
               py: 1.1,
             } as const;
-            const textSx = {
-              fontSize: 12.5,
+            const textSx = mollureBodySx(m.navy, {
               fontWeight: isTotal ? 900 : 700,
               color: alpha(m.navy, isTotal ? 0.78 : 0.7),
               whiteSpace: "normal",
-            } as const;
+            });
 
             return (
               <TableRow
@@ -455,11 +446,7 @@ function TransactionSummaryTable({
               >
                 <BodyText
                   component="span"
-                  sx={{
-                    fontSize: 11.5,
-                    fontWeight: 800,
-                    color: alpha(m.navy, 0.62),
-                  }}
+                  sx={mollureTableHeaderSx(m.navy)}
                 >
                   {h}
                 </BodyText>
@@ -474,12 +461,11 @@ function TransactionSummaryTable({
               borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
               py: 1.1,
             } as const;
-            const textSx = {
-              fontSize: 12.5,
+            const textSx = mollureBodySx(m.navy, {
               fontWeight: isTotal ? 900 : 700,
               color: alpha(m.navy, isTotal ? 0.78 : 0.7),
               whiteSpace: "normal",
-            } as const;
+            });
 
             return (
               <TableRow
@@ -689,12 +675,7 @@ export default function ProfessionalFixedLocationAnalytics({
           >
             <Stack direction="row" alignItems="center" spacing={0.75}>
               <BodyText
-                sx={{
-                  fontSize: 12,
-                  fontWeight: 800,
-                  color: alpha(m.navy, 0.65),
-                  whiteSpace: "nowrap",
-                }}
+                sx={mollureLabelSx(m.navy, { whiteSpace: "nowrap" })}
               >
                 Date From
               </BodyText>
@@ -708,12 +689,7 @@ export default function ProfessionalFixedLocationAnalytics({
 
             <Stack direction="row" alignItems="center" spacing={0.75}>
               <BodyText
-                sx={{
-                  fontSize: 12,
-                  fontWeight: 800,
-                  color: alpha(m.navy, 0.65),
-                  whiteSpace: "nowrap",
-                }}
+                sx={mollureLabelSx(m.navy, { whiteSpace: "nowrap" })}
               >
                 Date To
               </BodyText>
@@ -771,7 +747,7 @@ export default function ProfessionalFixedLocationAnalytics({
         <>
           <Box sx={{ px: 2.25, py: 1.6 }}>
             <BodyText
-              sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}
+              sx={mollureSectionTitleSx(m.navy)}
             >
               {section11.title}
             </BodyText>
@@ -791,9 +767,7 @@ export default function ProfessionalFixedLocationAnalytics({
           <Box sx={{ px: 2.25, pb: 2.25 }}>
             <BodyText
               sx={{
-                fontSize: 14,
-                fontWeight: 900,
-                color: alpha(m.navy, 0.88),
+                ...mollureSectionTitleSx(m.navy),
                 mb: 1.6,
               }}
             >
@@ -813,9 +787,7 @@ export default function ProfessionalFixedLocationAnalytics({
           <Box sx={{ px: 2.25, pb: 2.25 }}>
             <BodyText
               sx={{
-                fontSize: 14,
-                fontWeight: 900,
-                color: alpha(m.navy, 0.88),
+                ...mollureSectionTitleSx(m.navy),
                 mb: 1.6,
               }}
             >
@@ -835,9 +807,7 @@ export default function ProfessionalFixedLocationAnalytics({
           <Box sx={{ px: 2.25, pb: 2.25 }}>
             <BodyText
               sx={{
-                fontSize: 14,
-                fontWeight: 900,
-                color: alpha(m.navy, 0.88),
+                ...mollureSectionTitleSx(m.navy),
                 mb: 1.6,
               }}
             >
@@ -868,14 +838,12 @@ export default function ProfessionalFixedLocationAnalytics({
         />
       ) : (
         <Box sx={{ px: 2.25, py: 5 }}>
-          <BodyText
-            sx={{
-              fontSize: 14,
-              fontWeight: 800,
-              color: alpha(m.navy, 0.65),
-              textAlign: "center",
-            }}
-          >
+              <BodyText
+                sx={mollureSectionTitleSx(m.navy, {
+                  color: alpha(m.navy, 0.65),
+                  textAlign: "center",
+                })}
+              >
             No data is wired for{" "}
             <BodyText
               component="span"

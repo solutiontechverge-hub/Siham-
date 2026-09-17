@@ -13,10 +13,9 @@ import { resolveMediaUrl } from "../../../../lib/resolveMediaUrl";
 import { parseCalendarSettings } from "../../../../components/common/calendar/calendar-settings.types";
 import { mergeCalendarOverviewEvents, applyProfessionalClientKind } from "../../../../components/common/calendar/calendar-overview.mappers";
 import {
+  expandBlockedEntryToBlocks,
   getCalendarQueryDateRange,
   toIsoLocalDate,
-  wallClockDateFromDateTime,
-  wallClockTimeFromDateTime,
 } from "../../../../components/common/calendar/calendar.utils";
 import {
   useCreateCalendarEntryMutation,
@@ -54,16 +53,10 @@ import {
 import type { ServiceOrderSettings } from "../../../../components/common/calendar/calendar-settings.types";
 
 const DEFAULT_TIME_GRID = {
-  startHour: 8,
-  endHour: 22,
+  startHour: 0,
+  endHour: 24,
   stepMinutes: 15,
 } as const;
-
-const timeFromApi = (value?: string | null) =>
-  wallClockTimeFromDateTime(value) ?? "08:00";
-
-const dateFromApi = (value?: string | null) =>
-  wallClockDateFromDateTime(value) ?? new Date().toISOString().slice(0, 10);
 
 const parseServiceDurationMins = (label?: string | null) => {
   if (!label) return 30;
@@ -235,17 +228,9 @@ export function useFixedLocationCalendarPage() {
 
     const apiBlocks: CalendarBlock[] = (overview?.entries ?? [])
       .filter((entry) => entry.status === "blocked")
-      .map((entry) => ({
-        id: `blk-${entry.id}`,
-        resourceId: String(entry.team_member_id ?? resources[0]?.id ?? ""),
-        date: dateFromApi(
-          entry.date || entry.blocked_time_start || entry.start_date,
-        ),
-        start: entry.start || timeFromApi(entry.blocked_time_start),
-        end: entry.end || timeFromApi(entry.blocked_time_end),
-        title: entry.title,
-        kind: "unavailable" as const,
-      }));
+      .flatMap((entry) =>
+        expandBlockedEntryToBlocks(entry, fallbackResourceId),
+      );
 
     const calendarLocations = Array.from(
       new Set<CalendarBookingLocation>([

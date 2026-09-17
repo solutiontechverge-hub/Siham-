@@ -13,7 +13,18 @@ import {
 import { loginWithApple, loginWithGoogle } from "../controllers/oauth.controller.js";
 import { validateRequest } from "../middleware/validate.middleware.js";
 import { upload } from "../middleware/upload.middleware.js";
+import { validateImageUploadContent } from "../middleware/validateUploadContent.middleware.js";
 import { optionalOtherLink, optionalWebsite } from "../validators/optionalWebUrl.js";
+import {
+  cocBody,
+  emailBody,
+  otpBody,
+  passwordBody,
+  personNameBody,
+  textBody,
+  vatBody,
+  LIMITS,
+} from "../validators/fields.js";
 
 const router = express.Router();
 const userTypes = ["individual", "company", "professional"];
@@ -34,24 +45,62 @@ router.post(
     { name: "profile_picture", maxCount: 1 },
     { name: "logo", maxCount: 1 },
   ]),
+  validateImageUploadContent,
   [
     body("user_type")
       .trim()
       .isIn(userTypes)
       .withMessage("user_type must be one of individual, company, or professional."),
-    body("email").trim().isEmail().withMessage("A valid email is required.").normalizeEmail(),
-    body("password")
-      .isLength({ min: 8 })
-      .withMessage("Password must be at least 8 characters long."),
+    emailBody("email"),
+    passwordBody("password"),
     body("confirm_password")
+      .isString()
+      .withMessage("confirm_password must be a string.")
       .custom((value, { req }) => value === req.body.password)
       .withMessage("confirm_password must match password."),
+    personNameBody("first_name", { optional: true, label: "first_name" }),
+    personNameBody("last_name", { optional: true, label: "last_name" }),
+    personNameBody("contact_first_name", {
+      optional: true,
+      label: "contact_first_name",
+    }),
+    personNameBody("contact_last_name", {
+      optional: true,
+      label: "contact_last_name",
+    }),
+    textBody("legal_name", {
+      optional: true,
+      max: LIMITS.personName,
+      label: "legal_name",
+    }),
+    textBody("display_name", {
+      optional: true,
+      max: LIMITS.personName,
+      label: "display_name",
+    }),
+    cocBody("ccc_number", { optional: true }),
+    vatBody("vat_number", { optional: true }),
+    textBody("street", { optional: true, max: LIMITS.textShort }),
+    textBody("street_number", { optional: true, max: 20 }),
+    textBody("postal_code", { optional: true, max: 12 }),
+    textBody("province", { optional: true, max: LIMITS.textShort }),
+    textBody("municipality", { optional: true, max: LIMITS.textShort }),
+    textBody("gender", { optional: true, max: 32 }),
+    textBody("country_code", { optional: true, max: 8 }),
+    textBody("phone", { optional: true, max: LIMITS.phone }),
+    textBody("business_type", { optional: true, max: 64 }),
+    textBody("instagram", { optional: true, max: LIMITS.textShort }),
+    body("date_of_birth")
+      .optional({ values: "falsy" })
+      .trim()
+      .matches(/^\d{4}-\d{2}-\d{2}$/)
+      .withMessage("date_of_birth must be YYYY-MM-DD."),
     optionalWebsite(),
     optionalOtherLink(),
     body("experience_years")
       .optional({ values: "falsy" })
-      .isInt({ min: 0 })
-      .withMessage("experience_years must be a non-negative integer."),
+      .isInt({ min: 0, max: 80 })
+      .withMessage("experience_years must be an integer 0–80."),
   ],
   validateRequest,
   register,
@@ -60,8 +109,8 @@ router.post(
 router.post(
   "/login",
   [
-    body("email").trim().isEmail().withMessage("A valid email is required.").normalizeEmail(),
-    body("password").notEmpty().withMessage("Password is required."),
+    emailBody("email"),
+    passwordBody("password"),
     body("remember").optional().isBoolean().withMessage("remember must be a boolean."),
   ],
   validateRequest,
@@ -71,7 +120,11 @@ router.post(
 router.post(
   "/refresh",
   [
-    body("refresh_token").isString().notEmpty().withMessage("refresh_token is required."),
+    body("refresh_token")
+      .isString()
+      .notEmpty()
+      .isLength({ max: 2048 })
+      .withMessage("refresh_token is required."),
     body("remember").optional().isBoolean().withMessage("remember must be a boolean."),
   ],
   validateRequest,
@@ -80,7 +133,11 @@ router.post(
 
 router.post(
   "/google",
-  body("id_token").isString().notEmpty().withMessage("id_token is required."),
+  body("id_token")
+    .isString()
+    .notEmpty()
+    .isLength({ max: 8192 })
+    .withMessage("id_token is required."),
   validateRequest,
   loginWithGoogle,
 );
@@ -88,9 +145,13 @@ router.post(
 router.post(
   "/apple",
   [
-    body("id_token").isString().notEmpty().withMessage("id_token is required."),
-    body("first_name").optional().isString().trim(),
-    body("last_name").optional().isString().trim(),
+    body("id_token")
+      .isString()
+      .notEmpty()
+      .isLength({ max: 8192 })
+      .withMessage("id_token is required."),
+    personNameBody("first_name", { optional: true }),
+    personNameBody("last_name", { optional: true }),
   ],
   validateRequest,
   loginWithApple,
@@ -98,20 +159,14 @@ router.post(
 
 router.post(
   "/forgot-password",
-  body("email").trim().isEmail().withMessage("A valid email is required.").normalizeEmail(),
+  emailBody("email"),
   validateRequest,
   forgotPassword,
 );
 
 router.post(
   "/verify-otp",
-  [
-    body("email").trim().isEmail().withMessage("A valid email is required.").normalizeEmail(),
-    body("otp")
-      .trim()
-      .matches(/^\d{6}$/)
-      .withMessage("otp must be a 6-digit code."),
-  ],
+  [emailBody("email"), otpBody("otp")],
   validateRequest,
   verifyOtp,
 );
@@ -120,10 +175,9 @@ router.post(
   "/reset-password",
   [
     body("user_id").isInt({ min: 1 }).withMessage("user_id must be a valid integer."),
-    body("new_password")
-      .isLength({ min: 8 })
-      .withMessage("new_password must be at least 8 characters long."),
+    passwordBody("new_password"),
     body("confirm_password")
+      .isString()
       .custom((value, { req }) => value === req.body.new_password)
       .withMessage("confirm_password must match new_password."),
   ],
@@ -133,7 +187,11 @@ router.post(
 
 router.post(
   "/verify-email",
-  body("token").optional().isString().withMessage("token must be a valid string."),
+  body("token")
+    .optional()
+    .isString()
+    .isLength({ max: 512 })
+    .withMessage("token must be a valid string."),
   validateRequest,
   verifyEmail,
 );

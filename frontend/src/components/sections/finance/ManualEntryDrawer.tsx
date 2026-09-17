@@ -1,5 +1,12 @@
 "use client";
 
+import {
+  mollureBodyMutedSx,
+  mollureBodySx,
+  mollureLabelSx,
+  mollurePageTitleSx,
+  mollureSectionTitleSx,
+} from "../../../theme/mollureHierarchy";
 import AppButton from "../../common/AppButton";
 import * as React from "react";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
@@ -7,45 +14,17 @@ import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import { Box, Chip, Paper, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDrawer from "../../common/AppDrawer";
+import ClientPlatformTag from "../../common/ClientPlatformTag";
 import { FinanceDrawerActionsFooter } from "../../common/FinanceDrawerFooter";
 import AppSearchField from "../../common/AppSearchField";
 import MollureFormField from "../../common/MollureFormField";
 import { BodyText } from "../../ui/typography";
 import {
-  useGetBusinessSetupQuery,
-  useGetMollureClientDirectoryQuery,
-  useGetProfessionalClientsQuery,
-} from "../../../store/services/businessApi";
-import { mapApiProfessionalClientToRecord } from "../../../app/professionals/fixed-location/client/mapApiProfessionalClient";
-import type {
-  ClientRecord,
-  MollureDirectoryRow,
-} from "../../../app/professionals/fixed-location/client/data/clientList";
-import { useFinanceInvoiceSettings } from "./useFinanceInvoiceSettings";
-import {
-  calculateManualEntryDiscountAmount,
-  createManualEntryLineFromOption,
+  STEPS,
   formatEurAmount,
   formatManualEntryDiscountLabel,
-  lineTotal,
-  parseFinancePrice,
   selectionLabel,
-  type ManualEntryCatalogOption,
-  type ManualEntryClientMode,
-  type ManualEntryClientSelection,
-  type ManualEntryDiscount,
-  type ManualEntryLine,
-  type ManualEntryLineKind,
-  type ManualEntrySavePayload,
 } from "./manualEntry.data";
-import {
-  financeProductFromCatalogOption,
-  removeFinanceProduct,
-  removeFinanceUniqueItem,
-  toFinanceCatalogProduct,
-  upsertFinanceProduct,
-  upsertFinanceUniqueItem,
-} from "./financeCatalogPersist";
 import ManualEntryCatalogDrawer, {
   ManualEntryCatalogOpenButton,
 } from "./ManualEntryCatalogDrawer";
@@ -53,15 +32,13 @@ import ManualEntryDiscountModal from "./ManualEntryDiscountModal";
 import ManualEntryLineCard from "./ManualEntryLineCard";
 import ManualEntryLineEditModal from "./ManualEntryLineEditModal";
 import ManualEntryUniqueItemModal from "./ManualEntryUniqueItemModal";
+import {
+  useManualEntryDrawer,
+  type ManualEntryDrawerProps,
+} from "./useManualEntryDrawer";
 
-const STEPS = ["Client", "Items", "Payment", "Summary"] as const;
-type ManualEntryStep = (typeof STEPS)[number];
-
-export type ManualEntryDrawerProps = {
-  open: boolean;
-  onClose: () => void;
-  onSave?: (payload: ManualEntrySavePayload) => void;
-};
+export type { ManualEntryDrawerProps } from "./useManualEntryDrawer";
+export type { ManualEntryStep } from "./useManualEntryDrawer";
 
 export default function ManualEntryDrawer({
   open,
@@ -69,344 +46,65 @@ export default function ManualEntryDrawer({
   onSave,
 }: ManualEntryDrawerProps) {
   const m = useTheme().palette.mollure;
-  const rootRef = React.useRef<HTMLDivElement | null>(null);
-  const { settings, setSettings } = useFinanceInvoiceSettings();
-  const [clientOpen, setClientOpen] = React.useState(false);
-  const [clientMode, setClientMode] =
-    React.useState<ManualEntryClientMode | null>(null);
-  const [clientQuery, setClientQuery] = React.useState("");
-  const [clientSelection, setClientSelection] =
-    React.useState<ManualEntryClientSelection | null>(null);
-  const [lines, setLines] = React.useState<ManualEntryLine[]>([]);
-  const [discount, setDiscount] = React.useState<ManualEntryDiscount | null>(
-    null,
-  );
-  const [discountModalOpen, setDiscountModalOpen] = React.useState(false);
-  const [editingLine, setEditingLine] = React.useState<ManualEntryLine | null>(
-    null,
-  );
-  const [paymentMethod, setPaymentMethod] = React.useState<
-    "onlineDirect" | "offlineDirect"
-  >("offlineDirect");
-  const [guestEmail, setGuestEmail] = React.useState("");
-  const [guestName, setGuestName] = React.useState("");
-  const [step, setStep] = React.useState(0);
-  const [uniqueItemOpen, setUniqueItemOpen] = React.useState(false);
-  const [productDrawerOpen, setProductDrawerOpen] = React.useState(false);
-  const [itemDrawerOpen, setItemDrawerOpen] = React.useState(false);
-  const [guestContactError, setGuestContactError] = React.useState(false);
-
-  const { data: businessSetupResponse } = useGetBusinessSetupQuery(
-    { includeDraft: false },
-    {
-      skip: !open,
-    },
-  );
-  const businessSetup = businessSetupResponse?.data ?? null;
-  const { data: professionalClientsResponse } = useGetProfessionalClientsQuery(
-    undefined,
-    { skip: !open },
-  );
-  const { data: mollureDirectoryResponse } = useGetMollureClientDirectoryQuery(
-    { q: clientQuery },
-    { skip: !open || clientMode !== "platform" },
-  );
-
-  const hasGuestContact = Boolean(guestName.trim() || guestEmail.trim());
-  const isGuestClientStepValid =
-    clientSelection?.type !== "guest" || hasGuestContact;
-
-  React.useEffect(() => {
-    if (!open) return;
-    setClientOpen(false);
-    setClientMode(null);
-    setClientQuery("");
-    setClientSelection(null);
-    setLines([]);
-    setDiscount(null);
-    setDiscountModalOpen(false);
-    setEditingLine(null);
-    setPaymentMethod("offlineDirect");
-    setGuestEmail("");
-    setGuestName("");
-    setStep(0);
-    setUniqueItemOpen(false);
-    setProductDrawerOpen(false);
-    setItemDrawerOpen(false);
-    setGuestContactError(false);
-  }, [open]);
-
-  const productOptions = React.useMemo<ManualEntryCatalogOption[]>(
-    () =>
-      settings.products.map((product) => ({
-        id: product.id,
-        label: product.name,
-        unitPrice: parseFinancePrice(product.price),
-        vat: product.vat,
-      })),
-    [settings.products],
-  );
-
-  const itemOptions = React.useMemo<ManualEntryCatalogOption[]>(() => {
-    const setupServices = businessSetup?.service_details ?? [];
-    if (setupServices.length > 0) {
-      return setupServices.map((service) => ({
-        id: service.id,
-        label: service.service_title || service.category_title || "Service",
-        unitPrice: parseFinancePrice(String(service.price ?? "")),
-      }));
-    }
-
-    return settings.services.map((service) => ({
-      id: service.id,
-      label: service.service
-        ? `${service.category} - ${service.service}`
-        : service.category,
-      unitPrice: 0,
-      vat: service.vat,
-    }));
-  }, [businessSetup?.service_details, settings.services]);
-
-  const uniqueItemOptions = React.useMemo<ManualEntryCatalogOption[]>(
-    () =>
-      (settings.uniqueItems ?? []).map((item) => ({
-        id: item.id,
-        label: item.name,
-        unitPrice: parseFinancePrice(item.price),
-        vat: item.vat,
-        unit: item.unit,
-        discountType: item.discountType,
-        discountAmount: item.discountAmount,
-      })),
-    [settings.uniqueItems],
-  );
-
-  const [itemCatalogOverrides, setItemCatalogOverrides] = React.useState<
-    Record<string, ManualEntryCatalogOption>
-  >({});
-
-  const resolvedItemOptions = React.useMemo(() => {
-    const base = itemOptions.map(
-      (option) => itemCatalogOverrides[option.id] ?? option,
-    );
-    const extras = uniqueItemOptions.filter(
-      (option) => !base.some((item) => item.id === option.id),
-    );
-    return [...base, ...extras];
-  }, [itemCatalogOverrides, itemOptions, uniqueItemOptions]);
-
-  const handleAddProductOption = React.useCallback(
-    (option: ManualEntryCatalogOption) => {
-      setSettings((prev) =>
-        upsertFinanceProduct(prev, financeProductFromCatalogOption(option)),
-      );
-    },
-    [setSettings],
-  );
-
-  const handleDeleteProductOption = React.useCallback(
-    (option: ManualEntryCatalogOption) => {
-      setSettings((prev) => removeFinanceProduct(prev, option.id));
-    },
-    [setSettings],
-  );
-
-  const handleAddItemOption = React.useCallback(
-    (option: ManualEntryCatalogOption) => {
-      setSettings((prev) =>
-        upsertFinanceUniqueItem(prev, financeProductFromCatalogOption(option)),
-      );
-    },
-    [setSettings],
-  );
-
-  const handleDeleteItemOption = React.useCallback(
-    (option: ManualEntryCatalogOption) => {
-      setSettings((prev) => removeFinanceUniqueItem(prev, option.id));
-    },
-    [setSettings],
-  );
-
-  const isDeletableItemOption = React.useCallback(
-    (option: ManualEntryCatalogOption) =>
-      option.id.startsWith("unique-") ||
-      (settings.uniqueItems ?? []).some((item) => item.id === option.id),
-    [settings.uniqueItems],
-  );
-
-  const handleUpdateProductOption = React.useCallback(
-    (option: ManualEntryCatalogOption) => {
-      setSettings((prev) => ({
-        ...prev,
-        products: prev.products.map((product) =>
-          product.id === option.id
-            ? {
-                ...product,
-                name: option.label,
-                price: `${option.unitPrice}EUR`,
-                vat: option.vat?.trim() || product.vat,
-                unit: option.unit,
-                discountType: option.discountType,
-                discountAmount: option.discountAmount,
-              }
-            : product,
-        ),
-      }));
-    },
-    [setSettings],
-  );
-
-  const handleUpdateItemOption = React.useCallback(
-    (option: ManualEntryCatalogOption) => {
-      setItemCatalogOverrides((prev) => ({ ...prev, [option.id]: option }));
-      setSettings((prev) => {
-        const hasService = prev.services.some((s) => s.id === option.id);
-        if (!hasService) return prev;
-        return {
-          ...prev,
-          services: prev.services.map((service) =>
-            service.id === option.id
-              ? {
-                  ...service,
-                  service: option.label,
-                  vat: option.vat?.trim() || service.vat,
-                }
-              : service,
-          ),
-        };
-      });
-    },
-    [setSettings],
-  );
-
-  const productLines = React.useMemo(
-    () => lines.filter((l) => l.kind === "product"),
-    [lines],
-  );
-  const itemLines = React.useMemo(
-    () => lines.filter((l) => l.kind === "item"),
-    [lines],
-  );
-  const subtotal = React.useMemo(
-    () => lines.reduce((sum, line) => sum + lineTotal(line), 0),
-    [lines],
-  );
-  const discountAmount = React.useMemo(
-    () => calculateManualEntryDiscountAmount(subtotal, discount),
-    [discount, subtotal],
-  );
-  const totalPrice = Math.max(0, subtotal - discountAmount);
-  const hasItems = lines.length > 0;
-
-  React.useEffect(() => {
-    if (!clientOpen) return;
-    const onDocClick = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node))
-        setClientOpen(false);
-    };
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, [clientOpen]);
-
-  const listResults = React.useMemo(() => {
-    if (clientMode !== "list") return [] as ClientRecord[];
-    const records = (professionalClientsResponse?.data ?? []).map(
-      mapApiProfessionalClientToRecord,
-    );
-    const q = clientQuery.trim().toLowerCase();
-    if (!q) return records.slice(0, 5);
-    return records
-      .filter((c) => c.name.toLowerCase().includes(q))
-      .slice(0, 8);
-  }, [clientMode, clientQuery, professionalClientsResponse?.data]);
-
-  const platformResults = React.useMemo(() => {
-    if (clientMode !== "platform") return [] as MollureDirectoryRow[];
-    return (mollureDirectoryResponse?.data ?? [])
-      .filter((row) => row.has_eligible_booking !== false)
-      .map(
-        (row): MollureDirectoryRow => ({
-          id: row.id,
-          name: row.name,
-          email: row.email,
-          hasEligibleBooking: row.has_eligible_booking,
-          tags: ["Mollure"],
-        }),
-      );
-  }, [clientMode, mollureDirectoryResponse?.data]);
-
-  const displayClient = selectionLabel(clientSelection) || "Search Client";
-
-  const pickGuest = () => {
-    setClientMode("guest");
-    setClientSelection({ type: "guest", name: guestName || undefined });
-    setClientOpen(false);
-  };
-
-  const canNext =
-    (step === 0 && Boolean(clientSelection) && isGuestClientStepValid) ||
-    (step === 1 && hasItems) ||
-    step === 2;
-
-  const handlePrimary = () => {
-    if (step === 0 && clientSelection?.type === "guest" && !hasGuestContact) {
-      setGuestContactError(true);
-      return;
-    }
-    if (step < 3) {
-      if (canNext) setStep((s) => s + 1);
-      return;
-    }
-    if (!clientSelection || !hasItems) return;
-    onSave?.({
-      clientSelection:
-        clientSelection.type === "guest"
-          ? { type: "guest", name: guestName.trim() || clientSelection.name }
-          : clientSelection,
-      lines,
-      totalPrice,
-      discount,
-      discountAmount,
-      paymentMethod,
-      guestEmail: clientSelection?.type === "guest" ? guestEmail : undefined,
-      guestName: clientSelection?.type === "guest" ? guestName : undefined,
-    });
-  };
-
-  const pickListClient = (client: (typeof listResults)[number]) => {
-    setGuestEmail("");
-    setGuestName("");
-    setClientSelection({ type: "list", client });
-    setClientOpen(false);
-  };
-
-  const pickPlatformClient = (client: (typeof platformResults)[number]) => {
-    setGuestEmail("");
-    setGuestName("");
-    setClientSelection({ type: "platform", client });
-    setClientOpen(false);
-    setClientQuery("");
-  };
-
-  const addLinesFromCatalog = (
-    kind: ManualEntryLineKind,
-    options: Array<ManualEntryCatalogOption & { quantity?: number }>,
-  ) => {
-    setLines((prev) => [
-      ...prev,
-      ...options.map((option) =>
-        createManualEntryLineFromOption(kind, option, option.quantity ?? 1),
-      ),
-    ]);
-  };
-
-  const removeLine = (id: string) => {
-    setLines((prev) => prev.filter((l) => l.id !== id));
-  };
-
-  const updateLine = (next: ManualEntryLine) => {
-    setLines((prev) => prev.map((l) => (l.id === next.id ? next : l)));
-  };
+  const {
+    rootRef,
+    step,
+    goBack,
+    clientOpen,
+    setClientOpen,
+    clientMode,
+    setClientMode,
+    clientQuery,
+    setClientQuery,
+    clientSelection,
+    lines,
+    discount,
+    setDiscount,
+    discountModalOpen,
+    setDiscountModalOpen,
+    editingLine,
+    setEditingLine,
+    paymentMethod,
+    setPaymentMethod,
+    guestEmail,
+    guestName,
+    uniqueItemOpen,
+    setUniqueItemOpen,
+    productDrawerOpen,
+    setProductDrawerOpen,
+    itemDrawerOpen,
+    setItemDrawerOpen,
+    guestContactError,
+    productOptions,
+    resolvedItemOptions,
+    handleAddProductOption,
+    handleDeleteProductOption,
+    handleAddItemOption,
+    handleDeleteItemOption,
+    isDeletableItemOption,
+    handleUpdateProductOption,
+    handleUpdateItemOption,
+    productLines,
+    itemLines,
+    subtotal,
+    discountAmount,
+    totalPrice,
+    hasItems,
+    listResults,
+    platformResults,
+    displayClient,
+    pickGuest,
+    canNext,
+    handlePrimary,
+    pickListClient,
+    pickPlatformClient,
+    addLinesFromCatalog,
+    removeLine,
+    updateLine,
+    handleGuestNameChange,
+    handleGuestEmailChange,
+    handleUniqueItemSave,
+  } = useManualEntryDrawer({ open, onSave });
 
   const modeRowSx = (active: boolean) => ({
     display: "flex",
@@ -428,9 +126,7 @@ export default function ManualEntryDrawer({
       contentVariant="muted"
       footer={
         <FinanceDrawerActionsFooter
-          onCancel={
-            step === 0 ? onClose : () => setStep((s) => Math.max(0, s - 1))
-          }
+          onCancel={step === 0 ? onClose : goBack}
           cancelLabel={step === 0 ? "Cancel" : "Back"}
           primaryLabel={step < 3 ? "Next" : "Finalize checkout"}
           primaryDisabled={step < 3 ? !canNext : !clientSelection || !hasItems}
@@ -626,25 +322,10 @@ export default function ManualEntryDrawer({
                           >
                             {client.name}
                           </Typography>
-                          {client.tags.includes("Mollure") ? (
-                            <Chip
-                              label="Mollure"
-                              size="small"
-                              sx={{
-                                height: 16,
-                                borderRadius: "999px",
-                                fontWeight: 700,
-                                bgcolor: alpha(m.teal, 0.12),
-                                color: m.teal,
-                                "& .MuiChip-label": {
-                                  fontSize: 9,
-                                  px: 0.65,
-                                  py: 0,
-                                  lineHeight: 1.2,
-                                },
-                              }}
-                            />
-                          ) : null}
+                          <ClientPlatformTag
+                            isMollure={client.tags.includes("Mollure")}
+                            clientKind={client.kind}
+                          />
                         </Stack>
                         <Typography
                           sx={{
@@ -715,23 +396,7 @@ export default function ManualEntryDrawer({
                             >
                               {row.name}
                             </Typography>
-                            <Chip
-                              label="Mollure"
-                              size="small"
-                              sx={{
-                                height: 16,
-                                borderRadius: "999px",
-                                fontWeight: 700,
-                                bgcolor: alpha(m.teal, 0.12),
-                                color: m.teal,
-                                "& .MuiChip-label": {
-                                  fontSize: 9,
-                                  px: 0.65,
-                                  py: 0,
-                                  lineHeight: 1.2,
-                                },
-                              }}
-                            />
+                            <ClientPlatformTag isMollure />
                           </Stack>
                           <Typography
                             sx={{
@@ -780,11 +445,7 @@ export default function ManualEntryDrawer({
               label="Guest name"
               placeholder="Personalize guest name"
               value={guestName}
-              onChange={(e) => {
-                setGuestName(e.target.value);
-                setGuestContactError(false);
-                setClientSelection({ type: "guest", name: e.target.value });
-              }}
+              onChange={(e) => handleGuestNameChange(e.target.value)}
               fullWidth
               size="small"
               error={
@@ -800,10 +461,7 @@ export default function ManualEntryDrawer({
               label="Guest email"
               placeholder="Email for invoice and receipt"
               value={guestEmail}
-              onChange={(e) => {
-                setGuestEmail(e.target.value);
-                setGuestContactError(false);
-              }}
+              onChange={(e) => handleGuestEmailChange(e.target.value)}
               fullWidth
               size="small"
               error={
@@ -881,11 +539,10 @@ export default function ManualEntryDrawer({
                   <AppButton
                     tone="secondary"
                     onClick={() => setUniqueItemOpen(true)}
-                    sx={{
+                    sx={mollureLabelSx(m.navy, {
                       mt: 0.5,
-                      fontSize: 12.5,
                       color: m.teal,
-                    }}
+                    })}
                   >
                     + Unique item
                   </AppButton>
@@ -928,13 +585,7 @@ export default function ManualEntryDrawer({
                         justifyContent="space-between"
                         spacing={1}
                       >
-                        <Typography
-                          sx={{
-                            fontSize: 12.5,
-                            fontWeight: 700,
-                            color: alpha(m.navy, 0.55),
-                          }}
-                        >
+                        <Typography sx={mollureBodyMutedSx(m.navy)}>
                           Discount (
                           {discount.type === "fixed" ? "Fixed" : "Percentage"}):{" "}
                           {formatManualEntryDiscountLabel(discount)}
@@ -959,9 +610,7 @@ export default function ManualEntryDrawer({
                         p: 0,
                         minWidth: 0,
                         textTransform: "none",
-                        fontWeight: 800,
-                        fontSize: 12.5,
-                        color: m.teal,
+                        ...mollureLabelSx(m.navy, { color: m.teal }),
                         textDecoration: "underline",
                         "&:hover": {
                           bgcolor: "transparent",
@@ -981,22 +630,10 @@ export default function ManualEntryDrawer({
                       spacing={1}
                       sx={{ pt: 0.25 }}
                     >
-                      <Typography
-                        sx={{
-                          fontSize: 13,
-                          fontWeight: 700,
-                          color: alpha(m.navy, 0.55),
-                        }}
-                      >
+                      <Typography sx={mollureBodyMutedSx(m.navy)}>
                         Final Price:
                       </Typography>
-                      <Typography
-                        sx={{
-                          fontSize: 18,
-                          fontWeight: 900,
-                          color: alpha(m.navy, 0.88),
-                        }}
-                      >
+                      <Typography sx={mollurePageTitleSx(m.navy)}>
                         {formatEurAmount(totalPrice)}
                       </Typography>
                     </Stack>
@@ -1036,7 +673,7 @@ export default function ManualEntryDrawer({
                   onClick={() => setPaymentMethod(option.id)}
                   sx={{
                     justifyContent: "flex-start",
-                    fontSize: 12.5,
+                    ...mollureBodySx(m.navy),
                     bgcolor: paymentMethod === option.id ? m.teal : "#fff",
                     color:
                       paymentMethod === option.id
@@ -1059,35 +696,23 @@ export default function ManualEntryDrawer({
 
         {step === 3 ? (
           <Stack spacing={1.25}>
-            <BodyText
-              sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.86) }}
-            >
+            <BodyText sx={mollureLabelSx(m.navy)}>
               Final summary
             </BodyText>
             <Typography
-              sx={{
-                fontSize: 12.5,
-                fontWeight: 700,
-                color: alpha(m.navy, 0.65),
-              }}
+              sx={mollureBodySx(m.navy, { color: alpha(m.navy, 0.65) })}
             >
               Client: {selectionLabel(clientSelection)}
             </Typography>
             <Typography
-              sx={{
-                fontSize: 12.5,
-                fontWeight: 700,
-                color: alpha(m.navy, 0.65),
-              }}
+              sx={mollureBodySx(m.navy, { color: alpha(m.navy, 0.65) })}
             >
               Items: {lines.length} · Payment:{" "}
               {paymentMethod === "onlineDirect"
                 ? "Online direct"
                 : "Offline direct"}
             </Typography>
-            <Typography
-              sx={{ fontSize: 18, fontWeight: 900, color: alpha(m.navy, 0.88) }}
-            >
+            <Typography sx={mollureSectionTitleSx(m.navy)}>
               Total: {formatEurAmount(totalPrice)}
             </Typography>
           </Stack>
@@ -1131,19 +756,7 @@ export default function ManualEntryDrawer({
       <ManualEntryUniqueItemModal
         open={uniqueItemOpen}
         onClose={() => setUniqueItemOpen(false)}
-        onSave={(line) => {
-          setLines((prev) => [...prev, line]);
-          setSettings((prev) =>
-            upsertFinanceUniqueItem(
-              prev,
-              toFinanceCatalogProduct({
-                id: line.id,
-                name: line.name,
-                price: line.unitPrice,
-              }),
-            ),
-          );
-        }}
+        onSave={handleUniqueItemSave}
       />
 
       <ManualEntryLineEditModal

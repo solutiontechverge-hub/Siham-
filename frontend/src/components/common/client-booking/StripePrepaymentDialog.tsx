@@ -1,5 +1,7 @@
 "use client";
 
+import { mollureBodySx } from "../../../theme/mollureHierarchy";
+
 import AppButton from "../AppButton";
 import * as React from "react";
 import { Box, CircularProgress, Stack, Typography } from "@mui/material";
@@ -79,7 +81,7 @@ function PaymentForm({
       />
       {errorMessage ? (
         <Typography
-          sx={{ mt: 1.5, fontSize: 12.5, fontWeight: 700, color: "#C62828" }}
+          sx={mollureBodySx(m.navy, { mt: 1.5, color: "#C62828" })}
         >
           {errorMessage}
         </Typography>

@@ -1,5 +1,7 @@
 "use client";
 
+import { mollureSectionTitleSx } from "../../../theme/mollureHierarchy";
+
 import { Box, Paper, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import type {
@@ -107,9 +109,7 @@ export default function SalesVolumeStackedBarChart({
         <Box sx={{ px: 2.25, pt: 2, pb: 1 }}>
           <BodyText
             sx={{
-              fontSize: 14,
-              fontWeight: 900,
-              color: alpha(m.navy, 0.85),
+              ...mollureSectionTitleSx(m.navy),
               textAlign: "center",
             }}
           >

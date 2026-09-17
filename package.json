@@ -9,7 +9,9 @@
     "dev:frontend": "npm --workspace frontend run dev",
     "dev:frontend:clean": "npm --workspace frontend run dev:clean",
     "dev:backend": "npm --workspace backend run dev",
-    "dev": "npm run dev:frontend",
+    "dev": "npm run dev:all",
+    "dev:all": "node scripts/dev-all.mjs",
+    "dev:frontend-only": "npm run dev:frontend",
     "build:frontend": "npm --workspace frontend run build",
     "build:backend": "npm --workspace backend run build",
     "build": "npm run build:backend && npm run build:frontend",
@@ -24,6 +26,11 @@
     "npm": ">=9"
   },
   "dependencies": {
-    "sharp": "^0.35.3"
+    "sharp": "^0.35.4"
+  },
+  "overrides": {
+    "qs": "6.16.0",
+    "glob": "10.5.0",
+    "postcss": "8.5.28"
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import AppButton from "../AppButton";
+import { ModalCancelApplyFooter } from "../FinanceDrawerFooter";
 import * as React from "react";
 import DragIndicatorRoundedIcon from "@mui/icons-material/DragIndicatorRounded";
 import { Box, Stack } from "@mui/material";
@@ -84,16 +84,12 @@ export default function CalendarServiceOrderModal({
       maxWidth="sm"
       fullWidth
       footer={
-        <Box sx={{ px: 2.5, py: 2 }}>
-          <Stack direction="row" justifyContent="flex-end" spacing={1.25}>
-            <AppButton tone="secondary" onClick={onClose} sx={{ height: 38 }}>
-              Cancel
-            </AppButton>
-            <AppButton tone="primary" onClick={onApply} sx={{ height: 38 }}>
-              Save
-            </AppButton>
-          </Stack>
-        </Box>
+        <ModalCancelApplyFooter
+          onCancel={onClose}
+          onPrimary={onApply}
+          primaryLabel="Save"
+          buttonSx={{ height: 38 }}
+        />
       }
     >
       <Box sx={{ px: 2.5, py: 2 }}>

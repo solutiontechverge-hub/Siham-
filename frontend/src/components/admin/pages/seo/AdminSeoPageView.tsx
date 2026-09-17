@@ -7,6 +7,11 @@ import { alpha, useTheme } from "@mui/material/styles";
 import { AppButton } from "../../../common";
 import AdminSectionCard from "../../AdminSectionCard";
 import { AdminDashboardFooter } from "../../AdminDashboardHeader";
+import {
+  mollureSectionTitleSx,
+  mollureBodySx,
+  mollureBodyMutedSx,
+} from "../../../../theme/mollureHierarchy";
 import { SEO_LINKS } from "./seo.data";
 
 export default function AdminSeoPageView() {
@@ -23,17 +28,25 @@ export default function AdminSeoPageView() {
         <Typography
           component={Link}
           href="/admin/dashboard"
-          sx={{
-            fontSize: 12,
+          sx={mollureBodyMutedSx(tokens.navy, {
             color: tokens.bodyText,
             textDecoration: "none",
             "&:hover": { color: tokens.teal },
-          }}
+          })}
         >
           Home
         </Typography>
-        <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>/</Typography>
-        <Typography sx={{ fontSize: 12, color: tokens.navy, fontWeight: 500 }}>
+        <Typography
+          sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText })}
+        >
+          /
+        </Typography>
+        <Typography
+          sx={mollureBodySx(tokens.navy, {
+            color: tokens.navy,
+            fontWeight: 500,
+          })}
+        >
           SEO
         </Typography>
       </Stack>
@@ -50,7 +63,10 @@ export default function AdminSeoPageView() {
           SEO
         </Typography>
         <Typography
-          sx={{ fontSize: 14, color: tokens.bodyText, maxWidth: 640 }}
+          sx={mollureBodySx(tokens.navy, {
+            color: tokens.bodyText,
+            maxWidth: 640,
+          })}
         >
           Quick access to Google Search Console and Google Analytics.
         </Typography>
@@ -90,17 +106,18 @@ export default function AdminSeoPageView() {
                   </Box>
                   <Box sx={{ minWidth: 0 }}>
                     <Typography
-                      sx={{
-                        fontSize: 15,
+                      sx={mollureSectionTitleSx(tokens.navy, {
                         fontWeight: 600,
-                        color: tokens.navy,
                         lineHeight: 1.3,
-                      }}
+                      })}
                     >
                       {link.label}
                     </Typography>
                     <Typography
-                      sx={{ fontSize: 12, color: tokens.bodyText, mt: 0.35 }}
+                      sx={mollureBodyMutedSx(tokens.navy, {
+                        color: tokens.bodyText,
+                        mt: 0.35,
+                      })}
                     >
                       {link.description}
                     </Typography>

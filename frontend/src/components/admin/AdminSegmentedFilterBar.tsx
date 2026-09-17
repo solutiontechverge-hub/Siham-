@@ -10,6 +10,10 @@ import {
   type Theme,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
+import {
+  mollureLabelSx,
+  mollureBodyMutedSx,
+} from "../../theme/mollureHierarchy";
 
 export const ADMIN_FLUSHED_FIELD_SX: SxProps<Theme> = {
   "& .MuiOutlinedInput-root": {
@@ -74,13 +78,13 @@ export default function AdminSegmentedFilterBar({
               sx={{ flex: segment.flex ?? 1, minWidth: segment.minWidth ?? 0 }}
             >
               <Typography
-                sx={{
+                sx={mollureBodyMutedSx(tokens.navy, {
                   fontSize: 11,
                   fontWeight: 600,
                   color: tokens.slate,
                   lineHeight: 1.2,
                   whiteSpace: "nowrap",
-                }}
+                })}
               >
                 {segment.label}
               </Typography>
@@ -127,7 +131,11 @@ export default function AdminSegmentedFilterBar({
                 }}
               >
                 <Typography
-                  sx={{ fontSize: 11, fontWeight: 600, color: tokens.slate }}
+                  sx={mollureBodyMutedSx(tokens.navy, {
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: tokens.slate,
+                  })}
                 >
                   {segment.label}
                 </Typography>
@@ -153,14 +161,13 @@ export default function AdminSegmentedFilterBar({
           component="button"
           type="button"
           onClick={onReset}
-          sx={{
+          sx={mollureLabelSx(tokens.navy, {
             border: 0,
             bgcolor: "transparent",
             cursor: "pointer",
             display: "inline-flex",
             alignItems: "center",
             gap: 0.5,
-            fontSize: 13,
             fontWeight: 600,
             color: tokens.teal,
             p: 0,
@@ -168,7 +175,7 @@ export default function AdminSegmentedFilterBar({
             alignSelf: { xs: "flex-start", lg: "flex-end" },
             mb: { lg: 0.85 },
             "&:hover": { textDecoration: "underline" },
-          }}
+          })}
         >
           <RefreshOutlinedIcon sx={{ fontSize: 16 }} />
           {resetLabel}

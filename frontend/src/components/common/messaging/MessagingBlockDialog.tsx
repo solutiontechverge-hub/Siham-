@@ -1,13 +1,9 @@
 "use client";
 
-import { Box, Typography } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
 import type { MessagingAudience } from "./messagingRoutes";
 import { getBlockModalCopy } from "./messagingPeerLabels";
-import AppModal, {
-  MessagingModalCancelButton,
-  MessagingModalPrimaryButton,
-} from "../AppModal";
+import ModalConfirmBody from "../ModalConfirmBody";
+import MessagingDangerModal from "./MessagingDangerModal";
 
 type Props = {
   open: boolean;
@@ -24,43 +20,21 @@ export default function MessagingBlockDialog({
   onConfirm,
   embedded = false,
 }: Props) {
-  const m = useTheme().palette.mollure;
   const copy = getBlockModalCopy(audience);
 
   return (
-    <AppModal
-      contentSx={{ px: 2.5 }}
-      footerVariant="actions"
+    <MessagingDangerModal
       open={open}
-      title={copy.title}
       onClose={onClose}
+      title={copy.title}
       embedded={embedded}
-      headerTone="danger"
-      footer={
-        <>
-          <MessagingModalCancelButton onClick={onClose} />
-          <MessagingModalPrimaryButton
-            label={copy.confirmLabel}
-            onClick={() => {
-              onConfirm();
-              onClose();
-            }}
-          />
-        </>
-      }
+      primaryLabel={copy.confirmLabel}
+      onPrimary={() => {
+        onConfirm();
+        onClose();
+      }}
     >
-      <Box sx={{ py: 2.5, textAlign: "center" }}>
-        <Typography
-          sx={{
-            fontWeight: 900,
-            fontSize: 14,
-            color: alpha(m.navy, 0.85),
-            lineHeight: 1.5,
-          }}
-        >
-          {copy.message}
-        </Typography>
-      </Box>
-    </AppModal>
+      <ModalConfirmBody body={copy.message} bodyOpacity={0.85} />
+    </MessagingDangerModal>
   );
 }

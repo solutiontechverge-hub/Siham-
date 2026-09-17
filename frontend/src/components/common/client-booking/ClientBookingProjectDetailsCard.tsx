@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  mollureBodySx,
+  mollureLabelSx,
+  mollureSectionTitleSx,
+} from "../../../theme/mollureHierarchy";
+
 import { Box, Divider, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import type { ClientBookingDraftProjectDetails } from "./types";
@@ -26,29 +32,18 @@ export default function ClientBookingProjectDetailsCard({ project }: Props) {
     >
       <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 2, pb: 1.25 }}>
         <BodyText
-          sx={{
+          sx={mollureSectionTitleSx(m.navy, {
             m: 0,
-            fontWeight: 900,
-            fontSize: 13,
-            color: alpha(m.navy, 0.72),
             textAlign: "center",
             lineHeight: 1.2,
-          }}
+          })}
         >
           Project Details and Media
         </BodyText>
       </Box>
       <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
       <Box sx={{ px: { xs: 2, md: 2.5 }, py: 1.75 }}>
-        <BodyText
-          sx={{
-            m: 0,
-            fontSize: 12,
-            fontWeight: 900,
-            color: alpha(m.navy, 0.65),
-            mb: 0.75,
-          }}
-        >
+        <BodyText sx={mollureLabelSx(m.navy, { m: 0, mb: 0.75 })}>
           Description
         </BodyText>
         <Box
@@ -62,27 +57,13 @@ export default function ClientBookingProjectDetailsCard({ project }: Props) {
           }}
         >
           <BodyText
-            sx={{
-              m: 0,
-              fontSize: 12.5,
-              fontWeight: 700,
-              color: description ? alpha(m.navy, 0.72) : alpha(m.navy, 0.38),
-              whiteSpace: "pre-wrap",
-            }}
+            sx={mollureBodySx(m.navy, { m: 0, color: description ? alpha(m.navy, 0.72) : alpha(m.navy, 0.38), whiteSpace: "pre-wrap" })}
           >
             {description || "No description added"}
           </BodyText>
         </Box>
 
-        <BodyText
-          sx={{
-            m: 0,
-            fontSize: 12,
-            fontWeight: 900,
-            color: alpha(m.navy, 0.65),
-            mb: 0.75,
-          }}
-        >
+        <BodyText sx={mollureLabelSx(m.navy, { m: 0, mb: 0.75 })}>
           Media
         </BodyText>
         {uploads.length > 0 ? (
@@ -93,12 +74,7 @@ export default function ClientBookingProjectDetailsCard({ project }: Props) {
           </Stack>
         ) : (
           <BodyText
-            sx={{
-              m: 0,
-              fontSize: 12.5,
-              fontWeight: 700,
-              color: alpha(m.navy, 0.38),
-            }}
+            sx={mollureBodySx(m.navy, { m: 0, color: alpha(m.navy, 0.38) })}
           >
             No files uploaded
           </BodyText>

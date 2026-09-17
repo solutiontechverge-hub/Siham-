@@ -1,23 +1,15 @@
-import {
-  ListingImage1,
-  ListingImage2,
-  ListingImage3,
-  ListingImage4,
-  ListingImage5,
-  ListingImage6,
-} from "../../../../images";
 import type { ListingCardData } from "./listing.data";
 import { resolveResponseWindowMinutes } from "../../../components/common/calendar/bookingResponseDeadline";
 import {
   buildDesiredLocationFromSetupFields,
+  buildScheduleOptions,
+  DEFAULT_PUBLIC_PROFILE_SCHEDULE,
   type BusinessPublicProfileBookCombo,
   type BusinessPublicProfileCategory,
   type BusinessPublicProfileData,
   type BusinessPublicProfileDesiredLocation,
   type BusinessPublicProfileFixedLocation,
   type BusinessPublicProfilePolicySection,
-  type BusinessPublicProfileScheduleDay,
-  type BusinessPublicProfileScheduleOption,
   type BusinessPublicProfileService,
   type BusinessPublicProfileServiceForItem,
   type BusinessPublicProfileTeamMember,
@@ -38,50 +30,13 @@ import type {
   BusinessSetupListingPolicy,
   BusinessSetupListingTimeBlock,
 } from "../../../store/services/businessApi";
-
-const FALLBACK_IMAGES = [
-  ListingImage1,
-  ListingImage2,
-  ListingImage3,
-  ListingImage4,
-  ListingImage5,
-  ListingImage6,
-];
-
-const DEFAULT_SCHEDULE: BusinessPublicProfileScheduleDay[] = [
-  { day: "Monday", slots: "10:00 AM – 8:00 PM" },
-  { day: "Tuesday", slots: "10:00 AM – 8:00 PM" },
-  { day: "Wednesday", slots: "10:00 AM – 8:00 PM" },
-  { day: "Thursday", slots: "10:00 AM – 8:00 PM" },
-  { day: "Friday", slots: "12:45 PM – 4:30 PM" },
-  { day: "Saturday", slots: "10:00 AM – 6:00 PM" },
-  { day: "Sunday", slots: "Closed" },
-];
+import { LISTING_FALLBACK_IMAGES as FALLBACK_IMAGES } from "../../../data/listingFallbackImages.data";
 
 const SERVICE_FOR_LABELS: Record<string, { id: BusinessPublicProfileServiceForItem["id"]; label: string }> = {
   men: { id: "men", label: "Men" },
   women: { id: "women", label: "Women" },
   kids: { id: "kids", label: "Kids" },
 };
-
-function formatScheduleOptionLabel(day: string, slots: string) {
-  const normalized = slots.replace(/\s*–\s*/g, " - ").trim();
-  return `${day}(${normalized})`;
-}
-
-function buildScheduleOptions(weeklySchedule: BusinessPublicProfileScheduleDay[]): BusinessPublicProfileScheduleOption[] {
-  const today: BusinessPublicProfileScheduleOption = {
-    id: "today",
-    label: "Today(8:00 - 18:00)",
-  };
-  const days = weeklySchedule
-    .filter((row) => row.slots.toLowerCase() !== "closed")
-    .map((row) => ({
-      id: row.day.toLowerCase(),
-      label: formatScheduleOptionLabel(row.day, row.slots),
-    }));
-  return [today, ...days];
-}
 
 function parseDurationMins(durationLabel: string) {
   const match = durationLabel.match(/(\d+)/);
@@ -652,7 +607,7 @@ export function mapBusinessSetupToPublicProfile(setup: BusinessSetupListing): Bu
   const services = buildProfileServices(setup);
   const heroImages = resolveHeroImages(setup);
   const portfolioImages = heroImages;
-  const weeklySchedule = DEFAULT_SCHEDULE;
+  const weeklySchedule = DEFAULT_PUBLIC_PROFILE_SCHEDULE;
   const keywords = setup.keywords ?? [];
   const projectText = setup.project?.trim() ?? "";
 

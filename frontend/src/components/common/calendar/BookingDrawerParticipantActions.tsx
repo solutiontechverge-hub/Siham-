@@ -4,6 +4,7 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import { Box, ButtonBase, Stack, Tooltip } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../../ui/typography";
+import { mollureLabelSx } from "../../../theme/mollureHierarchy";
 
 export type BookingDrawerParticipantKind =
   | "guest"
@@ -90,12 +91,10 @@ function AddPersonButton({
       </Box>
       <BodyText
         component="span"
-        sx={{
-          fontSize: 12.5,
-          fontWeight: 800,
+        sx={mollureLabelSx(m.navy, {
           color: alpha(m.navy, 0.6),
           lineHeight: 1,
-        }}
+        })}
       >
         {label}
       </BodyText>

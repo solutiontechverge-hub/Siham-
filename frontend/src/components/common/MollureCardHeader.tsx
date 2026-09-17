@@ -2,7 +2,11 @@
 
 import * as React from "react";
 import { Box } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
+import { useTheme } from "@mui/material/styles";
+import {
+  mollurePageSubtitleSx,
+  mollurePageTitleSx,
+} from "../../theme/mollureHierarchy";
 import { BodyText, SubHeading } from "../ui/typography";
 
 export type MollureCardHeaderProps = {
@@ -27,9 +31,9 @@ export default function MollureCardHeader({
         bgcolor: tone === "tinted" ? m.surface : "transparent",
       }}
     >
-      <SubHeading sx={{ color: alpha(m.navy, 0.88) }}>{title}</SubHeading>
+      <SubHeading sx={mollurePageTitleSx(m.navy)}>{title}</SubHeading>
       {subtitle ? (
-        <BodyText sx={{ mt: 0.4, color: alpha(m.navy, 0.55) }}>
+        <BodyText sx={mollurePageSubtitleSx(m.navy, { mt: 0.4, lineHeight: 1.4 })}>
           {subtitle}
         </BodyText>
       ) : null}

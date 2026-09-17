@@ -14,6 +14,10 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import {
+  mollureBodyMutedSx,
+  mollureLabelSx,
+} from "../../../theme/mollureHierarchy";
 import MessagingAvatar from "./MessagingAvatar";
 import MessagingReadReceipt from "./MessagingReadReceipt";
 import { isMessageReadByPeer } from "./messagingReadReceiptHelpers";
@@ -202,9 +206,8 @@ export default function MessagingMessageBubble({
             spacing={0.75}
           >
             <Typography
-              sx={{
+              sx={mollureLabelSx(m.navy, {
                 fontWeight: 900,
-                fontSize: 12.5,
                 color: own ? alpha(m.navy, 0.55) : m.teal,
                 ...(own
                   ? {}
@@ -215,7 +218,7 @@ export default function MessagingMessageBubble({
                       borderRadius: "6px",
                       bgcolor: alpha(m.teal, 0.12),
                     }),
-              }}
+              })}
             >
               {displayName}
             </Typography>
@@ -258,14 +261,13 @@ export default function MessagingMessageBubble({
           </Typography>
         ) : message.body ? (
           <Typography
-            sx={{
+            sx={mollureBodyMutedSx(m.navy, {
               mt: 0.45,
-              fontSize: 12.5,
               lineHeight: 1.55,
               color: alpha(m.navy, 0.62),
               fontWeight: 500,
               textAlign: own ? "right" : "left",
-            }}
+            })}
           >
             {message.body}
           </Typography>

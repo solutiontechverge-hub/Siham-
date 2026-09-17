@@ -9,6 +9,7 @@ import {
   verifyGoogleIdToken,
 } from "../helpers/oauth.helper.js";
 import { findOrCreateOAuthUser } from "../services/social-auth.service.js";
+import { logError } from "../utils/httpError.js";
 
 const buildLoginPayload = (user) => ({
   access_token: generateAccessToken(user),
@@ -39,6 +40,7 @@ const respondWithOAuthUser = (res, user) => {
 };
 
 const handleOAuthError = (res, error) => {
+  logError("oauth", error);
   if (error.code === "EMAIL_ALREADY_REGISTERED") {
     return res.status(409).json({
       success: false,
@@ -60,9 +62,7 @@ const handleOAuthError = (res, error) => {
   return res.status(401).json({
     success: false,
     message: "Social login failed. Please try again.",
-    data: {
-      error: error.message,
-    },
+    data: null,
   });
 };
 

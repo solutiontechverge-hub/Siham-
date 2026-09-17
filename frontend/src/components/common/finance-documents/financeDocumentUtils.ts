@@ -1,11 +1,41 @@
+import { alpha } from "@mui/material/styles";
+import { mollureBodyMutedSx } from "../../../theme/mollureHierarchy";
 import type {
   TransactionDocumentBookingItem,
   TransactionDocumentLineItem,
   TransactionRow,
 } from "../../../app/professionals/fixed-location/finance/data/transactions";
-import type { ProfessionalProfile } from "../../../store/services/profileApi";
+import type {
+  ProfessionalProfile,
+  ProfileResponse,
+} from "../../../store/services/profileApi";
 import type { FinanceProfessionalBusinessOverride } from "./financeDocumentTypes";
 import type { FinanceInvoiceSettings, FinanceInvoiceTemplateType } from "./useFinanceInvoiceSettings";
+
+/** Shared muted meta/line copy on invoice + receipt previews. */
+export function financeMutedTextSx(
+  navy: string,
+  extra?: Record<string, unknown>,
+) {
+  return mollureBodyMutedSx(navy, { color: alpha(navy, 0.62), ...extra });
+}
+
+/** Outer white card shell for invoice/receipt document previews. */
+export function financePreviewCardSx(navy: string, padding: number = 2) {
+  return {
+    borderRadius: "10px",
+    border: `1px solid ${alpha(navy, 0.1)}`,
+    bgcolor: "#fff",
+    p: padding,
+  };
+}
+
+export function getProfessionalProfile(
+  profileData?: ProfileResponse | null,
+): ProfessionalProfile | null {
+  if (!profileData || profileData.user_type !== "professional") return null;
+  return profileData.profile as ProfessionalProfile | null;
+}
 
 export type PreviewLineItem = {
   description: string;

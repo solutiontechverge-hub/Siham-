@@ -21,16 +21,16 @@ assert.equal(onlineSave?.status, "Requested");
 assert.equal(onlineSave?.reopen, true);
 assert.equal(onlineSave?.confirmPrepayment, false);
 
-const offlinePayNow = resolveOfflineBookingPrepayAction({
+const offlineSave = resolveOfflineBookingPrepayAction({
   isNewBooking: true,
   isOfflineBooking: true,
   showPrepayment: true,
   prepaymentAmount: 40,
   paymentMethod: "offline",
 });
-assert.equal(offlinePayNow?.label, "Pay Now");
-assert.equal(offlinePayNow?.status, "Confirmed");
-assert.equal(offlinePayNow?.confirmPrepayment, true);
+assert.equal(offlineSave?.label, "Save");
+assert.equal(offlineSave?.status, "Confirmed");
+assert.equal(offlineSave?.confirmPrepayment, true);
 
 assert.equal(
   resolveOfflineBookingPrepayAction({

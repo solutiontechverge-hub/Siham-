@@ -1,5 +1,7 @@
 "use client";
 
+import { mollureBodySx } from "../../../theme/mollureHierarchy";
+
 import AppButton from "../AppButton";
 import * as React from "react";
 import { Box, Stack } from "@mui/material";
@@ -56,9 +58,7 @@ export default function CalendarServiceColorEditModal({
       <Box sx={{ px: 2.5, py: 2 }}>
         <BodyText
           sx={{
-            fontSize: 12.5,
-            fontWeight: 700,
-            color: alpha(m.navy, 0.62),
+            ...mollureBodySx(m.navy),
             mb: 1.25,
           }}
         >

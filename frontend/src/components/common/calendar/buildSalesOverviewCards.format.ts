@@ -1,0 +1,202 @@
+﻿import type { CalendarBooking } from "../../../store/services/businessApi";
+import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
+import {
+  calculateManualEntryDiscountAmount,
+  type ManualEntryDiscount,
+} from "../../sections/finance/manualEntry.data";
+import type {
+  SalesFinanceHint,
+  SalesLineItem,
+  SalesOverviewCardData,
+  SalesPaymentState,
+  SalesPaymentTermsInput,
+  SalesPenaltyPrompt,
+  SalesSubCardData,
+} from "./salesOverview.types";
+import { salesPaymentBadge } from "./salesOverview.types";
+import { formatFinanceDueDate } from "../booking-finance/formatBookingFinance";
+import { roundBookingMoney as roundMoney } from "../../../data/bookingLinePricing";
+export function formatDateLabel(iso?: string | null): string {
+  const d = iso ? new Date(iso) : new Date();
+  if (Number.isNaN(d.getTime())) {
+    return new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  }
+  return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+}
+
+export function formatMethodDateTime(method: string, iso?: string | null): string {
+  const d = iso ? new Date(iso) : new Date();
+  if (Number.isNaN(d.getTime())) return method;
+  const date = formatDateLabel(d.toISOString());
+  const time = d
+    .toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
+    .replace(/\s/g, "")
+    .toLowerCase();
+  return `${method}, ${date} ${time}`;
+}
+
+export function paymentMethodLabel(
+  method?: string | null,
+): string {
+  if (method === "offline" || method === "offlineDirect") return "Offline Direct";
+  if (method === "onlineNonDirect") return "Online Non-Direct";
+  if (method === "offlineNonDirect") return "Offline Non-Direct";
+  return "Online Direct";
+}
+
+export function isInvoicePaymentMethod(method?: string | null): boolean {
+  return method === "onlineNonDirect" || method === "offlineNonDirect";
+}
+
+export function isOnlineDirectPayment(method?: string | null): boolean {
+  return !method || method === "online" || method === "onlineDirect";
+}
+
+export function isOnlineBookingType(booking?: CalendarBooking, event?: CalendarEvent): boolean {
+  const type = String(booking?.booking_type ?? event?.bookingType ?? "").toLowerCase();
+  return type === "online" || type === "request";
+}
+
+export function toIsoDateOnly(value?: string | null): string | null {
+  if (!value) return null;
+  const match = String(value).match(/^(\d{4}-\d{2}-\d{2})/);
+  if (match) return match[1];
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+export function addDaysToIsoDate(iso: string, days: number): string {
+  const base = new Date(`${iso.slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(base.getTime())) return iso.slice(0, 10);
+  base.setDate(base.getDate() + days);
+  return toIsoDateOnly(base.toISOString()) ?? iso.slice(0, 10);
+}
+
+export function durationToDays(value?: string, unit?: string): number {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return 14;
+  const u = String(unit ?? "").trim().toLowerCase();
+  if (u.startsWith("day")) return Math.round(n);
+  if (u.startsWith("week")) return Math.round(n * 7);
+  if (u.startsWith("month")) return Math.round(n * 30);
+  return Math.round(n);
+}
+
+export function deriveDueDate(occurredAt: string, terms?: SalesPaymentTermsInput): string {
+  const start = toIsoDateOnly(occurredAt) ?? new Date().toISOString().slice(0, 10);
+  return addDaysToIsoDate(start, durationToDays(terms?.originalDueValue, terms?.originalDueUnit));
+}
+
+export function isDueDatePast(dueDate?: string | null): boolean {
+  const iso = toIsoDateOnly(dueDate);
+  if (!iso) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const due = new Date(`${iso}T00:00:00`);
+  return !Number.isNaN(due.getTime()) && due < today;
+}
+
+export function isAutomaticTrigger(trigger?: string | null): boolean {
+  const t = String(trigger ?? "").trim().toLowerCase();
+  return t === "automatic" || t === "auto";
+}
+
+export function resolvePenaltyPrompt(
+  state: SalesPaymentState | undefined,
+  terms: SalesPaymentTermsInput | undefined,
+  alreadyReissued: boolean,
+): SalesPenaltyPrompt {
+  if (state !== "overdue_invoice") return "none";
+  const trigger = alreadyReissued ? terms?.secondReissueTrigger : terms?.firstReissueTrigger;
+  return isAutomaticTrigger(trigger) ? "automatic" : "manual";
+}
+
+export function matchFinanceHint(
+  card: { id: string; bookingId: string; bookingCode: string; kind: SalesOverviewCardData["kind"]; payerKey?: string },
+  hints: SalesFinanceHint[],
+): SalesFinanceHint | undefined {
+  const matches = hints.filter((hint) => {
+    const bookingMatch =
+      (hint.bookingId && String(hint.bookingId) === String(card.bookingId)) ||
+      (hint.bookingCode && String(hint.bookingCode) === String(card.bookingCode)) ||
+      (hint.bookingId && String(hint.bookingId) === String(card.bookingCode));
+    if (!bookingMatch) return false;
+    const phase = String(hint.phase ?? "").toLowerCase();
+    const status = String(hint.status ?? "").toLowerCase();
+    if (status === "voided" || status === "void" || status === "refunded") return false;
+    if (card.kind === "prepayment") return phase === "prepay" || !phase;
+    if (card.kind === "addon") {
+      const addonId = card.id.replace(/^addon-/, "");
+      return phase === "addon" && (!hint.addonId || card.id.includes(hint.addonId) || hint.addonId === addonId);
+    }
+    if (phase === "prepay" || phase === "addon") return false;
+    if (hint.payerKey && card.payerKey && hint.payerKey !== card.payerKey) return false;
+    return true;
+  });
+  const rank = (status: string) => {
+    const s = status.toLowerCase();
+    if (s === "refunded") return 0;
+    if (s === "voided" || s === "void") return 1;
+    if (s === "failed") return 2;
+    if (s === "paid" || s === "prepaid") return 3;
+    return 4;
+  };
+  return [...matches].sort((a, b) => rank(a.status) - rank(b.status))[0];
+}
+
+export function applyVisualState<T extends {
+  paymentState?: SalesPaymentState;
+  statusBadge?: string;
+  methodDateLine?: string;
+  paymentMethodLabel?: string;
+  dueDate?: string | null;
+  paidAt?: string | null;
+  overdueKind?: SalesOverviewCardData["overdueKind"];
+  penaltyPrompt?: SalesPenaltyPrompt;
+  limitedMenu?: boolean;
+}>(
+  next: T,
+  state: SalesPaymentState,
+  extras: { method?: string | null; dueDate?: string | null; paidAt?: string | null; occurredAt?: string },
+): T {
+  next.paymentState = state;
+  next.statusBadge = salesPaymentBadge(state);
+  const methodLabel = next.paymentMethodLabel || paymentMethodLabel(extras.method);
+  if (state === "prepaid" || state === "paid") {
+    next.methodDateLine = formatMethodDateTime(methodLabel, extras.paidAt || extras.occurredAt);
+    next.dueDate = null;
+    next.overdueKind = undefined;
+    next.limitedMenu = false;
+  } else if (
+    state === "payment_due" ||
+    state === "overdue" ||
+    state === "overdue_invoice"
+  ) {
+    const due = extras.dueDate;
+    next.dueDate = due ?? next.dueDate;
+    next.methodDateLine = due
+      ? `${methodLabel} (Due date ${formatFinanceDueDate(due)})`
+      : methodLabel;
+    next.overdueKind = state === "overdue" ? "prepayment" : state === "overdue_invoice" ? "invoice" : undefined;
+    next.limitedMenu = state === "overdue_invoice";
+  } else {
+    next.methodDateLine = methodLabel;
+    if (state !== "unpaid") next.dueDate = extras.dueDate ?? next.dueDate;
+  }
+  return next;
+}
+
+export function discountLine(discount: ManualEntryDiscount | null | undefined, subtotal: number): SalesLineItem | null {
+  if (!discount || discount.amount <= 0) return null;
+  const amount = calculateManualEntryDiscountAmount(subtotal, discount);
+  if (amount <= 0) return null;
+  const label =
+    discount.type === "percentage" ? `Discount (${discount.amount}%)` : "Discount";
+  return { id: "discount", label, amount: -roundMoney(amount) };
+}
+
+

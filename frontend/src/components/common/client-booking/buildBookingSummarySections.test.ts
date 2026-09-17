@@ -342,4 +342,55 @@ const duplicatedRequester = duplicatedSections.find(
 );
 assert.equal(duplicatedRequester?.items.length, 2);
 
+// Guest default name stays "Guest"; service titles stay catalog names (not TM/person).
+const defaultGuestDraft: ClientBookingDraft = {
+  selectedDateISO: "2026-09-15",
+  selectedTime: "10:00 AM",
+  combineServices: true,
+  total: 122,
+  people: [
+    { id: "p-requester", name: "Client", isRequester: true },
+    { id: "p-guest-1", name: "Guest", participantType: "guest" },
+  ],
+  teamMembers: [
+    { id: "tm-ali", name: "ali" },
+    { id: "tm-umer", name: "Muhammad umer arshad" },
+  ],
+  services: [
+    {
+      id: "svc-catalog-person-named",
+      name: "Muhammad umer arshad",
+      durationMins: 1,
+      price: 11,
+      guestId: "p-guest-1",
+      teamMemberId: "tm-umer",
+      teamMemberName: "Muhammad umer arshad",
+    },
+    {
+      id: "svc-lash-guest",
+      name: "eyelash",
+      durationMins: 11,
+      price: 111,
+      guestId: "p-guest-1",
+      teamMemberId: "tm-ali",
+      teamMemberName: "ali",
+    },
+  ],
+};
+const defaultGuestSections = buildBookingSummarySections(defaultGuestDraft);
+const defaultGuest = defaultGuestSections.find(
+  (section) => section.participantType === "guest",
+);
+assert.equal(defaultGuest?.title, "Guest");
+assert.equal(bookingParticipantDisplayHeading(defaultGuest!), "Guest");
+assert.deepEqual(
+  defaultGuest?.items.map((item) => item.name),
+  ["Muhammad umer arshad", "eyelash"],
+);
+assert.equal(defaultGuest?.teamMemberLabel, undefined); // mixed TMs → no section-level chip
+assert.ok(
+  defaultGuest?.items.every((item) => Boolean(item.teamMemberId)),
+  "guest services keep per-line team members",
+);
+
 console.log("buildBookingSummarySections.test.ts: all assertions passed");

@@ -1,6 +1,7 @@
 "use client";
 
 import { Menu, MenuItem } from "@mui/material";
+import { CALENDAR_ADD_MENU_ITEMS } from "./calendarAddMenuItems";
 
 type CalendarAddMenuProps = {
   anchorEl: HTMLElement | null;
@@ -14,11 +15,6 @@ type CalendarAddMenuProps = {
   bookingDisabled?: boolean;
 };
 
-const addMenuItems = [
-  { label: "Booking", key: "booking" },
-  { label: "Blocked time", key: "blocked" },
-] as const;
-
 export default function CalendarAddMenu({
   anchorEl,
   onBlockedTime,
@@ -28,7 +24,7 @@ export default function CalendarAddMenu({
 }: CalendarAddMenuProps) {
   return (
     <Menu open={Boolean(anchorEl)} anchorEl={anchorEl} onClose={onClose}>
-      {addMenuItems.map((item) => {
+      {CALENDAR_ADD_MENU_ITEMS.map((item) => {
         const isBooking = item.key === "booking";
         const disabled = isBooking && bookingDisabled;
         return (
@@ -37,7 +33,6 @@ export default function CalendarAddMenu({
             disabled={disabled}
             onClick={() => {
               if (disabled) return;
-              // Run action before closing so the handler is not dropped.
               if (isBooking) onBooking();
               else onBlockedTime();
               onClose();

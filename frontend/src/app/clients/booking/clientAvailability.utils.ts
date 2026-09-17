@@ -216,6 +216,9 @@ export function sortMembersByLowestOccupancy(
   });
 }
 
+/** Max distinct team members auto-assigned across one Fixed Location booking. */
+export const FIXED_LOCATION_MAX_DISTINCT_TEAM_MEMBERS = 3;
+
 export function findAvailableMemberForService(
   snapshot: SetupAvailabilitySnapshot,
   candidateMemberIds: string[],
@@ -242,6 +245,26 @@ export function findAvailableMemberForService(
     if (isMemberAvailableAt(startMin, durationMins, working, busy)) {
       return memberId;
     }
+  }
+  return null;
+}
+
+/** Capable members only, lowest day occupancy first (may be busy at the slot). */
+export function findLowestOccupancyMemberForService(
+  snapshot: SetupAvailabilitySnapshot,
+  candidateMemberIds: string[],
+  catalogServiceId: string,
+  fallbackCatalogIds: string[],
+) {
+  for (const memberId of sortMembersByLowestOccupancy(snapshot, candidateMemberIds)) {
+    const member = snapshot.teamMembers.find((row) => row.id === memberId);
+    if (!member) continue;
+    if (
+      !memberCanPerformService(member, catalogServiceId, fallbackCatalogIds)
+    ) {
+      continue;
+    }
+    return memberId;
   }
   return null;
 }
@@ -369,6 +392,9 @@ export function autoAssignServicesByAvailability(input: {
     }));
   }
 
+  // Fixed Location: per-service assign, prefer free-at-slot, else lowest
+  // occupancy; reuse already-picked members; cap distinct members at 3.
+  const usedMemberIds = new Set<string>();
   let cursor = startMin;
   return services.map((service) => {
     const catalogServiceId =
@@ -378,37 +404,87 @@ export function autoAssignServicesByAvailability(input: {
     const durationMins = service.durationMins || 30;
 
     if (service.teamMemberId) {
-      const member = snapshot.teamMembers.find(
-        (row) => row.id === service.teamMemberId,
-      );
-      if (member) {
-        const working = getMemberWorkingIntervals(
-          service.teamMemberId,
-          snapshot.date,
-          snapshot.location,
-          snapshot,
+      const wouldExceedCap =
+        !usedMemberIds.has(service.teamMemberId) &&
+        usedMemberIds.size >= FIXED_LOCATION_MAX_DISTINCT_TEAM_MEMBERS;
+      if (!wouldExceedCap) {
+        const member = snapshot.teamMembers.find(
+          (row) => row.id === service.teamMemberId,
         );
-        const busy = snapshot.busyByMember[service.teamMemberId] ?? [];
-        if (
-          memberCanPerformService(member, catalogServiceId, fallbackCatalogIds) &&
-          isMemberAvailableAt(cursor, durationMins, working, busy)
-        ) {
-          cursor += durationMins;
-          return { id: service.id, teamMemberId: service.teamMemberId };
+        if (member) {
+          const working = getMemberWorkingIntervals(
+            service.teamMemberId,
+            snapshot.date,
+            snapshot.location,
+            snapshot,
+          );
+          const busy = snapshot.busyByMember[service.teamMemberId] ?? [];
+          if (
+            memberCanPerformService(
+              member,
+              catalogServiceId,
+              fallbackCatalogIds,
+            ) &&
+            isMemberAvailableAt(cursor, durationMins, working, busy)
+          ) {
+            usedMemberIds.add(service.teamMemberId);
+            cursor += durationMins;
+            return { id: service.id, teamMemberId: service.teamMemberId };
+          }
         }
       }
     }
 
-    const memberId =
+    const atCap =
+      usedMemberIds.size >= FIXED_LOCATION_MAX_DISTINCT_TEAM_MEMBERS;
+    const preferredIds = candidateMemberIds.filter((id) =>
+      usedMemberIds.has(id),
+    );
+
+    let memberId =
       findAvailableMemberForService(
         snapshot,
-        candidateMemberIds,
+        preferredIds,
         catalogServiceId,
         fallbackCatalogIds,
         cursor,
         durationMins,
-      ) ?? service.teamMemberId ?? null;
+      ) ??
+      (!atCap
+        ? findAvailableMemberForService(
+            snapshot,
+            candidateMemberIds,
+            catalogServiceId,
+            fallbackCatalogIds,
+            cursor,
+            durationMins,
+          )
+        : null);
+
+    if (!memberId) {
+      // Nobody free → still assign: prefer already-used, else expand (under cap).
+      const fallbackPool = preferredIds.length
+        ? preferredIds
+        : atCap
+          ? [...usedMemberIds]
+          : candidateMemberIds;
+      memberId =
+        findLowestOccupancyMemberForService(
+          snapshot,
+          fallbackPool,
+          catalogServiceId,
+          fallbackCatalogIds,
+        ) ??
+        (atCap
+          ? sortMembersByLowestOccupancy(snapshot, fallbackPool)[0] ?? null
+          : null);
+    }
+
+    if (memberId) usedMemberIds.add(memberId);
     cursor += durationMins;
-    return { id: service.id, teamMemberId: memberId };
+    return {
+      id: service.id,
+      teamMemberId: memberId ?? service.teamMemberId ?? null,
+    };
   });
 }

@@ -1,10 +1,11 @@
 "use client";
 
-import AppButton from "../AppButton";
 import * as React from "react";
 import { Box, Checkbox, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppModal from "../AppModal";
+import { ModalCancelApplyFooter } from "../FinanceDrawerFooter";
+import { mollureLabelSx } from "../../../theme/mollureHierarchy";
 
 export type NoShowParticipant = {
   id: string;
@@ -93,6 +94,16 @@ export default function CalendarNoShowModal({
       maxWidth="sm"
       fullWidth
       headerTone="danger"
+      footer={
+        <ModalCancelApplyFooter
+          onCancel={onClose}
+          onPrimary={() => onConfirm([...selected])}
+          primaryLabel="Save"
+          primaryDisabled={selected.size === 0}
+          justifyContent="center"
+          buttonSx={{ height: 40, minWidth: 120 }}
+        />
+      }
     >
       <Box sx={{ px: 2.5, py: 2 }}>
         <Box
@@ -103,14 +114,7 @@ export default function CalendarNoShowModal({
             p: 1.5,
           }}
         >
-          <Typography
-            sx={{
-              fontSize: 13,
-              fontWeight: 800,
-              color: alpha(m.navy, 0.6),
-              mb: 1.25,
-            }}
-          >
+          <Typography sx={mollureLabelSx(m.navy, { mb: 1.25 })}>
             Client booked but did not arrive. Mark the booking as no show
             (select who did not show).
           </Typography>
@@ -151,31 +155,6 @@ export default function CalendarNoShowModal({
             ))}
           </Stack>
         </Box>
-      </Box>
-      <Box sx={{ px: 2.5, py: 2 }}>
-        <Stack direction="row" justifyContent="center" spacing={1.5}>
-          <AppButton
-            tone="secondary"
-            onClick={onClose}
-            sx={{
-              height: 40,
-              minWidth: 120,
-            }}
-          >
-            Cancel
-          </AppButton>
-          <AppButton
-            tone="primary"
-            disabled={selected.size === 0}
-            onClick={() => onConfirm([...selected])}
-            sx={{
-              height: 40,
-              minWidth: 120,
-            }}
-          >
-            Save
-          </AppButton>
-        </Stack>
       </Box>
     </AppModal>
   );

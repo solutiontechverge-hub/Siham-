@@ -6,6 +6,16 @@ import { profilePageData } from "./profile.data";
 import { getPasswordStrength } from "../../../lib/passwordStrength";
 import { getOptionalPhoneValidationErrors } from "../../../lib/phone-validation";
 import {
+  INPUT_LIMITS,
+  parseCoc,
+  parseEmail,
+  parsePassword,
+  parsePersonName,
+  parseText,
+  parseVat,
+  rejectInvalid,
+} from "../../../lib/inputSchema";
+import {
   isAllowedProfileImageFile,
   PROFILE_IMAGE_INVALID_MESSAGE,
 } from "../../../lib/profileImageUpload";
@@ -14,6 +24,7 @@ import {
   resolveDisplayNameFromMode,
   type ReviewNameMode,
 } from "../../../lib/reviewNameDisplay";
+import { CLIENT_PROFILE_KEY } from "../../../lib/auth-storage";
 import {
   type CompanyProfile,
   type IndividualProfile,
@@ -99,7 +110,7 @@ type PersistedClientProfile = {
 
 function writePersistedClientProfile(next: PersistedClientProfile) {
   try {
-    window.localStorage.setItem("mollure:client_profile", JSON.stringify(next));
+    window.localStorage.setItem(CLIENT_PROFILE_KEY, JSON.stringify(next));
   } catch {
     // ignore storage failures
   }
@@ -386,6 +397,77 @@ export function useClientProfilePage() {
         setErrorMessage("Only strong passwords are allowed.");
         return;
       }
+    }
+
+    const schema = isCompanyProfile
+      ? rejectInvalid({
+          legalName: parseText(form.legalName, {
+            label: "Legal name",
+            max: INPUT_LIMITS.personName,
+          }),
+          cccNumber: parseCoc(form.cccNumber, { required: false }),
+          vatNumber: parseVat(form.vatNumber, { required: false }),
+          street: parseText(form.street, {
+            required: false,
+            label: "Street",
+            max: INPUT_LIMITS.textShort,
+          }),
+          streetNumber: parseText(form.streetNumber, {
+            required: false,
+            label: "Street number",
+            max: INPUT_LIMITS.streetNumber,
+          }),
+          postalCode: parseText(form.postalCode, {
+            required: false,
+            label: "Postal code",
+            max: INPUT_LIMITS.postalCode,
+          }),
+          province: parseText(form.province, {
+            required: false,
+            label: "Province",
+            max: INPUT_LIMITS.textShort,
+          }),
+          municipality: parseText(form.municipality, {
+            required: false,
+            label: "Municipality",
+            max: INPUT_LIMITS.textShort,
+          }),
+          contactFirstName: parsePersonName(form.contactFirstName, {
+            required: false,
+            label: "First name",
+          }),
+          contactLastName: parsePersonName(form.contactLastName, {
+            required: false,
+            label: "Last name",
+          }),
+          phone: parseText(form.phone, {
+            required: false,
+            label: "Phone",
+            max: 32,
+          }),
+          password: parsePassword(form.password, { required: false, strong: true }),
+        })
+      : rejectInvalid({
+          firstName: parsePersonName(form.firstName, { label: "First name" }),
+          lastName: parsePersonName(form.lastName, { label: "Last name" }),
+          email: parseEmail(form.email, { required: false }),
+          phone: parseText(form.phone, {
+            required: false,
+            label: "Phone",
+            max: 32,
+          }),
+          gender: parseText(form.gender, {
+            required: false,
+            label: "Gender",
+            max: 32,
+          }),
+          password: parsePassword(form.password, { required: false, strong: true }),
+        });
+
+    if (!schema.ok) {
+      const first = Object.values(schema.errors).find(Boolean);
+      setErrorMessage(first || "Please check your profile details.");
+      return;
     }
 
     if (!isCompanyProfile) {

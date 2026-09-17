@@ -1,5 +1,7 @@
 "use client";
 
+import { mollureSectionTitleSx } from "../../theme/mollureHierarchy";
+
 import * as React from "react";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
@@ -317,9 +319,7 @@ export function AppCalendarPanel({
             <BodyText
               sx={{
                 flex: 1,
-                fontSize: 14,
-                fontWeight: 900,
-                color: alpha(m.navy, 0.82),
+                ...mollureSectionTitleSx(m.navy),
               }}
             >
               Select month
@@ -346,9 +346,7 @@ export function AppCalendarPanel({
             <BodyText
               sx={{
                 flex: 1,
-                fontSize: 14,
-                fontWeight: 900,
-                color: alpha(m.navy, 0.82),
+                ...mollureSectionTitleSx(m.navy),
               }}
             >
               {yearPageStart} – {yearPageEnd}

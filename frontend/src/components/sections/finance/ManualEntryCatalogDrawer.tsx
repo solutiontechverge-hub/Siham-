@@ -1,11 +1,16 @@
 "use client";
 
+import {
+  mollureBodyMutedSx,
+  mollureLabelSx,
+  mollureSectionTitleSx,
+} from "../../../theme/mollureHierarchy";
+
 import AppButton from "../../common/AppButton";
 import * as React from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
-import RemoveRoundedIcon from "@mui/icons-material/RemoveRounded";
 import {
   Box,
   ButtonBase,
@@ -16,6 +21,7 @@ import {
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDrawer from "../../common/AppDrawer";
+import QtyStepper from "../../common/QtyStepper";
 import { FinanceDrawerActionsFooter } from "../../common/FinanceDrawerFooter";
 import AppSearchField from "../../common/AppSearchField";
 import BookingAddUniqueItemScreen from "../../common/calendar/BookingAddUniqueItemScreen";
@@ -53,11 +59,9 @@ export function ManualEntryCatalogOpenButton({
       sx={{
         borderRadius: "10px",
         textTransform: "none",
-        fontWeight: 800,
-        fontSize: 12.5,
+        ...mollureLabelSx(m.navy),
         justifyContent: "flex-start",
         borderColor: alpha(m.navy, 0.1),
-        color: alpha(m.navy, 0.78),
         bgcolor: "#fff",
         height: 42,
         px: 1.5,
@@ -431,7 +435,7 @@ export default function ManualEntryCatalogDrawer({
         <Stack spacing={1.5}>
           {allowAddProduct ? (
             <BodyText
-              sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 15 }}
+              sx={mollureSectionTitleSx(m.navy)}
             >
               {isItemMode ? "Select Item" : "Select Product"}
             </BodyText>
@@ -495,12 +499,11 @@ export default function ManualEntryCatalogDrawer({
                   >
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Typography
-                        sx={{
-                          fontSize: 12.5,
+                        sx={mollureLabelSx(m.navy, {
                           fontWeight: 900,
                           color: alpha(m.navy, 0.82),
                           lineHeight: 1.25,
-                        }}
+                        })}
                       >
                         {withQuantity && qty > 1
                           ? `${option.label} x${qty}`
@@ -561,57 +564,14 @@ export default function ManualEntryCatalogDrawer({
                     ) : null}
 
                     {withQuantity ? (
-                      <Stack
-                        direction="row"
-                        alignItems="center"
-                        onClick={(e) => e.stopPropagation()}
-                        sx={{
-                          border: `1px solid ${alpha(m.navy, 0.12)}`,
-                          borderRadius: "8px",
-                          overflow: "hidden",
-                          flexShrink: 0,
-                        }}
-                      >
-                        <IconButton
-                          size="small"
-                          disabled={!checked || qty <= 1}
-                          onClick={() => adjustQuantity(option.id, -1)}
-                          sx={{
-                            width: 30,
-                            height: 30,
-                            borderRadius: 0,
-                            color: alpha(m.navy, 0.55),
-                          }}
-                        >
-                          <RemoveRoundedIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                        <BodyText
-                          component="span"
-                          sx={{
-                            width: 24,
-                            textAlign: "center",
-                            fontSize: 12,
-                            fontWeight: 900,
-                            color: alpha(m.navy, 0.78),
-                            lineHeight: 1,
-                          }}
-                        >
-                          {qty}
-                        </BodyText>
-                        <IconButton
-                          size="small"
-                          disabled={!checked}
-                          onClick={() => adjustQuantity(option.id, 1)}
-                          sx={{
-                            width: 30,
-                            height: 30,
-                            borderRadius: 0,
-                            color: alpha(m.navy, 0.55),
-                          }}
-                        >
-                          <AddRoundedIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </Stack>
+                      <QtyStepper
+                        value={qty}
+                        onDecrement={() => adjustQuantity(option.id, -1)}
+                        onIncrement={() => adjustQuantity(option.id, 1)}
+                        decrementDisabled={!checked || qty <= 1}
+                        incrementDisabled={!checked}
+                        stopPropagation
+                      />
                     ) : null}
 
                     <Checkbox
@@ -665,12 +625,10 @@ export default function ManualEntryCatalogDrawer({
               </Box>
               <BodyText
                 component="span"
-                sx={{
-                  fontSize: 12.5,
-                  fontWeight: 800,
+                sx={mollureLabelSx(m.navy, {
                   color: alpha(m.navy, 0.6),
                   lineHeight: 1,
-                }}
+                })}
               >
                 {addProductLabel}
               </BodyText>

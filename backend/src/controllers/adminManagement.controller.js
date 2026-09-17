@@ -22,6 +22,7 @@ import {
   updateAdminUser,
   upsertAdminRole,
 } from "../services/adminManagement.service.js";
+import { logError } from "../utils/httpError.js";
 
 const ok = (res, message, data, status = 200) =>
   res.status(status).json({ success: true, message, data });
@@ -34,7 +35,8 @@ export const getAdminProfessionals = async (_req, res) => {
     const data = await listAdminProfessionals();
     return ok(res, "Professionals loaded.", data);
   } catch (error) {
-    return fail(res, 500, "Failed to load professionals.", { error: error.message });
+    logError("adminManagement", error);
+    return fail(res, 500, "Failed to load professionals.");
   }
 };
 
@@ -44,7 +46,8 @@ export const patchAdminProfessional = async (req, res) => {
     if (!item) return fail(res, 404, "Professional not found.");
     return ok(res, "Professional updated.", item);
   } catch (error) {
-    return fail(res, 500, "Failed to update professional.", { error: error.message });
+    logError("adminManagement", error);
+    return fail(res, 500, "Failed to update professional.");
   }
 };
 
@@ -53,7 +56,8 @@ export const getAdminClients = async (_req, res) => {
     const data = await listAdminClients();
     return ok(res, "Clients loaded.", data);
   } catch (error) {
-    return fail(res, 500, "Failed to load clients.", { error: error.message });
+    logError("adminManagement", error);
+    return fail(res, 500, "Failed to load clients.");
   }
 };
 
@@ -66,7 +70,8 @@ export const patchAdminClient = async (req, res) => {
     if (!item) return fail(res, 404, "Client not found.");
     return ok(res, "Client updated.", item);
   } catch (error) {
-    return fail(res, 500, "Failed to update client.", { error: error.message });
+    logError("adminManagement", error);
+    return fail(res, 500, "Failed to update client.");
   }
 };
 
@@ -75,7 +80,8 @@ export const getAdminReviewsModeration = async (_req, res) => {
     const data = await listAdminReviews();
     return ok(res, "Reviews loaded.", data);
   } catch (error) {
-    return fail(res, 500, "Failed to load reviews.", { error: error.message });
+    logError("adminManagement", error);
+    return fail(res, 500, "Failed to load reviews.");
   }
 };
 
@@ -85,7 +91,8 @@ export const deleteAdminReview = async (req, res) => {
     if (!row) return fail(res, 404, "Review not found.");
     return ok(res, "Review removed.", { id: String(row.id) });
   } catch (error) {
-    return fail(res, 500, "Failed to remove review.", { error: error.message });
+    logError("adminManagement", error);
+    return fail(res, 500, "Failed to remove review.");
   }
 };
 
@@ -95,7 +102,8 @@ export const postAdminKeyword = async (req, res) => {
     if (!keyword) return fail(res, 400, "Keyword is required.");
     return ok(res, "Keyword added.", { keyword }, 201);
   } catch (error) {
-    return fail(res, 500, "Failed to add keyword.", { error: error.message });
+    logError("adminManagement", error);
+    return fail(res, 500, "Failed to add keyword.");
   }
 };
 
@@ -104,7 +112,8 @@ export const deleteAdminKeyword = async (req, res) => {
     const data = await removeAdminKeyword(req.params.keyword || req.body?.keyword);
     return ok(res, "Keyword removed.", data);
   } catch (error) {
-    return fail(res, 500, "Failed to remove keyword.", { error: error.message });
+    logError("adminManagement", error);
+    return fail(res, 500, "Failed to remove keyword.");
   }
 };
 
@@ -113,7 +122,8 @@ export const putAdminRatingRanges = async (req, res) => {
     const ranges = await updateAdminRatingRanges(req.body?.ranges || req.body || {});
     return ok(res, "Rating ranges updated.", ranges);
   } catch (error) {
-    return fail(res, 500, "Failed to update rating ranges.", { error: error.message });
+    logError("adminManagement", error);
+    return fail(res, 500, "Failed to update rating ranges.");
   }
 };
 
@@ -122,7 +132,8 @@ export const getAdminReports = async (_req, res) => {
     const items = await listAdminReports();
     return ok(res, "Reports loaded.", { items });
   } catch (error) {
-    return fail(res, 500, "Failed to load reports.", { error: error.message });
+    logError("adminManagement", error);
+    return fail(res, 500, "Failed to load reports.");
   }
 };
 
@@ -132,7 +143,8 @@ export const patchAdminReport = async (req, res) => {
     if (!item) return fail(res, 404, "Report not found.");
     return ok(res, "Report updated.", item);
   } catch (error) {
-    return fail(res, 500, "Failed to update report.", { error: error.message });
+    logError("adminManagement", error);
+    return fail(res, 500, "Failed to update report.");
   }
 };
 
@@ -141,7 +153,8 @@ export const getAdminMessaging = async (_req, res) => {
     const items = await listAdminContactMessages();
     return ok(res, "Messages loaded.", { items });
   } catch (error) {
-    return fail(res, 500, "Failed to load messages.", { error: error.message });
+    logError("adminManagement", error);
+    return fail(res, 500, "Failed to load messages.");
   }
 };
 
@@ -153,7 +166,8 @@ export const postAdminMessagingReply = async (req, res) => {
     if (!result.replied) return fail(res, 404, "Message not found.");
     return ok(res, "Reply sent.", result.message);
   } catch (error) {
-    return fail(res, 500, "Failed to send reply.", { error: error.message });
+    logError("adminManagement", error);
+    return fail(res, 500, "Failed to send reply.");
   }
 };
 
@@ -163,7 +177,8 @@ export const deleteAdminMessaging = async (req, res) => {
     if (!row) return fail(res, 404, "Message not found.");
     return ok(res, "Message deleted.", { id: String(row.id) });
   } catch (error) {
-    return fail(res, 500, "Failed to delete message.", { error: error.message });
+    logError("adminManagement", error);
+    return fail(res, 500, "Failed to delete message.");
   }
 };
 
@@ -172,7 +187,8 @@ export const getAdminAccessUsers = async (_req, res) => {
     const items = await listAdminUsers();
     return ok(res, "Admin users loaded.", { items });
   } catch (error) {
-    return fail(res, 500, "Failed to load admin users.", { error: error.message });
+    logError("adminManagement", error);
+    return fail(res, 500, "Failed to load admin users.");
   }
 };
 
@@ -185,8 +201,13 @@ export const postAdminAccessUser = async (req, res) => {
     const item = await createAdminUser({ name, email, role, status, password });
     return ok(res, "Admin user created.", item, 201);
   } catch (error) {
-    const status = String(error.message || "").includes("unique") ? 409 : 500;
-    return fail(res, status, "Failed to create admin user.", { error: error.message });
+    const status = error.code === "23505" || String(error.message || "").includes("unique") ? 409 : 500;
+    logError("adminManagement.createUser", error);
+    return fail(
+      res,
+      status,
+      status === 409 ? "An admin with this email already exists." : "Failed to create admin user.",
+    );
   }
 };
 
@@ -196,7 +217,8 @@ export const patchAdminAccessUser = async (req, res) => {
     if (!item) return fail(res, 404, "Admin user not found.");
     return ok(res, "Admin user updated.", item);
   } catch (error) {
-    return fail(res, 500, "Failed to update admin user.", { error: error.message });
+    logError("adminManagement", error);
+    return fail(res, 500, "Failed to update admin user.");
   }
 };
 
@@ -206,7 +228,8 @@ export const deleteAdminAccessUser = async (req, res) => {
     if (!row) return fail(res, 404, "Admin user not found.");
     return ok(res, "Admin user deleted.", { id: String(row.id) });
   } catch (error) {
-    return fail(res, 500, "Failed to delete admin user.", { error: error.message });
+    logError("adminManagement", error);
+    return fail(res, 500, "Failed to delete admin user.");
   }
 };
 
@@ -215,7 +238,8 @@ export const getAdminAccessRoles = async (_req, res) => {
     const items = await listAdminRoles();
     return ok(res, "Admin roles loaded.", { items });
   } catch (error) {
-    return fail(res, 500, "Failed to load admin roles.", { error: error.message });
+    logError("adminManagement", error);
+    return fail(res, 500, "Failed to load admin roles.");
   }
 };
 
@@ -226,7 +250,8 @@ export const putAdminAccessRole = async (req, res) => {
     const item = await upsertAdminRole(role);
     return ok(res, "Admin role saved.", item);
   } catch (error) {
-    return fail(res, 500, "Failed to save admin role.", { error: error.message });
+    logError("adminManagement", error);
+    return fail(res, 500, "Failed to save admin role.");
   }
 };
 
@@ -235,7 +260,8 @@ export const deleteAdminAccessRole = async (req, res) => {
     const data = await deleteAdminRole(req.params.id);
     return ok(res, "Admin role deleted.", data);
   } catch (error) {
-    return fail(res, 500, "Failed to delete admin role.", { error: error.message });
+    logError("adminManagement", error);
+    return fail(res, 500, "Failed to delete admin role.");
   }
 };
 
@@ -244,6 +270,7 @@ export const getAdminListingRanking = async (_req, res) => {
     const factors = getListingRankingFactors();
     return ok(res, "Listing ranking factors loaded.", { factors });
   } catch (error) {
-    return fail(res, 500, "Failed to load listing ranking.", { error: error.message });
+    logError("adminManagement", error);
+    return fail(res, 500, "Failed to load listing ranking.");
   }
 };

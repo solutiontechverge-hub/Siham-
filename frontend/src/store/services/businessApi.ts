@@ -1495,8 +1495,6 @@ export const businessApi = baseApi.injectEndpoints({
     }),
     upsertBusinessSetup: builder.mutation<ApiEnvelope<BusinessSetup>, UpsertBusinessSetupPayload>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
-        console.log("[businessApi] upsertBusinessSetup payload:", payload);
-
         const isMultipart = typeof FormData !== "undefined" && payload instanceof FormData;
 
         const response = await fetchWithBQ({
@@ -1504,8 +1502,6 @@ export const businessApi = baseApi.injectEndpoints({
           method: isMultipart ? "POST" : "PUT",
           body: payload,
         });
-
-        console.log("[businessApi] upsertBusinessSetup response:", response);
 
         if (response.error) {
           console.error("[businessApi] upsertBusinessSetup error:", response.error);

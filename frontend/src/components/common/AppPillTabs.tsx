@@ -26,8 +26,7 @@ export default function AppPillTabs({
   onChange,
   alignStart = true,
 }: AppPillTabsProps) {
-  const theme = useTheme();
-  const m = theme.palette.mollure;
+  const m = useTheme().palette.mollure;
 
   return (
     <Box
@@ -52,51 +51,37 @@ export default function AppPillTabs({
         const isFirst = index === 0;
         const isLast = index === tabs.length - 1;
 
-        const tabSx = {
-          textTransform: "none" as const,
-          fontWeight: 800,
-          fontSize: { xs: 12, sm: 13 },
-          borderRadius: isActive
-            ? "8px"
-            : isFirst
-              ? "8px 4px 4px 8px"
-              : isLast
-                ? "4px 8px 8px 4px"
-                : "6px",
-          px: { xs: 1.5, sm: 2.75 },
-          py: 0.95,
-          minHeight: 38,
-          minWidth: { xs: 72, sm: 96 },
-          flex: alignStart ? "0 0 auto" : "1 1 0",
-          bgcolor: isActive ? m.teal : "#fff",
-          color: isActive ? "#fff" : alpha(m.navy, 0.62),
-          border: isActive ? "none" : `1px solid ${alpha(m.navy, 0.06)}`,
-          boxShadow: "none",
-          "&:hover": {
-            bgcolor: isActive ? m.tealDark : alpha(m.navy, 0.02),
-          },
-        };
-
-        if (t.href) {
-          return (
-            <AppButton
-              key={t.href}
-              component={Link}
-              href={t.href}
-              disableElevation
-              sx={tabSx}
-            >
-              {t.label}
-            </AppButton>
-          );
-        }
-
         return (
           <AppButton
-            key={v}
-            onClick={() => onChange?.(v)}
+            key={t.href ?? v}
+            {...(t.href
+              ? { component: Link, href: t.href }
+              : { onClick: () => onChange?.(v) })}
             disableElevation
-            sx={tabSx}
+            sx={{
+              textTransform: "none",
+              fontWeight: 800,
+              fontSize: { xs: 12, sm: 13 },
+              borderRadius: isActive
+                ? "8px"
+                : isFirst
+                  ? "8px 4px 4px 8px"
+                  : isLast
+                    ? "4px 8px 8px 4px"
+                    : "6px",
+              px: { xs: 1.5, sm: 2.75 },
+              py: 0.95,
+              minHeight: 38,
+              minWidth: { xs: 72, sm: 96 },
+              flex: alignStart ? "0 0 auto" : "1 1 0",
+              bgcolor: isActive ? m.teal : "#fff",
+              color: isActive ? "#fff" : alpha(m.navy, 0.62),
+              border: isActive ? "none" : `1px solid ${alpha(m.navy, 0.06)}`,
+              boxShadow: "none",
+              "&:hover": {
+                bgcolor: isActive ? m.tealDark : alpha(m.navy, 0.02),
+              },
+            }}
           >
             {t.label}
           </AppButton>

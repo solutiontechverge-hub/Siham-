@@ -8,6 +8,11 @@ import { Avatar, Box, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AdminSectionCard from "./AdminSectionCard";
 import {
+  mollureLabelSx,
+  mollureBodySx,
+  mollureBodyMutedSx,
+} from "../../theme/mollureHierarchy";
+import {
   ACTION_STYLES,
   activitySummaryCounts,
   recentActivityAlerts,
@@ -40,13 +45,19 @@ export function ActivitySummaryWidget() {
                   }}
                 />
                 <Typography
-                  sx={{ fontSize: 12, color: tokens.navy, fontWeight: 500 }}
+                  sx={mollureBodySx(tokens.navy, {
+                    color: tokens.navy,
+                    fontWeight: 500,
+                  })}
                 >
                   {style.label}
                 </Typography>
               </Stack>
               <Typography
-                sx={{ fontSize: 12, fontWeight: 700, color: tokens.navy }}
+                sx={mollureBodySx(tokens.navy, {
+                  fontWeight: 700,
+                  color: tokens.navy,
+                })}
               >
                 {item.count.toLocaleString()}
               </Typography>
@@ -85,22 +96,30 @@ export function TopActivityUsersWidget() {
             </Avatar>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography
-                sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}
+                sx={mollureLabelSx(tokens.navy, {
+                  fontWeight: 600,
+                  color: tokens.navy,
+                })}
                 noWrap
               >
                 {user.name}
               </Typography>
-              <Typography sx={{ fontSize: 10.5, color: tokens.slate }} noWrap>
+              <Typography
+                sx={mollureBodyMutedSx(tokens.navy, {
+                  fontSize: 10.5,
+                  color: tokens.slate,
+                })}
+                noWrap
+              >
                 {user.email}
               </Typography>
             </Box>
             <Typography
-              sx={{
-                fontSize: 12,
+              sx={mollureBodySx(tokens.navy, {
                 fontWeight: 700,
                 color: tokens.teal,
                 flexShrink: 0,
-              }}
+              })}
             >
               {user.count.toLocaleString()}
             </Typography>
@@ -160,24 +179,31 @@ export function RecentActivityAlertsWidget() {
                   spacing={1}
                 >
                   <Typography
-                    sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}
+                    sx={mollureLabelSx(tokens.navy, {
+                      fontWeight: 600,
+                      color: tokens.navy,
+                    })}
                     noWrap
                   >
                     {alert.title}
                   </Typography>
                   <Typography
-                    sx={{ fontSize: 10.5, color: tokens.slate, flexShrink: 0 }}
+                    sx={mollureBodyMutedSx(tokens.navy, {
+                      fontSize: 10.5,
+                      color: tokens.slate,
+                      flexShrink: 0,
+                    })}
                   >
                     {alert.time}
                   </Typography>
                 </Stack>
                 <Typography
-                  sx={{
+                  sx={mollureBodyMutedSx(tokens.navy, {
                     fontSize: 11,
                     color: tokens.bodyText,
                     mt: 0.25,
                     lineHeight: 1.4,
-                  }}
+                  })}
                 >
                   {alert.description}
                 </Typography>

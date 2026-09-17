@@ -101,6 +101,8 @@ export type CalendarBookingClientSnapshot = {
     endTime?: string;
     guestId?: string | null;
     teamMemberId?: string | null;
+    /** Older rows / lane writes may only set staffResourceId. */
+    staffResourceId?: string;
     teamMemberName?: string | null;
     originalPrice?: number;
     discountPct?: number;
@@ -210,7 +212,7 @@ export type CalendarBookingDetails = {
   hiddenForProfessional?: boolean;
   /** Soft-delete: hide from client booking list without changing status. */
   hiddenForCustomer?: boolean;
-  /** Company client (CC) vs individual — used for professional-end CC tag. */
+  /** Company client (BC) vs individual — used for professional-end BC tag. */
   clientKind?: "individual" | "company";
   /**
    * Walk-in guest booking: name/phone live on the calendar entry only.
@@ -284,7 +286,7 @@ export type CalendarEvent = {
   updatedAt?: string | null;
   showClientName?: string;
   details?: CalendarBookingDetails;
-  /** Company client (CC) vs individual — shown as CC tag on professional calendar. */
+  /** Company client (BC) vs individual — shown as BC tag on professional calendar. */
   clientKind?: "individual" | "company";
   /** Same booking split across two or more team-member columns. */
   teamShared?: boolean;

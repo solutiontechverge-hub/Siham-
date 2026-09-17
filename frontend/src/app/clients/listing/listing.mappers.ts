@@ -1,11 +1,3 @@
-import {
-  ListingImage1,
-  ListingImage2,
-  ListingImage3,
-  ListingImage4,
-  ListingImage5,
-  ListingImage6,
-} from "../../../../images";
 import type { BusinessSetupListing } from "../../../store/services/businessApi";
 import { resolvePriceTier } from "../../../components/common/listingDrawerFilters";
 import {
@@ -21,15 +13,7 @@ import {
   applyBusinessServiceDiscount,
   isBusinessServiceDiscountActive,
 } from "../../../data/businessServiceModal.data";
-
-const FALLBACK_IMAGES = [
-  ListingImage1,
-  ListingImage2,
-  ListingImage3,
-  ListingImage4,
-  ListingImage5,
-  ListingImage6,
-];
+import { LISTING_FALLBACK_IMAGES as FALLBACK_IMAGES } from "../../../data/listingFallbackImages.data";
 
 const formatPriceLabel = (price: number) => {
   if (!Number.isFinite(price) || price <= 0) return "Price on request";

@@ -1,6 +1,6 @@
 "use client";
 
-import AppButton from "../AppButton";
+import { ModalCancelApplyFooter } from "../FinanceDrawerFooter";
 import * as React from "react";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import { Box, ButtonBase, Checkbox, FormControlLabel, Stack } from "@mui/material";
@@ -10,6 +10,7 @@ import AppTextField from "../AppTextField";
 import { AppTimePanel, formatTimeDisplay } from "../AppTimePicker";
 import AppModal from "../AppModal";
 import { BodyText } from "../../ui/typography";
+import { calendarModalFlexFieldSx } from "./calendar.utils";
 
 export const PUBLIC_HOURS_NOTE_MAX_LENGTH = 120;
 
@@ -117,7 +118,10 @@ export function draftFromPublicBusinessHoursEntries(
   location: PublicBusinessHoursLocation,
 ): PublicBusinessHoursDraft {
   const forLocation = entries.filter((entry) => entry.location === location);
-  const schedule = preferredScheduleForLocation(location);
+  // Prefer saved schedule so FL/DL can independently be Fixed or Variable.
+  const schedule =
+    scheduleTypeForLocation(entries, location) ||
+    preferredScheduleForLocation(location);
   const note =
     forLocation.find((entry) => entry.note?.trim())?.note?.trim() || "";
 
@@ -388,77 +392,25 @@ export default function CalendarPublicBusinessHoursModal({
       const nextDraft = hasSaved
         ? draftFromPublicBusinessHoursEntries(existingEntries, next)
         : createEmptyPublicBusinessHoursDraft(next);
-      // Keep FL ↔ Fixed and DL ↔ Variable aligned when switching location.
-      const alignedSchedule = preferredScheduleForLocation(next);
-      setDraft({
-        ...nextDraft,
-        schedule: alignedSchedule,
-        note:
-          alignedSchedule === "variable"
-            ? nextDraft.note.slice(0, PUBLIC_HOURS_NOTE_MAX_LENGTH)
-            : "",
-      });
+      // Load that location's own saved (or default) schedule — do not force FL↔Fixed / DL↔Variable.
+      setDraft(nextDraft);
     },
     [existingEntries, setDraft],
   );
 
   const switchSchedule = React.useCallback(
     (nextSchedule: "fixed" | "variable") => {
-      const allowed = availableLocations.filter(
-        (item): item is PublicBusinessHoursLocation =>
-          item === "FL" || item === "DL",
-      );
-      const targetLocation = preferredLocationForSchedule(nextSchedule, allowed);
-      if (!targetLocation) {
-        setDraft((p) => ({
-          ...p,
-          schedule: nextSchedule,
-          note:
-            nextSchedule === "variable"
-              ? p.note.slice(0, PUBLIC_HOURS_NOTE_MAX_LENGTH)
-              : "",
-        }));
-        return;
-      }
-
-      if (targetLocation === (draft.location || draft.locations[0])) {
-        setDraft((p) => ({
-          ...p,
-          location: targetLocation,
-          locations: [targetLocation],
-          schedule: nextSchedule,
-          note:
-            nextSchedule === "variable"
-              ? p.note.slice(0, PUBLIC_HOURS_NOTE_MAX_LENGTH)
-              : "",
-        }));
-        return;
-      }
-
-      const hasSaved = existingEntries.some(
-        (entry) => entry.location === targetLocation,
-      );
-      const nextDraft = hasSaved
-        ? draftFromPublicBusinessHoursEntries(existingEntries, targetLocation)
-        : createEmptyPublicBusinessHoursDraft(targetLocation);
-      setDraft({
-        ...nextDraft,
-        location: targetLocation,
-        locations: [targetLocation],
+      // Schedule type is independent of location — stay on the current FL/DL.
+      setDraft((p) => ({
+        ...p,
         schedule: nextSchedule,
         note:
           nextSchedule === "variable"
-            ? nextDraft.note.slice(0, PUBLIC_HOURS_NOTE_MAX_LENGTH)
+            ? p.note.slice(0, PUBLIC_HOURS_NOTE_MAX_LENGTH)
             : "",
-      });
+      }));
     },
-    [
-      availableLocations,
-      draft.location,
-      draft.locations,
-      existingEntries,
-      setDraft,
-    ],
+    [setDraft],
   );
 
   React.useEffect(() => {
@@ -516,24 +468,7 @@ export default function CalendarPublicBusinessHoursModal({
       maxWidth="sm"
       fullWidth
       footer={
-        <Box sx={{ px: 2.5, py: 2 }}>
-          <Stack direction="row" justifyContent="flex-end" spacing={1.25}>
-            <AppButton
-              tone="secondary"
-              onClick={onClose}
-              sx={{ height: 38, minWidth: 110 }}
-            >
-              Cancel
-            </AppButton>
-            <AppButton
-              tone="primary"
-              onClick={onApply}
-              sx={{ height: 38, minWidth: 110 }}
-            >
-              Apply
-            </AppButton>
-          </Stack>
-        </Box>
+        <ModalCancelApplyFooter onCancel={onClose} onPrimary={onApply} />
       }
     >
       <Box sx={{ px: 2.5, py: 2 }}>
@@ -595,7 +530,7 @@ export default function CalendarPublicBusinessHoursModal({
               ).map((field) => {
                 const active = editingTimeField === field.key && !timesDisabled;
                 return (
-                  <Box key={field.key} sx={{ flex: 1, minWidth: 0 }}>
+                  <Box key={field.key} sx={calendarModalFlexFieldSx}>
                     <BodyText
                       component="label"
                       sx={{
@@ -670,7 +605,7 @@ export default function CalendarPublicBusinessHoursModal({
                 <AppTimePanel
                   compact
                   hideHeader
-                  variant="clock"
+                  variant="wheel"
                   value={
                     editingTimeField === "start"
                       ? activeDay?.startTime || "09:00"
