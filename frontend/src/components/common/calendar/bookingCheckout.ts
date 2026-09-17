@@ -7,13 +7,13 @@ import {
 } from "./salesSplitBill";
 
 export type OfflineBookingPrepayAction = {
-  label: "Save" | "Pay Now";
+  label: "Save";
   status: "Requested" | "Confirmed";
   reopen: boolean;
   confirmPrepayment: boolean;
 };
 
-/** New offline (walk-in / non-Mollure) booking with prepayment: Save vs Pay Now. */
+/** New offline (walk-in / non-Mollure) booking with prepayment — footer always "Save". */
 export function resolveOfflineBookingPrepayAction(input: {
   isNewBooking: boolean;
   isOfflineBooking: boolean;
@@ -26,7 +26,7 @@ export function resolveOfflineBookingPrepayAction(input: {
 
   if (isOfflinePaymentMethod(input.paymentMethod)) {
     return {
-      label: "Pay Now",
+      label: "Save",
       status: "Confirmed",
       reopen: true,
       confirmPrepayment: true,

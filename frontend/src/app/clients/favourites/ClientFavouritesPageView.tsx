@@ -1,7 +1,6 @@
 "use client";
 
 import AppButton from "../../../components/common/AppButton";
-import * as React from "react";
 import {
   Alert,
   Box,
@@ -13,7 +12,6 @@ import {
 } from "@mui/material";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useAppSelector } from "../../../store/hooks";
 import {
   AppCard,
   AppPagination,
@@ -30,11 +28,18 @@ import { favouritesPageData } from "./favourites.data";
 import { useClientFavouritesPage } from "./useClientFavouritesPage";
 import { profilePageData } from "../profile/profile.data";
 import { marketingShellFooter } from "../../../data/marketingShell.data";
+import {
+  mollurePageSubtitleSx,
+  mollurePageTitleSx,
+} from "../../../theme/mollureHierarchy";
 
 export default function ClientFavouritesPageView() {
   const pathname = usePathname();
   const {
     tokens,
+    user,
+    userName,
+    avatarUrl,
     items,
     favorites,
     toggleFavorite,
@@ -43,48 +48,10 @@ export default function ClientFavouritesPageView() {
     totalPages,
     totalCount,
     rangeLabel,
+    snackbarOpen,
+    setSnackbarOpen,
+    snackbarMessage,
   } = useClientFavouritesPage();
-  const user = useAppSelector((s) => s.auth.user);
-  const fallbackDisplayName =
-    ((user as any)?.display_name as string | undefined) ||
-    `${(user as any)?.first_name ?? ""} ${(user as any)?.last_name ?? ""}`.trim();
-  const [userName, setUserName] = React.useState<string>(fallbackDisplayName);
-  const [avatarUrl, setAvatarUrl] = React.useState<string | undefined>(
-    undefined,
-  );
-  const [snackbarOpen, setSnackbarOpen] = React.useState(false);
-
-  React.useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem("mollure:client_profile");
-      if (!raw) return;
-      const data = JSON.parse(raw) as {
-        avatar_url?: string | null;
-        email?: string;
-        first_name?: string;
-        last_name?: string;
-        display_name?: string;
-      };
-      const authedEmail = user?.email?.trim().toLowerCase();
-      const persistedEmail = data?.email?.trim().toLowerCase();
-      if (authedEmail && persistedEmail && authedEmail === persistedEmail) {
-        if (typeof data.avatar_url === "string" && data.avatar_url)
-          setAvatarUrl(data.avatar_url);
-        const persistedName = (data.display_name ?? "").trim();
-        const fullName =
-          `${data.first_name ?? ""} ${data.last_name ?? ""}`.trim();
-        const resolved = persistedName || fullName;
-        if (resolved) setUserName(resolved);
-      }
-    } catch {
-      // ignore
-    }
-  }, [user?.email]);
-
-  React.useEffect(() => {
-    const next = fallbackDisplayName.trim();
-    if (next) setUserName(next);
-  }, [fallbackDisplayName]);
 
   return (
     <Box sx={{ ...stickyFooterPageSx, bgcolor: profilePageData.pageBg }}>
@@ -99,7 +66,7 @@ export default function ClientFavouritesPageView() {
 
       <MollureSnackbar
         open={snackbarOpen}
-        message="Item Removed"
+        message={snackbarMessage}
         severity="info"
         autoHideDuration={2500}
         onClose={() => setSnackbarOpen(false)}
@@ -118,13 +85,14 @@ export default function ClientFavouritesPageView() {
               boxShadow: "0 16px 40px rgba(40, 92, 112, 0.08)",
             }}
           >
-            <Typography
-              sx={{ fontWeight: 800, color: tokens.navy, fontSize: 18 }}
-            >
+            <Typography sx={mollurePageTitleSx(tokens.navy)}>
               {favouritesPageData.emptyState.title}
             </Typography>
             <Typography
-              sx={{ mt: 1, color: tokens.slate, fontSize: 14, lineHeight: 1.6 }}
+              sx={mollurePageSubtitleSx(tokens.navy, {
+                mt: 1,
+                lineHeight: 1.6,
+              })}
             >
               {favouritesPageData.emptyState.subtitle}
             </Typography>
@@ -163,11 +131,7 @@ export default function ClientFavouritesPageView() {
                   <ClientListingCard
                     item={item}
                     isFavorite={Boolean(favorites[item.id])}
-                    onToggleFavorite={() => {
-                      const wasFavorite = Boolean(favorites[item.id]);
-                      toggleFavorite(item.id);
-                      if (wasFavorite) setSnackbarOpen(true);
-                    }}
+                    onToggleFavorite={() => toggleFavorite(item.id)}
                   />
                 </Grid>
               ))}

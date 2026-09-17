@@ -16,6 +16,11 @@ import {
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import {
+  mollureBodyMutedSx,
+  mollureLabelSx,
+  mollurePageTitleSx,
+} from "../../../theme/mollureHierarchy";
+import {
   isClientBookingPaymentDue,
   isWaitingForPrepayment,
   statusChipLabel,
@@ -152,9 +157,7 @@ export default function ClientBookingListView({ listTab }: Props) {
             gap: 1.25,
           }}
         >
-          <Typography
-            sx={{ fontWeight: 900, color: alpha(m.navy, 0.86), fontSize: 14 }}
-          >
+          <Typography sx={mollurePageTitleSx(m.navy)}>
             Your Bookings
           </Typography>
           <Stack
@@ -192,12 +195,12 @@ export default function ClientBookingListView({ listTab }: Props) {
         <Divider />
         <Box sx={{ p: { xs: 2, md: 2.5 } }}>
           {loading ? (
-            <Typography sx={{ fontWeight: 800, color: alpha(m.navy, 0.55) }}>
+            <Typography sx={mollureBodyMutedSx(m.navy)}>
               Loading bookings…
             </Typography>
           ) : isError ? (
             <Stack spacing={1}>
-              <Typography sx={{ fontWeight: 800, color: alpha(m.navy, 0.55) }}>
+              <Typography sx={mollureBodyMutedSx(m.navy)}>
                 Unable to load bookings from the server.
               </Typography>
               <AppButton
@@ -213,7 +216,7 @@ export default function ClientBookingListView({ listTab }: Props) {
               </AppButton>
             </Stack>
           ) : bookings.length === 0 ? (
-            <Typography sx={{ fontWeight: 800, color: alpha(m.navy, 0.55) }}>
+            <Typography sx={mollureBodyMutedSx(m.navy)}>
               {searchQuery
                 ? "No bookings match your search."
                 : emptyCopy[listTab]}
@@ -325,12 +328,7 @@ export default function ClientBookingListView({ listTab }: Props) {
                           </Typography>
                           {bookingIdLabel ? (
                             <Typography
-                              sx={{
-                                mt: 0.2,
-                                fontWeight: 800,
-                                color: alpha(m.navy, 0.62),
-                                fontSize: 12,
-                              }}
+                              sx={mollureLabelSx(m.navy, { mt: 0.2 })}
                             >
                               Booking ID:{" "}
                               <Box
@@ -342,15 +340,12 @@ export default function ClientBookingListView({ listTab }: Props) {
                             </Typography>
                           ) : null}
                           <Typography
-                            sx={{
+                            sx={mollureBodyMutedSx(m.navy, {
                               mt: 0.25,
-                              fontWeight: 800,
-                              color: alpha(m.navy, 0.55),
-                              fontSize: 12,
                               whiteSpace: "nowrap",
                               overflow: "hidden",
                               textOverflow: "ellipsis",
-                            }}
+                            })}
                           >
                             {address}
                           </Typography>
@@ -385,9 +380,9 @@ export default function ClientBookingListView({ listTab }: Props) {
                           ) : null}
                           {(b.draft?.services ?? []).length > 0 ? (
                             <Stack spacing={0.35} sx={{ mt: 0.75 }}>
-                              {b.draft!.services.map((s) => (
+                              {b.draft!.services.map((s, i) => (
                                 <Typography
-                                  key={s.id}
+                                  key={`${s.id}::${s.guestId ?? ""}::${i}`}
                                   sx={{
                                     fontSize: 11.5,
                                     fontWeight: 700,

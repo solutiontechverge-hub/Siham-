@@ -1,10 +1,13 @@
 "use client";
 
+import { mollureLabelSx } from "../../../theme/mollureHierarchy";
+
 import * as React from "react";
 import { Box, Checkbox, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppSearchField from "../AppSearchField";
 import { BodyText } from "../../ui/typography";
+import { bookingScreenTitleSx } from "./calendar.utils";
 import {
   formatBookingServiceMeta,
   type BookingCatalogService,
@@ -81,9 +84,7 @@ export default function BookingSelectServicesScreen({
 
   return (
     <Stack spacing={1.5}>
-      <BodyText
-        sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 15 }}
-      >
+      <BodyText sx={bookingScreenTitleSx(m.navy)}>
         Select Service
       </BodyText>
 
@@ -127,9 +128,7 @@ export default function BookingSelectServicesScreen({
               >
                 <BodyText
                   sx={{
-                    fontSize: 12.5,
-                    fontWeight: 900,
-                    color: alpha(m.navy, 0.72),
+                    ...mollureLabelSx(m.navy),
                   }}
                 >
                   {group.category}
@@ -172,9 +171,7 @@ export default function BookingSelectServicesScreen({
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <BodyText
                           sx={{
-                            fontSize: 12.5,
-                            fontWeight: 900,
-                            color: alpha(m.navy, 0.82),
+                            ...mollureLabelSx(m.navy),
                             lineHeight: 1.25,
                           }}
                         >

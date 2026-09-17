@@ -12,7 +12,7 @@ export type ClientRecord = {
   phone: string;
   totalSales: string;
   lastBooking: string;
-  tags: Array<"Mollure" | "CC">;
+  tags: Array<"Mollure" | "BC">;
   photoSrc?: string;
   kind: ClientKind;
   addedOn: string;
@@ -50,7 +50,7 @@ export const mockClientRecords: ClientRecord[] = [
     phone: "123456849",
     totalSales: "€25,450",
     lastBooking: "15/12/2022",
-    tags: ["CC"],
+    tags: ["BC"],
     kind: "company",
     addedOn: "July 20, 2023",
     detailEmail: "sanajohnson@gmail.com",
@@ -124,7 +124,7 @@ export const mockClientRecords: ClientRecord[] = [
     phone: "+31 6 1122334",
     totalSales: "€950",
     lastBooking: "21/06/2025",
-    tags: ["CC"],
+    tags: ["BC"],
     kind: "company",
     addedOn: "November 5, 2024",
     detailEmail: "ops@northwind.nl",
@@ -149,7 +149,7 @@ export const mockClientRecords: ClientRecord[] = [
     phone: "+91 98765 43210",
     totalSales: "€5,600",
     lastBooking: "15/07/2025",
-    tags: ["CC"],
+    tags: ["BC"],
     kind: "individual",
     addedOn: "February 14, 2023",
     gender: "Female",
@@ -212,7 +212,7 @@ export const mockClientRecords: ClientRecord[] = [
     phone: "+49 1512 3456789",
     totalSales: "€7,200",
     lastBooking: "22/10/2025",
-    tags: ["Mollure", "CC"],
+    tags: ["Mollure", "BC"],
     kind: "company",
     addedOn: "October 10, 2022",
     detailEmail: "manager@hanse-salon.de",

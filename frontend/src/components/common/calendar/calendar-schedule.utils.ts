@@ -16,11 +16,19 @@ export function makeScheduleRowId() {
   return `sch-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 }
 
-/** Match by date span only — dayFrom/dayTo are display-only. */
-export function rowMatchesDate(row: ScheduleAvailabilityRow, iso: string) {
-  if (row.archived) return false;
+/** Date span only (includes archived). dayFrom/dayTo are display-only. */
+export function rowCoversCalendarDate(
+  row: ScheduleAvailabilityRow,
+  iso: string,
+) {
   if (row.excludedDates?.includes(iso)) return false;
   return iso >= row.dateFrom && iso <= row.dateTo;
+}
+
+/** Active (non-archived) availability for a date — dayFrom/dayTo are display-only. */
+export function rowMatchesDate(row: ScheduleAvailabilityRow, iso: string) {
+  if (row.archived) return false;
+  return rowCoversCalendarDate(row, iso);
 }
 
 export function getScheduleRowsForDate(
@@ -205,14 +213,19 @@ export function archiveFullyPastScheduleRows(
   return changed ? next : (rows as ScheduleAvailabilityRow[]);
 }
 
-/** True when the member has non-archived availability or a block on the given date. */
+/**
+ * True when the member has schedule coverage or a block on the given date.
+ * Includes archived rows so Overview still shows columns for past days after
+ * auto-archive moves finished ranges off the Active schedule tab.
+ */
 export function resourceHasScheduleOrBlockOnDate(
   resourceId: string,
   iso: string,
   rows: readonly ScheduleAvailabilityRow[],
   blocks: readonly { resourceId: string; date: string }[],
 ) {
-  if (hasAvailabilityOnDate(rows, iso, resourceId)) return true;
+  const relevant = rows.filter((row) => row.resourceIds.includes(resourceId));
+  if (relevant.some((row) => rowCoversCalendarDate(row, iso))) return true;
   return blocks.some(
     (block) => block.resourceId === resourceId && block.date === iso,
   );

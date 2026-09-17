@@ -1,5 +1,7 @@
 "use client";
 
+import { mollureBodySx, mollureSectionTitleSx, mollureLabelSx } from "../../../../theme/mollureHierarchy";
+
 import AppButton from "../../../../components/common/AppButton";
 import * as React from "react";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
@@ -17,6 +19,7 @@ import {
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import MollureFormField from "../../../../components/common/MollureFormField";
+import { mollureWhiteFieldInputSx } from "../../../../components/common/mollureFormSx";
 import type { ClientRecord } from "./data/clientList";
 import { isClientBlocked } from "./data/clientList";
 import ClientPlatformTag from "../../../../components/common/ClientPlatformTag";
@@ -46,13 +49,7 @@ function InfoFieldCell({ label, value }: InfoField) {
         {label}
       </Typography>
       <Typography
-        sx={{
-          fontSize: 12.5,
-          fontWeight: 700,
-          color: alpha(m.navy, 0.86),
-          mt: 0.4,
-          lineHeight: 1.35,
-        }}
+        sx={mollureBodySx(m.navy, { color: alpha(m.navy, 0.86), mt: 0.4, lineHeight: 1.35 })}
       >
         {value || "—"}
       </Typography>
@@ -180,12 +177,7 @@ export default function ClientDetailsViewPanel({
               useFlexGap
             >
               <Typography
-                sx={{
-                  fontWeight: 800,
-                  fontSize: 15,
-                  color: alpha(m.navy, 0.9),
-                  lineHeight: 1.2,
-                }}
+                sx={mollureSectionTitleSx(m.navy, { fontWeight: 800, color: alpha(m.navy, 0.9), lineHeight: 1.2 })}
               >
                 {client.name}
               </Typography>
@@ -330,13 +322,7 @@ export default function ClientDetailsViewPanel({
                   {card.label}
                 </Typography>
                 <Typography
-                  sx={{
-                    fontSize: 15,
-                    fontWeight: 800,
-                    color: m.teal,
-                    mt: 0.45,
-                    lineHeight: 1.2,
-                  }}
+                  sx={mollureSectionTitleSx(m.navy, { fontWeight: 800, color: m.teal, mt: 0.45, lineHeight: 1.2 })}
                 >
                   {card.value}
                 </Typography>
@@ -356,14 +342,7 @@ export default function ClientDetailsViewPanel({
                 height: "100%",
               }}
             >
-              <Typography
-                sx={{
-                  fontSize: 12.5,
-                  fontWeight: 800,
-                  color: alpha(m.navy, 0.88),
-                  mb: 1.1,
-                }}
-              >
+              <Typography sx={mollureLabelSx(m.navy, { mb: 1.1 })}>
                 Recent Services
               </Typography>
               <Stack spacing={0.9}>
@@ -421,14 +400,7 @@ export default function ClientDetailsViewPanel({
                 height: "100%",
               }}
             >
-              <Typography
-                sx={{
-                  fontSize: 12.5,
-                  fontWeight: 800,
-                  color: alpha(m.navy, 0.88),
-                  mb: 1.1,
-                }}
-              >
+              <Typography sx={mollureLabelSx(m.navy, { mb: 1.1 })}>
                 Booking History
               </Typography>
               <Stack spacing={0.9}>
@@ -532,7 +504,7 @@ export default function ClientDetailsViewPanel({
             if (trimmed !== saved) onSaveTechnicalNote(technicalNoteDraft);
           }}
           disabled={blocked}
-          sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+          sx={mollureWhiteFieldInputSx}
         />
       </Box>
     </Stack>

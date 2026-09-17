@@ -1,6 +1,5 @@
 "use client";
 
-import AppButton from "../../../../components/common/AppButton";
 import * as React from "react";
 import {
   Box,
@@ -11,6 +10,7 @@ import {
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDrawer from "../../../../components/common/AppDrawer";
+import { FinanceDrawerFiltersFooter } from "../../../../components/common/FinanceDrawerFooter";
 import {
   CLIENT_LIST_FILTER_OPTIONS,
   type ClientListFilterKey,
@@ -40,19 +40,14 @@ export default function ClientListFilterDrawer({
       onClose={onClose}
       title="Filter clients"
       footer={
-        <Stack
-          direction="row"
+        <FinanceDrawerFiltersFooter
+          onCancel={onClose}
+          onReset={onClear}
+          onApply={onClose}
+          resetLabel="All clients"
           spacing={1}
-          justifyContent="space-between"
-          sx={{ px: 2.5, py: 2, width: "100%" }}
-        >
-          <AppButton tone="secondary" onClick={onClear}>
-            All clients
-          </AppButton>
-          <AppButton tone="primary" onClick={onClose}>
-            Apply
-          </AppButton>
-        </Stack>
+          stackSx={{ py: 2, width: "100%" }}
+        />
       }
     >
       <Box sx={{ px: 2.5, py: 2 }}>

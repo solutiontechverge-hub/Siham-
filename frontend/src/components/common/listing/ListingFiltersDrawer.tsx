@@ -1,10 +1,10 @@
 "use client";
 
-import AppButton from "../AppButton";
 import * as React from "react";
-import { Box, Stack } from "@mui/material";
+import { Box } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDrawer from "../AppDrawer";
+import { FinanceDrawerFiltersFooter } from "../FinanceDrawerFooter";
 import MessagingFilterCheckboxList from "../messaging/MessagingFilterCheckboxList";
 import {
   defaultListingDrawerFilters,
@@ -41,53 +41,26 @@ export default function ListingFiltersDrawer({
     if (open) setDraft(filters);
   }, [open, filters]);
 
-  const outlinedActionSx = {
-    textTransform: "none",
-    fontWeight: 700,
-    borderRadius: "10px",
-    height: 44,
-    borderColor: alpha(m.navy, 0.18),
-    color: alpha(m.navy, 0.75),
-    bgcolor: "#fff",
-  } as const;
-
   const footer = (
-    <Box sx={{ px: 2.5, py: 2 }}>
-      <Stack direction="row" spacing={1.25}>
-        <AppButton
-          fullWidth
-          variant="outlined"
-          onClick={() => {
-            setDraft(filters);
-            onCancel();
-          }}
-          sx={outlinedActionSx}
-        >
-          Cancel
-        </AppButton>
-        <AppButton
-          fullWidth
-          variant="outlined"
-          onClick={() => setDraft(defaultListingDrawerFilters())}
-          sx={outlinedActionSx}
-        >
-          Reset
-        </AppButton>
-        <AppButton
-          tone="primary"
-          fullWidth
-          onClick={() => {
-            onChange(draft);
-            onApply(draft);
-          }}
-          sx={{
-            height: 44,
-          }}
-        >
-          Apply
-        </AppButton>
-      </Stack>
-    </Box>
+    <FinanceDrawerFiltersFooter
+      onCancel={() => {
+        setDraft(filters);
+        onCancel();
+      }}
+      onReset={() => setDraft(defaultListingDrawerFilters())}
+      onApply={() => {
+        onChange(draft);
+        onApply(draft);
+      }}
+      stackSx={{ py: 2 }}
+      buttonSx={{
+        height: 44,
+        borderRadius: "10px",
+        textTransform: "none",
+        fontWeight: 700,
+        borderColor: alpha(m.navy, 0.18),
+      }}
+    />
   );
 
   return (

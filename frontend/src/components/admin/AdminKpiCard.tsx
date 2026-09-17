@@ -6,6 +6,10 @@ import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import TrendingDownIcon from "@mui/icons-material/TrendingDown";
 import type { SvgIconComponent } from "@mui/icons-material";
 import AppCard from "../common/AppCard";
+import {
+  mollureLabelSx,
+  mollureBodyMutedSx,
+} from "../../theme/mollureHierarchy";
 import { ADMIN_CARD_PADDING as pad } from "./adminCardPadding";
 
 type AdminKpiCardProps = {
@@ -56,12 +60,11 @@ export default function AdminKpiCard({
       >
         <Stack spacing={0.75} sx={{ flex: 1, minWidth: 0 }}>
           <Typography
-            sx={{
-              fontSize: compact ? 12 : 13,
+            sx={mollureLabelSx(tokens.navy, {
               fontWeight: 500,
               color: tokens.slate,
               lineHeight: 1.3,
-            }}
+            })}
           >
             {label}
           </Typography>
@@ -76,7 +79,11 @@ export default function AdminKpiCard({
             {typeof value === "number" ? value.toLocaleString() : value}
           </Typography>
           {sublabel ? (
-            <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>
+            <Typography
+              sx={mollureBodyMutedSx(tokens.navy, {
+                color: tokens.bodyText,
+              })}
+            >
               {sublabel}
             </Typography>
           ) : null}
@@ -95,11 +102,11 @@ export default function AdminKpiCard({
                 />
               )}
               <Typography
-                sx={{
+                sx={mollureBodyMutedSx(tokens.navy, {
                   fontSize: 11,
                   fontWeight: 600,
                   color: trendUp ? tokens.teal : tokens.requestAccent,
-                }}
+                })}
               >
                 {trendUp ? "+" : ""}
                 {trend}% {trendLabel}

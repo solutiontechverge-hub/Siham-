@@ -1,6 +1,6 @@
 "use client";
 
-import AppButton from "../AppButton";
+import { ModalCancelApplyFooter } from "../FinanceDrawerFooter";
 import * as React from "react";
 import { Box, Stack } from "@mui/material";
 import AppDatePicker from "../AppDatePicker";
@@ -13,6 +13,7 @@ import type {
   CalendarResource,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import {
+  calendarModalFlexFieldSx,
   weekdayNameFromIso,
   type BlockTimeDraft,
 } from "./calendar.utils";
@@ -115,6 +116,10 @@ export default function CalendarBlockTimeModal({
     [resources],
   );
 
+  const FlexField = ({ children }: { children: React.ReactNode }) => (
+    <Box sx={calendarModalFlexFieldSx}>{children}</Box>
+  );
+
   return (
     <AppModal
       open={open}
@@ -123,31 +128,11 @@ export default function CalendarBlockTimeModal({
       maxWidth="sm"
       fullWidth
       footer={
-        <Box sx={{ px: 2.5, py: 2 }}>
-          <Stack direction="row" justifyContent="flex-end" spacing={1.25}>
-            <AppButton
-              tone="secondary"
-              onClick={onClose}
-              sx={{
-                height: 38,
-                minWidth: 110,
-              }}
-            >
-              Cancel
-            </AppButton>
-            <AppButton
-              tone="primary"
-              onClick={onApply}
-              disabled={!draft.title}
-              sx={{
-                height: 38,
-                minWidth: 110,
-              }}
-            >
-              Apply
-            </AppButton>
-          </Stack>
-        </Box>
+        <ModalCancelApplyFooter
+          onCancel={onClose}
+          onPrimary={onApply}
+          primaryDisabled={!draft.title}
+        />
       }
     >
       <Box sx={{ px: 2.5, py: 2 }}>
@@ -246,15 +231,15 @@ export default function CalendarBlockTimeModal({
           />
 
           <Stack direction="row" spacing={1.25}>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
+            <FlexField>
               <AppDatePicker
                 label="Date (from)"
                 value={draft.dateFrom}
                 onChange={(iso) => patchDates({ dateFrom: iso })}
                 fullWidth
               />
-            </Box>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
+            </FlexField>
+            <FlexField>
               <AppDatePicker
                 label="Date (To)"
                 value={draft.dateTo}
@@ -262,51 +247,51 @@ export default function CalendarBlockTimeModal({
                 min={draft.dateFrom || undefined}
                 fullWidth
               />
-            </Box>
+            </FlexField>
           </Stack>
 
           {showDays ? (
             <Stack direction="row" spacing={1.25}>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
+              <FlexField>
                 <AppTextField
                   label="Day (From)"
                   value={dayFromLabel}
                   fullWidth
                   disabled
                 />
-              </Box>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
+              </FlexField>
+              <FlexField>
                 <AppTextField
                   label="Day (To)"
                   value={dayToLabel}
                   fullWidth
                   disabled
                 />
-              </Box>
+              </FlexField>
             </Stack>
           ) : null}
 
           <Stack direction="row" spacing={1.25}>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
+            <FlexField>
               <AppTimePicker
-                variant="wheel"
+                variant="clock"
                 label="Start Time"
                 value={draft.startTime}
                 onChange={(val) => setDraft((p) => ({ ...p, startTime: val }))}
                 fullWidth
                 sx={{ minHeight: 40, py: 0.5 }}
               />
-            </Box>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
+            </FlexField>
+            <FlexField>
               <AppTimePicker
-                variant="wheel"
+                variant="clock"
                 label="End Time"
                 value={draft.endTime}
                 onChange={(val) => setDraft((p) => ({ ...p, endTime: val }))}
                 fullWidth
                 sx={{ minHeight: 40, py: 0.5 }}
               />
-            </Box>
+            </FlexField>
           </Stack>
         </Stack>
       </Box>

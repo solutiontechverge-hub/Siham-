@@ -17,6 +17,11 @@ import {
 } from "@mui/material";
 import { alpha, type Theme } from "@mui/material/styles";
 import {
+  mollureBodySx,
+  mollureLabelSx,
+  mollureTableHeaderSx,
+} from "../../../theme/mollureHierarchy";
+import {
   formatEntryIdDisplay,
   formatTransactionDate,
   formatTransactionStatusLabel,
@@ -24,16 +29,21 @@ import {
   getTransactionStatusTone,
   isTransactionClientClickable,
   shouldShowTransactionClientEmail,
+  type TransactionClientType,
   type TransactionRow,
   type TransactionStatus,
 } from "../../../app/professionals/fixed-location/finance/data/transactions";
+import { clientPlatformTagToneColors } from "../../common/ClientPlatformTag";
 import { BodyText } from "../../ui/typography";
 
-function clientTypeChipSx(theme: Theme) {
-  return {
-    bgcolor: alpha(theme.palette.primary.main, 0.1),
-    color: theme.palette.primary.main,
-  };
+function clientTypeChipSx(theme: Theme, clientType?: TransactionClientType) {
+  // Guest stays navy; M / IC / BC use the shared teal hierarchy.
+  const tone = clientType === "guest" ? "navy" : "teal";
+  const { color, bgcolor, border } = clientPlatformTagToneColors(
+    theme.palette.mollure,
+    tone,
+  );
+  return { bgcolor, color, border };
 }
 
 function statusChipSx(status: TransactionStatus, theme: Theme) {
@@ -149,11 +159,7 @@ export default function TransactionsTable({
                 >
                   <BodyText
                     component="span"
-                    sx={{
-                      fontSize: 11.5,
-                      fontWeight: 800,
-                      color: alpha(m.navy, 0.62),
-                    }}
+                    sx={mollureTableHeaderSx(m.navy)}
                   >
                     {h}
                   </BodyText>
@@ -205,27 +211,22 @@ export default function TransactionsTable({
                         type="button"
                         underline="hover"
                         onClick={() => onEntryClick(row)}
-                        sx={{
-                          fontSize: 12.5,
-                          fontWeight: 800,
+                        sx={mollureLabelSx(theme.palette.mollure.navy, {
                           color: theme.palette.primary.main,
                           border: 0,
                           bgcolor: "transparent",
                           p: 0,
                           cursor: "pointer",
+                          fontFamily: "inherit",
                           textAlign: "left",
-                        }}
+                        })}
                       >
                         {entryDisplay}
                       </MuiLink>
                     ) : (
                       <BodyText
                         component="span"
-                        sx={{
-                          fontSize: 12.5,
-                          fontWeight: 800,
-                          color: alpha(m.navy, 0.78),
-                        }}
+                        sx={mollureLabelSx(m.navy)}
                       >
                         {entryDisplay}
                       </BodyText>
@@ -235,11 +236,9 @@ export default function TransactionsTable({
                     <Stack spacing={0.35}>
                       <BodyText
                         component="span"
-                        sx={{
-                          fontSize: 12.5,
-                          fontWeight: 700,
+                        sx={mollureBodySx(m.navy, {
                           color: alpha(m.navy, 0.75),
-                        }}
+                        })}
                       >
                         {dateDisplay}
                       </BodyText>
@@ -321,7 +320,7 @@ export default function TransactionsTable({
                                 py: 0,
                                 lineHeight: 1.2,
                               },
-                              ...clientTypeChipSx(theme),
+                              ...clientTypeChipSx(theme, row.clientType),
                             }}
                           />
                         ) : null}
@@ -352,13 +351,10 @@ export default function TransactionsTable({
                       >
                         <BodyText
                           component="span"
-                          sx={{
-                            fontSize: 12.5,
-                            fontWeight: 800,
-                            color: alpha(m.navy, 0.78),
+                          sx={mollureLabelSx(m.navy, {
                             borderBottom: `1px dashed ${alpha(m.navy, 0.25)}`,
                             cursor: "help",
-                          }}
+                          })}
                         >
                           {row.netAmount}
                         </BodyText>
@@ -366,11 +362,7 @@ export default function TransactionsTable({
                     ) : (
                       <BodyText
                         component="span"
-                        sx={{
-                          fontSize: 12.5,
-                          fontWeight: 800,
-                          color: alpha(m.navy, 0.78),
-                        }}
+                        sx={mollureLabelSx(m.navy)}
                       >
                         {row.netAmount}
                       </BodyText>
@@ -379,11 +371,9 @@ export default function TransactionsTable({
                   <TableCell sx={{ verticalAlign: "top", maxWidth: 200 }}>
                     <BodyText
                       component="div"
-                      sx={{
-                        fontSize: 12.5,
-                        fontWeight: 800,
+                      sx={mollureLabelSx(m.navy, {
                         color: alpha(m.navy, 0.82),
-                      }}
+                      })}
                     >
                       {row.methodTitle}
                     </BodyText>

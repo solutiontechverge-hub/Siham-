@@ -1,8 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Box, CircularProgress } from "@mui/material";
 import DesiredLocationPageScaffold from "../../../../components/common/DesiredLocationPageScaffold";
+import DynamicChunkFallback from "../../../../components/common/DynamicChunkFallback";
 import { useSnackbar } from "../../../../components/common/AppSnackbar";
 import { getApiErrorMessage } from "../../../../lib/api-error";
 import { desiredLocationPageData } from "../desiredLocation.data";
@@ -20,21 +20,7 @@ import {
 const ProfessionalDesiredLocationSetup = dynamic(
   () =>
     import("../../../../components/common/ProfessionalDesiredLocationSetup"),
-  {
-    ssr: false,
-    loading: () => (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          py: 8,
-        }}
-      >
-        <CircularProgress size={32} />
-      </Box>
-    ),
-  },
+  { ssr: false, loading: () => <DynamicChunkFallback /> },
 );
 
 export default function DesiredLocationProfilePage() {

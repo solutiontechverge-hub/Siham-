@@ -1,14 +1,7 @@
 "use client";
 
-import * as React from "react";
 import type { CalendarBookingScenario } from "../../../app/professionals/fixed-location/calendar/calendar.data";
-import { Box, Typography } from "@mui/material";
-import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
-import { alpha, useTheme } from "@mui/material/styles";
-import AppModal, {
-  MessagingModalCancelButton,
-  MessagingModalPrimaryButton,
-} from "../AppModal";
+import ModalActionConfirmDialog from "../ModalActionConfirmDialog";
 
 export type BookingRequestConfirmAction = "accept" | "suggest" | "reject";
 
@@ -77,65 +70,20 @@ export default function BookingRequestConfirmDialog({
   onClose,
   onConfirm,
 }: Props) {
-  const m = useTheme().palette.mollure;
-  const [submitting, setSubmitting] = React.useState(false);
   if (!action) return null;
-
   const copy = copyFor(action, scenario);
 
   return (
-    <AppModal
-      contentSx={{ px: 2.5 }}
-      footerVariant="actions"
+    <ModalActionConfirmDialog
       open={open}
+      onClose={onClose}
+      onConfirm={onConfirm}
       title={copy.title}
-      onClose={submitting ? () => undefined : onClose}
-      maxWidth="sm"
+      body={copy.body}
+      confirmLabel={copy.confirmLabel}
       headerTone={action === "reject" ? "danger" : "default"}
-      footer={
-        <>
-          <MessagingModalCancelButton
-            onClick={onClose}
-            disabled={submitting}
-          />
-          <MessagingModalPrimaryButton
-            label={copy.confirmLabel}
-            disabled={submitting}
-            onClick={() => {
-              void (async () => {
-                setSubmitting(true);
-                try {
-                  await onConfirm();
-                  onClose();
-                } catch {
-                  // Caller shows the error snackbar.
-                } finally {
-                  setSubmitting(false);
-                }
-              })();
-            }}
-          />
-        </>
-      }
-    >
-      <Box sx={{ py: 2.5, textAlign: "center" }}>
-        {copy.showWarning ? (
-          <WarningAmberRoundedIcon
-            sx={{ fontSize: 52, color: "#E85D5D", mb: 1.5 }}
-          />
-        ) : null}
-        <Typography
-          sx={{
-            fontWeight: 900,
-            fontSize: 14,
-            color: alpha(m.navy, 0.88),
-            lineHeight: 1.55,
-            px: 1,
-          }}
-        >
-          {copy.body}
-        </Typography>
-      </Box>
-    </AppModal>
+      showWarning={copy.showWarning}
+      awaitConfirm
+    />
   );
 }

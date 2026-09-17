@@ -12,6 +12,10 @@ import {
   type Theme,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import {
+  mollurePageSubtitleSx,
+  mollurePageTitleSx,
+} from "../../theme/mollureHierarchy";
 import { BodyText, SubHeading } from "../ui/typography";
 import useOverlayScrollLock from "../../hooks/useOverlayScrollLock";
 import AppButton from "./AppButton";
@@ -93,16 +97,14 @@ export default function AppModal({
     >
       <Box sx={{ minWidth: 0, flex: 1, pr: 1 }}>
         <SubHeading
-          sx={{
-            fontSize: subtitle ? 18 : 16,
-            color: alpha(m.navy, 0.9),
-            fontWeight: 800,
-          }}
+          sx={mollurePageTitleSx(m.navy, {
+            fontSize: subtitle ? undefined : 16,
+          })}
         >
           {title}
         </SubHeading>
         {subtitle ? (
-          <BodyText sx={{ mt: 0.4, color: alpha(m.navy, 0.62), fontSize: 13 }}>
+          <BodyText sx={mollurePageSubtitleSx(m.navy, { mt: 0.4 })}>
             {subtitle}
           </BodyText>
         ) : null}
@@ -217,6 +219,30 @@ export default function AppModal({
   );
 }
 
+function AppModalActionButton({
+  onClick,
+  label,
+  disabled,
+  tone,
+}: {
+  onClick: () => void;
+  label: string;
+  disabled?: boolean;
+  tone: "primary" | "secondary" | "danger";
+}) {
+  return (
+    <AppButton
+      tone={tone}
+      presetSize="lg"
+      onClick={onClick}
+      disabled={disabled}
+      sx={{ minWidth: 100, px: 3 }}
+    >
+      {label}
+    </AppButton>
+  );
+}
+
 export function AppModalCancelButton({
   onClick,
   label = "Cancel",
@@ -227,15 +253,12 @@ export function AppModalCancelButton({
   disabled?: boolean;
 }) {
   return (
-    <AppButton
-      tone="secondary"
-      presetSize="lg"
+    <AppModalActionButton
       onClick={onClick}
+      label={label}
       disabled={disabled}
-      sx={{ minWidth: 100, px: 3 }}
-    >
-      {label}
-    </AppButton>
+      tone="secondary"
+    />
   );
 }
 
@@ -251,15 +274,12 @@ export function AppModalPrimaryButton({
   tone?: "primary" | "danger";
 }) {
   return (
-    <AppButton
-      tone={tone}
-      presetSize="lg"
+    <AppModalActionButton
       onClick={onClick}
+      label={label}
       disabled={disabled}
-      sx={{ minWidth: 100, px: 3 }}
-    >
-      {label}
-    </AppButton>
+      tone={tone}
+    />
   );
 }
 

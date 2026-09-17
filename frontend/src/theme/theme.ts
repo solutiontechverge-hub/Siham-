@@ -149,6 +149,9 @@ const theme = createTheme({
       timelineGridHalfHourSlotBg: "#F2F4F7",
       /** Slot row at :15 / :45 — default white */
       timelineGridNormalSlotBg: "#FFFFFF",
+      /** Multi-service booking - lighter service sub-card surface */
+      calendarBookingSubCardBg: "#FFFFFF",
+      calendarBookingSubCardBorder: "rgba(52, 74, 102, 0.14)",
       /** Soft status chips (finance / payment labels) */
       statusOrangeBg: "#FFFAEB",
       statusOrangeFg: "#F79009",

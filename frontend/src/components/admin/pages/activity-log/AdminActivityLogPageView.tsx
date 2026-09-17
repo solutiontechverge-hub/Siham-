@@ -30,6 +30,12 @@ import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { alpha, useTheme } from "@mui/material/styles";
 import {
+  mollureSectionTitleSx,
+  mollureLabelSx,
+  mollureBodySx,
+  mollureBodyMutedSx,
+} from "../../../../theme/mollureHierarchy";
+import {
   AppButton,
   AppPagination,
   AppSearchField,
@@ -81,12 +87,12 @@ function UserCell({ user }: { user: ActivityLogRow["user"] }) {
       </Avatar>
       <Box sx={{ minWidth: 0 }}>
         <Typography
-          sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}
+          sx={mollureLabelSx(tokens.navy, { fontWeight: 600, color: tokens.navy })}
           noWrap
         >
           {user.name}
         </Typography>
-        <Typography sx={{ fontSize: 10.5, color: tokens.slate }} noWrap>
+        <Typography sx={mollureBodyMutedSx(tokens.navy, { fontSize: 10.5, color: tokens.slate })} noWrap>
           {user.email}
         </Typography>
       </Box>
@@ -136,7 +142,7 @@ function ModuleCell({
       >
         <Icon sx={{ fontSize: 15 }} />
       </Box>
-      <Typography sx={{ fontSize: 12, fontWeight: 500, color: tokens.navy }}>
+      <Typography sx={mollureBodyMutedSx(tokens.navy, { fontWeight: 500, color: tokens.navy })}>
         {label}
       </Typography>
     </Stack>
@@ -150,12 +156,12 @@ function ActivityDetailContent({ entry }: { entry: ActivityLogRow }) {
     <Stack spacing={2} sx={{ px: 2.5, py: 2 }}>
       <Stack direction="row" alignItems="center" spacing={1}>
         <InfoOutlinedIcon sx={{ fontSize: 18, color: tokens.teal }} />
-        <Typography sx={{ fontSize: 15, fontWeight: 600, color: tokens.navy }}>
+        <Typography sx={mollureSectionTitleSx(tokens.navy, { fontWeight: 600, color: tokens.navy })}>
           Activity Details
         </Typography>
       </Stack>
 
-      <Typography sx={{ fontSize: 12, color: tokens.slate, fontWeight: 500 }}>
+      <Typography sx={mollureBodyMutedSx(tokens.navy, { fontWeight: 500, color: tokens.slate })}>
         Log ID #{entry.id}
       </Typography>
 
@@ -168,14 +174,7 @@ function ActivityDetailContent({ entry }: { entry: ActivityLogRow }) {
         }}
       >
         <Typography
-          sx={{
-            fontSize: 11,
-            fontWeight: 600,
-            color: tokens.slate,
-            mb: 1,
-            textTransform: "uppercase",
-            letterSpacing: "0.04em",
-          }}
+          sx={mollureLabelSx(tokens.navy, { fontSize: 11, fontWeight: 600, color: tokens.slate, mb: 1, textTransform: "uppercase", letterSpacing: "0.04em" })}
         >
           User
         </Typography>
@@ -185,14 +184,7 @@ function ActivityDetailContent({ entry }: { entry: ActivityLogRow }) {
       <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
         <Box>
           <Typography
-            sx={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: tokens.slate,
-              mb: 0.75,
-              textTransform: "uppercase",
-              letterSpacing: "0.04em",
-            }}
+            sx={mollureLabelSx(tokens.navy, { fontSize: 11, fontWeight: 600, color: tokens.slate, mb: 0.75, textTransform: "uppercase", letterSpacing: "0.04em" })}
           >
             Action
           </Typography>
@@ -200,14 +192,7 @@ function ActivityDetailContent({ entry }: { entry: ActivityLogRow }) {
         </Box>
         <Box>
           <Typography
-            sx={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: tokens.slate,
-              mb: 0.75,
-              textTransform: "uppercase",
-              letterSpacing: "0.04em",
-            }}
+            sx={mollureLabelSx(tokens.navy, { fontSize: 11, fontWeight: 600, color: tokens.slate, mb: 0.75, textTransform: "uppercase", letterSpacing: "0.04em" })}
           >
             Module
           </Typography>
@@ -217,19 +202,12 @@ function ActivityDetailContent({ entry }: { entry: ActivityLogRow }) {
 
       <Box>
         <Typography
-          sx={{
-            fontSize: 11,
-            fontWeight: 600,
-            color: tokens.slate,
-            mb: 0.75,
-            textTransform: "uppercase",
-            letterSpacing: "0.04em",
-          }}
+          sx={mollureLabelSx(tokens.navy, { fontSize: 11, fontWeight: 600, color: tokens.slate, mb: 0.75, textTransform: "uppercase", letterSpacing: "0.04em" })}
         >
           Details
         </Typography>
         <Typography
-          sx={{ fontSize: 13, color: tokens.bodyText, lineHeight: 1.55 }}
+          sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText, lineHeight: 1.55 })}
         >
           {entry.details}
         </Typography>
@@ -239,11 +217,11 @@ function ActivityDetailContent({ entry }: { entry: ActivityLogRow }) {
         <CalendarTodayOutlinedIcon sx={{ fontSize: 16, color: tokens.slate }} />
         <Box>
           <Typography
-            sx={{ fontSize: 11, fontWeight: 600, color: tokens.slate }}
+            sx={mollureLabelSx(tokens.navy, { fontSize: 11, fontWeight: 600, color: tokens.slate })}
           >
             Date & Time
           </Typography>
-          <Typography sx={{ fontSize: 12, color: tokens.navy }}>
+          <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.navy })}>
             {formatDateTime(entry.date, entry.time)}
           </Typography>
         </Box>
@@ -251,19 +229,12 @@ function ActivityDetailContent({ entry }: { entry: ActivityLogRow }) {
 
       <Box>
         <Typography
-          sx={{
-            fontSize: 11,
-            fontWeight: 600,
-            color: tokens.slate,
-            mb: 0.5,
-            textTransform: "uppercase",
-            letterSpacing: "0.04em",
-          }}
+          sx={mollureLabelSx(tokens.navy, { fontSize: 11, fontWeight: 600, color: tokens.slate, mb: 0.5, textTransform: "uppercase", letterSpacing: "0.04em" })}
         >
           IP Address
         </Typography>
         <Typography
-          sx={{ fontSize: 12, color: tokens.navy, fontFamily: "monospace" }}
+          sx={mollureBodyMutedSx(tokens.navy, { color: tokens.navy, fontFamily: "monospace" })}
         >
           {entry.ipAddress}
         </Typography>
@@ -386,10 +357,10 @@ export default function AdminActivityLogPageView() {
       minWidth: 160,
       render: (r) => (
         <Box>
-          <Typography sx={{ fontSize: 12, color: tokens.navy }}>
+          <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.navy })}>
             {formatDisplayDate(r.date)}
           </Typography>
-          <Typography sx={{ fontSize: 10.5, color: tokens.slate }}>
+          <Typography sx={mollureBodyMutedSx(tokens.navy, { fontSize: 10.5, color: tokens.slate })}>
             {formatTime12h(r.time)}
           </Typography>
         </Box>
@@ -418,7 +389,7 @@ export default function AdminActivityLogPageView() {
       minWidth: 220,
       render: (r) => (
         <Typography
-          sx={{ fontSize: 12, color: tokens.bodyText, lineHeight: 1.45 }}
+          sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText, lineHeight: 1.45 })}
           noWrap
         >
           {r.details}
@@ -430,7 +401,7 @@ export default function AdminActivityLogPageView() {
       label: "IP Address",
       render: (r) => (
         <Typography
-          sx={{ fontSize: 12, color: tokens.navy, fontFamily: "monospace" }}
+          sx={mollureBodyMutedSx(tokens.navy, { color: tokens.navy, fontFamily: "monospace" })}
         >
           {r.ipAddress}
         </Typography>
@@ -460,17 +431,12 @@ export default function AdminActivityLogPageView() {
         <Typography
           component={Link}
           href="/admin/dashboard"
-          sx={{
-            fontSize: 12,
-            color: tokens.bodyText,
-            textDecoration: "none",
-            "&:hover": { color: tokens.teal },
-          }}
+          sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText, textDecoration: "none", "&:hover": { color: tokens.teal } })}
         >
           Home
         </Typography>
-        <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>/</Typography>
-        <Typography sx={{ fontSize: 12, color: tokens.navy, fontWeight: 500 }}>
+        <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText })}>/</Typography>
+        <Typography sx={mollureBodyMutedSx(tokens.navy, { fontWeight: 500, color: tokens.navy })}>
           Activity Log
         </Typography>
       </Stack>
@@ -494,7 +460,7 @@ export default function AdminActivityLogPageView() {
             Activity Log
           </Typography>
           <Typography
-            sx={{ fontSize: 14, color: tokens.bodyText, maxWidth: 640 }}
+            sx={mollureBodySx(tokens.navy, { color: tokens.bodyText, maxWidth: 640 })}
           >
             Track and monitor all activities and actions performed across the
             platform.
@@ -559,12 +525,7 @@ export default function AdminActivityLogPageView() {
               sx={{ fontSize: 16, color: tokens.slate }}
             />
             <Typography
-              sx={{
-                fontSize: 12,
-                color: tokens.bodyText,
-                fontWeight: 500,
-                whiteSpace: "nowrap",
-              }}
+              sx={mollureBodyMutedSx(tokens.navy, { fontWeight: 500, color: tokens.bodyText, whiteSpace: "nowrap" })}
             >
               {dateRangeLabel}
             </Typography>
@@ -654,7 +615,7 @@ export default function AdminActivityLogPageView() {
 
             {isError ? (
               <Box sx={{ px: pad.tableCellX, py: 2 }}>
-                <Typography sx={{ fontSize: 13, color: tokens.bodyText }}>
+                <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText })}>
                   Failed to load activity log.{" "}
                   <Box
                     component="button"
@@ -702,7 +663,7 @@ export default function AdminActivityLogPageView() {
                 alignItems={{ sm: "center" }}
                 justifyContent="space-between"
               >
-                <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>
+                <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText })}>
                   Showing{" "}
                   {filteredLogs.length === 0 ? 0 : (page - 1) * pageSize + 1} to{" "}
                   {Math.min(page * pageSize, filteredLogs.length)} of{" "}
@@ -782,13 +743,13 @@ export default function AdminActivityLogPageView() {
             />
             <Box>
               <Typography
-                sx={{ fontSize: 14, fontWeight: 600, color: tokens.navy }}
+                sx={mollureLabelSx(tokens.navy, { fontWeight: 600, color: tokens.navy })}
               >
                 Are you sure you want to delete this activity log entry?
               </Typography>
               {deleteTarget ? (
                 <Typography
-                  sx={{ fontSize: 13, color: tokens.bodyText, mt: 0.75 }}
+                  sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText, mt: 0.75 })}
                 >
                   <strong>{deleteTarget.actionLabel}</strong> by{" "}
                   <strong>{deleteTarget.user.name}</strong> on{" "}

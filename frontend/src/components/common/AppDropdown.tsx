@@ -104,6 +104,14 @@ export default function AppDropdown({
   const showSelectAll =
     Boolean(multiple && selectAll) && selectAllTargets.length > 1;
 
+  const menuItemBaseSx = {
+    display: "flex",
+    alignItems: "center",
+    minHeight: 40,
+    py: 1,
+    lineHeight: 1.2,
+  } as const;
+
   const applySelectAll = (
     event?: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
@@ -244,15 +252,7 @@ export default function AppDropdown({
       {showSelectAll ? (
         <MenuItem
           value={SELECT_ALL_VALUE}
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            gap: 1,
-            minHeight: 40,
-            py: 1,
-            lineHeight: 1.2,
-            fontWeight: 700,
-          }}
+          sx={{ ...menuItemBaseSx, gap: 1, fontWeight: 700 }}
         >
           <Checkbox
             size="small"
@@ -270,18 +270,14 @@ export default function AppDropdown({
         const rowColor = option.disabled
           ? m.placeholder
           : option.color;
-        const item = (
+        return (
           <MenuItem
             key={option.value}
             value={option.value}
             disabled={option.disabled}
             sx={{
-              display: "flex",
-              alignItems: "center",
+              ...menuItemBaseSx,
               gap: option.icon ? 1.75 : 1,
-              minHeight: 40,
-              py: 1,
-              lineHeight: 1.2,
               color: rowColor,
               fontWeight: option.color && !option.disabled ? 700 : undefined,
               "&.Mui-disabled": {
@@ -295,7 +291,7 @@ export default function AppDropdown({
             {multiple ? (
               <Checkbox size="small" checked={selected} sx={{ p: 0.5 }} />
             ) : null}
-            {option.icon ? option.icon : null}
+            {option.icon}
             {option.tooltip ? (
               <Tooltip title={option.tooltip} placement="right">
                 <span>{option.label}</span>
@@ -306,7 +302,6 @@ export default function AppDropdown({
             {option.endAdornment}
           </MenuItem>
         );
-        return item;
       })}
     </AppTextField>
   );

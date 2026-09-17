@@ -1,5 +1,7 @@
 "use client";
 
+import * as React from "react";
+import { useRouter } from "next/navigation";
 import ArrowDropDownRoundedIcon from "@mui/icons-material/ArrowDropDownRounded";
 import FmdGoodRoundedIcon from "@mui/icons-material/FmdGoodRounded";
 import ForumRoundedIcon from "@mui/icons-material/ForumRounded";
@@ -10,11 +12,41 @@ import Box from "@mui/material/Box";
 import SvgIcon from "@mui/material/SvgIcon";
 import TextField from "@mui/material/TextField";
 import { useTheme } from "@mui/material/styles";
-import type { ClientFeatureIconKey } from "./clients.data";
+import type { ClientFeatureIconKey, ClientFilter } from "./clients.data";
 import { BodyText, CardTitle } from "../../components/ui/typography";
+import { buildListingSearchHref } from "./listing/listingSearchParams";
 
 export function useClientsPageTokens() {
   return useTheme().palette.mollure;
+}
+
+export function useClientsLandingFilters(filters: ClientFilter[]) {
+  const router = useRouter();
+  const [filterValues, setFilterValues] = React.useState<
+    Record<string, string[]>
+  >(
+    () =>
+      Object.fromEntries(filters.map((f) => [f.label, []])) as Record<
+        string,
+        string[]
+      >,
+  );
+
+  const hasSearchSelection = Object.values(filterValues).some(
+    (values) => values.length > 0,
+  );
+
+  function handleSearch() {
+    if (!hasSearchSelection) return;
+    router.push(buildListingSearchHref(filterValues));
+  }
+
+  return {
+    filterValues,
+    setFilterValues,
+    hasSearchSelection,
+    handleSearch,
+  };
 }
 
 export function LogoMark() {

@@ -27,6 +27,7 @@ import {
   DEFAULT_INVOICE_SETTINGS,
   mergeInvoiceSettings,
 } from "../helpers/financeInvoiceSettings.js";
+import { sendCaughtError } from "../utils/httpError.js";
 
 const DEFAULT_TRANSACTION_OPTIONS = {
   onlineImmediate: true,
@@ -235,7 +236,7 @@ export const getFinanceSettings = async (req, res) => {
       data: mapSettingsRow(row),
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message, data: null });
+    return sendCaughtError(res, error, { fallbackMessage: "Request failed." });
   }
 };
 
@@ -266,7 +267,7 @@ export const updateFinanceInvoiceSettings = async (req, res) => {
       data: mapSettingsRow(result.rows[0]),
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message, data: null });
+    return sendCaughtError(res, error, { fallbackMessage: "Request failed." });
   }
 };
 
@@ -297,7 +298,7 @@ export const updateFinanceTransactionOptions = async (req, res) => {
       data: mapSettingsRow(result.rows[0]),
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message, data: null });
+    return sendCaughtError(res, error, { fallbackMessage: "Request failed." });
   }
 };
 
@@ -347,7 +348,7 @@ export const updateFinanceStripeStatus = async (req, res) => {
       data: mapSettingsRow(result.rows[0]),
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message, data: null });
+    return sendCaughtError(res, error, { fallbackMessage: "Request failed." });
   }
 };
 
@@ -399,7 +400,7 @@ export const listFinanceTransactions = async (req, res) => {
       }),
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message, data: null });
+    return sendCaughtError(res, error, { fallbackMessage: "Request failed." });
   }
 };
 
@@ -549,7 +550,7 @@ export const createFinanceTransaction = async (req, res) => {
       data: mapTransactionRow(result.rows[0]),
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message, data: null });
+    return sendCaughtError(res, error, { fallbackMessage: "Request failed." });
   }
 };
 
@@ -608,7 +609,7 @@ export const updateFinanceTransaction = async (req, res) => {
       data: mapTransactionRow(updated),
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message, data: null });
+    return sendCaughtError(res, error, { fallbackMessage: "Request failed." });
   }
 };
 
@@ -716,7 +717,7 @@ export const bulkFinanceTransactionAction = async (req, res) => {
       data: { affected: result.rows.length, status: nextStatus },
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message, data: null });
+    return sendCaughtError(res, error, { fallbackMessage: "Request failed." });
   }
 };
 
@@ -760,7 +761,7 @@ export const createFinanceTransactionFromBooking = async (req, res) => {
       data: mapTransactionRow(result.rows[0]),
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message, data: null });
+    return sendCaughtError(res, error, { fallbackMessage: "Request failed." });
   }
 };
 
@@ -839,7 +840,7 @@ export const replaceFinanceTransaction = async (req, res) => {
       data: mapTransactionRow(result.rows[0]),
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message, data: null });
+    return sendCaughtError(res, error, { fallbackMessage: "Request failed." });
   }
 };
 
@@ -855,7 +856,7 @@ export const processFinanceInvoiceReissues = async (req, res) => {
       data: { created },
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message, data: null });
+    return sendCaughtError(res, error, { fallbackMessage: "Request failed." });
   }
 };
 
@@ -1045,7 +1046,7 @@ export const reissueFinanceInvoiceForBooking = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message, data: null });
+    return sendCaughtError(res, error, { fallbackMessage: "Request failed." });
   }
 };
 
@@ -1071,7 +1072,7 @@ export const getPublicInvoiceSettings = async (req, res) => {
       data: invoiceSettings,
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message, data: null });
+    return sendCaughtError(res, error, { fallbackMessage: "Request failed." });
   }
 };
 
@@ -1097,7 +1098,7 @@ export const getPublicTransactionOptions = async (req, res) => {
       data: { ...DEFAULT_TRANSACTION_OPTIONS, ...options },
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message, data: null });
+    return sendCaughtError(res, error, { fallbackMessage: "Request failed." });
   }
 };
 
@@ -1157,6 +1158,6 @@ export const createStripeConnectOnboardingLink = async (req, res) => {
       data: { url: link.url, accountId, simulated: false },
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message, data: null });
+    return sendCaughtError(res, error, { fallbackMessage: "Request failed." });
   }
 };

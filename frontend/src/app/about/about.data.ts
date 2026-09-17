@@ -92,7 +92,7 @@ export const aboutPageData = {
         id: "project-bookings",
         question: "Who Can Book Project Bookings?",
         answer:
-          "Project Bookings Are A Special Feature Available Only For Company Clients (CC). These Bookings Are Designed For Small To Large-Scale Creative Or Production Services — Such As Photo Shoots For Marketing Campaigns, Media Projects, Or Film Work. They Allow Professionals To Manage Projects That May Include Several Services And Planning Stages. Company Clients Can Add A Project Description, Upload Images Or Files, And Create A Timeline By Adding Planning Details Directly Within The Booking.",
+          "Project Bookings Are A Special Feature Available Only For Company Clients (BC). These Bookings Are Designed For Small To Large-Scale Creative Or Production Services — Such As Photo Shoots For Marketing Campaigns, Media Projects, Or Film Work. They Allow Professionals To Manage Projects That May Include Several Services And Planning Stages. Company Clients Can Add A Project Description, Upload Images Or Files, And Create A Timeline By Adding Planning Details Directly Within The Booking.",
       },
       {
         id: "availability",

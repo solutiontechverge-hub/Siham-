@@ -10,6 +10,10 @@ import {
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import AppCard from "../common/AppCard";
+import {
+  mollureSectionTitleSx,
+  mollureBodyMutedSx,
+} from "../../theme/mollureHierarchy";
 import { ADMIN_CARD_PADDING as pad } from "./adminCardPadding";
 
 type AdminSectionCardProps = {
@@ -69,17 +73,21 @@ export default function AdminSectionCard({
           <Stack spacing={0.25}>
             {title ? (
               <Typography
-                sx={{
-                  fontSize: compact ? 14 : 16,
+                sx={mollureSectionTitleSx(tokens.navy, {
+                  fontSize: compact ? 14 : 15,
                   fontWeight: 600,
                   color: tokens.textcolorgrey700,
-                }}
+                })}
               >
                 {title}
               </Typography>
             ) : null}
             {description ? (
-              <Typography sx={{ fontSize: 13, color: tokens.bodyText }}>
+              <Typography
+                sx={mollureBodyMutedSx(tokens.navy, {
+                  color: tokens.bodyText,
+                })}
+              >
                 {description}
               </Typography>
             ) : null}

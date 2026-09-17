@@ -1,10 +1,14 @@
 "use client";
 
-import AppButton from "../AppButton";
 import * as React from "react";
-import { Box, Checkbox, Divider, Stack, Typography } from "@mui/material";
+import { Box, Divider, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDrawer from "../AppDrawer";
+import {
+  FilterDrawerCheckboxRow,
+  FilterDrawerSectionHeading,
+} from "../FilterDrawerFields";
+import { FinanceDrawerFiltersFooter } from "../FinanceDrawerFooter";
 import type {
   CalendarBookingLocation,
   CalendarBookingStatus,
@@ -31,81 +35,6 @@ type CalendarFiltersDrawerProps = {
   setDraftFilters: React.Dispatch<React.SetStateAction<CalendarFilters>>;
 };
 
-function FilterRow({
-  checked,
-  label,
-  onChange,
-}: {
-  checked: boolean;
-  label: string;
-  onChange: (next: boolean) => void;
-}) {
-  const m = useTheme().palette.mollure;
-
-  return (
-    <Box
-      component="label"
-      sx={{
-        display: "flex",
-        flexDirection: "row",
-        alignItems: "center",
-        gap: "8px",
-        margin: 0,
-        padding: "2px 0",
-        cursor: "pointer",
-        userSelect: "none",
-      }}
-    >
-      <Checkbox
-        size="small"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        disableRipple
-        sx={{
-          padding: 0,
-          margin: 0,
-          width: 18,
-          height: 18,
-          color: alpha(m.navy, 0.35),
-          "&.Mui-checked": { color: m.teal },
-          "& .MuiSvgIcon-root": { fontSize: 18 },
-        }}
-      />
-      <Typography
-        component="span"
-        sx={{
-          fontSize: 12,
-          lineHeight: "18px",
-          fontWeight: 500,
-          color: alpha(m.navy, 0.72),
-          margin: 0,
-          padding: 0,
-        }}
-      >
-        {label}
-      </Typography>
-    </Box>
-  );
-}
-
-function SectionHeading({ children }: { children: React.ReactNode }) {
-  const m = useTheme().palette.mollure;
-  return (
-    <Typography
-      component="div"
-      sx={{
-        fontSize: 12,
-        fontWeight: 900,
-        lineHeight: 1.2,
-        color: alpha(m.navy, 0.7),
-        mb: 0.75,
-      }}
-    >
-      {children}
-    </Typography>
-  );
-}
-
 export default function CalendarFiltersDrawer({
   appliedFilters,
   bookingTypes,
@@ -120,6 +49,9 @@ export default function CalendarFiltersDrawer({
   setDraftFilters,
 }: CalendarFiltersDrawerProps) {
   const m = useTheme().palette.mollure;
+  const sectionDivider = (
+    <Divider sx={{ mt: 1.5, borderColor: alpha(m.navy, 0.08) }} />
+  );
 
   return (
     <AppDrawer
@@ -128,45 +60,25 @@ export default function CalendarFiltersDrawer({
       onClose={onClose}
       title="Filter calendar"
       footer={
-        <Box sx={{ p: 2 }}>
-          <Stack direction="row" spacing={1}>
-            <AppButton
-              fullWidth
-              tone="secondary"
-              onClick={() => {
-                setDraftFilters(appliedFilters);
-                onClose();
-              }}
-              sx={{ borderRadius: "8px" }}
-            >
-              Cancel
-            </AppButton>
-            <AppButton
-              fullWidth
-              tone="secondary"
-              onClick={() => setDraftFilters(initialFilters)}
-              sx={{ borderRadius: "8px" }}
-            >
-              Reset
-            </AppButton>
-            <AppButton
-              tone="primary"
-              fullWidth
-              onClick={() => onApply(draftFilters)}
-              sx={{ borderRadius: "8px" }}
-            >
-              Apply
-            </AppButton>
-          </Stack>
-        </Box>
+        <FinanceDrawerFiltersFooter
+          spacing={1}
+          stackSx={{ p: 2 }}
+          buttonSx={{ borderRadius: "8px" }}
+          onCancel={() => {
+            setDraftFilters(appliedFilters);
+            onClose();
+          }}
+          onReset={() => setDraftFilters(initialFilters)}
+          onApply={() => onApply(draftFilters)}
+        />
       }
     >
       <Box sx={{ px: 2, py: 1.5 }}>
         <Stack spacing={2}>
           <Box>
-            <SectionHeading>Team Member</SectionHeading>
+            <FilterDrawerSectionHeading>Team Member</FilterDrawerSectionHeading>
             <Stack spacing={0.75}>
-              <FilterRow
+              <FilterDrawerCheckboxRow
                 label="All"
                 checked={draftFilters.teamAll}
                 onChange={(checked) =>
@@ -181,20 +93,21 @@ export default function CalendarFiltersDrawer({
                   }))
                 }
               />
-              {resources.map((r) => (
-                <FilterRow
+              {resources.map((r) => {
+                const isChecked =
+                  !draftFilters.teamAll && Boolean(draftFilters.teamIds[r.id]);
+                return (
+                <FilterDrawerCheckboxRow
                   key={r.id}
                   label={r.name}
-                  checked={
-                    !draftFilters.teamAll && Boolean(draftFilters.teamIds[r.id])
-                  }
+                  checked={isChecked}
                   onChange={(checked) =>
                     setDraftFilters((p) => {
                       const teamIds = { ...p.teamIds, [r.id]: checked };
-                      const selectedCount = resources.filter(
+                      const nextSelected = resources.filter(
                         (member) => teamIds[member.id],
-                      ).length;
-                      if (selectedCount === resources.length) {
+                      );
+                      if (nextSelected.length === resources.length) {
                         return {
                           ...p,
                           teamAll: true,
@@ -207,16 +120,17 @@ export default function CalendarFiltersDrawer({
                     })
                   }
                 />
-              ))}
+                );
+              })}
             </Stack>
-            <Divider sx={{ mt: 1.5, borderColor: alpha(m.navy, 0.08) }} />
+            {sectionDivider}
           </Box>
 
           {locations.length > 1 ? (
             <Box>
-              <SectionHeading>Location</SectionHeading>
+              <FilterDrawerSectionHeading>Location</FilterDrawerSectionHeading>
               <Stack spacing={0.75}>
-                <FilterRow
+                <FilterDrawerCheckboxRow
                   label="All"
                   checked={draftFilters.locationAll}
                   onChange={(checked) =>
@@ -230,7 +144,7 @@ export default function CalendarFiltersDrawer({
                   }
                 />
                 {locations.map((loc) => (
-                  <FilterRow
+                  <FilterDrawerCheckboxRow
                     key={loc}
                     label={loc}
                     checked={
@@ -256,14 +170,14 @@ export default function CalendarFiltersDrawer({
                   />
                 ))}
               </Stack>
-              <Divider sx={{ mt: 1.5, borderColor: alpha(m.navy, 0.08) }} />
+              {sectionDivider}
             </Box>
           ) : null}
 
           <Box>
-            <SectionHeading>Booking</SectionHeading>
+            <FilterDrawerSectionHeading>Booking</FilterDrawerSectionHeading>
             <Stack spacing={0.75}>
-              <FilterRow
+              <FilterDrawerCheckboxRow
                 label="All"
                 checked={draftFilters.bookingAll}
                 onChange={(checked) =>
@@ -282,7 +196,7 @@ export default function CalendarFiltersDrawer({
                 }
               />
               {bookingTypes.map((bt) => (
-                <FilterRow
+                <FilterDrawerCheckboxRow
                   key={bt}
                   label={bt}
                   checked={
@@ -310,9 +224,9 @@ export default function CalendarFiltersDrawer({
           </Box>
 
           <Box>
-            <SectionHeading>Status</SectionHeading>
+            <FilterDrawerSectionHeading>Status</FilterDrawerSectionHeading>
             <Stack spacing={0.75}>
-              <FilterRow
+              <FilterDrawerCheckboxRow
                 label="All"
                 checked={draftFilters.statusAll !== false}
                 onChange={(checked) =>
@@ -328,7 +242,7 @@ export default function CalendarFiltersDrawer({
               />
               {bookingStatuses.map((st) => (
                 <React.Fragment key={st}>
-                  <FilterRow
+                  <FilterDrawerCheckboxRow
                     label={st}
                     checked={
                       draftFilters.statusAll === false &&
@@ -357,7 +271,7 @@ export default function CalendarFiltersDrawer({
                     }
                   />
                   {st === "Invalid" ? (
-                    <FilterRow
+                    <FilterDrawerCheckboxRow
                       label="BR Rejected"
                       checked={
                         draftFilters.statusAll === false &&

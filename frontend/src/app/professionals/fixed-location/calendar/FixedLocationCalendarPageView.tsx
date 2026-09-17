@@ -1,7 +1,13 @@
 "use client";
 
-import ProfessionalFixedLocationCalendar from "../../../../components/common/ProfessionalFixedLocationCalendar";
+import dynamic from "next/dynamic";
+import DynamicChunkFallback from "../../../../components/common/DynamicChunkFallback";
 import { useFixedLocationCalendarPage } from "./useFixedLocationCalendarPage";
+
+const ProfessionalFixedLocationCalendar = dynamic(
+  () => import("../../../../components/common/ProfessionalFixedLocationCalendar"),
+  { ssr: false, loading: () => <DynamicChunkFallback /> },
+);
 
 export default function FixedLocationCalendarPageView() {
   const {

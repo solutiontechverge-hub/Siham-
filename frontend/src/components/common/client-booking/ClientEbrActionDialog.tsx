@@ -1,12 +1,6 @@
 "use client";
 
-import { Box, Typography } from "@mui/material";
-import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
-import { alpha, useTheme } from "@mui/material/styles";
-import AppModal, {
-  MessagingModalCancelButton,
-  MessagingModalPrimaryButton,
-} from "../AppModal";
+import ModalActionConfirmDialog from "../ModalActionConfirmDialog";
 import { useSnackbar } from "../AppSnackbar";
 
 export type ClientEbrActionKind = "accept" | "suggest" | "reject";
@@ -100,7 +94,6 @@ export default function ClientEbrActionDialog({
   onClose,
   onConfirm,
 }: Props) {
-  const m = useTheme().palette.mollure;
   const { showSnackbar } = useSnackbar();
   if (!action) return null;
 
@@ -109,51 +102,24 @@ export default function ClientEbrActionDialog({
   )[action];
 
   return (
-    <AppModal
-      contentSx={{ px: 2.5 }}
-      footerVariant="actions"
+    <ModalActionConfirmDialog
       open={open}
-      title={copy.title}
       onClose={onClose}
+      title={copy.title}
+      body={copy.body}
+      confirmLabel={copy.confirmLabel}
       headerTone={action === "reject" ? "danger" : "default"}
-      footer={
-        <>
-          <MessagingModalCancelButton onClick={onClose} />
-          <MessagingModalPrimaryButton
-            tone={action === "reject" ? "danger" : "primary"}
-            label={copy.confirmLabel}
-            onClick={() => {
-              onConfirm();
-              if (copy.snackbarMessage) {
-                showSnackbar({
-                  severity: "success",
-                  message: copy.snackbarMessage,
-                });
-              }
-              onClose();
-            }}
-          />
-        </>
-      }
-    >
-      <Box sx={{ py: 2.5, textAlign: "center" }}>
-        {copy.showWarning ? (
-          <WarningAmberRoundedIcon
-            sx={{ fontSize: 52, color: "#E85D5D", mb: 1.5 }}
-          />
-        ) : null}
-        <Typography
-          sx={{
-            fontWeight: 900,
-            fontSize: 14,
-            color: alpha(m.navy, 0.88),
-            lineHeight: 1.55,
-            px: 1,
-          }}
-        >
-          {copy.body}
-        </Typography>
-      </Box>
-    </AppModal>
+      primaryTone={action === "reject" ? "danger" : "primary"}
+      showWarning={Boolean(copy.showWarning)}
+      onConfirm={() => {
+        onConfirm();
+        if (copy.snackbarMessage) {
+          showSnackbar({
+            severity: "success",
+            message: copy.snackbarMessage,
+          });
+        }
+      }}
+    />
   );
 }

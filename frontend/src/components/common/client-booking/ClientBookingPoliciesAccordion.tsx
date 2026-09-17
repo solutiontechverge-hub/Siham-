@@ -1,5 +1,7 @@
 "use client";
 
+import { mollureLabelSx } from "../../../theme/mollureHierarchy";
+
 import AppButton from "../AppButton";
 import * as React from "react";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
@@ -42,13 +44,13 @@ export default function ClientBookingPoliciesAccordion({
         onCancelBooking?.();
       }}
       sx={{
+        ...mollureLabelSx(m.navy, {
+          color: alpha(m.navy, 0.55),
+        }),
         borderRadius: "10px",
         textTransform: "none",
-        fontWeight: 800,
-        fontSize: 12.5,
         height: 40,
         borderColor: alpha(m.navy, 0.12),
-        color: alpha(m.navy, 0.55),
         bgcolor: alpha(m.navy, 0.03),
         "&:hover": {
           bgcolor: alpha(m.navy, 0.06),
@@ -110,7 +112,7 @@ export default function ClientBookingPoliciesAccordion({
         }}
       >
         <Typography
-          sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.78) }}
+          sx={mollureLabelSx(m.navy, { fontWeight: 900 })}
         >
           Professional&apos;s Policies
         </Typography>

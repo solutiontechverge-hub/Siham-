@@ -1,9 +1,7 @@
 "use client";
 
 import AppButton from "../AppButton";
-import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   Box,
   Card,
@@ -15,13 +13,13 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import type { ClientsLandingData } from "../../../app/clients/clients.data";
-import { buildListingSearchHref } from "../../../app/clients/listing/listingSearchParams";
 import {
   clientsShellHeader,
   type ClientsShellHeaderConfig,
 } from "../../../data/marketingShell.data";
 import {
   getFeatureIcon,
+  useClientsLandingFilters,
   useClientsPageTokens,
 } from "../../../app/clients/clients.use";
 import { MOLLURE_SECTION_GAP_PX } from "../../../theme/spacing";
@@ -52,7 +50,6 @@ export default function ClientsLanding({
   overrides,
 }: ClientsLandingProps) {
   const tokens = useClientsPageTokens();
-  const router = useRouter();
 
   const header: ClientsShellHeaderConfig = {
     ...clientsShellHeader,
@@ -68,24 +65,8 @@ export default function ClientsLanding({
     footer,
   } = data;
 
-  const [filterValues, setFilterValues] = React.useState<
-    Record<string, string[]>
-  >(
-    () =>
-      Object.fromEntries(hero.filters.map((f) => [f.label, []])) as Record<
-        string,
-        string[]
-      >,
-  );
-
-  const hasSearchSelection = Object.values(filterValues).some(
-    (values) => values.length > 0,
-  );
-
-  function handleSearch() {
-    if (!hasSearchSelection) return;
-    router.push(buildListingSearchHref(filterValues));
-  }
+  const { filterValues, setFilterValues, hasSearchSelection, handleSearch } =
+    useClientsLandingFilters(hero.filters);
 
   const filterFieldSx = {
     "& .MuiOutlinedInput-root": {

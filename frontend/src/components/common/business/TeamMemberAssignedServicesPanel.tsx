@@ -28,8 +28,7 @@ export default function TeamMemberAssignedServicesPanel({
   disabled = false,
   onRemoveService,
 }: TeamMemberAssignedServicesPanelProps) {
-  const theme = useTheme();
-  const m = theme.palette.mollure;
+  const m = useTheme().palette.mollure;
 
   const assignedServices = React.useMemo(
     () =>
@@ -48,18 +47,36 @@ export default function TeamMemberAssignedServicesPanel({
       setSelectedServiceId("");
       return;
     }
-
-    if (!assignedServices.some((service) => service.serviceId === selectedServiceId)) {
+    if (!assignedServices.some((s) => s.serviceId === selectedServiceId)) {
       setSelectedServiceId(assignedServices[0]?.serviceId ?? "");
     }
   }, [assignedServices, selectedServiceId]);
 
   const selectedService =
-    assignedServices.find((service) => service.serviceId === selectedServiceId) ??
+    assignedServices.find((s) => s.serviceId === selectedServiceId) ??
     assignedServices[0] ??
     null;
   const spansMultipleCategories =
-    new Set(assignedServices.map((service) => service.categoryId)).size > 1;
+    new Set(assignedServices.map((s) => s.categoryId)).size > 1;
+
+  const removeButton = (
+    serviceId: string | undefined,
+    label: string,
+    mt: number,
+  ) => (
+    <IconButton
+      size="small"
+      aria-label={label}
+      onClick={() => {
+        if (!serviceId) return;
+        onRemoveService(serviceId);
+      }}
+      disabled={disabled || !serviceId}
+      sx={{ color: alpha(m.navy, 0.45), mt }}
+    >
+      <DeleteOutlineRoundedIcon sx={{ fontSize: 20 }} />
+    </IconButton>
+  );
 
   return (
     <Box
@@ -87,99 +104,92 @@ export default function TeamMemberAssignedServicesPanel({
         <Typography sx={{ fontSize: 13, color: alpha(m.navy, 0.5) }}>
           {businessTeamMemberModalCopy.noSelections}
         </Typography>
-      ) : assignedServices.length === 1 ? (
-        <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.75 }}>
-          <Paper
-            elevation={0}
-            sx={{
-              flex: 1,
-              minWidth: 0,
-              borderRadius: "10px",
-              border: `1px solid ${alpha(m.teal, 0.22)}`,
-              px: 1.75,
-              py: 1.35,
-              bgcolor: "#fff",
-              boxShadow: "0 2px 8px rgba(16, 35, 63, 0.06)",
-            }}
-          >
-            <Typography
-              sx={{
-                fontSize: 13.5,
-                fontWeight: 800,
-                color: alpha(m.navy, 0.88),
-                lineHeight: 1.25,
-              }}
-            >
-              {assignedServices[0].label}
-            </Typography>
-            <Typography
-              sx={{
-                fontSize: 11.5,
-                fontWeight: 600,
-                color: alpha(m.navy, 0.48),
-                mt: 0.35,
-              }}
-            >
-              {assignedServices[0].categoryTitle}
-            </Typography>
-          </Paper>
-          <IconButton
-            size="small"
-            aria-label={`Remove ${assignedServices[0].label}`}
-            onClick={() => onRemoveService(assignedServices[0].serviceId)}
-            disabled={disabled}
-            sx={{ color: alpha(m.navy, 0.45), mt: 0.5 }}
-          >
-            <DeleteOutlineRoundedIcon sx={{ fontSize: 20 }} />
-          </IconButton>
-        </Box>
       ) : (
         <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.75 }}>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <MollureLabeledSelect
-              fieldLabel={businessTeamMemberModalCopy.selectServicesLabel}
-              value={selectedServiceId}
-              onChange={(e) => setSelectedServiceId(String(e.target.value ?? ""))}
-              disabled={disabled}
-              sx={{ bgcolor: "#fff", borderRadius: "10px" }}
-            >
-              {assignedServices.map((service) => (
-                <MenuItem key={service.serviceId} value={service.serviceId}>
-                  {spansMultipleCategories
-                    ? `${service.label} (${service.categoryTitle})`
-                    : service.label}
-                </MenuItem>
-              ))}
-            </MollureLabeledSelect>
-            {selectedService ? (
-              <Typography
+          {assignedServices.length === 1 ? (
+            <>
+              <Paper
+                elevation={0}
                 sx={{
-                  mt: 0.75,
-                  px: 0.5,
-                  fontSize: 11.5,
-                  color: alpha(m.navy, 0.58),
+                  flex: 1,
+                  minWidth: 0,
+                  borderRadius: "10px",
+                  border: `1px solid ${alpha(m.teal, 0.22)}`,
+                  px: 1.75,
+                  py: 1.35,
+                  bgcolor: "#fff",
+                  boxShadow: "0 2px 8px rgba(16, 35, 63, 0.06)",
                 }}
               >
-                {selectedService.categoryTitle}
-              </Typography>
-            ) : null}
-          </Box>
-          <IconButton
-            size="small"
-            aria-label={
-              selectedService
-                ? `Remove ${selectedService.label}`
-                : "Remove selected service"
-            }
-            onClick={() => {
-              if (!selectedService) return;
-              onRemoveService(selectedService.serviceId);
-            }}
-            disabled={disabled || !selectedService}
-            sx={{ color: alpha(m.navy, 0.45), mt: 3.25 }}
-          >
-            <DeleteOutlineRoundedIcon sx={{ fontSize: 20 }} />
-          </IconButton>
+                <Typography
+                  sx={{
+                    fontSize: 13.5,
+                    fontWeight: 800,
+                    color: alpha(m.navy, 0.88),
+                    lineHeight: 1.25,
+                  }}
+                >
+                  {assignedServices[0].label}
+                </Typography>
+                <Typography
+                  sx={{
+                    fontSize: 11.5,
+                    fontWeight: 600,
+                    color: alpha(m.navy, 0.48),
+                    mt: 0.35,
+                  }}
+                >
+                  {assignedServices[0].categoryTitle}
+                </Typography>
+              </Paper>
+              {removeButton(
+                assignedServices[0].serviceId,
+                `Remove ${assignedServices[0].label}`,
+                0.5,
+              )}
+            </>
+          ) : (
+            <>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <MollureLabeledSelect
+                  fieldLabel={businessTeamMemberModalCopy.selectServicesLabel}
+                  value={selectedServiceId}
+                  onChange={(e) =>
+                    setSelectedServiceId(String(e.target.value ?? ""))
+                  }
+                  disabled={disabled}
+                  sx={{ bgcolor: "#fff", borderRadius: "10px" }}
+                >
+                  {assignedServices.map((service) => (
+                    <MenuItem key={service.serviceId} value={service.serviceId}>
+                      {spansMultipleCategories
+                        ? `${service.label} (${service.categoryTitle})`
+                        : service.label}
+                    </MenuItem>
+                  ))}
+                </MollureLabeledSelect>
+                {selectedService ? (
+                  <Typography
+                    sx={{
+                      mt: 0.75,
+                      px: 0.5,
+                      fontSize: 11.5,
+                      color: alpha(m.navy, 0.58),
+                    }}
+                  >
+                    {selectedService.categoryTitle}
+                  </Typography>
+                ) : null}
+              </Box>
+              {removeButton(
+                selectedService?.serviceId,
+                selectedService
+                  ? `Remove ${selectedService.label}`
+                  : "Remove selected service",
+                3.25,
+              )}
+            </>
+          )}
         </Box>
       )}
     </Box>

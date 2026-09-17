@@ -8,6 +8,7 @@ import {
 } from "@mui/material";
 import BusinessOutlinedIcon from "@mui/icons-material/BusinessOutlined";
 import { useTheme } from "@mui/material/styles";
+import { mollureBodySx } from "../../../../theme/mollureHierarchy";
 import AdminKpiCard from "../../AdminKpiCard";
 import { AdminLineChart, ADMIN_CHART_COLORS } from "../../AdminCharts";
 import AdminDashboardHeader, {
@@ -48,7 +49,9 @@ export default function AdminDashboardPageView() {
 
       {isError ? (
         <Box sx={{ mb: 1.5, p: 2, borderRadius: 2, bgcolor: tokens.surface }}>
-          <Typography sx={{ fontSize: 13, color: tokens.bodyText }}>
+          <Typography
+            sx={mollureBodySx(tokens.navy, { color: tokens.bodyText })}
+          >
             {(error as { data?: { message?: string } })?.data?.message ||
               "Failed to load dashboard data."}
           </Typography>

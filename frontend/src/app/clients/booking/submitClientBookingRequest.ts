@@ -1,4 +1,6 @@
-import { getApiErrorMessage } from "../../../lib/api-error";
+import { getApiErrorMessage, isApiRequestAborted } from "../../../lib/api-error";
+import { INPUT_LIMITS, parseText } from "../../../lib/inputSchema";
+import { UUID_RE } from "../../../lib/uuid";
 import type { BusinessSetupListing, CreateBookingRequest } from "../../../store/services/businessApi";
 import { parseTimeLabelToMinutes, buildWallClockDateTimeIso } from "./booking-time";
 import { buildClientBookingApiPayload, extractUuidFromSyntheticId, hasProjectBookingContent } from "./clientBookingApi.mapper";
@@ -6,8 +8,41 @@ import type { ClientBookingRecord } from "./clientBookingRecords";
 import { createBookingRef } from "./clientBookingSession";
 import { resolveCreateBookingStatus } from "./resolveCreateBookingStatus";
 
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+function validateBookingPayloadFields(
+  payload: CreateBookingRequest,
+  contactPhone?: string | null,
+): string | null {
+  if (contactPhone != null && contactPhone.trim()) {
+    const phone = parseText(contactPhone, {
+      required: false,
+      label: "Contact number",
+      max: 32,
+    });
+    if (!phone.ok) return phone.error;
+  }
+  if (payload.notes != null && String(payload.notes).trim()) {
+    const notes = parseText(String(payload.notes), {
+      required: false,
+      label: "Notes",
+      min: 0,
+      max: null,
+    });
+    if (!notes.ok) return notes.error;
+  }
+  for (const [field, label, max] of [
+    ["province", "Province", INPUT_LIMITS.textShort],
+    ["municipality", "Municipality", INPUT_LIMITS.textShort],
+    ["street_address", "Street", INPUT_LIMITS.textShort],
+    ["street_number", "Street number", INPUT_LIMITS.streetNumber],
+    ["postal_code", "Postal code", INPUT_LIMITS.postalCode],
+  ] as const) {
+    const raw = payload[field];
+    if (raw == null || !String(raw).trim()) continue;
+    const parsed = parseText(String(raw), { required: false, label, max });
+    if (!parsed.ok) return parsed.error;
+  }
+  return null;
+}
 
 type CreateBookingResult = { data?: { id?: string | number; unique_code?: string | null } | null };
 
@@ -34,7 +69,7 @@ function buildFallbackCreateBookingPayload(
   const catalogServiceId =
     (primaryService as { catalogServiceId?: string | null }).catalogServiceId ?? primaryService.id;
   const resolvedServiceId =
-    (catalogServiceId && UUID_PATTERN.test(catalogServiceId) ? catalogServiceId : null) ??
+    (catalogServiceId && UUID_RE.test(catalogServiceId) ? catalogServiceId : null) ??
     extractUuidFromSyntheticId(catalogServiceId);
 
   return {
@@ -42,7 +77,7 @@ function buildFallbackCreateBookingPayload(
     business_setup_id: shopId,
     service_id: resolvedServiceId,
     team_member_id:
-      primaryService.teamMemberId && UUID_PATTERN.test(primaryService.teamMemberId)
+      primaryService.teamMemberId && UUID_RE.test(primaryService.teamMemberId)
         ? primaryService.teamMemberId
         : extractUuidFromSyntheticId(primaryService.teamMemberId),
     start_time: buildWallClockDateTimeIso(bookingDate, startMinutes),
@@ -158,6 +193,14 @@ export async function submitClientBookingRequest(params: {
     return { ok: false, message: "Booking details are incomplete." };
   }
 
+  const schemaError = validateBookingPayloadFields(
+    payload,
+    params.record.contactPhone,
+  );
+  if (schemaError) {
+    return { ok: false, message: schemaError };
+  }
+
   try {
     const created = await params.createBooking(payload).unwrap();
     const savedBookingRef = created.data?.unique_code ?? payload.unique_code ?? createBookingRef();
@@ -176,9 +219,15 @@ export async function submitClientBookingRequest(params: {
     };
     return { ok: true, record: updated };
   } catch (error) {
+    if (isApiRequestAborted(error)) {
+      return { ok: false, message: "" };
+    }
     return {
       ok: false,
-      message: getApiErrorMessage(error, "Unable to send booking request. Please try again."),
+      message: getApiErrorMessage(
+        error,
+        "Unable to send booking request. Please try again.",
+      ),
     };
   }
 }

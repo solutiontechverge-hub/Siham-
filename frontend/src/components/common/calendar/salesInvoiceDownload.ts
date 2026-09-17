@@ -1,8 +1,5 @@
 import type { SalesOverviewCardData } from "./salesOverview.types";
-
-function roundMoney(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
-}
+import { roundBookingMoney as roundMoney } from "../../../data/bookingLinePricing";
 
 export async function downloadSalesInvoicePdf(card: SalesOverviewCardData) {
   const { jsPDF } = await import("jspdf");

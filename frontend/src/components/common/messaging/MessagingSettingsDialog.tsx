@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Box, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import { mollureLabelSx } from "../../../theme/mollureHierarchy";
 import AppModal from "../AppModal";
 import MessagingFilterCheckboxList from "./MessagingFilterCheckboxList";
 import { MESSAGE_RETENTION_DAYS } from "./messagingRetention";
@@ -56,13 +57,11 @@ function SettingsContent({
   return (
     <>
       <Typography
-        sx={{
-          fontSize: 12.5,
-          fontWeight: 800,
+        sx={mollureLabelSx(m.navy, {
           color: alpha(m.navy, 0.55),
           mb: 1,
           mt: 0.5,
-        }}
+        })}
       >
         Status
       </Typography>
@@ -114,13 +113,11 @@ function SettingsContent({
       </Stack>
 
       <Typography
-        sx={{
-          fontSize: 12.5,
-          fontWeight: 800,
+        sx={mollureLabelSx(m.navy, {
           color: alpha(m.navy, 0.55),
           mb: 1,
           mt: 0.75,
-        }}
+        })}
       >
         Auto delete messages of
       </Typography>

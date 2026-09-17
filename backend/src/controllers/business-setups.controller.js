@@ -13,6 +13,7 @@ import {
   getReviewAggregatesForSetups,
   getTeamMemberReviewAggregatesForSetups,
 } from "../services/review.service.js";
+import { logError, sendCaughtError } from "../utils/httpError.js";
 
 function parseJsonField(value, fallback = {}) {
   if (value == null) return fallback;
@@ -201,11 +202,7 @@ export const getSetupAvailabilityForDate = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch setup availability.",
-      data: { error: error.message },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to fetch setup availability." });
   }
 };
 
@@ -257,11 +254,7 @@ export const getPublicBusinessHoursForSetup = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch public business hours.",
-      data: { error: error.message },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to fetch public business hours." });
   }
 };
 
@@ -408,12 +401,6 @@ export const listAllBusinessSetups = async (req, res) => {
       }),
     );
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch business setups.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to fetch business setups." });
   }
 };

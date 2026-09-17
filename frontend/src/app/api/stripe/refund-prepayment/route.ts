@@ -3,10 +3,17 @@ import { getStripe } from "../../../../lib/stripe/server";
 
 export const dynamic = "force-dynamic";
 
+const BOOKING_REF_RE = /^[A-Za-z0-9][A-Za-z0-9._:#-]{0,119}$/;
+const MAX_AMOUNT_EUR = 50_000;
+
 type RefundPrepaymentBody = {
-  bookingRef?: string;
-  amount?: number;
+  bookingRef?: unknown;
+  amount?: unknown;
 };
+
+function reject(message: string) {
+  return NextResponse.json({ error: message }, { status: 400 });
+}
 
 /**
  * Refund unused prepayment after cancellation fee is withheld.
@@ -14,20 +21,28 @@ type RefundPrepaymentBody = {
  */
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as RefundPrepaymentBody;
-    const bookingRef = body.bookingRef?.trim();
-    const amountEur = typeof body.amount === "number" ? body.amount : Number(body.amount);
-
-    if (!bookingRef) {
-      return NextResponse.json({ error: "Missing booking reference." }, { status: 400 });
-    }
-    if (!Number.isFinite(amountEur) || amountEur <= 0) {
-      return NextResponse.json({ error: "Invalid refund amount." }, { status: 400 });
+    let body: RefundPrepaymentBody;
+    try {
+      body = (await request.json()) as RefundPrepaymentBody;
+    } catch {
+      return reject("Invalid JSON body.");
     }
 
-    const amountCents = Math.round(amountEur * 100);
+    if (typeof body.bookingRef !== "string" || !BOOKING_REF_RE.test(body.bookingRef.trim())) {
+      return reject("bookingRef is required and must be 1–120 safe characters.");
+    }
+    const bookingRef = body.bookingRef.trim();
+
+    if (typeof body.amount !== "number" || !Number.isFinite(body.amount)) {
+      return reject("amount must be a finite number.");
+    }
+    if (body.amount <= 0 || body.amount > MAX_AMOUNT_EUR) {
+      return reject(`amount must be between 0 and ${MAX_AMOUNT_EUR}.`);
+    }
+
+    const amountCents = Math.round(body.amount * 100);
     if (amountCents < 1) {
-      return NextResponse.json({ error: "Refund amount too small." }, { status: 400 });
+      return reject("Refund amount too small.");
     }
 
     const stripe = getStripe();
@@ -68,8 +83,7 @@ export async function POST(request: Request) {
       status: refund.status,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Refund failed.";
     console.error("[stripe/refund-prepayment]", err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Refund failed." }, { status: 500 });
   }
 }

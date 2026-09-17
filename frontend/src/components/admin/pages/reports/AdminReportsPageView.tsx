@@ -28,6 +28,12 @@ import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { alpha, useTheme } from "@mui/material/styles";
 import {
+  mollureSectionTitleSx,
+  mollureLabelSx,
+  mollureBodySx,
+  mollureBodyMutedSx,
+} from "../../../../theme/mollureHierarchy";
+import {
   AppButton,
   AppPagination,
   AppSearchField,
@@ -74,12 +80,12 @@ function UserCell({ user }: { user: ReportRow["reporter"] }) {
       </Avatar>
       <Box sx={{ minWidth: 0 }}>
         <Typography
-          sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}
+          sx={mollureLabelSx(tokens.navy, { fontWeight: 600, color: tokens.navy })}
           noWrap
         >
           {user.name}
         </Typography>
-        <Typography sx={{ fontSize: 10.5, color: tokens.slate }} noWrap>
+        <Typography sx={mollureBodyMutedSx(tokens.navy, { fontSize: 10.5, color: tokens.slate })} noWrap>
           {user.email}
         </Typography>
       </Box>
@@ -144,14 +150,7 @@ function ReportDetailContent({
   const renderUserBlock = (label: string, user: ReportRow["reporter"]) => (
     <Box>
       <Typography
-        sx={{
-          fontSize: 11,
-          fontWeight: 600,
-          color: tokens.slate,
-          mb: 1,
-          textTransform: "uppercase",
-          letterSpacing: "0.04em",
-        }}
+        sx={mollureLabelSx(tokens.navy, { fontSize: 11, fontWeight: 600, color: tokens.slate, mb: 1, textTransform: "uppercase", letterSpacing: "0.04em" })}
       >
         {label}
       </Typography>
@@ -172,17 +171,17 @@ function ReportDetailContent({
         <Box sx={{ minWidth: 0 }}>
           <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.25 }}>
             <Typography
-              sx={{ fontSize: 13, fontWeight: 600, color: tokens.navy }}
+              sx={mollureLabelSx(tokens.navy, { fontWeight: 600, color: tokens.navy })}
               noWrap
             >
               {user.name}
             </Typography>
             <UserTypeBadge type={user.type} />
           </Stack>
-          <Typography sx={{ fontSize: 12, color: tokens.bodyText }} noWrap>
+          <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText })} noWrap>
             {user.email}
           </Typography>
-          <Typography sx={{ fontSize: 12, color: tokens.bodyText }} noWrap>
+          <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText })} noWrap>
             {user.phone}
           </Typography>
         </Box>
@@ -196,7 +195,7 @@ function ReportDetailContent({
         <Stack direction="row" alignItems="center" spacing={1}>
           <InfoOutlinedIcon sx={{ fontSize: 18, color: tokens.teal }} />
           <Typography
-            sx={{ fontSize: 15, fontWeight: 600, color: tokens.navy }}
+            sx={mollureSectionTitleSx(tokens.navy, { fontWeight: 600, color: tokens.navy })}
           >
             Report Details
           </Typography>
@@ -204,7 +203,7 @@ function ReportDetailContent({
         <StatusBadge status={report.status} />
       </Stack>
 
-      <Typography sx={{ fontSize: 12, color: tokens.slate, fontWeight: 500 }}>
+      <Typography sx={mollureBodyMutedSx(tokens.navy, { fontWeight: 500, color: tokens.slate })}>
         Report ID #{report.reportId}
       </Typography>
 
@@ -235,40 +234,26 @@ function ReportDetailContent({
 
       <Box>
         <Typography
-          sx={{
-            fontSize: 11,
-            fontWeight: 600,
-            color: tokens.slate,
-            mb: 0.75,
-            textTransform: "uppercase",
-            letterSpacing: "0.04em",
-          }}
+          sx={mollureLabelSx(tokens.navy, { fontSize: 11, fontWeight: 600, color: tokens.slate, mb: 0.75, textTransform: "uppercase", letterSpacing: "0.04em" })}
         >
           Reason
         </Typography>
-        <Typography sx={{ fontSize: 13, fontWeight: 600, color: tokens.navy }}>
+        <Typography sx={mollureLabelSx(tokens.navy, { fontWeight: 600, color: tokens.navy })}>
           {report.reasonCategory}
         </Typography>
-        <Typography sx={{ fontSize: 12, color: tokens.bodyText, mt: 0.5 }}>
+        <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText, mt: 0.5 })}>
           {report.reasonDescription}
         </Typography>
       </Box>
 
       <Box>
         <Typography
-          sx={{
-            fontSize: 11,
-            fontWeight: 600,
-            color: tokens.slate,
-            mb: 0.75,
-            textTransform: "uppercase",
-            letterSpacing: "0.04em",
-          }}
+          sx={mollureLabelSx(tokens.navy, { fontSize: 11, fontWeight: 600, color: tokens.slate, mb: 0.75, textTransform: "uppercase", letterSpacing: "0.04em" })}
         >
           Additional Details
         </Typography>
         <Typography
-          sx={{ fontSize: 12, color: tokens.bodyText, lineHeight: 1.55 }}
+          sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText, lineHeight: 1.55 })}
         >
           {report.additionalDetails}
         </Typography>
@@ -278,11 +263,11 @@ function ReportDetailContent({
         <CalendarTodayOutlinedIcon sx={{ fontSize: 16, color: tokens.slate }} />
         <Box>
           <Typography
-            sx={{ fontSize: 11, fontWeight: 600, color: tokens.slate }}
+            sx={mollureLabelSx(tokens.navy, { fontSize: 11, fontWeight: 600, color: tokens.slate })}
           >
             Date Reported
           </Typography>
-          <Typography sx={{ fontSize: 12, color: tokens.navy }}>
+          <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.navy })}>
             {formatDisplayDate(report.date)} · {report.time}
           </Typography>
         </Box>
@@ -462,12 +447,12 @@ export default function AdminReportsPageView({
       render: (r) => (
         <Box>
           <Typography
-            sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}
+            sx={mollureLabelSx(tokens.navy, { fontWeight: 600, color: tokens.navy })}
           >
             {r.reasonCategory}
           </Typography>
           <Typography
-            sx={{ fontSize: 11, color: tokens.bodyText, mt: 0.25 }}
+            sx={mollureBodyMutedSx(tokens.navy, { fontSize: 11, color: tokens.bodyText, mt: 0.25 })}
             noWrap
           >
             {r.reasonDescription}
@@ -481,10 +466,10 @@ export default function AdminReportsPageView({
       minWidth: 120,
       render: (r) => (
         <Box>
-          <Typography sx={{ fontSize: 12, color: tokens.navy }}>
+          <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.navy })}>
             {formatDisplayDate(r.date)}
           </Typography>
-          <Typography sx={{ fontSize: 10.5, color: tokens.slate }}>
+          <Typography sx={mollureBodyMutedSx(tokens.navy, { fontSize: 10.5, color: tokens.slate })}>
             {r.time}
           </Typography>
         </Box>
@@ -556,20 +541,15 @@ export default function AdminReportsPageView({
             <Typography
               component={Link}
               href="/admin/dashboard"
-              sx={{
-                fontSize: 12,
-                color: tokens.bodyText,
-                textDecoration: "none",
-                "&:hover": { color: tokens.teal },
-              }}
+              sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText, textDecoration: "none", "&:hover": { color: tokens.teal } })}
             >
               Home
             </Typography>
-            <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>
+            <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText })}>
               /
             </Typography>
             <Typography
-              sx={{ fontSize: 12, color: tokens.navy, fontWeight: 500 }}
+              sx={mollureBodyMutedSx(tokens.navy, { fontWeight: 500, color: tokens.navy })}
             >
               Reports
             </Typography>
@@ -594,7 +574,7 @@ export default function AdminReportsPageView({
                 Reports
               </Typography>
               <Typography
-                sx={{ fontSize: 14, color: tokens.bodyText, maxWidth: 640 }}
+                sx={mollureBodySx(tokens.navy, { color: tokens.bodyText, maxWidth: 640 })}
               >
                 Review and manage reports submitted by clients and
                 professionals.
@@ -738,7 +718,7 @@ export default function AdminReportsPageView({
                 alignItems={{ sm: "center" }}
                 justifyContent="space-between"
               >
-                <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>
+                <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText })}>
                   Showing{" "}
                   {filteredReports.length === 0 ? 0 : (page - 1) * pageSize + 1}{" "}
                   to {Math.min(page * pageSize, filteredReports.length)} of{" "}
@@ -823,13 +803,13 @@ export default function AdminReportsPageView({
             />
             <Box>
               <Typography
-                sx={{ fontSize: 14, fontWeight: 600, color: tokens.navy }}
+                sx={mollureLabelSx(tokens.navy, { fontWeight: 600, color: tokens.navy })}
               >
                 Are you sure you want to delete this report?
               </Typography>
               {deleteTarget ? (
                 <Typography
-                  sx={{ fontSize: 13, color: tokens.bodyText, mt: 0.75 }}
+                  sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText, mt: 0.75 })}
                 >
                   Report <strong>#{deleteTarget.reportId}</strong> (
                   {deleteTarget.reporter.name} â†’ {deleteTarget.reported.name})

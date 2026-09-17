@@ -1,20 +1,13 @@
 "use client";
 
 import * as React from "react";
-import {
-  Box,
-  FormControlLabel,
-  Radio,
-  RadioGroup,
-  Typography,
-} from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
-import AppModal, {
-  MessagingModalCancelButton,
-  MessagingModalPrimaryButton,
-} from "../AppModal";
+import { Box } from "@mui/material";
+import MessagingDangerModal from "./MessagingDangerModal";
+import MessagingDeleteScopeRadios, {
+  type MessagingDeleteScopeOption,
+} from "./MessagingDeleteScopeRadios";
 
-export type MessagingMessageDeleteScope = "me" | "everyone";
+export type MessagingMessageDeleteScope = MessagingDeleteScopeOption;
 
 type Props = {
   open: boolean;
@@ -31,7 +24,6 @@ export default function MessagingDeleteMessageDialog({
   canDeleteForEveryone,
   embedded = false,
 }: Props) {
-  const m = useTheme().palette.mollure;
   const [scope, setScope] = React.useState<MessagingMessageDeleteScope>("me");
 
   React.useEffect(() => {
@@ -39,85 +31,25 @@ export default function MessagingDeleteMessageDialog({
   }, [canDeleteForEveryone, open]);
 
   return (
-    <AppModal
-      contentSx={{ px: 2.5 }}
-      footerVariant="actions"
-      headerTone="danger"
+    <MessagingDangerModal
       open={open}
-      title="Delete this message?"
       onClose={onClose}
+      title="Delete this message?"
       embedded={embedded}
       maxWidth="xs"
-      footer={
-        <>
-          <MessagingModalCancelButton onClick={onClose} />
-          <MessagingModalPrimaryButton
-            label="Delete"
-            onClick={() => {
-              onConfirm(scope);
-              onClose();
-            }}
-          />
-        </>
-      }
+      onPrimary={() => {
+        onConfirm(scope);
+        onClose();
+      }}
     >
       <Box sx={{ py: 1 }}>
-        <RadioGroup
+        <MessagingDeleteScopeRadios
           value={scope}
-          onChange={(_, value) =>
-            setScope(value as MessagingMessageDeleteScope)
-          }
-        >
-          <FormControlLabel
-            value="me"
-            control={
-              <Radio
-                size="small"
-                sx={{
-                  color: alpha(m.navy, 0.35),
-                  "&.Mui-checked": { color: m.teal },
-                }}
-              />
-            }
-            label={
-              <Typography
-                sx={{
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: alpha(m.navy, 0.72),
-                }}
-              >
-                Delete for me
-              </Typography>
-            }
-          />
-          {canDeleteForEveryone ? (
-            <FormControlLabel
-              value="everyone"
-              control={
-                <Radio
-                  size="small"
-                  sx={{
-                    color: alpha(m.navy, 0.35),
-                    "&.Mui-checked": { color: m.teal },
-                  }}
-                />
-              }
-              label={
-                <Typography
-                  sx={{
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: alpha(m.navy, 0.72),
-                  }}
-                >
-                  Delete for everyone
-                </Typography>
-              }
-            />
-          ) : null}
-        </RadioGroup>
+          onChange={setScope}
+          showEveryone={canDeleteForEveryone}
+          labelOpacity={0.72}
+        />
       </Box>
-    </AppModal>
+    </MessagingDangerModal>
   );
 }

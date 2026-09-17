@@ -2,6 +2,12 @@ import type {
   ClientRecord,
   MollureDirectoryRow,
 } from "../../../app/professionals/fixed-location/client/data/clientList";
+import type {
+  FinanceInvoiceProduct,
+  FinanceInvoiceService,
+} from "../../common/finance-documents/useFinanceInvoiceSettings";
+
+export const STEPS = ["Client", "Items", "Payment", "Summary"] as const;
 
 export type ManualEntryClientMode = "list" | "platform" | "guest";
 
@@ -71,6 +77,62 @@ export function parseFinancePrice(price: string): number {
   const normalized = price.replace(/[^\d.,-]/g, "").replace(",", ".");
   const value = Number.parseFloat(normalized);
   return Number.isFinite(value) ? value : 0;
+}
+
+/** Minimal setup-service shape used when mapping catalog item options. */
+export type ManualEntrySetupService = {
+  id: string;
+  service_title?: string | null;
+  category_title?: string | null;
+  price?: string | number | null;
+};
+
+/** Maps invoice-settings (+ optional setup services) into catalog drawer options. */
+export function buildManualEntryCatalogOptions(input: {
+  products: readonly FinanceInvoiceProduct[];
+  services: readonly FinanceInvoiceService[];
+  uniqueItems?: readonly FinanceInvoiceProduct[] | null;
+  setupServices?: readonly ManualEntrySetupService[] | null;
+}): {
+  productOptions: ManualEntryCatalogOption[];
+  itemOptions: ManualEntryCatalogOption[];
+  uniqueItemOptions: ManualEntryCatalogOption[];
+} {
+  const productOptions = input.products.map((product) => ({
+    id: product.id,
+    label: product.name,
+    unitPrice: parseFinancePrice(product.price),
+    vat: product.vat,
+  }));
+
+  const setupServices = input.setupServices ?? [];
+  const itemOptions =
+    setupServices.length > 0
+      ? setupServices.map((service) => ({
+          id: service.id,
+          label: service.service_title || service.category_title || "Service",
+          unitPrice: parseFinancePrice(String(service.price ?? "")),
+        }))
+      : input.services.map((service) => ({
+          id: service.id,
+          label: service.service
+            ? `${service.category} - ${service.service}`
+            : service.category,
+          unitPrice: 0,
+          vat: service.vat,
+        }));
+
+  const uniqueItemOptions = (input.uniqueItems ?? []).map((item) => ({
+    id: item.id,
+    label: item.name,
+    unitPrice: parseFinancePrice(item.price),
+    vat: item.vat,
+    unit: item.unit,
+    discountType: item.discountType,
+    discountAmount: item.discountAmount,
+  }));
+
+  return { productOptions, itemOptions, uniqueItemOptions };
 }
 
 export function calculateManualEntryDiscountAmount(

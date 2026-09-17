@@ -1,7 +1,8 @@
 "use client";
 
-import ProfessionalFixedLocationSetup from "../../../../components/common/ProfessionalFixedLocationSetup";
+import dynamic from "next/dynamic";
 import { useSnackbar } from "../../../../components/common/AppSnackbar";
+import DynamicChunkFallback from "../../../../components/common/DynamicChunkFallback";
 import { getApiErrorMessage } from "../../../../lib/api-error";
 import { fixedLocationPageData } from "../../fixed-location/fixedLocation.data";
 import {
@@ -14,6 +15,11 @@ import {
   useUploadBusinessMediaMutation,
   useUpsertBusinessSetupMutation,
 } from "../../../../store/services/businessApi";
+
+const ProfessionalFixedLocationSetup = dynamic(
+  () => import("../../../../components/common/ProfessionalFixedLocationSetup"),
+  { ssr: false, loading: () => <DynamicChunkFallback /> },
+);
 
 export default function ProfessionalsProfilePage() {
   const { data } = useGetProfileQuery();

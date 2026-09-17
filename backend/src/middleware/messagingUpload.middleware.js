@@ -18,6 +18,8 @@ const ALLOWED_MIME = new Set([
   "application/vnd.ms-excel",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "text/csv",
+  // Browsers sometimes omit or generic-type Office parts
+  "application/octet-stream",
 ]);
 
 const ALLOWED_EXT = new Set([
@@ -46,6 +48,10 @@ export const messagingUpload = multer({
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname || "").toLowerCase();
     if (!ALLOWED_EXT.has(ext)) {
+      return cb(new Error("Unsupported file type for messaging attachments."));
+    }
+    const mime = String(file.mimetype || "").toLowerCase();
+    if (mime && !ALLOWED_MIME.has(mime)) {
       return cb(new Error("Unsupported file type for messaging attachments."));
     }
     return cb(null, true);

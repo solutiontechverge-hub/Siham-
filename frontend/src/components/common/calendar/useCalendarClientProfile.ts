@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useSnackbar } from "../AppSnackbar";
 import { getApiErrorMessage } from "../../../lib/api-error";
+import { INPUT_LIMITS, parseText } from "../../../lib/inputSchema";
 import { mapApiProfessionalClientToRecord } from "../../../app/professionals/fixed-location/client/mapApiProfessionalClient";
 import type { ClientRecord } from "../../../app/professionals/fixed-location/client/data/clientList";
 import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
@@ -196,10 +197,23 @@ export function useCalendarClientProfile(
   const saveClientTechnicalNote = React.useCallback(
     async (note: string) => {
       if (!viewClientId) return;
+      const parsed = parseText(note, {
+        required: false,
+        label: "Technical note",
+        min: INPUT_LIMITS.notesMin,
+        max: null,
+      });
+      if (!parsed.ok) {
+        showSnackbar({
+          severity: "error",
+          message: parsed.error,
+        });
+        return;
+      }
       try {
         await updateProfessionalClientTechnicalNote({
           id: viewClientId,
-          technical_note: note.trim(),
+          technical_note: parsed.value,
         }).unwrap();
         showSnackbar({
           severity: "success",

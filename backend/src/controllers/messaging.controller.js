@@ -14,6 +14,7 @@ import {
 import { emitMessagingMessage, emitMessagingMessageDeleted, emitMessagingThreadRead } from "../messaging/messagingSocket.js";
 import { saveMessagingAttachments } from "../services/messaging-upload.service.js";
 import { buildPaginationMeta, parseListPagination } from "../utils/pagination.js";
+import { sendCaughtError } from "../utils/httpError.js";
 
 export const uploadMessagingAttachments = async (req, res) => {
   try {
@@ -33,11 +34,7 @@ export const uploadMessagingAttachments = async (req, res) => {
       data: { attachments },
     });
   } catch (error) {
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Failed to upload attachments.",
-      data: null,
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to upload attachments." });
   }
 };
 
@@ -50,11 +47,7 @@ export const getMessagingInbox = async (req, res) => {
       data,
     });
   } catch (error) {
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Failed to fetch messaging inbox.",
-      data: null,
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to fetch messaging inbox." });
   }
 };
 
@@ -75,11 +68,7 @@ export const openMessagingForBooking = async (req, res) => {
       data,
     });
   } catch (error) {
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Failed to open conversation for booking.",
-      data: null,
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to open conversation for booking." });
   }
 };
 
@@ -108,11 +97,7 @@ export const getMessagingProfessionals = async (req, res) => {
       }),
     });
   } catch (error) {
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Failed to fetch professionals.",
-      data: null,
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to fetch professionals." });
   }
 };
 
@@ -126,11 +111,7 @@ export const getMessagingThreadMessages = async (req, res) => {
       data: { threadId, messages },
     });
   } catch (error) {
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Failed to fetch messages.",
-      data: null,
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to fetch messages." });
   }
 };
 
@@ -151,11 +132,7 @@ export const postMessagingMessage = async (req, res) => {
       data: result,
     });
   } catch (error) {
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Failed to send message.",
-      data: null,
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to send message." });
   }
 };
 
@@ -176,11 +153,7 @@ export const removeMessagingMessage = async (req, res) => {
       data: result,
     });
   } catch (error) {
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Failed to delete message.",
-      data: null,
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to delete message." });
   }
 };
 
@@ -195,11 +168,7 @@ export const markMessagingThreadRead = async (req, res) => {
       data: result,
     });
   } catch (error) {
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Failed to mark thread as read.",
-      data: null,
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to mark thread as read." });
   }
 };
 
@@ -214,11 +183,7 @@ export const clearMessagingThread = async (req, res) => {
       data: result,
     });
   } catch (error) {
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Failed to clear chat.",
-      data: null,
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to clear chat." });
   }
 };
 
@@ -232,11 +197,7 @@ export const getMessagingLinkableBookings = async (req, res) => {
       data,
     });
   } catch (error) {
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Failed to fetch linkable bookings.",
-      data: null,
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to fetch linkable bookings." });
   }
 };
 
@@ -251,10 +212,6 @@ export const postMessagingLinkBooking = async (req, res) => {
       data,
     });
   } catch (error) {
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Failed to link conversation to booking.",
-      data: null,
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to link conversation to booking." });
   }
 };

@@ -1,6 +1,9 @@
 "use client";
 
+import { mollureBodySx } from "../../../theme/mollureHierarchy";
+
 import AppButton from "../AppButton";
+import { ModalCancelApplyFooter } from "../FinanceDrawerFooter";
 import * as React from "react";
 import { Box, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -127,30 +130,7 @@ export default function CalendarDesignModal({
       maxWidth="sm"
       fullWidth
       footer={
-        <Box sx={{ px: 2.5, py: 2 }}>
-          <Stack direction="row" justifyContent="flex-end" spacing={1.25}>
-            <AppButton
-              tone="secondary"
-              onClick={onClose}
-              sx={{
-                height: 38,
-                minWidth: 110,
-              }}
-            >
-              Cancel
-            </AppButton>
-            <AppButton
-              tone="primary"
-              onClick={onApply}
-              sx={{
-                height: 38,
-                minWidth: 110,
-              }}
-            >
-              Apply
-            </AppButton>
-          </Stack>
-        </Box>
+        <ModalCancelApplyFooter onCancel={onClose} onPrimary={onApply} />
       }
     >
       <Box sx={{ px: 2.5, py: 2 }}>
@@ -230,11 +210,7 @@ export default function CalendarDesignModal({
                   }}
                 >
                   <BodyText
-                    sx={{
-                      fontSize: 12.5,
-                      fontWeight: 700,
-                      color: alpha(m.navy, 0.7),
-                    }}
+                    sx={mollureBodySx(m.navy, { color: alpha(m.navy, 0.7) })}
                   >
                     {row.label}
                   </BodyText>

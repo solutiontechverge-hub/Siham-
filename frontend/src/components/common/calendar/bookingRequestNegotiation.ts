@@ -151,6 +151,21 @@ export function resolveLineChangeTags(
 }
 
 /**
+ * Computed Added/Cancelled only while editing an existing booking (or awaiting
+ * approval). Create / first-view must not treat catalog lines as Added.
+ */
+export function allowComputedServiceAddCancelTags(input: {
+  hasExistingBooking: boolean;
+  isEditingExisting: boolean;
+  awaitingLineApproval: boolean;
+}) {
+  return (
+    input.hasExistingBooking &&
+    (input.isEditingExisting || input.awaitingLineApproval)
+  );
+}
+
+/**
  * Per-line tag for bundled edit changes.
  * Cancelled > added > edited. Pending is appended when awaiting approval.
  */
@@ -237,14 +252,21 @@ export function getProductEditTag(
   return null;
 }
 
+function clockHmPart(value?: string | null) {
+  return String(value ?? "").trim().slice(0, 5);
+}
+
 function serviceSignature(service: CalendarBookingServiceItem) {
   return JSON.stringify({
     name: service.name,
-    price: service.price,
-    durationMins: service.durationMins,
-    startTime: service.startTime ?? "",
-    endTime: service.endTime ?? "",
-    staffResourceId: service.staffResourceId ?? "",
+    price: Number(service.price) || 0,
+    durationMins: Number(service.durationMins) || 0,
+    startTime: clockHmPart(service.startTime),
+    endTime: clockHmPart(service.endTime),
+    // Normalize FL staff fields so teamMemberId-only lines are not false-Edited.
+    staffResourceId: String(
+      service.staffResourceId ?? service.teamMemberId ?? "",
+    ).trim(),
   });
 }
 
@@ -334,9 +356,11 @@ export function flattenBookingProducts(input: {
 function serviceContentSignature(service: CalendarBookingServiceItem) {
   return JSON.stringify({
     name: service.name,
-    price: service.price,
-    durationMins: service.durationMins,
-    staffResourceId: service.staffResourceId ?? service.teamMemberId ?? "",
+    price: Number(service.price) || 0,
+    durationMins: Number(service.durationMins) || 0,
+    staffResourceId: String(
+      service.staffResourceId ?? service.teamMemberId ?? "",
+    ).trim(),
     guestId: service.guestId ?? "",
   });
 }
@@ -773,14 +797,17 @@ export function detectServiceLineChanges(
   originalServices: readonly CalendarBookingServiceItem[],
   currentServices: readonly CalendarBookingServiceItem[],
 ) {
-  const originalById = new Map(originalServices.map((service) => [service.id, service]));
-  const currentIds = new Set(currentServices.map((service) => service.id));
+  // Key by guestId:id — client + guest often share the same catalog service id.
+  const originalByKey = new Map(
+    originalServices.map((service) => [serviceLineKey(service), service]),
+  );
+  const currentKeys = new Set(currentServices.map(serviceLineKey));
   const added: string[] = [];
   const edited: string[] = [];
   const cancelled: string[] = [];
 
   for (const service of currentServices) {
-    const original = originalById.get(service.id);
+    const original = originalByKey.get(serviceLineKey(service));
     if (!original) added.push(service.id);
     else if (serviceSignature(original) !== serviceSignature(service)) {
       edited.push(service.id);
@@ -788,7 +815,7 @@ export function detectServiceLineChanges(
   }
 
   for (const original of originalServices) {
-    if (!currentIds.has(original.id)) cancelled.push(original.id);
+    if (!currentKeys.has(serviceLineKey(original))) cancelled.push(original.id);
   }
 
   return {

@@ -6,6 +6,9 @@ import { fixedLocationPageData } from "../app/professionals/fixed-location/fixed
 import type { ServiceCategorySliderIconId } from "./businessServiceCategorySlider.data";
 import { resolveServiceCategorySliderIconId } from "./businessServiceCategorySlider.data";
 import { applyBusinessServiceDiscount } from "./businessServiceModal.data";
+import { DESIRED_LOCATION_MUNICIPALITY_OPTIONS } from "./netherlandsLocations.data";
+
+export { DESIRED_LOCATION_MUNICIPALITY_OPTIONS };
 
 export type BusinessPublicProfileService = {
   id: string;
@@ -202,7 +205,7 @@ export type BusinessPublicProfileData = {
 const defaultAbout =
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
 
-const defaultSchedule: BusinessPublicProfileScheduleDay[] = [
+export const DEFAULT_PUBLIC_PROFILE_SCHEDULE: BusinessPublicProfileScheduleDay[] = [
   { day: "Monday", slots: "10:00 AM – 8:00 PM" },
   { day: "Tuesday", slots: "10:00 AM – 8:00 PM" },
   { day: "Wednesday", slots: "10:00 AM – 8:00 PM" },
@@ -212,12 +215,16 @@ const defaultSchedule: BusinessPublicProfileScheduleDay[] = [
   { day: "Sunday", slots: "Closed" },
 ];
 
+const defaultSchedule = DEFAULT_PUBLIC_PROFILE_SCHEDULE;
+
 function formatScheduleOptionLabel(day: string, slots: string) {
   const normalized = slots.replace(/\s*–\s*/g, " - ").trim();
   return `${day}(${normalized})`;
 }
 
-function buildScheduleOptions(weeklySchedule: BusinessPublicProfileScheduleDay[]): BusinessPublicProfileScheduleOption[] {
+export function buildScheduleOptions(
+  weeklySchedule: BusinessPublicProfileScheduleDay[],
+): BusinessPublicProfileScheduleOption[] {
   const today: BusinessPublicProfileScheduleOption = {
     id: "today",
     label: "Today(8:00 - 18:00)",
@@ -475,16 +482,6 @@ export function buildDesiredMunicipalityList(desired: BusinessPublicProfileDesir
 
   return municipalities;
 }
-
-/** Same municipality set used on professional Desired Location setup dropdowns. */
-export const DESIRED_LOCATION_MUNICIPALITY_OPTIONS = [
-  "Amsterdam",
-  "Rotterdam",
-  "Utrecht",
-  "Haarlem",
-  "Groningen",
-  "Eindhoven",
-] as const;
 
 const PROVINCE_MUNICIPALITIES: Record<string, readonly string[]> = {
   Drenthe: ["Assen", "Emmen", "Hoogeveen", "Meppel", "Coevorden"],
@@ -780,4 +777,61 @@ export function getTeamForLocationMode(
 
 export function categoryIconIdForLabel(label: string): ServiceCategorySliderIconId {
   return resolveServiceCategorySliderIconId(label);
+}
+
+export const businessPublicProfileUiCopy = {
+  defaultPageTitle: "Profile",
+  defaultPublicProfileTitle: "Public Profile",
+  scheduleFallbackLabel: "Today(8:00 - 18:00)",
+  desiredScheduleLabel: "Desired Schedule",
+  fixedScheduleLabel: "Fixed Schedule",
+  emptyValue: "N/A",
+  noReviewsYet: "No reviews yet",
+} as const;
+
+export const POLICY_SECTION_TEMPLATES = [
+  {
+    title: "Prepayment/Response Time",
+    fields: [{ label: "Response Time" }, { label: "Prepayment" }],
+  },
+  {
+    title: "Reschedule",
+    fields: [
+      { label: "Min. Time Before Appointment" },
+      { label: "Late Reschedule Fee" },
+    ],
+  },
+  {
+    title: "Cancellation",
+    fields: [
+      { label: "Min. Time Before Appointment" },
+      { label: "Late Cancellation Fee" },
+    ],
+  },
+  {
+    title: "No show",
+    fields: [{ label: "No show Fee" }],
+  },
+] as const;
+
+export function displayProfileValue(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : businessPublicProfileUiCopy.emptyValue;
+}
+
+export function resolvePolicyFieldValue(
+  sections: BusinessPublicProfileData["policySections"],
+  sectionTitle: string,
+  fieldLabel: string,
+) {
+  return sections
+    .find((item) => item.title === sectionTitle)
+    ?.fields?.find((field) => field.label === fieldLabel)?.value;
+}
+
+export function resolvePolicyDescription(
+  sections: BusinessPublicProfileData["policySections"],
+  sectionTitle: string,
+) {
+  return sections.find((item) => item.title === sectionTitle)?.description;
 }

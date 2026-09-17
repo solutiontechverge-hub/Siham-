@@ -1,10 +1,10 @@
 "use client";
 
-import AppButton from "../../common/AppButton";
 import * as React from "react";
 import { Stack } from "@mui/material";
 import MollureFormField from "../../common/MollureFormField";
 import AppModal from "../../common/AppModal";
+import { ModalCancelApplyFooter } from "../../common/FinanceDrawerFooter";
 import type { ManualEntryLine } from "./manualEntry.data";
 
 type ManualEntryLineEditModalProps = {
@@ -54,19 +54,12 @@ export default function ManualEntryLineEditModal({
       title={line?.kind === "product" ? "Edit Product" : "Edit Item"}
       maxWidth="xs"
       footer={
-        <Stack
-          direction="row"
-          spacing={1}
-          justifyContent="flex-end"
-          sx={{ px: 2.5, py: 2 }}
-        >
-          <AppButton tone="secondary" onClick={onClose}>
-            Cancel
-          </AppButton>
-          <AppButton tone="primary" onClick={handleSave}>
-            Save
-          </AppButton>
-        </Stack>
+        <ModalCancelApplyFooter
+          onCancel={onClose}
+          onPrimary={handleSave}
+          primaryLabel="Save"
+          buttonSx={{}}
+        />
       }
     >
       <Stack spacing={1.5} sx={{ px: 2.5, pb: 2 }}>

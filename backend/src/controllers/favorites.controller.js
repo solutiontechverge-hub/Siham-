@@ -1,4 +1,5 @@
 import { query } from "../db/index.js";
+import { sendCaughtError } from "../utils/httpError.js";
 
 export const listUserFavorites = async (req, res) => {
   try {
@@ -17,11 +18,7 @@ export const listUserFavorites = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to load favorites.",
-      data: { error: error.message },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to load favorites." });
   }
 };
 
@@ -54,11 +51,7 @@ export const putUserFavorites = async (req, res) => {
       data: { businessSetupIds: ids },
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to save favorites.",
-      data: { error: error.message },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to save favorites." });
   }
 };
 
@@ -110,10 +103,6 @@ export const toggleUserFavorite = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to toggle favorite.",
-      data: { error: error.message },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to toggle favorite." });
   }
 };

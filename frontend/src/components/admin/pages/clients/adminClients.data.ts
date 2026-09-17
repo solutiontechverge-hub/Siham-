@@ -10,7 +10,7 @@ export const SORT_OPTIONS: { value: SortOption; label: string }[] = [
 
 export const CLIENT_TYPE_OPTIONS = [
   { value: "IC", label: "Individual (IC)" },
-  { value: "CC", label: "Company (CC)" },
+  { value: "CC", label: "Company (BC)" },
 ];
 
 export const STATUS_STYLES: Record<

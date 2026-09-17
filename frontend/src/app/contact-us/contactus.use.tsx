@@ -3,6 +3,12 @@
 import * as React from "react";
 import { useAppSelector } from "../../store/hooks";
 import { useSubmitContactMessageMutation } from "../../store/services/contactApi";
+import {
+  INPUT_LIMITS,
+  parseEmail,
+  parseText,
+  rejectInvalid,
+} from "../../lib/inputSchema";
 
 export type ContactUsFormValues = {
   persona: string;
@@ -31,26 +37,30 @@ const initialValues: ContactUsFormValues = {
 };
 
 function validate(values: ContactUsFormValues): ContactUsFieldErrors {
-  const errors: ContactUsFieldErrors = {};
+  const parsed = rejectInvalid({
+    persona: parseText(values.persona, {
+      label: "Who you are",
+      max: 64,
+    }),
+    name: parseText(values.name, {
+      label: "Name",
+      max: INPUT_LIMITS.personName,
+    }),
+    email: parseEmail(values.email),
+    subject: parseText(values.subject, {
+      label: "Subject",
+      max: INPUT_LIMITS.subject,
+    }),
+    message: parseText(values.message, {
+      label: "Message",
+      min: INPUT_LIMITS.messageMin,
+      max: INPUT_LIMITS.messageMax,
+    }),
+  });
 
-  if (!values.persona?.trim()) errors.persona = "Please select who you are.";
-
-  if (!values.name.trim()) errors.name = "Please enter your name.";
-
-  if (!values.email.trim()) {
-    errors.email = "Please enter your email.";
-  } else {
-    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim());
-    if (!emailOk) errors.email = "Please enter a valid email address.";
-  }
-
-  if (!values.subject?.trim()) errors.subject = "Please select a subject.";
-
-  if (!values.message.trim()) {
-    errors.message = "Please enter your message.";
-  } else if (values.message.trim().length < 10) {
-    errors.message = "Message should be at least 10 characters.";
-  }
+  const errors: ContactUsFieldErrors = parsed.ok
+    ? {}
+    : { ...parsed.errors };
 
   if (!values.consent)
     errors.consent = "Please accept the privacy policy consent to continue.";

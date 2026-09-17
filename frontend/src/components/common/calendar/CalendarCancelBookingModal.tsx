@@ -1,13 +1,13 @@
 "use client";
 
-import AppButton from "../AppButton";
 import * as React from "react";
-import { Box, Stack, Typography } from "@mui/material";
+import { Box, Stack } from "@mui/material";
 import WarningRoundedIcon from "@mui/icons-material/WarningRounded";
-import { alpha, useTheme } from "@mui/material/styles";
 import AppModal from "../AppModal";
 import AppDropdown from "../AppDropdown";
 import AppTextField from "../AppTextField";
+import ModalConfirmBody from "../ModalConfirmBody";
+import { ModalCancelApplyFooter } from "../FinanceDrawerFooter";
 
 export type CancelBookingPayload = {
   reasons: string[];
@@ -35,7 +35,6 @@ export default function CalendarCancelBookingModal({
   onClose,
   onConfirm,
 }: CalendarCancelBookingModalProps) {
-  const m = useTheme().palette.mollure;
   const [reasons, setReasons] = React.useState<string[]>([]);
   const [details, setDetails] = React.useState("");
 
@@ -54,24 +53,32 @@ export default function CalendarCancelBookingModal({
       maxWidth="sm"
       fullWidth
       headerTone="danger"
+      footer={
+        <ModalCancelApplyFooter
+          onCancel={onClose}
+          onPrimary={() => onConfirm({ reasons, details: details.trim() })}
+          primaryLabel="Yes, Reject"
+          primaryTone="danger"
+          justifyContent="center"
+          buttonSx={{ height: 40, minWidth: 120 }}
+        />
+      }
     >
       <Box sx={{ px: 2.5, py: 2.5 }}>
-        <Stack alignItems="center" spacing={1.25} sx={{ mb: 2 }}>
-          <WarningRoundedIcon sx={{ fontSize: 52, color: "#E85D5D" }} />
-          <Typography
-            sx={{
-              fontWeight: 900,
-              fontSize: 16,
-              color: alpha(m.navy, 0.88),
-              textAlign: "center",
-              lineHeight: 1.4,
-            }}
-          >
-            Are you sure you want to Cancel this booking?
-          </Typography>
-        </Stack>
+        <ModalConfirmBody
+          showWarning
+          icon={
+            <WarningRoundedIcon sx={{ fontSize: 52, color: "#E85D5D" }} />
+          }
+          iconColor="#E85D5D"
+          iconSize={52}
+          py={0}
+          px={0}
+          body="Are you sure you want to Cancel this booking?"
+          bodySx={{ fontSize: 16, lineHeight: 1.4 }}
+        />
 
-        <Stack spacing={1.75}>
+        <Stack spacing={1.75} sx={{ mt: 2 }}>
           <AppDropdown
             label="Reason"
             value={reasons}
@@ -99,30 +106,6 @@ export default function CalendarCancelBookingModal({
             minRows={2}
             fullWidth
           />
-        </Stack>
-      </Box>
-      <Box sx={{ px: 2.5, py: 2 }}>
-        <Stack direction="row" justifyContent="center" spacing={1.5}>
-          <AppButton
-            tone="secondary"
-            onClick={onClose}
-            sx={{
-              height: 40,
-              minWidth: 120,
-            }}
-          >
-            Cancel
-          </AppButton>
-          <AppButton
-            tone="danger"
-            onClick={() => onConfirm({ reasons, details: details.trim() })}
-            sx={{
-              height: 40,
-              minWidth: 120,
-            }}
-          >
-            Yes, Reject
-          </AppButton>
         </Stack>
       </Box>
     </AppModal>
