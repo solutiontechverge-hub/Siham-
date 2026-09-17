@@ -1,10 +1,11 @@
 "use client";
 
-import AppButton from "../../common/AppButton";
 import * as React from "react";
 import { InputAdornment, MenuItem, Stack } from "@mui/material";
 import MollureFormField from "../../common/MollureFormField";
 import AppModal from "../../common/AppModal";
+import { ModalCancelApplyFooter } from "../../common/FinanceDrawerFooter";
+import { BOOKING_CATALOG_DISCOUNT_TYPE_OPTIONS } from "../../../data/bookingUniqueItem.data";
 import type {
   ManualEntryDiscount,
   ManualEntryDiscountType,
@@ -16,14 +17,6 @@ type ManualEntryDiscountModalProps = {
   onClose: () => void;
   onApply: (discount: ManualEntryDiscount) => void;
 };
-
-const DISCOUNT_TYPE_OPTIONS: Array<{
-  value: ManualEntryDiscountType;
-  label: string;
-}> = [
-  { value: "fixed", label: "Fixed discount" },
-  { value: "percentage", label: "Percentage discount" },
-];
 
 export default function ManualEntryDiscountModal({
   open,
@@ -57,19 +50,12 @@ export default function ManualEntryDiscountModal({
       title="Add Discount"
       maxWidth="xs"
       footer={
-        <Stack
-          direction="row"
-          spacing={1}
-          justifyContent="flex-end"
-          sx={{ px: 2.5, py: 2 }}
-        >
-          <AppButton tone="secondary" onClick={onClose}>
-            Cancel
-          </AppButton>
-          <AppButton tone="primary" onClick={handleApply}>
-            Apply
-          </AppButton>
-        </Stack>
+        <ModalCancelApplyFooter
+          onCancel={onClose}
+          onPrimary={handleApply}
+          primaryLabel="Apply"
+          buttonSx={{}}
+        />
       }
     >
       <Stack spacing={1.5} sx={{ px: 2.5, pb: 2 }}>
@@ -88,7 +74,7 @@ export default function ManualEntryDiscountModal({
             },
           }}
         >
-          {DISCOUNT_TYPE_OPTIONS.map((option) => (
+          {BOOKING_CATALOG_DISCOUNT_TYPE_OPTIONS.map((option) => (
             <MenuItem key={option.value} value={option.value}>
               {option.label}
             </MenuItem>

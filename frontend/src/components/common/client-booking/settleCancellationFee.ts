@@ -1,3 +1,5 @@
+import { roundBookingMoney as roundMoney } from "../../../data/bookingLinePricing";
+
 export type CancellationFeeSettlement = {
   bookingTotal: number;
   feePercent: number;
@@ -9,10 +11,6 @@ export type CancellationFeeSettlement = {
   /** True when cancel is inside the professional's minimum notice window. */
   isLateCancellation: boolean;
 };
-
-function roundMoney(value: number) {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
-}
 
 function toNonNegativeNumber(value: number | null | undefined) {
   const n = Number(value);

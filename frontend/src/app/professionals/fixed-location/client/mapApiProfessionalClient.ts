@@ -4,7 +4,7 @@ import type { ApiProfessionalClient } from "../../../../store/services/businessA
 export function mapApiProfessionalClientToRecord(row: ApiProfessionalClient): ClientRecord {
   const tags: ClientRecord["tags"] = [];
   if (row.is_mollure) tags.push("Mollure");
-  if (row.client_kind === "company") tags.push("CC");
+  if (row.client_kind === "company") tags.push("BC");
 
   return {
     id: row.id,

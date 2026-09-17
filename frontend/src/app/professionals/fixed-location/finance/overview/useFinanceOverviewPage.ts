@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { alpha, useTheme } from "@mui/material/styles";
+import { useTheme } from "@mui/material/styles";
+import { mollureMenuItemSx } from "../../../../../components/common/mollureFormSx";
 import {
   getTransactionActionCategory,
   isRefundableTransactionStatus,
@@ -512,13 +513,7 @@ export function useFinanceOverviewPage() {
   );
 
   const addMenuItemSx = React.useMemo(
-    () => ({
-      borderRadius: "8px",
-      fontSize: 12.5,
-      fontWeight: 700,
-      color: alpha(m.navy, 0.75),
-      my: 0.25,
-    }),
+    () => mollureMenuItemSx(m.navy),
     [m.navy],
   );
 

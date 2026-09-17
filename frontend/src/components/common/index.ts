@@ -34,10 +34,12 @@ export {
   default as ClientPlatformTag,
   MollureLogoMark,
   resolveClientPlatformTag,
+  clientPlatformTagToneColors,
 } from "./ClientPlatformTag";
 export type {
   ClientPlatformTagInput,
   ClientPlatformTagState,
+  ClientPlatformTagTone,
 } from "./ClientPlatformTag";
 export { default as AppDatePicker, AppCalendarPanel, normalizeDateToIso } from "./AppDatePicker";
 export { default as AppTimePicker, AppTimePanel, formatTimeDisplay } from "./AppTimePicker";

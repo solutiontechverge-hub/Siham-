@@ -6,21 +6,32 @@ import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import { Box, Divider, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import type { TransactionRow } from "../../../app/professionals/fixed-location/finance/data/transactions";
-import type { ProfessionalProfile, ProfileResponse } from "../../../store/services/profileApi";
+import type { ProfileResponse } from "../../../store/services/profileApi";
 import { useSnackbar } from "../AppSnackbar";
 import { BodyText, SubHeading } from "../../ui/typography";
 import {
+  mollurePageTitleSx,
+  mollureSectionTitleSx,
+} from "../../../theme/mollureHierarchy";
+import {
   formatDocumentDateTime,
   formatPaymentMethod,
+  getProfessionalProfile,
   parseCurrencyValue,
   professionalBusinessInfoLines,
   receiptItemsTitleForStatus,
   receiptNumberLabelForStatus,
   receiptTitleForStatus,
   resolveProfessionalBusinessDisplay,
+  financePreviewCardSx,
   toInvoiceDisplayLineItems,
   type PreviewLineItem,
 } from "./financeDocumentUtils";
+import FinanceInfoBlock from "./FinanceInfoBlock";
+import {
+  FinanceMutedLines,
+  FinancePreviewLabelValueRow,
+} from "./FinancePreviewRows";
 import type { FinanceProfessionalBusinessOverride } from "./financeDocumentTypes";
 import type { FinanceInvoiceTemplateType } from "./useFinanceInvoiceSettings";
 
@@ -34,34 +45,6 @@ type Props = {
   onDownload?: () => void;
 };
 
-function ReceiptMetaRow({ label, value }: { label: string; value: string }) {
-  const m = useTheme().palette.mollure;
-  return (
-    <Stack
-      direction="row"
-      justifyContent="space-between"
-      alignItems="flex-start"
-      spacing={2}
-    >
-      <BodyText
-        sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.55) }}
-      >
-        {label}
-      </BodyText>
-      <BodyText
-        sx={{
-          fontSize: 13,
-          fontWeight: 800,
-          color: alpha(m.navy, 0.82),
-          textAlign: "right",
-        }}
-      >
-        {value}
-      </BodyText>
-    </Stack>
-  );
-}
-
 export default function FinanceReceiptPreview({
   row,
   lineItems,
@@ -73,10 +56,7 @@ export default function FinanceReceiptPreview({
 }: Props) {
   const m = useTheme().palette.mollure;
   const { showSnackbar } = useSnackbar();
-  const professionalProfile =
-    profileData?.user_type === "professional"
-      ? (profileData.profile as ProfessionalProfile | null)
-      : null;
+  const professionalProfile = getProfessionalProfile(profileData);
   const professionalDisplay = resolveProfessionalBusinessDisplay(
     professionalBusinessOverride,
     professionalProfile,
@@ -220,129 +200,70 @@ export default function FinanceReceiptPreview({
   ]);
 
   return (
-    <Box
-      sx={{
-        borderRadius: "10px",
-        border: `1px solid ${alpha(m.navy, 0.1)}`,
-        bgcolor: "#fff",
-        p: 2.5,
-      }}
-    >
-      <SubHeading
-        sx={{
-          fontSize: 20,
-          fontWeight: 900,
-          color: alpha(m.navy, 0.88),
-          mb: 2,
-        }}
-      >
+    <Box sx={financePreviewCardSx(m.navy, 2.5)}>
+      <SubHeading sx={mollurePageTitleSx(m.navy, { mb: 2 })}>
         {receiptTitle}
       </SubHeading>
 
       <Stack spacing={1.15}>
-        <ReceiptMetaRow label="Invoice Number" value={invoiceNumber} />
-        <ReceiptMetaRow label={receiptNumberLabel} value={receiptNumber} />
-        <ReceiptMetaRow label="Date and time" value={date} />
+        <FinancePreviewLabelValueRow label="Invoice Number" value={invoiceNumber} />
+        <FinancePreviewLabelValueRow
+          label={receiptNumberLabel}
+          value={receiptNumber}
+        />
+        <FinancePreviewLabelValueRow label="Date and time" value={date} />
         {isRefund && refundAmount ? (
-          <ReceiptMetaRow label="Refund Amount" value={refundAmount} />
+          <FinancePreviewLabelValueRow
+            label="Refund Amount"
+            value={refundAmount}
+          />
         ) : null}
-        <ReceiptMetaRow label="Payment Method" value={paymentMethod} />
-        <ReceiptMetaRow label="Payment Status" value={paymentStatus} />
+        <FinancePreviewLabelValueRow
+          label="Payment Method"
+          value={paymentMethod}
+        />
+        <FinancePreviewLabelValueRow
+          label="Payment Status"
+          value={paymentStatus}
+        />
       </Stack>
 
-      <Box
-        sx={{
-          mt: 2,
-          p: 1.75,
-          borderRadius: "10px",
-          bgcolor: alpha(m.navy, 0.015),
-          border: `1px solid ${alpha(m.navy, 0.08)}`,
-        }}
-      >
-        <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.78) }}>
-          Professional's Business Info
-        </BodyText>
-        <Stack spacing={0.5} sx={{ mt: 1.1 }}>
-          {professionalLines.map((line) => (
-            <BodyText
-              key={line}
-              sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62) }}
-            >
-              {line}
-            </BodyText>
-          ))}
-        </Stack>
-      </Box>
+      <FinanceInfoBlock title="Professional's Business Info" sx={{ mt: 2 }}>
+        <FinanceMutedLines lines={professionalLines} navy={m.navy} />
+      </FinanceInfoBlock>
 
-      <BodyText
-        sx={{
-          mt: 2.25,
-          mb: 1.1,
-          fontWeight: 900,
-          fontSize: 13.5,
-          color: alpha(m.navy, 0.78),
-        }}
-      >
+      <BodyText sx={mollureSectionTitleSx(m.navy, { mt: 2.25, mb: 1.1 })}>
         {itemsTitle}
       </BodyText>
 
       <Stack spacing={0.85}>
         {displayLineItems.map((item, index) => (
-          <Stack
+          <FinancePreviewLabelValueRow
             key={`${item.displayDescription}-${index}`}
-            direction="row"
-            justifyContent="space-between"
-            alignItems="center"
-          >
-            <BodyText
-              sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.72) }}
-            >
-              {item.displayDescription}
-            </BodyText>
-            <BodyText
-              sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.82) }}
-            >
-              {item.totalPrice}
-            </BodyText>
-          </Stack>
+            label={item.displayDescription}
+            value={item.totalPrice}
+            variant="line"
+          />
         ))}
         {prepaidAmountLabel &&
         !displayLineItems.some(
           (item) => item.description.toLowerCase() === "prepayment",
         ) ? (
-          <Stack
-            direction="row"
-            justifyContent="space-between"
-            alignItems="center"
-          >
-            <BodyText
-              sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.72) }}
-            >
-              Prepayment
-            </BodyText>
-            <BodyText
-              sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.82) }}
-            >
-              {prepaidAmountLabel}
-            </BodyText>
-          </Stack>
+          <FinancePreviewLabelValueRow
+            label="Prepayment"
+            value={prepaidAmountLabel}
+            variant="line"
+          />
         ) : null}
       </Stack>
 
       <Divider sx={{ my: 1.75, borderColor: alpha(m.navy, 0.1) }} />
 
-      <Stack direction="row" justifyContent="space-between" alignItems="center">
-        <BodyText
-          sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.72) }}
-        >
-          Total Amount (VAT included)
-        </BodyText>
-        <BodyText
-          sx={{ fontSize: 15, fontWeight: 1000, color: alpha(m.navy, 0.88) }}
-        >
-          {totalPriceLabel}
-        </BodyText>
-      </Stack>
+      <FinancePreviewLabelValueRow
+        label="Total Amount (VAT included)"
+        value={totalPriceLabel}
+        variant="total"
+      />
 
       <Stack direction="row" justifyContent="center" sx={{ mt: 2.5 }}>
         <AppButton

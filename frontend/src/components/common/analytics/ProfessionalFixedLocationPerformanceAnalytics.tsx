@@ -12,6 +12,11 @@ import {
   TableRow,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import {
+  mollureBodySx,
+  mollureSectionTitleSx,
+  mollureTableHeaderSx,
+} from "../../../theme/mollureHierarchy";
 import { BodyText } from "../../ui/typography";
 import type { ProfessionalFixedLocationPerformanceAnalyticsData } from "../../../app/professionals/fixed-location/analytics/performanceAnalytics.data";
 import AnalyticsSectionExplanation from "./AnalyticsSectionExplanation";
@@ -57,7 +62,7 @@ export default function ProfessionalFixedLocationPerformanceAnalytics({
     <Box sx={{ px: 2.25, pb: 2.5 }}>
       <Box sx={{ pt: 2.25, pb: 1.4 }}>
         <BodyText
-          sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}
+          sx={mollureSectionTitleSx(m.navy)}
         >
           {section.title}
         </BodyText>
@@ -87,11 +92,7 @@ export default function ProfessionalFixedLocationPerformanceAnalytics({
                 >
                   <BodyText
                     component="span"
-                    sx={{
-                      fontSize: 11.5,
-                      fontWeight: 800,
-                      color: alpha(m.navy, 0.62),
-                    }}
+                    sx={mollureTableHeaderSx(m.navy)}
                   >
                     {h}
                   </BodyText>
@@ -119,12 +120,11 @@ export default function ProfessionalFixedLocationPerformanceAnalytics({
                   <TableCell sx={{ py: 1.1 }}>
                     <BodyText
                       component="span"
-                      sx={{
-                        fontSize: 12.5,
+                      sx={mollureBodySx(m.navy, {
                         fontWeight,
                         color: textColor,
                         whiteSpace: "nowrap",
-                      }}
+                      })}
                     >
                       {r.teamMember}
                     </BodyText>
@@ -133,12 +133,11 @@ export default function ProfessionalFixedLocationPerformanceAnalytics({
                   <TableCell sx={{ py: 1.1 }}>
                     <BodyText
                       component="span"
-                      sx={{
-                        fontSize: 12.5,
+                      sx={mollureBodySx(m.navy, {
                         fontWeight,
                         color: textColor,
                         fontVariantNumeric: "tabular-nums",
-                      }}
+                      })}
                     >
                       {r.hoursWorked}
                     </BodyText>
@@ -147,12 +146,11 @@ export default function ProfessionalFixedLocationPerformanceAnalytics({
                   <TableCell sx={{ py: 1.1 }}>
                     <BodyText
                       component="span"
-                      sx={{
-                        fontSize: 12.5,
+                      sx={mollureBodySx(m.navy, {
                         fontWeight,
                         color: textColor,
                         fontVariantNumeric: "tabular-nums",
-                      }}
+                      })}
                     >
                       {r.completedBookings}
                     </BodyText>
@@ -161,12 +159,11 @@ export default function ProfessionalFixedLocationPerformanceAnalytics({
                   <TableCell sx={{ py: 1.1 }}>
                     <BodyText
                       component="span"
-                      sx={{
-                        fontSize: 12.5,
+                      sx={mollureBodySx(m.navy, {
                         fontWeight,
                         color: textColor,
                         fontVariantNumeric: "tabular-nums",
-                      }}
+                      })}
                     >
                       {formatMoney(r.revenueEur)}
                     </BodyText>
@@ -175,12 +172,11 @@ export default function ProfessionalFixedLocationPerformanceAnalytics({
                   <TableCell sx={{ py: 1.1 }}>
                     <BodyText
                       component="span"
-                      sx={{
-                        fontSize: 12.5,
+                      sx={mollureBodySx(m.navy, {
                         fontWeight,
                         color: textColor,
                         fontVariantNumeric: "tabular-nums",
-                      }}
+                      })}
                     >
                       {formatMoney2(r.productivityEurPerHr)}
                     </BodyText>
@@ -189,12 +185,11 @@ export default function ProfessionalFixedLocationPerformanceAnalytics({
                   <TableCell sx={{ py: 1.1 }}>
                     <BodyText
                       component="span"
-                      sx={{
-                        fontSize: 12.5,
+                      sx={mollureBodySx(m.navy, {
                         fontWeight,
                         color: textColor,
                         fontVariantNumeric: "tabular-nums",
-                      }}
+                      })}
                     >
                       {r.efficiencyPct}
                     </BodyText>
@@ -203,12 +198,11 @@ export default function ProfessionalFixedLocationPerformanceAnalytics({
                   <TableCell sx={{ py: 1.1 }}>
                     <BodyText
                       component="span"
-                      sx={{
-                        fontSize: 12.5,
+                      sx={mollureBodySx(m.navy, {
                         fontWeight,
                         color: textColor,
                         fontVariantNumeric: "tabular-nums",
-                      }}
+                      })}
                     >
                       {r.averageRating}
                     </BodyText>
@@ -217,12 +211,11 @@ export default function ProfessionalFixedLocationPerformanceAnalytics({
                   <TableCell sx={{ py: 1.1 }}>
                     <BodyText
                       component="span"
-                      sx={{
-                        fontSize: 12.5,
+                      sx={mollureBodySx(m.navy, {
                         fontWeight,
                         color: textColor,
                         fontVariantNumeric: "tabular-nums",
-                      }}
+                      })}
                     >
                       {r.reviews}
                     </BodyText>

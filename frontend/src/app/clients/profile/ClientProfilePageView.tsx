@@ -48,6 +48,10 @@ import {
   stickyFooterAnchorSx,
   stickyFooterPageSx,
 } from "../../../components/common/StickyFooterPageShell";
+import {
+  mollurePageTitleSx,
+  mollureSectionTitleSx,
+} from "../../../theme/mollureHierarchy";
 import { marketingShellFooter } from "../../../data/marketingShell.data";
 import {
   AppCountryPhoneFields,
@@ -188,12 +192,7 @@ export default function ClientProfilePageView() {
             />
             <Box sx={{ minWidth: 0 }}>
               <Typography
-                sx={{
-                  fontWeight: 900,
-                  color: tokens.navy,
-                  fontSize: 18,
-                  lineHeight: 1.2,
-                }}
+                sx={mollurePageTitleSx(tokens.navy, { lineHeight: 1.2 })}
               >
                 {displayName}
               </Typography>
@@ -392,9 +391,7 @@ export default function ClientProfilePageView() {
               bgcolor: "#fff",
             }}
           >
-            <Typography
-              sx={{ fontWeight: 800, fontSize: 18, color: tokens.navy }}
-            >
+            <Typography sx={mollurePageTitleSx(tokens.navy)}>
               {profilePageData.card.title}
             </Typography>
             <IconButton
@@ -473,7 +470,7 @@ export default function ClientProfilePageView() {
                 onClose={clearMessages}
               />
 
-              <Typography sx={{ fontWeight: 800, color: tokens.navy, mb: 1 }}>
+              <Typography sx={mollureSectionTitleSx(tokens.navy, { mb: 1 })}>
                 {isCompanyProfile
                   ? "Company Information"
                   : profilePageData.sections.personal}
@@ -654,7 +651,7 @@ export default function ClientProfilePageView() {
               )}
 
               <Typography
-                sx={{ fontWeight: 800, color: tokens.navy, mb: 1, mt: 3.5 }}
+                sx={mollureSectionTitleSx(tokens.navy, { mb: 1, mt: 3.5 })}
               >
                 {isCompanyProfile
                   ? "Contact Person"

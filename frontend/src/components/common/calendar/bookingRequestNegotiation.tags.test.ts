@@ -3,6 +3,7 @@
  */
 import assert from "node:assert/strict";
 import {
+  allowComputedServiceAddCancelTags,
   detectProductLineChanges,
   detectServiceLineChanges,
   detectSilentUpdatedFields,
@@ -46,6 +47,192 @@ const lineChanges = detectServiceLineChanges(original, current);
 assert.deepEqual(lineChanges.edited, ["cut"]);
 assert.deepEqual(lineChanges.added, ["color"]);
 assert.deepEqual(lineChanges.cancelled, []);
+
+// teamMemberId vs staffResourceId is the same assignee — not Edited.
+assert.deepEqual(
+  detectServiceLineChanges(
+    [
+      {
+        id: "cut",
+        name: "Haircut",
+        price: 40,
+        durationMins: 30,
+        startTime: "10:00",
+        endTime: "10:30",
+        teamMemberId: "tm-ali",
+      },
+    ],
+    [
+      {
+        id: "cut",
+        name: "Haircut",
+        price: 40,
+        durationMins: 30,
+        startTime: "10:00",
+        endTime: "10:30",
+        staffResourceId: "tm-ali",
+      },
+    ],
+  ).edited,
+  [],
+);
+
+// Real staff change still counts as Edited.
+assert.deepEqual(
+  detectServiceLineChanges(
+    [
+      {
+        id: "cut",
+        name: "Haircut",
+        price: 40,
+        durationMins: 30,
+        startTime: "10:00",
+        endTime: "10:30",
+        teamMemberId: "tm-ali",
+      },
+    ],
+    [
+      {
+        id: "cut",
+        name: "Haircut",
+        price: 40,
+        durationMins: 30,
+        startTime: "10:00",
+        endTime: "10:30",
+        staffResourceId: "tm-aliza",
+      },
+    ],
+  ).edited,
+  ["cut"],
+);
+
+// Client + guest sharing the same catalog service id are distinct lines.
+{
+  const sharedOriginal = [
+    {
+      id: "cut",
+      name: "Haircut",
+      price: 40,
+      durationMins: 30,
+      startTime: "10:00",
+      endTime: "10:30",
+      teamMemberId: "tm-ali",
+    },
+    {
+      id: "color",
+      name: "Color",
+      price: 80,
+      durationMins: 60,
+      startTime: "10:30",
+      endTime: "11:30",
+      staffResourceId: "tm-bob",
+    },
+    {
+      id: "cut",
+      name: "Haircut",
+      price: 40,
+      durationMins: 30,
+      startTime: "10:00",
+      endTime: "10:30",
+      teamMemberId: "tm-ali",
+      guestId: "g-umer",
+    },
+    {
+      id: "color",
+      name: "Color",
+      price: 80,
+      durationMins: 60,
+      startTime: "10:30",
+      endTime: "11:30",
+      staffResourceId: "tm-bob",
+      guestId: "g-umer",
+    },
+  ];
+  const sharedCurrent = [
+    {
+      id: "cut",
+      name: "Haircut",
+      price: 40,
+      durationMins: 30,
+      startTime: "10:00",
+      endTime: "10:30",
+      staffResourceId: "tm-ali",
+    },
+    {
+      id: "color",
+      name: "Color",
+      price: 80,
+      durationMins: 60,
+      startTime: "10:30",
+      endTime: "11:30",
+      teamMemberId: "tm-bob",
+    },
+    {
+      id: "cut",
+      name: "Haircut",
+      price: 40,
+      durationMins: 30,
+      startTime: "10:00",
+      endTime: "10:30",
+      staffResourceId: "tm-ali",
+      guestId: "g-umer",
+    },
+    {
+      id: "color",
+      name: "Color",
+      price: 80,
+      durationMins: 60,
+      startTime: "10:30",
+      endTime: "11:30",
+      teamMemberId: "tm-bob",
+      guestId: "g-umer",
+    },
+  ];
+  assert.deepEqual(
+    detectServiceLineChanges(sharedOriginal, sharedCurrent).edited,
+    [],
+    "multi-guest shared catalog ids + staff field swap must not false-Edited",
+  );
+  assert.deepEqual(
+    detectServiceLineChanges(sharedOriginal, [
+      sharedCurrent[0],
+      sharedCurrent[1],
+      { ...sharedCurrent[2], price: 55 },
+      sharedCurrent[3],
+    ]).edited,
+    ["cut"],
+    "real guest price change is Edited",
+  );
+}
+
+// HH:mm vs HH:mm:ss and string price are the same content — not Edited.
+assert.deepEqual(
+  detectServiceLineChanges(
+    [
+      {
+        id: "cut",
+        name: "Haircut",
+        price: "40" as unknown as number,
+        durationMins: 30,
+        startTime: "10:00:00",
+        endTime: "10:30:00",
+        teamMemberId: "tm-ali",
+      },
+    ],
+    [
+      {
+        id: "cut",
+        name: "Haircut",
+        price: 40,
+        durationMins: 30,
+        startTime: "10:00",
+        endTime: "10:30",
+        staffResourceId: "tm-ali",
+      },
+    ],
+  ).edited,
+  [],
+);
 
 const removed = detectServiceLineChanges(current, original);
 assert.deepEqual(removed.cancelled, ["color"]);
@@ -550,6 +737,73 @@ assert.equal(
   assert.equal(fields.phoneUpdated, false);
   assert.deepEqual(fields.guestIds, ["g-model"]);
   assert.deepEqual(fields.serviceIds.slice().sort(), ["brow", "eyelash"]);
+}
+
+// Create / view: no computed Added. Edit existing: allow computed Added.
+assert.equal(
+  allowComputedServiceAddCancelTags({
+    hasExistingBooking: false,
+    isEditingExisting: false,
+    awaitingLineApproval: false,
+  }),
+  false,
+  "new booking create must not use computed Added",
+);
+assert.equal(
+  allowComputedServiceAddCancelTags({
+    hasExistingBooking: true,
+    isEditingExisting: false,
+    awaitingLineApproval: false,
+  }),
+  false,
+  "view-after-create must not use computed Added",
+);
+assert.equal(
+  allowComputedServiceAddCancelTags({
+    hasExistingBooking: true,
+    isEditingExisting: true,
+    awaitingLineApproval: false,
+  }),
+  true,
+  "edit existing may use computed Added",
+);
+{
+  // Incomplete create-era original (client only) would false-Add guest lines.
+  const createEraOriginal = [
+    {
+      id: "cut",
+      name: "Haircut",
+      price: 40,
+      durationMins: 30,
+      startTime: "10:00",
+      endTime: "10:30",
+    },
+  ];
+  const createEraCurrent = [
+    ...createEraOriginal,
+    {
+      id: "cut",
+      name: "Haircut",
+      price: 40,
+      durationMins: 30,
+      startTime: "10:30",
+      endTime: "11:00",
+      guestId: "g-umer",
+    },
+  ];
+  assert.deepEqual(
+    detectServiceLineChanges(createEraOriginal, createEraCurrent).added,
+    ["cut"],
+    "incomplete original false-Adds guest catalog id — drawer must gate this",
+  );
+  assert.equal(
+    allowComputedServiceAddCancelTags({
+      hasExistingBooking: true,
+      isEditingExisting: false,
+      awaitingLineApproval: false,
+    }),
+    false,
+  );
 }
 
 console.log("bookingRequestNegotiation.tags.test.ts passed");

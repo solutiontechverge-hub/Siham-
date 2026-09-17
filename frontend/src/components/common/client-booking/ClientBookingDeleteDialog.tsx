@@ -1,9 +1,6 @@
 "use client";
 
-import AppModal, {
-  MessagingModalCancelButton,
-  MessagingModalPrimaryButton,
-} from "../AppModal";
+import { ClientEmptyDangerDialog } from "./ClientEmptyDangerDialog";
 
 type Props = {
   open: boolean;
@@ -18,34 +15,17 @@ export default function ClientBookingDeleteDialog({
   onConfirm,
   variant = "cancelled",
 }: Props) {
-  const title =
-    variant === "completed"
-      ? "Remove this completed booking from your list?"
-      : "Remove this cancelled booking from your list?";
-
   return (
-    <AppModal
-      contentSx={{ px: 2.5, py: 1 }}
-      footerVariant="actions"
-      headerTone="danger"
+    <ClientEmptyDangerDialog
       open={open}
-      title={title}
       onClose={onClose}
-      footer={
-        <>
-          <MessagingModalCancelButton onClick={onClose} />
-          <MessagingModalPrimaryButton
-            tone="danger"
-            label="Delete"
-            onClick={() => {
-              onConfirm();
-              onClose();
-            }}
-          />
-        </>
+      onConfirm={onConfirm}
+      confirmLabel="Delete"
+      title={
+        variant === "completed"
+          ? "Remove this completed booking from your list?"
+          : "Remove this cancelled booking from your list?"
       }
-    >
-      {null}
-    </AppModal>
+    />
   );
 }

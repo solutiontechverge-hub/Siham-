@@ -2,6 +2,10 @@
 
 import { Box, Paper, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import {
+  mollureLabelSx,
+  mollureSectionTitleSx,
+} from "../../../theme/mollureHierarchy";
 import type { BookingPaymentSummarySection } from "./bookingFinance.types";
 import { formatFinanceEuro } from "./formatBookingFinance";
 
@@ -77,12 +81,10 @@ export default function BookingPaymentSummaryCard({
           Payment Summary
         </Typography>
         <Typography
-          sx={{
-            fontWeight: 900,
-            fontSize: 15,
+          sx={mollureSectionTitleSx(m.navy, {
             color: alpha(m.navy, 0.9),
             lineHeight: 1,
-          }}
+          })}
         >
           {formatFinanceEuro(headerTotal)}
         </Typography>
@@ -156,13 +158,12 @@ export default function BookingPaymentSummaryCard({
                         • {line.label}
                       </Typography>
                       <Typography
-                        sx={{
+                        sx={mollureLabelSx(m.navy, {
                           fontWeight: 900,
-                          fontSize: 12.5,
                           color: amountColor,
                           flexShrink: 0,
                           lineHeight: 1,
-                        }}
+                        })}
                       >
                         {formatFinanceEuro(line.amount)}
                       </Typography>

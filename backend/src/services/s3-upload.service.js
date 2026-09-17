@@ -20,17 +20,32 @@ function extensionFromMime(mimetype) {
     "image/jpg": ".jpg",
     "image/png": ".png",
     "image/webp": ".webp",
+    "image/gif": ".gif",
+    "image/heic": ".heic",
+    "image/heif": ".heif",
+    "application/pdf": ".pdf",
+    "text/plain": ".txt",
+    "text/csv": ".csv",
+    "application/msword": ".doc",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+    "application/vnd.ms-excel": ".xls",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
   };
   return map[mimetype] || "";
 }
 
-function safeExtension(originalName, mimetype) {
+function safeExtension(originalName, mimetype, detectedExt) {
+  // Prefer sniffed extension / MIME over client filename (blocks .pdf + text/html tricks).
+  if (detectedExt && /^\.[a-z0-9]{2,5}$/i.test(detectedExt)) {
+    return detectedExt.toLowerCase();
+  }
+  const fromMime = extensionFromMime(mimetype);
+  if (fromMime) return fromMime;
   const fromName = path.extname(originalName || "");
   if (/^\.[a-z0-9]{2,5}$/i.test(fromName)) {
     return fromName.toLowerCase();
   }
-  const fromMime = extensionFromMime(mimetype);
-  return fromMime || ".bin";
+  return ".bin";
 }
 
 /** Optional CloudFront or public CDN base (no trailing slash). */
@@ -59,13 +74,15 @@ export async function uploadUserProfileAsset({
   buffer,
   contentType,
   originalName,
+  detectedExt,
 }) {
   if (!isS3UploadConfigured()) {
     throw new Error("S3 upload is not configured (AWS_REGION, AWS_S3_BUCKET, credentials).");
   }
 
   const bucket = getBucket();
-  const ext = safeExtension(originalName, contentType);
+  const trustedType = contentType || "application/octet-stream";
+  const ext = safeExtension(originalName, trustedType, detectedExt);
   const key = `profiles/${userId}/${assetKind}-${crypto.randomUUID()}${ext}`;
 
   await getS3Client().send(
@@ -73,7 +90,11 @@ export async function uploadUserProfileAsset({
       Bucket: bucket,
       Key: key,
       Body: buffer,
-      ContentType: contentType || "application/octet-stream",
+      ContentType: trustedType,
+      ContentDisposition: "inline",
+      Metadata: {
+        "x-content-type-options": "nosniff",
+      },
     }),
   );
 
@@ -147,18 +168,23 @@ export async function deleteProfileMediaIfOwned(storedUrl, userId) {
   }
 }
 
+function assetFromMulterFile(userId, assetKind, file) {
+  return uploadUserProfileAsset({
+    userId,
+    assetKind,
+    buffer: file.buffer,
+    contentType: file.mimetype,
+    originalName: file.originalname,
+    detectedExt: file.detectedExt,
+  });
+}
+
 export async function uploadTeamMemberPhotoFileToS3(userId, file) {
   if (!file?.buffer?.length) {
     throw new Error("No image file provided.");
   }
 
-  return uploadUserProfileAsset({
-    userId,
-    assetKind: "team_member_photo",
-    buffer: file.buffer,
-    contentType: file.mimetype,
-    originalName: file.originalname,
-  });
+  return assetFromMulterFile(userId, "team_member_photo", file);
 }
 
 export async function uploadTeamMemberDocumentFileToS3(userId, file) {
@@ -166,13 +192,7 @@ export async function uploadTeamMemberDocumentFileToS3(userId, file) {
     throw new Error("No document file provided.");
   }
 
-  return uploadUserProfileAsset({
-    userId,
-    assetKind: "team_member_document",
-    buffer: file.buffer,
-    contentType: file.mimetype,
-    originalName: file.originalname,
-  });
+  return assetFromMulterFile(userId, "team_member_document", file);
 }
 
 export async function uploadBusinessMediaFilesToS3(userId, files = []) {
@@ -183,14 +203,7 @@ export async function uploadBusinessMediaFilesToS3(userId, files = []) {
       continue;
     }
 
-    const url = await uploadUserProfileAsset({
-      userId,
-      assetKind: "business_media",
-      buffer: file.buffer,
-      contentType: file.mimetype,
-      originalName: file.originalname,
-    });
-    urls.push(url);
+    urls.push(await assetFromMulterFile(userId, "business_media", file));
   }
 
   return urls;
@@ -201,24 +214,12 @@ export async function uploadProfileMulterFilesToS3(userId, files) {
 
   const pic = files?.profile_picture?.[0];
   if (pic?.buffer?.length) {
-    out.profile_picture = await uploadUserProfileAsset({
-      userId,
-      assetKind: "profile_picture",
-      buffer: pic.buffer,
-      contentType: pic.mimetype,
-      originalName: pic.originalname,
-    });
+    out.profile_picture = await assetFromMulterFile(userId, "profile_picture", pic);
   }
 
   const logo = files?.logo?.[0];
   if (logo?.buffer?.length) {
-    out.logo = await uploadUserProfileAsset({
-      userId,
-      assetKind: "logo",
-      buffer: logo.buffer,
-      contentType: logo.mimetype,
-      originalName: logo.originalname,
-    });
+    out.logo = await assetFromMulterFile(userId, "logo", logo);
   }
 
   return out;

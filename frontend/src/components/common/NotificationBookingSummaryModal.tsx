@@ -1,5 +1,7 @@
 "use client";
 
+import { mollureLabelSx, mollureBodySx } from "../../theme/mollureHierarchy";
+
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Box, Chip, CircularProgress, Divider, Stack } from "@mui/material";
@@ -77,12 +79,7 @@ function SummaryRow({ label, value }: { label: string; value: React.ReactNode })
       sx={{ py: 0.85 }}
     >
       <Typography
-        sx={{
-          fontSize: 12.5,
-          fontWeight: 800,
-          color: alpha(m.navy, 0.5),
-          flexShrink: 0,
-        }}
+        sx={mollureLabelSx(m.navy, { color: alpha(m.navy, 0.5), flexShrink: 0 })}
       >
         {label}
       </Typography>
@@ -404,15 +401,9 @@ export default function NotificationBookingSummaryModal({
                     }}
                   >
                     <Typography
-                      sx={{
-                        fontWeight: 900,
-                        fontSize: 12.5,
-                        color: alpha(m.navy, 0.72),
-                        mb:
-                          section.items.length || section.planningItem
+                      sx={mollureLabelSx(m.navy, { fontWeight: 900, color: alpha(m.navy, 0.72), mb: section.items.length || section.planningItem
                             ? 0.85
-                            : 0,
-                      }}
+                            : 0 })}
                     >
                       {bookingParticipantDisplayHeading(
                         section,
@@ -434,11 +425,7 @@ export default function NotificationBookingSummaryModal({
                           spacing={1.5}
                         >
                           <Typography
-                            sx={{
-                              fontSize: 12.5,
-                              fontWeight: 700,
-                              color: alpha(m.navy, 0.78),
-                            }}
+                            sx={mollureBodySx(m.navy, { color: alpha(m.navy, 0.78) })}
                           >
                             {item.name}
                             {item.durationMins
@@ -446,12 +433,7 @@ export default function NotificationBookingSummaryModal({
                               : ""}
                           </Typography>
                           <Typography
-                            sx={{
-                              fontSize: 12.5,
-                              fontWeight: 800,
-                              color: alpha(m.navy, 0.7),
-                              flexShrink: 0,
-                            }}
+                            sx={mollureLabelSx(m.navy, { color: alpha(m.navy, 0.7), flexShrink: 0 })}
                           >
                             {formatMoney(item.price)}
                           </Typography>

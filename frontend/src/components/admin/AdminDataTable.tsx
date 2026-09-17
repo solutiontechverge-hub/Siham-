@@ -12,6 +12,12 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import {
+  mollureTableHeaderSx,
+  mollureBodySx,
+  mollureBodyMutedSx,
+  mollureLabelSx,
+} from "../../theme/mollureHierarchy";
 import { ADMIN_CARD_PADDING as pad } from "./adminCardPadding";
 
 export type AdminTableColumn<T> = {
@@ -60,9 +66,9 @@ export default function AdminDataTable<T>({
                 align={col.align ?? "left"}
                 sx={{
                   minWidth: col.minWidth,
-                  fontWeight: 600,
-                  fontSize: 12,
-                  color: tokens.slate,
+                  ...mollureTableHeaderSx(tokens.navy, {
+                    color: tokens.slate,
+                  }),
                   borderBottom: `1px solid ${tokens.cardBorder}`,
                   py: dense ? pad.tableCellY : 1.75,
                   px: pad.tableCellX,
@@ -80,7 +86,12 @@ export default function AdminDataTable<T>({
                 colSpan={columns.length}
                 sx={{ py: 4, textAlign: "center" }}
               >
-                <Typography sx={{ fontSize: 14, color: tokens.bodyText }}>
+                <Typography
+                  sx={mollureBodySx(tokens.navy, {
+                    fontWeight: 700,
+                    color: tokens.bodyText,
+                  })}
+                >
                   {emptyMessage}
                 </Typography>
               </TableCell>
@@ -109,8 +120,9 @@ export default function AdminDataTable<T>({
                       key={col.id}
                       align={col.align ?? "left"}
                       sx={{
-                        fontSize: 13,
-                        color: tokens.navy,
+                        ...mollureBodySx(tokens.navy, {
+                          color: tokens.navy,
+                        }),
                         borderBottom: `1px solid ${tokens.cardBorder}`,
                         py: dense ? pad.tableCellY : 1.75,
                         px: pad.tableCellX,
@@ -177,13 +189,12 @@ export function AdminSummaryGrid({
           >
             <Box sx={{ minWidth: 0 }}>
               <Typography
-                sx={{
-                  fontSize: 12,
+                sx={mollureLabelSx(tokens.navy, {
                   color: item.labelColor ?? tokens.slate,
                   fontWeight: 600,
                   mb: 0.75,
                   lineHeight: 1.35,
-                }}
+                })}
               >
                 {item.label}
               </Typography>
@@ -201,7 +212,11 @@ export function AdminSummaryGrid({
               </Typography>
               {item.sub ? (
                 <Typography
-                  sx={{ fontSize: 11, color: tokens.bodyText, mt: 0.75 }}
+                  sx={mollureBodyMutedSx(tokens.navy, {
+                    fontSize: 11,
+                    color: tokens.bodyText,
+                    mt: 0.75,
+                  })}
                 >
                   {item.sub}
                 </Typography>

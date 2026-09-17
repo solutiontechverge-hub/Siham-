@@ -1,5 +1,6 @@
 import { submitContactMessage, replyToContactMessage } from "../services/contact.service.js";
 import { logAdminActivityFromRequest } from "../services/adminActivity.service.js";
+import { sendCaughtError } from "../utils/httpError.js";
 
 export const createContactMessage = async (req, res) => {
   try {
@@ -22,11 +23,7 @@ export const createContactMessage = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to send your message.",
-      data: { error: error.message },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to send your message." });
   }
 };
 
@@ -57,10 +54,6 @@ export const adminReplyContactMessage = async (req, res) => {
       data: result.message,
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to send reply.",
-      data: { error: error.message },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to send reply." });
   }
 };

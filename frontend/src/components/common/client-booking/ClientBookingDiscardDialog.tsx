@@ -1,9 +1,6 @@
 "use client";
 
-import AppModal, {
-  MessagingModalCancelButton,
-  MessagingModalPrimaryButton,
-} from "../AppModal";
+import { ClientEmptyDangerDialog } from "./ClientEmptyDangerDialog";
 
 type Props = {
   open: boolean;
@@ -17,28 +14,12 @@ export default function ClientBookingDiscardDialog({
   onConfirm,
 }: Props) {
   return (
-    <AppModal
-      contentSx={{ px: 2.5, py: 1 }}
-      footerVariant="actions"
-      headerTone="danger"
+    <ClientEmptyDangerDialog
       open={open}
-      title="Are you sure you want to discard your BR? It will be deleted afterward."
       onClose={onClose}
-      footer={
-        <>
-          <MessagingModalCancelButton onClick={onClose} />
-          <MessagingModalPrimaryButton
-            tone="danger"
-            label="Discard"
-            onClick={() => {
-              onConfirm();
-              onClose();
-            }}
-          />
-        </>
-      }
-    >
-      {null}
-    </AppModal>
+      onConfirm={onConfirm}
+      confirmLabel="Discard"
+      title="Are you sure you want to discard your BR? It will be deleted afterward."
+    />
   );
 }

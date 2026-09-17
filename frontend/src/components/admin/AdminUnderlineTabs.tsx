@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Box, Stack } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
+import { mollureLabelSx } from "../../theme/mollureHierarchy";
 
 export type AdminUnderlineTab = { id: string; label: string };
 
@@ -47,9 +48,11 @@ export default function AdminUnderlineTabs({
                 pb: 1.5,
                 cursor: "pointer",
                 userSelect: "none",
-                fontSize: 14,
-                fontWeight: active ? 600 : 500,
-                color: active ? tokens.tealDark : tokens.slate,
+                ...mollureLabelSx(tokens.navy, {
+                  fontSize: 14,
+                  fontWeight: active ? 800 : 600,
+                  color: active ? tokens.tealDark : tokens.slate,
+                }),
                 borderBottom: `2px solid ${active ? tokens.teal : "transparent"}`,
                 mb: "-1px",
                 transition: "color 160ms ease, border-color 160ms ease",

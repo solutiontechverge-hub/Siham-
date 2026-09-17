@@ -64,6 +64,7 @@ import {
   isEditRequestPending,
   parseEditRequest,
 } from "../helpers/bookingEditRequest.js";
+import { logError, sendCaughtError } from "../utils/httpError.js";
 
 const parseJsonValue = (value, fallback) => {
   if (value === undefined || value === null || value === "") {
@@ -661,13 +662,7 @@ export const listCategories = async (req, res) => {
       }),
     );
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch categories.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to fetch categories." });
   }
 };
 
@@ -686,6 +681,7 @@ export const createCategory = async (req, res) => {
       data: result.rows[0],
     });
   } catch (error) {
+    logError("handler", error);
     const statusCode = error.code === "23505" ? 409 : 500;
     const message =
       error.code === "23505" ? "Category title already exists." : "Failed to create category.";
@@ -693,9 +689,7 @@ export const createCategory = async (req, res) => {
     return res.status(statusCode).json({
       success: false,
       message,
-      data: {
-        error: error.message,
-      },
+      data: null,
     });
   }
 };
@@ -715,6 +709,7 @@ export const createSubcategory = async (req, res) => {
       data: result.rows[0],
     });
   } catch (error) {
+    logError("handler", error);
     const statusCode = error.code === "23505" ? 409 : 500;
     const message =
       error.code === "23505"
@@ -724,9 +719,7 @@ export const createSubcategory = async (req, res) => {
     return res.status(statusCode).json({
       success: false,
       message,
-      data: {
-        error: error.message,
-      },
+      data: null,
     });
   }
 };
@@ -759,13 +752,7 @@ export const getBusinessSetup = async (req, res) => {
       data: businessSetup,
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch business setup.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to fetch business setup." });
   }
 };
 
@@ -836,13 +823,7 @@ export const updateBusinessSetupActive = async (req, res) => {
       data: savedBusinessSetup,
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to update business setup status.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to update business setup status." });
   }
 };
 
@@ -987,13 +968,7 @@ export const uploadBusinessMedia = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to upload business media.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to upload business media." });
   }
 };
 
@@ -1456,13 +1431,7 @@ export const upsertBusinessSetup = async (req, res) => {
       client.release();
     }
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to save business setup.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to save business setup." });
   }
 };
 
@@ -1536,13 +1505,7 @@ export const listCalendarEntries = async (req, res) => {
       }),
     );
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch calendar entries.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to fetch calendar entries." });
   }
 };
 
@@ -1669,13 +1632,7 @@ export const createCalendarEntry = async (req, res) => {
       data: entry,
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to create calendar entry.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to create calendar entry." });
   }
 };
 
@@ -1812,13 +1769,7 @@ export const getCalendarOverview = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch calendar overview.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to fetch calendar overview." });
   }
 };
 
@@ -1874,13 +1825,7 @@ export const upsertCalendarSettings = async (req, res) => {
       data: result.rows[0],
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to save calendar settings.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to save calendar settings." });
   }
 };
 
@@ -2386,13 +2331,7 @@ export const listBookings = async (req, res) => {
       }),
     );
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch bookings.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to fetch bookings." });
   }
 };
 
@@ -2414,11 +2353,7 @@ export const uploadBookingAttachments = async (req, res) => {
       data: { attachments },
     });
   } catch (error) {
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Failed to upload booking attachments.",
-      data: null,
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to upload booking attachments." });
   }
 };
 
@@ -2539,13 +2474,7 @@ export const createBooking = async (req, res) => {
       data: booking,
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to create booking.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to create booking." });
   }
 };
 
@@ -2666,13 +2595,7 @@ export const updateCalendarEntryStatus = async (req, res) => {
       data: entry,
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to update calendar entry status.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to update calendar entry status." });
   }
 };
 
@@ -2806,13 +2729,7 @@ export const updateCalendarEntry = async (req, res) => {
       data: entry,
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to update calendar entry.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to update calendar entry." });
   }
 };
 
@@ -2871,13 +2788,7 @@ export const deleteCalendarEntry = async (req, res) => {
       data: { id: result.rows[0].id },
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to delete calendar entry.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to delete calendar entry." });
   }
 };
 
@@ -3107,13 +3018,7 @@ export const updateMyBooking = async (req, res) => {
       data: booking,
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to update booking.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to update booking." });
   }
 };
 
@@ -3358,13 +3263,7 @@ export const updateBookingStatus = async (req, res) => {
       data: booking,
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to update booking status.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to update booking status." });
   }
 };
 
@@ -3538,13 +3437,7 @@ export const manageBookingEditRequest = async (req, res) => {
       data: updated,
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to update edit request.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to update edit request." });
   }
 };
 
@@ -3659,13 +3552,7 @@ export const getBookingActivity = async (req, res) => {
       data: events,
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to load booking activity.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to load booking activity." });
   }
 };
 
@@ -3740,13 +3627,7 @@ export const createBookingNotification = async (req, res) => {
       data: { bookingId, event },
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to dispatch booking notification.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to dispatch booking notification." });
   }
 };
 
@@ -3919,10 +3800,6 @@ export const updateTeamMember = async (req, res) => {
       data: mapTeamMemberDetail(updatedResult.rows[0]),
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to update team member.",
-      data: { error: error.message },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to update team member." });
   }
 };

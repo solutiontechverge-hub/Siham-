@@ -11,6 +11,7 @@ import {
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import type { SalesByCategoryServiceRow } from "../../../app/professionals/fixed-location/analytics/salesVolumeAnalytics.data";
+import { mollureBodySx, mollureTableHeaderSx } from "../../../theme/mollureHierarchy";
 import { BodyText } from "../../ui/typography";
 
 function formatNetSalesEur(value: number) {
@@ -56,11 +57,7 @@ export default function SalesByCategoriesServicesTable({
               >
                 <BodyText
                   component="span"
-                  sx={{
-                    fontSize: 11.5,
-                    fontWeight: 800,
-                    color: alpha(m.navy, 0.62),
-                  }}
+                  sx={mollureTableHeaderSx(m.navy)}
                 >
                   {h}
                 </BodyText>
@@ -74,6 +71,8 @@ export default function SalesByCategoriesServicesTable({
             const isTotal = Boolean(r.isCategoryTotal || r.isGrandTotal);
             const fontWeight = isTotal ? 900 : 700;
             const textColor = alpha(m.navy, isTotal ? 0.82 : 0.68);
+            const cellSx = (extra?: Record<string, unknown>) =>
+              mollureBodySx(m.navy, { fontWeight, color: textColor, ...extra });
 
             return (
               <TableRow
@@ -84,30 +83,19 @@ export default function SalesByCategoriesServicesTable({
                 }}
               >
                 <TableCell sx={{ py: 1.1, verticalAlign: "top" }}>
-                  <BodyText
-                    component="span"
-                    sx={{ fontSize: 12.5, fontWeight, color: textColor }}
-                  >
+                  <BodyText component="span" sx={cellSx()}>
                     {r.hideCategoryCell ? "" : r.category}
                   </BodyText>
                 </TableCell>
                 <TableCell sx={{ py: 1.1 }}>
-                  <BodyText
-                    component="span"
-                    sx={{ fontSize: 12.5, fontWeight, color: textColor }}
-                  >
+                  <BodyText component="span" sx={cellSx()}>
                     {r.service}
                   </BodyText>
                 </TableCell>
                 <TableCell sx={{ py: 1.1 }}>
                   <BodyText
                     component="span"
-                    sx={{
-                      fontSize: 12.5,
-                      fontWeight,
-                      color: textColor,
-                      fontVariantNumeric: "tabular-nums",
-                    }}
+                    sx={cellSx({ fontVariantNumeric: "tabular-nums" })}
                   >
                     {r.count}
                   </BodyText>
@@ -115,12 +103,7 @@ export default function SalesByCategoriesServicesTable({
                 <TableCell sx={{ py: 1.1 }}>
                   <BodyText
                     component="span"
-                    sx={{
-                      fontSize: 12.5,
-                      fontWeight,
-                      color: textColor,
-                      fontVariantNumeric: "tabular-nums",
-                    }}
+                    sx={cellSx({ fontVariantNumeric: "tabular-nums" })}
                   >
                     {formatNetSalesEur(r.netSalesEur)}
                   </BodyText>
@@ -128,12 +111,7 @@ export default function SalesByCategoriesServicesTable({
                 <TableCell sx={{ py: 1.1 }}>
                   <BodyText
                     component="span"
-                    sx={{
-                      fontSize: 12.5,
-                      fontWeight,
-                      color: textColor,
-                      fontVariantNumeric: "tabular-nums",
-                    }}
+                    sx={cellSx({ fontVariantNumeric: "tabular-nums" })}
                   >
                     {r.sharePct.toFixed(1)}%
                   </BodyText>

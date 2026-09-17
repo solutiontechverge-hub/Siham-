@@ -29,6 +29,10 @@ import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
 import { alpha, useTheme } from "@mui/material/styles";
 import {
+  mollureLabelSx,
+  mollureBodyMutedSx,
+} from "../../../../theme/mollureHierarchy";
+import {
   AppButton,
   AppDropdown,
   AppPagination,
@@ -97,7 +101,7 @@ function StarRating({ value, count }: { value: number; count: number }) {
   const tokens = useTheme().palette.mollure;
   if (count === 0) {
     return (
-      <Typography sx={{ fontSize: 12, color: tokens.slate }}>â€”</Typography>
+      <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.slate })}>â€”</Typography>
     );
   }
   return (
@@ -117,11 +121,11 @@ function StarRating({ value, count }: { value: number; count: number }) {
             />
           ))}
         </Stack>
-        <Typography sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}>
+        <Typography sx={mollureLabelSx(tokens.navy, { fontWeight: 600, color: tokens.navy })}>
           {value.toFixed(1)}
         </Typography>
       </Stack>
-      <Typography sx={{ fontSize: 10.5, color: tokens.bodyText }}>
+      <Typography sx={mollureBodyMutedSx(tokens.navy, { fontSize: 10.5, color: tokens.bodyText })}>
         ({count} reviews)
       </Typography>
     </Stack>
@@ -190,12 +194,12 @@ export default function AdminProfessionalsPageView() {
             </Avatar>
             <Stack spacing={0.2} sx={{ minWidth: 0 }}>
               <Typography
-                sx={{ fontSize: 13, fontWeight: 600, color: tokens.navy }}
+                sx={mollureLabelSx(tokens.navy, { fontWeight: 600, color: tokens.navy })}
                 noWrap
               >
                 {r.brandName}
               </Typography>
-              <Typography sx={{ fontSize: 10.5, color: tokens.bodyText }}>
+              <Typography sx={mollureBodyMutedSx(tokens.navy, { fontSize: 10.5, color: tokens.bodyText })}>
                 ID: {r.id.toUpperCase()}
               </Typography>
             </Stack>
@@ -215,10 +219,10 @@ export default function AdminProfessionalsPageView() {
       minWidth: 180,
       render: (r) => (
         <Stack spacing={0.25}>
-          <Typography sx={{ fontSize: 12, color: tokens.navy }}>
+          <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.navy })}>
             {r.email}
           </Typography>
-          <Typography sx={{ fontSize: 11, color: tokens.bodyText }}>
+          <Typography sx={mollureBodyMutedSx(tokens.navy, { fontSize: 11, color: tokens.bodyText })}>
             {r.phone}
           </Typography>
         </Stack>
@@ -234,7 +238,7 @@ export default function AdminProfessionalsPageView() {
           <Stack spacing={0.35}>
             <StatusPill bg={s.bg} fg={s.fg} label={s.label} />
             {r.verificationDate ? (
-              <Typography sx={{ fontSize: 10.5, color: tokens.bodyText }}>
+              <Typography sx={mollureBodyMutedSx(tokens.navy, { fontSize: 10.5, color: tokens.bodyText })}>
                 {formatDisplayDate(r.verificationDate)}
               </Typography>
             ) : null}
@@ -267,7 +271,7 @@ export default function AdminProfessionalsPageView() {
       label: "Total Bookings",
       align: "right",
       render: (r) => (
-        <Typography sx={{ fontSize: 13, fontWeight: 600, color: tokens.navy }}>
+        <Typography sx={mollureLabelSx(tokens.navy, { fontWeight: 600, color: tokens.navy })}>
           {(r.onlineBookings + r.offlineBookings).toLocaleString()}
         </Typography>
       ),
@@ -308,17 +312,12 @@ export default function AdminProfessionalsPageView() {
         <Typography
           component={Link}
           href="/admin/dashboard"
-          sx={{
-            fontSize: 12,
-            color: tokens.bodyText,
-            textDecoration: "none",
-            "&:hover": { color: tokens.teal },
-          }}
+          sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText, textDecoration: "none", "&:hover": { color: tokens.teal } })}
         >
           Home
         </Typography>
-        <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>/</Typography>
-        <Typography sx={{ fontSize: 12, color: tokens.navy, fontWeight: 500 }}>
+        <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText })}>/</Typography>
+        <Typography sx={mollureBodyMutedSx(tokens.navy, { fontWeight: 500, color: tokens.navy })}>
           Professional Management
         </Typography>
       </Stack>
@@ -562,7 +561,7 @@ export default function AdminProfessionalsPageView() {
 
               {exportNotice ? (
                 <Typography
-                  sx={{ fontSize: 12, color: tokens.tealDark, fontWeight: 500 }}
+                  sx={mollureBodyMutedSx(tokens.navy, { fontWeight: 500, color: tokens.tealDark })}
                 >
                   {exportNotice}
                 </Typography>
@@ -583,7 +582,7 @@ export default function AdminProfessionalsPageView() {
               }}
             >
               <Typography
-                sx={{ fontSize: 13, fontWeight: 600, color: tokens.navy }}
+                sx={mollureLabelSx(tokens.navy, { fontWeight: 600, color: tokens.navy })}
               >
                 Total Professionals:{" "}
                 <Box component="span" sx={{ fontWeight: 700 }}>
@@ -668,7 +667,7 @@ export default function AdminProfessionalsPageView() {
                 gap: 2,
               }}
             >
-              <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>
+              <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText })}>
                 Showing {showingFrom.toLocaleString()} to{" "}
                 {showingTo.toLocaleString()} of{" "}
                 {filtered.length.toLocaleString()} results
@@ -744,13 +743,7 @@ export default function AdminProfessionalsPageView() {
       </Menu>
 
       <Typography
-        sx={{
-          textAlign: "center",
-          fontSize: 11,
-          color: tokens.slate,
-          mt: 2.5,
-          pb: 1,
-        }}
+        sx={mollureBodyMutedSx(tokens.navy, { fontSize: 11, textAlign: "center", color: tokens.slate, mt: 2.5, pb: 1 })}
       >
         Â© 2025 Molur. All rights reserved.
       </Typography>

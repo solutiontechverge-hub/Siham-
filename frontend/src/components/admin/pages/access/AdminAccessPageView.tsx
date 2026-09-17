@@ -11,10 +11,11 @@ import {
   Typography,
 } from "@mui/material";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
-import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
-import { alpha, useTheme } from "@mui/material/styles";
+import { useTheme } from "@mui/material/styles";
 import { AppButton, AppSelect, AppTextField } from "../../../common";
 import AppModal from "../../../common/AppModal";
+import ModalConfirmBody from "../../../common/ModalConfirmBody";
+import MessagingDangerModal from "../../../common/messaging/MessagingDangerModal";
 import AdminPageHeader from "../../AdminPageHeader";
 import AdminSectionCard from "../../AdminSectionCard";
 import AdminUnderlineTabs from "../../AdminUnderlineTabs";
@@ -22,6 +23,11 @@ import AdminRolesPermissionsPanel from "../../AdminRolesPermissionsPanel";
 import AdminDataTable, { type AdminTableColumn } from "../../AdminDataTable";
 import AdminUserRowActions from "../../AdminUserRowActions";
 import type { AdminUser, AdminUserStatus } from "../../adminMockData";
+import {
+  mollureLabelSx,
+  mollureBodySx,
+  mollureBodyMutedSx,
+} from "../../../../theme/mollureHierarchy";
 import { ACCESS_TABS } from "./access.data";
 import type { AccessTab } from "./access.types";
 import { useAdminAccessPage } from "./useAdminAccessPage";
@@ -44,7 +50,10 @@ export default function AdminAccessPageView() {
       id: "role",
       label: "Role",
       render: (r) => (
-        <Typography component="span" sx={{ fontSize: 13 }}>
+        <Typography
+          component="span"
+          sx={mollureBodySx(tokens.navy, { color: tokens.navy })}
+        >
           {roleLabels[r.role] ?? r.role}
         </Typography>
       ),
@@ -217,12 +226,11 @@ export default function AdminAccessPageView() {
               />
               <Box>
                 <Typography
-                  sx={{
-                    fontSize: 13,
+                  sx={mollureLabelSx(tokens.navy, {
                     fontWeight: 600,
                     color: tokens.navy,
                     mb: 1,
-                  }}
+                  })}
                 >
                   Status
                 </Typography>
@@ -238,22 +246,20 @@ export default function AdminAccessPageView() {
                       <Box>
                         <Typography
                           component="span"
-                          sx={{
+                          sx={mollureLabelSx(tokens.navy, {
                             display: "block",
-                            fontSize: 13,
                             fontWeight: 600,
                             color: tokens.navy,
-                          }}
+                          })}
                         >
                           Active
                         </Typography>
                         <Typography
                           component="span"
-                          sx={{
+                          sx={mollureBodyMutedSx(tokens.navy, {
                             display: "block",
-                            fontSize: 12,
                             color: tokens.bodyText,
-                          }}
+                          })}
                         >
                           Admin can log in and use whatever their role allows.
                         </Typography>
@@ -269,22 +275,20 @@ export default function AdminAccessPageView() {
                       <Box>
                         <Typography
                           component="span"
-                          sx={{
+                          sx={mollureLabelSx(tokens.navy, {
                             display: "block",
-                            fontSize: 13,
                             fontWeight: 600,
                             color: tokens.navy,
-                          }}
+                          })}
                         >
                           Disabled
                         </Typography>
                         <Typography
                           component="span"
-                          sx={{
+                          sx={mollureBodyMutedSx(tokens.navy, {
                             display: "block",
-                            fontSize: 12,
                             color: tokens.bodyText,
-                          }}
+                          })}
                         >
                           Admin account exists but cannot log in anymore.
                         </Typography>
@@ -297,97 +301,46 @@ export default function AdminAccessPageView() {
             </Stack>
           </AppModal>
 
-          <AppModal
+          <MessagingDangerModal
             open={modal === "disable"}
             onClose={closeModal}
             title="Disable admin user"
             maxWidth="sm"
-            fullWidth
-            headerTone="danger"
-            footer={
-              <Box sx={{ px: 2.5, py: 2 }}>
-                <Stack direction="row" justifyContent="center" spacing={1.25}>
-                  <AppButton
-                    tone="secondary"
-                    onClick={closeModal}
-                    sx={{ minWidth: 120 }}
-                  >
-                    Cancel
-                  </AppButton>
-                  <AppButton
-                    tone="primary"
-                    onClick={handleDisable}
-                    sx={{ minWidth: 120 }}
-                  >
-                    Yes, disable
-                  </AppButton>
-                </Stack>
-              </Box>
-            }
+            primaryLabel="Yes, disable"
+            contentSx={{ px: 0 }}
+            onPrimary={handleDisable}
           >
-            <Box sx={{ py: 3, px: 2.5, textAlign: "center" }}>
-              <WarningAmberRoundedIcon
-                sx={{ fontSize: 56, color: "#E85D5D", mb: 1.75 }}
-              />
-              <Typography
-                sx={{
-                  fontWeight: 700,
-                  fontSize: 14,
-                  color: alpha(tokens.navy, 0.88),
-                  lineHeight: 1.55,
-                }}
-              >
-                Are you sure you want to disable {selectedUser?.name}? They will
-                lose access to the admin panel.
-              </Typography>
-            </Box>
-          </AppModal>
+            <ModalConfirmBody
+              showWarning
+              iconSize={56}
+              iconMb={1.75}
+              py={3}
+              px={2.5}
+              bodySx={{ fontWeight: 700 }}
+              body={`Are you sure you want to disable ${selectedUser?.name}? They will lose access to the admin panel.`}
+            />
+          </MessagingDangerModal>
 
-          <AppModal
+          <MessagingDangerModal
             open={modal === "delete"}
             onClose={closeModal}
             title="Delete admin user"
             maxWidth="sm"
-            fullWidth
-            headerTone="danger"
-            footer={
-              <Box sx={{ px: 2.5, py: 2 }}>
-                <Stack direction="row" justifyContent="center" spacing={1.25}>
-                  <AppButton
-                    tone="secondary"
-                    onClick={closeModal}
-                    sx={{ minWidth: 120 }}
-                  >
-                    Cancel
-                  </AppButton>
-                  <AppButton
-                    tone="danger"
-                    onClick={handleDelete}
-                    sx={{ minWidth: 120 }}
-                  >
-                    Yes, delete
-                  </AppButton>
-                </Stack>
-              </Box>
-            }
+            primaryLabel="Delete"
+            primaryTone="danger"
+            contentSx={{ px: 0 }}
+            onPrimary={handleDelete}
           >
-            <Box sx={{ py: 3, px: 2.5, textAlign: "center" }}>
-              <WarningAmberRoundedIcon
-                sx={{ fontSize: 56, color: "#E85D5D", mb: 1.75 }}
-              />
-              <Typography
-                sx={{
-                  fontWeight: 700,
-                  fontSize: 14,
-                  color: alpha(tokens.navy, 0.88),
-                  lineHeight: 1.55,
-                }}
-              >
-                Are you sure you want to permanently delete {selectedUser?.name}
-                ? This action cannot be undone.
-              </Typography>
-            </Box>
-          </AppModal>
+            <ModalConfirmBody
+              showWarning
+              iconSize={56}
+              iconMb={1.75}
+              py={3}
+              px={2.5}
+              bodySx={{ fontWeight: 700 }}
+              body={`Are you sure you want to permanently delete ${selectedUser?.name}? This action cannot be undone.`}
+            />
+          </MessagingDangerModal>
         </>
       ) : null}
     </>

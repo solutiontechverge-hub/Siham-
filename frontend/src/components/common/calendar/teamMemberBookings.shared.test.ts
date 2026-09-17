@@ -4,7 +4,11 @@
 import assert from "node:assert/strict";
 import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import { calendarEventToDisplaySegments } from "../../../data/bookingChronologicalBlocks";
-import { resolveSameTimeStackChip } from "./calendar-overlap.utils";
+import {
+  resolveBookingIdAccentColor,
+  resolveCalendarBookingIdentity,
+  resolveSameTimeStackChip,
+} from "./calendar-overlap.utils";
 import {
   collectEventTeamMemberIds,
   isTeamSharedBooking,
@@ -93,6 +97,25 @@ assert.deepEqual(collectEventTeamMemberIds(event({ id: "b-1", details: sharedDet
   "tm-muhammad",
 ]);
 assert.equal(isTeamSharedBooking(event({ id: "b-1", details: sharedDetails })), true);
+
+assert.deepEqual(
+  collectEventTeamMemberIds(
+    event({
+      id: "b-snapshot-staff",
+      details: {
+        clientSnapshot: {
+          services: [
+            { id: "s1", name: "Cut", price: 10, durationMins: 30, staffResourceId: "tm-saad" },
+            { id: "s2", name: "Color", price: 10, durationMins: 30, teamMemberId: "tm-ali" },
+          ],
+          people: [{ id: "p1", name: "Buf", bufferTeamMemberId: "tm-hama" }],
+        },
+      },
+    }),
+  ).sort(),
+  ["tm-ali", "tm-hama", "tm-saad"],
+  "snapshot staffResourceId + people buffer feed team ids",
+);
 assert.equal(
   teamSharedBookingTooltip(event({ id: "b-1", details: sharedDetails })),
   "Shared across team members: ali, Muhammad",
@@ -345,5 +368,33 @@ assert.equal(desiredLocationCards[0]?.end, "14:48");
 assert.equal(desiredLocationCards[0]?.showClientName, "alizaCompany");
 assert.equal(desiredLocationCards[0]?.title, "Muhammad umer arshad · eyelash");
 assert.equal(desiredLocationCards[0]?.teamShared, false);
+
+const accents = ["#21B8BF", "#149CA7", "#344A66", "#71819A"];
+const a0 = resolveBookingIdAccentColor("booking-a", accents);
+assert.equal(
+  resolveBookingIdAccentColor("BOOKING-A", accents),
+  a0,
+  "same booking id → stable accent (case-insensitive)",
+);
+assert.equal(
+  resolveBookingIdAccentColor("booking-a", accents),
+  a0,
+  "stable across calls",
+);
+assert.notEqual(
+  a0,
+  resolveBookingIdAccentColor("booking-b", accents),
+  "different booking ids → different accents when possible",
+);
+const segAccent = (partial: Partial<CalendarEvent> & Pick<CalendarEvent, "id">) =>
+  resolveBookingIdAccentColor(
+    resolveCalendarBookingIdentity(event(partial)),
+    accents,
+  );
+assert.equal(
+  segAccent({ id: "booking-a::segment-0", bookingCode: "A1" }),
+  segAccent({ id: "booking-a::segment-1", bookingCode: "A1" }),
+  "shared booking segments → same accent via identity",
+);
 
 console.log("teamMemberBookings.shared.test.ts passed");

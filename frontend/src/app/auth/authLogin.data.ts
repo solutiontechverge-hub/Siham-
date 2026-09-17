@@ -1,0 +1,18 @@
+export const authLoginCopy = {
+  title: "Sign In",
+  subtitle: "Welcome Back! Login To Access Your Account",
+  emailLabel: "Email Address",
+  emailPlaceholder: "e.g Jane",
+  passwordLabel: "Password",
+  passwordPlaceholder: "Enter Password Here",
+  rememberMe: "Remember Me",
+  forgotPassword: "Forget Password?",
+  forgotPasswordHref: "/auth/forgot-password",
+  submit: "Sign In",
+  submitting: "Signing in...",
+  orContinueWith: "or continue with",
+  noAccount: "Don't have account?",
+  createAccount: "Create account",
+  validationFallback: "Please check your login details.",
+  loginFailedFallback: "Login failed. Please check your credentials.",
+} as const;

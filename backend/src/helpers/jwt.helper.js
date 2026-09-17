@@ -1,8 +1,13 @@
 import jwt from "jsonwebtoken";
 
-const jwtSecret = process.env.JWT_SECRET || "development_jwt_secret_change_me";
-const refreshSecret =
-  process.env.JWT_REFRESH_SECRET || "development_refresh_secret_change_me";
+const jwtSecret = process.env.JWT_SECRET?.trim();
+const refreshSecret = process.env.JWT_REFRESH_SECRET?.trim();
+
+if (!jwtSecret || !refreshSecret) {
+  throw new Error(
+    "JWT_SECRET and JWT_REFRESH_SECRET must be set in the environment (see backend/.env.example).",
+  );
+}
 
 const getPayload = (user) => ({
   id: user.id,

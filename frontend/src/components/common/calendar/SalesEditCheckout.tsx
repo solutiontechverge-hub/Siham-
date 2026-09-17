@@ -1,5 +1,12 @@
 "use client";
 
+import {
+  mollureBodyMutedSx,
+  mollureLabelSx,
+  mollurePageTitleSx,
+  mollureSectionTitleSx,
+} from "../../../theme/mollureHierarchy";
+
 import AppButton from "../AppButton";
 import AppTextField from "../AppTextField";
 import * as React from "react";
@@ -16,6 +23,7 @@ import {
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useGetBusinessSetupQuery } from "../../../store/services/businessApi";
+import { clientPlatformTagToneColors } from "../ClientPlatformTag";
 import ManualEntryCatalogDrawer, {
   ManualEntryCatalogOpenButton,
 } from "../../sections/finance/ManualEntryCatalogDrawer";
@@ -24,12 +32,12 @@ import ManualEntryLineCard from "../../sections/finance/ManualEntryLineCard";
 import ManualEntryLineEditModal from "../../sections/finance/ManualEntryLineEditModal";
 import ManualEntryUniqueItemModal from "../../sections/finance/ManualEntryUniqueItemModal";
 import {
+  buildManualEntryCatalogOptions,
   calculateManualEntryDiscountAmount,
   createManualEntryLineFromOption,
   formatEurAmount,
   formatManualEntryDiscountLabel,
   lineTotal,
-  parseFinancePrice,
   type ManualEntryCatalogOption,
   type ManualEntryDiscount,
   type ManualEntryLine,
@@ -45,6 +53,7 @@ import {
   upsertFinanceUniqueItem,
 } from "../../sections/finance/financeCatalogPersist";
 import { AppCalendarPanel } from "../AppDatePicker";
+import { tomorrowIso } from "./calendar.utils";
 import type {
   SalesCheckoutPaymentMethod,
   SalesClientKind,
@@ -68,12 +77,6 @@ type SalesEditCheckoutProps = {
   onSave: (payload: SalesEditCheckoutPayload) => void;
 };
 
-function tomorrowIso(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().slice(0, 10);
-}
-
 function linesFromCard(card: SalesOverviewCardData): ManualEntryLine[] {
   const source = card.highlightedLineIds?.length
     ? card.lines.filter(
@@ -95,7 +98,7 @@ function collectPeople(card: SalesOverviewCardData): PersonChip[] {
   const people: PersonChip[] = [
     {
       id: card.payerKey || "main",
-      label: card.clientKind === "company" ? "CC Client" : "IC Client",
+      label: card.clientKind === "company" ? "BC Client" : "IC Client",
       name: card.clientName,
       role: "main_client",
     },
@@ -153,51 +156,23 @@ export default function SalesEditCheckout({
   const people = React.useMemo(() => collectPeople(card), [card]);
   const kindBadge =
     clientKind === "company" || card.clientKind === "company"
-      ? "CC Client"
+      ? "BC Client"
       : "IC Client";
 
-  const productOptions = React.useMemo<ManualEntryCatalogOption[]>(
+  const { productOptions, itemOptions, uniqueItemOptions } = React.useMemo(
     () =>
-      settings.products.map((product) => ({
-        id: product.id,
-        label: product.name,
-        unitPrice: parseFinancePrice(product.price),
-        vat: product.vat,
-      })),
-    [settings.products],
-  );
-
-  const itemOptions = React.useMemo<ManualEntryCatalogOption[]>(() => {
-    const setupServices = businessSetup?.service_details ?? [];
-    if (setupServices.length > 0) {
-      return setupServices.map((service) => ({
-        id: service.id,
-        label: service.service_title || service.category_title || "Service",
-        unitPrice: parseFinancePrice(String(service.price ?? "")),
-      }));
-    }
-    return settings.services.map((service) => ({
-      id: service.id,
-      label: service.service
-        ? `${service.category} - ${service.service}`
-        : service.category,
-      unitPrice: 0,
-      vat: service.vat,
-    }));
-  }, [businessSetup?.service_details, settings.services]);
-
-  const uniqueItemOptions = React.useMemo<ManualEntryCatalogOption[]>(
-    () =>
-      (settings.uniqueItems ?? []).map((item) => ({
-        id: item.id,
-        label: item.name,
-        unitPrice: parseFinancePrice(item.price),
-        vat: item.vat,
-        unit: item.unit,
-        discountType: item.discountType,
-        discountAmount: item.discountAmount,
-      })),
-    [settings.uniqueItems],
+      buildManualEntryCatalogOptions({
+        products: settings.products,
+        services: settings.services,
+        uniqueItems: settings.uniqueItems,
+        setupServices: businessSetup?.service_details,
+      }),
+    [
+      businessSetup?.service_details,
+      settings.products,
+      settings.services,
+      settings.uniqueItems,
+    ],
   );
 
   const [itemCatalogOverrides, setItemCatalogOverrides] = React.useState<
@@ -391,9 +366,7 @@ export default function SalesEditCheckout({
         >
           <ArrowBackRoundedIcon sx={{ fontSize: 20 }} />
         </IconButton>
-        <Typography
-          sx={{ fontSize: 16, fontWeight: 900, color: alpha(m.navy, 0.88) }}
-        >
+        <Typography sx={mollureSectionTitleSx(m.navy)}>
           Checkout
         </Typography>
       </Stack>
@@ -440,12 +413,10 @@ export default function SalesEditCheckout({
                     px: 0.7,
                     py: 0.15,
                     borderRadius: "999px",
-                    bgcolor: alpha(m.teal, 0.12),
+                    ...clientPlatformTagToneColors(m, "teal"),
                   }}
                 >
-                  <Typography
-                    sx={{ fontSize: 10.5, fontWeight: 800, color: m.teal }}
-                  >
+                  <Typography sx={{ fontSize: 10.5, fontWeight: 800 }}>
                     {kindBadge}
                   </Typography>
                 </Box>
@@ -479,9 +450,7 @@ export default function SalesEditCheckout({
                     >
                       <Typography
                         sx={{
-                          fontSize: 12.5,
-                          fontWeight: 800,
-                          color: alpha(m.navy, 0.78),
+                          ...mollureLabelSx(m.navy),
                         }}
                       >
                         {person.label}
@@ -563,14 +532,7 @@ export default function SalesEditCheckout({
               <AppButton
                 variant="outlined"
                 onClick={() => setUniqueItemOpen(true)}
-                sx={{
-                  borderRadius: "10px",
-                  textTransform: "none",
-                  fontWeight: 800,
-                  fontSize: 12.5,
-                  borderColor: alpha(m.teal, 0.35),
-                  color: m.teal,
-                }}
+                sx={mollureLabelSx(m.navy, { borderRadius: "10px", textTransform: "none", borderColor: alpha(m.teal, 0.35), color: m.teal })}
               >
                 + Unique Item
               </AppButton>
@@ -580,31 +542,17 @@ export default function SalesEditCheckout({
           {hasItems ? (
             <Stack spacing={1}>
               <Stack direction="row" justifyContent="space-between">
-                <Typography
-                  sx={{
-                    fontSize: 16,
-                    fontWeight: 900,
-                    color: m.headingText,
-                  }}
-                >
+                <Typography sx={mollureSectionTitleSx(m.navy, { color: m.headingText })}>
                   Total Price:
                 </Typography>
-                <Typography
-                  sx={{
-                    fontSize: 18,
-                    fontWeight: 900,
-                    color: m.headingText,
-                  }}
-                >
+                <Typography sx={mollurePageTitleSx(m.navy, { color: m.headingText })}>
                   {formatEurAmount(totalPrice)} EUR
                 </Typography>
               </Stack>
               {discount && discount.amount > 0 ? (
                 <Typography
                   sx={{
-                    fontSize: 12.5,
-                    fontWeight: 700,
-                    color: alpha(m.navy, 0.55),
+                    ...mollureBodyMutedSx(m.navy),
                   }}
                 >
                   Discount ({formatManualEntryDiscountLabel(discount)}): -
@@ -614,15 +562,7 @@ export default function SalesEditCheckout({
               <AppButton
                 variant="text"
                 onClick={() => setDiscountModalOpen(true)}
-                sx={{
-                  alignSelf: "flex-start",
-                  p: 0,
-                  minWidth: 0,
-                  textTransform: "none",
-                  fontWeight: 800,
-                  fontSize: 12.5,
-                  color: m.teal,
-                }}
+                sx={mollureLabelSx(m.navy, { alignSelf: "flex-start", p: 0, minWidth: 0, textTransform: "none", color: m.teal })}
               >
                 {discount && discount.amount > 0
                   ? "Edit Discount"
@@ -752,11 +692,7 @@ export default function SalesEditCheckout({
             <Box sx={{ mt: 1.5 }} onClick={(e) => e.stopPropagation()}>
               {checkoutEmail.trim() && card.clientEmail?.trim() ? (
                 <Typography
-                  sx={{
-                    fontSize: 12.5,
-                    fontWeight: 650,
-                    color: alpha(m.navy, 0.55),
-                  }}
+                  sx={mollureBodyMutedSx(m.navy, { fontWeight: 650 })}
                 >
                   Email: {checkoutEmail.trim()}
                 </Typography>
@@ -820,7 +756,7 @@ export default function SalesEditCheckout({
         >
           <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
             <Typography
-              sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.86) }}
+              sx={mollureSectionTitleSx(m.navy)}
             >
               {needsDueDate
                 ? "Reissued Invoice Summary"

@@ -14,6 +14,7 @@ import AppSegmentTabs from "../../common/AppSegmentTabs";
 import AppDrawer from "../../common/AppDrawer";
 import { FinanceDrawerActionsFooter } from "../../common/FinanceDrawerFooter";
 import MollureFormField from "../../common/MollureFormField";
+import { mollureWhiteFieldInputSx } from "../../common/mollureFormSx";
 import { BodyText } from "../../ui/typography";
 import {
   REFUND_METHOD_OPTIONS,
@@ -33,9 +34,7 @@ export type RefundSalesDrawerProps = {
 
 type RefundTab = "item" | "amount";
 
-const fieldSx = {
-  "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" },
-} as const;
+const fieldSx = mollureWhiteFieldInputSx;
 
 function RefundItemRow({
   item,

@@ -8,6 +8,11 @@ import SpaOutlinedIcon from "@mui/icons-material/SpaOutlined";
 import StorefrontOutlinedIcon from "@mui/icons-material/StorefrontOutlined";
 import { Avatar, Box, LinearProgress, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import {
+  mollureBodyMutedSx,
+  mollureBodySx,
+  mollureLabelSx,
+} from "../../theme/mollureHierarchy";
 import type { SvgIconComponent } from "@mui/icons-material";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import AdminSectionCard from "./AdminSectionCard";
@@ -99,15 +104,15 @@ function SummaryRow({
       alignItems="center"
       spacing={1}
     >
-      <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>
+      <Typography sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText })}>
         {label}
       </Typography>
       <Stack alignItems="flex-end" spacing={0.15}>
-        <Typography sx={{ fontSize: 13, fontWeight: 700, color: tokens.navy }}>
+        <Typography sx={mollureBodySx(tokens.navy, { fontWeight: 700, color: tokens.navy })}>
           {typeof value === "number" ? value.toLocaleString() : value}
         </Typography>
         {sub ? (
-          <Typography sx={{ fontSize: 10.5, color: tokens.slate }}>
+          <Typography sx={mollureBodyMutedSx(tokens.navy, { fontSize: 10.5, color: tokens.slate })}>
             {sub}
           </Typography>
         ) : null}
@@ -146,7 +151,7 @@ export function ProfessionalSummaryWidget() {
         }}
       >
         <Typography
-          sx={{ fontSize: 11, color: tokens.bodyText, lineHeight: 1.45 }}
+          sx={mollureBodyMutedSx(tokens.navy, { fontSize: 11, color: tokens.bodyText, lineHeight: 1.45 })}
         >
           Platform-wide professional metrics. Filter the table to drill into
           specific segments.
@@ -246,12 +251,12 @@ export function VerificationOverviewWidget() {
               }}
             />
             <Typography
-              sx={{ fontSize: 11.5, color: tokens.bodyText, flex: 1 }}
+              sx={mollureBodyMutedSx(tokens.navy, { fontSize: 11.5, color: tokens.bodyText, flex: 1 })}
             >
               {item.name}
             </Typography>
             <Typography
-              sx={{ fontSize: 11.5, fontWeight: 600, color: tokens.navy }}
+              sx={mollureLabelSx(tokens.navy, { fontSize: 11.5, fontWeight: 600, color: tokens.navy })}
             >
               {((item.value / total) * 100).toFixed(1)}%
             </Typography>
@@ -296,17 +301,16 @@ export function TopCategoriesWidget() {
                   <Icon sx={{ fontSize: 16 }} />
                 </Box>
                 <Typography
-                  sx={{
-                    fontSize: 12,
+                  sx={mollureBodySx(tokens.navy, {
                     fontWeight: 500,
                     color: tokens.navy,
                     flex: 1,
-                  }}
+                  })}
                 >
                   {cat.name}
                 </Typography>
                 <Typography
-                  sx={{ fontSize: 12, fontWeight: 700, color: tokens.navy }}
+                  sx={mollureBodySx(tokens.navy, { fontWeight: 700, color: tokens.navy })}
                 >
                   {cat.count.toLocaleString()}
                 </Typography>
@@ -365,12 +369,15 @@ export function RecentlyJoinedWidget() {
               </Avatar>
               <Box sx={{ minWidth: 0, flex: 1 }}>
                 <Typography
-                  sx={{ fontSize: 12.5, fontWeight: 600, color: tokens.navy }}
+                  sx={mollureLabelSx(tokens.navy, {
+                    fontWeight: 600,
+                    color: tokens.navy,
+                  })}
                   noWrap
                 >
                   {pro.brandName}
                 </Typography>
-                <Typography sx={{ fontSize: 11, color: tokens.bodyText }}>
+                <Typography sx={mollureBodyMutedSx(tokens.navy, { fontSize: 11, color: tokens.bodyText })}>
                   Joined {formatDisplayDate(pro.registrationDate)}
                 </Typography>
               </Box>

@@ -9,6 +9,7 @@ import {
   resolveNotificationAudience,
 } from "../services/bookingNotification.service.js";
 import { listResponse, parseListPagination } from "../utils/pagination.js";
+import { sendCaughtError } from "../utils/httpError.js";
 
 const audienceFromRequest = (req) => {
   const fromQuery = resolveNotificationAudience(req.query?.audience);
@@ -40,11 +41,7 @@ export const listMyNotifications = async (req, res) => {
       }),
     );
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch notifications.",
-      data: { error: error.message },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to fetch notifications." });
   }
 };
 
@@ -58,11 +55,7 @@ export const getUnreadNotificationCount = async (req, res) => {
       data: { count },
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch unread count.",
-      data: { error: error.message },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to fetch unread count." });
   }
 };
 
@@ -92,11 +85,7 @@ export const markNotificationAsRead = async (req, res) => {
       data: mapNotificationRow(row),
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to mark notification as read.",
-      data: { error: error.message },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to mark notification as read." });
   }
 };
 
@@ -110,10 +99,6 @@ export const markAllMyNotificationsRead = async (req, res) => {
       data: null,
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to mark notifications as read.",
-      data: { error: error.message },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to mark notifications as read." });
   }
 };

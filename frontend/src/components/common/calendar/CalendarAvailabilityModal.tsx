@@ -1,6 +1,7 @@
 "use client";
 
 import AppButton from "../AppButton";
+import { ModalCancelApplyFooter } from "../FinanceDrawerFooter";
 import * as React from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
@@ -15,7 +16,7 @@ import type {
   CalendarBookingLocation,
   CalendarResource,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
-import { weekdayNameFromIso, type BlockTimeDraft } from "./calendar.utils";
+import { weekdayNameFromIso, calendarModalFlexFieldSx, type BlockTimeDraft } from "./calendar.utils";
 import type { ScheduleShift } from "./calendar-settings.types";
 
 export type AvailabilityDraft = {
@@ -66,6 +67,10 @@ export default function CalendarAvailabilityModal({
     ? weekdayNameFromIso(draft.dateTo)
     : draft.dayTo;
 
+  const FlexField = ({ children }: { children: React.ReactNode }) => (
+    <Box sx={calendarModalFlexFieldSx}>{children}</Box>
+  );
+
   const patchDates = React.useCallback(
     (patch: { dateFrom?: string; dateTo?: string }) => {
       setDraft((p) => {
@@ -109,30 +114,7 @@ export default function CalendarAvailabilityModal({
       maxWidth="sm"
       fullWidth
       footer={
-        <Box sx={{ px: 2.5, py: 2 }}>
-          <Stack direction="row" justifyContent="flex-end" spacing={1.25}>
-            <AppButton
-              tone="secondary"
-              onClick={onClose}
-              sx={{
-                height: 38,
-                minWidth: 110,
-              }}
-            >
-              Cancel
-            </AppButton>
-            <AppButton
-              tone="primary"
-              onClick={onApply}
-              sx={{
-                height: 38,
-                minWidth: 110,
-              }}
-            >
-              Apply
-            </AppButton>
-          </Stack>
-        </Box>
+        <ModalCancelApplyFooter onCancel={onClose} onPrimary={onApply} />
       }
     >
       <Box sx={{ px: 2.5, py: 2 }}>
@@ -188,15 +170,15 @@ export default function CalendarAvailabilityModal({
           />
 
           <Stack direction="row" spacing={1.25}>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
+            <FlexField>
               <AppDatePicker
                 label="Date (from)"
                 value={draft.dateFrom}
                 onChange={(val) => patchDates({ dateFrom: val })}
                 fullWidth
               />
-            </Box>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
+            </FlexField>
+            <FlexField>
               <AppDatePicker
                 label="Date (To)"
                 value={draft.dateTo}
@@ -204,27 +186,27 @@ export default function CalendarAvailabilityModal({
                 min={draft.dateFrom || undefined}
                 fullWidth
               />
-            </Box>
+            </FlexField>
           </Stack>
 
           {showDays ? (
             <Stack direction="row" spacing={1.25}>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
+              <FlexField>
                 <AppTextField
                   label="Day (From)"
                   value={dayFromLabel}
                   fullWidth
                   disabled
                 />
-              </Box>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
+              </FlexField>
+              <FlexField>
                 <AppTextField
                   label="Day (To)"
                   value={dayToLabel}
                   fullWidth
                   disabled
                 />
-              </Box>
+              </FlexField>
             </Stack>
           ) : null}
 
@@ -235,9 +217,9 @@ export default function CalendarAvailabilityModal({
               spacing={1.25}
               alignItems="flex-end"
             >
-              <Box sx={{ flex: 1, minWidth: 0 }}>
+              <FlexField>
                 <AppTimePicker
-                  variant="wheel"
+                  variant="clock"
                   label="Start Time"
                   value={shift.start}
                   onChange={(val) =>
@@ -251,10 +233,10 @@ export default function CalendarAvailabilityModal({
                   fullWidth
                   sx={{ minHeight: 40, py: 0.5 }}
                 />
-              </Box>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
+              </FlexField>
+              <FlexField>
                 <AppTimePicker
-                  variant="wheel"
+                  variant="clock"
                   label="End Time"
                   value={shift.end}
                   onChange={(val) =>
@@ -268,7 +250,7 @@ export default function CalendarAvailabilityModal({
                   fullWidth
                   sx={{ minHeight: 40, py: 0.5 }}
                 />
-              </Box>
+              </FlexField>
               {draft.shifts.length > 1 ? (
                 <IconButton
                   size="small"

@@ -208,7 +208,7 @@ export type TransactionClientType = "mollure" | "nonMollure" | "business" | "gue
 export function getTransactionClientTypeLabel(type?: TransactionClientType): string | null {
   switch (type) {
     case "mollure":
-      return "Mollure";
+      return "M";
     case "nonMollure":
       return "IC";
     case "business":

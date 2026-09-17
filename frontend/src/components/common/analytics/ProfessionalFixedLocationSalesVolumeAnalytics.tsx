@@ -13,6 +13,11 @@ import {
   TableRow,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import {
+  mollureBodySx,
+  mollureSectionTitleSx,
+  mollureTableHeaderSx,
+} from "../../../theme/mollureHierarchy";
 import { BodyText } from "../../ui/typography";
 import type { ProfessionalFixedLocationSalesVolumeAnalyticsData } from "../../../app/professionals/fixed-location/analytics/salesVolumeAnalytics.data";
 import AnalyticsSectionExplanation from "./AnalyticsSectionExplanation";
@@ -122,9 +127,7 @@ function HorizontalBarChart({
         <Box sx={{ px: 2.25, pt: 2.1, pb: 1.1 }}>
           <BodyText
             sx={{
-              fontSize: 14,
-              fontWeight: 900,
-              color: alpha(m.navy, 0.85),
+              ...mollureSectionTitleSx(m.navy),
               textAlign: "center",
             }}
           >
@@ -342,7 +345,7 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({
     <Box sx={{ px: 2.25, pb: 2.5 }}>
       <Box sx={{ pt: 2.25, pb: 1.4 }}>
         <BodyText
-          sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}
+          sx={mollureSectionTitleSx(m.navy)}
         >
           {section21.title}
         </BodyText>
@@ -367,7 +370,7 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({
       {/* 2.2 Product Sales */}
       <Box sx={{ pt: 2.7, pb: 1.4 }}>
         <BodyText
-          sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}
+          sx={mollureSectionTitleSx(m.navy)}
         >
           {section22.title}
         </BodyText>
@@ -397,11 +400,7 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({
                   >
                     <BodyText
                       component="span"
-                      sx={{
-                        fontSize: 11.5,
-                        fontWeight: 800,
-                        color: alpha(m.navy, 0.62),
-                      }}
+                      sx={mollureTableHeaderSx(m.navy)}
                     >
                       {h}
                     </BodyText>
@@ -518,7 +517,7 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({
 
       <Box sx={{ pt: 2.7, pb: 1.4 }}>
         <BodyText
-          sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}
+          sx={mollureSectionTitleSx(m.navy)}
         >
           {section23.title}
         </BodyText>
@@ -547,11 +546,7 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({
                 >
                   <BodyText
                     component="span"
-                    sx={{
-                      fontSize: 11.5,
-                      fontWeight: 800,
-                      color: alpha(m.navy, 0.62),
-                    }}
+                    sx={mollureTableHeaderSx(m.navy)}
                   >
                     {h}
                   </BodyText>
@@ -572,11 +567,10 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({
                 <TableCell sx={{ py: 1.1 }}>
                   <BodyText
                     component="span"
-                    sx={{
-                      fontSize: 12.5,
+                    sx={mollureBodySx(m.navy, {
                       fontWeight: 700,
                       color: alpha(m.navy, 0.65),
-                    }}
+                    })}
                   >
                     {r.adjustmentType}
                   </BodyText>
@@ -585,15 +579,14 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({
                 <TableCell sx={{ py: 1.1 }}>
                   <BodyText
                     component="span"
-                    sx={{
-                      fontSize: 12.5,
+                    sx={mollureBodySx(m.navy, {
                       fontWeight: 700,
                       color:
                         r.amountEur < 0
                           ? alpha(theme.palette.error.main, 0.9)
                           : alpha(m.navy, 0.65),
                       fontVariantNumeric: "tabular-nums",
-                    }}
+                    })}
                   >
                     {formatAmountEur(r.amountEur)}
                   </BodyText>
@@ -602,15 +595,14 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({
                 <TableCell sx={{ py: 1.1 }}>
                   <BodyText
                     component="span"
-                    sx={{
-                      fontSize: 12.5,
+                    sx={mollureBodySx(m.navy, {
                       fontWeight: 700,
                       color:
                         r.shareOfGrossSalesPct < 0
                           ? alpha(theme.palette.error.main, 0.9)
                           : alpha(m.navy, 0.65),
                       fontVariantNumeric: "tabular-nums",
-                    }}
+                    })}
                   >
                     {formatPct(r.shareOfGrossSalesPct)}
                   </BodyText>
@@ -630,7 +622,7 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({
 
       <Box sx={{ pt: 2.7, pb: 1.4 }}>
         <BodyText
-          sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}
+          sx={mollureSectionTitleSx(m.navy)}
         >
           {section25.title}
         </BodyText>
@@ -659,11 +651,7 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({
                 >
                   <BodyText
                     component="span"
-                    sx={{
-                      fontSize: 11.5,
-                      fontWeight: 800,
-                      color: alpha(m.navy, 0.62),
-                    }}
+                    sx={mollureTableHeaderSx(m.navy)}
                   >
                     {h}
                   </BodyText>
@@ -693,11 +681,10 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({
                   <TableCell sx={{ py: 1.1 }}>
                     <BodyText
                       component="span"
-                      sx={{
-                        fontSize: 12.5,
+                      sx={mollureBodySx(m.navy, {
                         fontWeight: isHighlight ? 900 : 700,
                         color: alpha(m.navy, isHighlight ? 0.82 : 0.65),
-                      }}
+                      })}
                     >
                       {r.metric}
                     </BodyText>
@@ -706,14 +693,13 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({
                   <TableCell sx={{ py: 1.1 }}>
                     <BodyText
                       component="span"
-                      sx={{
-                        fontSize: 12.5,
+                      sx={mollureBodySx(m.navy, {
                         fontWeight: isHighlight ? 900 : 700,
                         color: isNegative
                           ? "#D32F2F"
                           : alpha(m.navy, isHighlight ? 0.82 : 0.65),
                         fontVariantNumeric: "tabular-nums",
-                      }}
+                      })}
                     >
                       {formatAmountEur(r.amountEur)}
                     </BodyText>

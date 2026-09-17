@@ -12,6 +12,7 @@ import {
   sqlLimitOffset,
   withPaginationParams,
 } from "../utils/pagination.js";
+import { logError, sendCaughtError } from "../utils/httpError.js";
 
 const getProfessionalProfile = async (userId) => {
   const result = await query(
@@ -151,11 +152,7 @@ export const listProfessionalClients = async (req, res) => {
       }),
     );
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch clients.",
-      data: { error: error.message },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to fetch clients." });
   }
 };
 
@@ -228,11 +225,7 @@ export const lookupMollureClientByEmail = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to look up Mollure client.",
-      data: { error: error.message },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to look up Mollure client." });
   }
 };
 
@@ -297,11 +290,7 @@ export const listMollureClientDirectory = async (req, res) => {
       }),
     );
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch Mollure client directory.",
-      data: { error: error.message },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to fetch Mollure client directory." });
   }
 };
 
@@ -470,7 +459,7 @@ export const createProfessionalClient = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to add client.",
-      data: { error: error.message },
+      data: null,
     });
   }
 };
@@ -560,11 +549,7 @@ export const updateProfessionalClient = async (req, res) => {
       data: mapClientRow(updated.rows[0]),
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to update client.",
-      data: { error: error.message },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to update client." });
   }
 };
 
@@ -600,11 +585,7 @@ export const updateProfessionalClientTechnicalNote = async (req, res) => {
       data: mapClientRow(updated.rows[0]),
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to save technical note.",
-      data: { error: error.message },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to save technical note." });
   }
 };
 
@@ -640,11 +621,7 @@ export const setProfessionalClientBlocked = async (req, res) => {
       data: mapClientRow(updated.rows[0]),
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to update block status.",
-      data: { error: error.message },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to update block status." });
   }
 };
 
@@ -675,10 +652,6 @@ export const deleteProfessionalClient = async (req, res) => {
       data: { id: deleted.rows[0].id },
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to delete client.",
-      data: { error: error.message },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to delete client." });
   }
 };

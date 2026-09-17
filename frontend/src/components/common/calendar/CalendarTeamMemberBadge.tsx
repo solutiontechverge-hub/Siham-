@@ -12,6 +12,8 @@ export type CalendarTeamMemberBadgeProps = {
   photoSrc?: string | null;
   bookedPercent: number;
   selected?: boolean;
+  /** Stretch across a day-view resource column instead of a compact centered pill. */
+  fullWidth?: boolean;
   onClick?: (anchor: HTMLElement) => void;
 };
 
@@ -21,6 +23,7 @@ export default function CalendarTeamMemberBadge({
   photoSrc,
   bookedPercent,
   selected = false,
+  fullWidth = false,
   onClick,
 }: CalendarTeamMemberBadgeProps) {
   const m = useTheme().palette.mollure;
@@ -44,14 +47,16 @@ export default function CalendarTeamMemberBadge({
         display: "flex",
         alignItems: "center",
         gap: 0.65,
-        px: 1.15,
-        py: 0.5,
-        borderRadius: "999px",
+        px: fullWidth ? 1.25 : 1.15,
+        py: fullWidth ? 0.65 : 0.5,
+        borderRadius: fullWidth ? "10px" : "999px",
         bgcolor: selected ? alpha(m.teal, 0.12) : "transparent",
         cursor: "pointer",
         flexShrink: 1,
         minWidth: 0,
-        width: "100%",
+        width: fullWidth ? "100%" : "auto",
+        maxWidth: "100%",
+        boxSizing: "border-box",
         transition: "background-color 0.15s ease",
         "&:hover": {
           bgcolor: selected ? alpha(m.teal, 0.16) : alpha(m.teal, 0.08),
@@ -73,7 +78,14 @@ export default function CalendarTeamMemberBadge({
       >
         {initial}
       </Avatar>
-      <Box sx={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          minWidth: 0,
+          flex: fullWidth ? 1 : undefined,
+        }}
+      >
         <Stack
           direction="row"
           alignItems="center"
@@ -83,7 +95,7 @@ export default function CalendarTeamMemberBadge({
           <BodyText
             sx={{
               fontWeight: 600,
-              fontSize: 11.5,
+              fontSize: fullWidth ? 12.5 : 11.5,
               color: selected ? m.tealDark : alpha(m.navy, 0.78),
               lineHeight: 1.2,
               whiteSpace: "nowrap",
@@ -111,11 +123,12 @@ export default function CalendarTeamMemberBadge({
             sx={{
               height: 3,
               width: "100%",
-              maxWidth: 62,
+              maxWidth: fullWidth ? "100%" : 62,
               minWidth: 24,
               borderRadius: "999px",
               bgcolor: m.fxGrayF2F4F7,
               overflow: "hidden",
+              flex: fullWidth ? 1 : undefined,
             }}
           >
             <Box

@@ -8,3 +8,5 @@ export const mollureFontSizes = {
   subheading: `${MOLLURE_FONT_SUBHEADING_PX}px`,
   content: `${MOLLURE_FONT_CONTENT_PX}px`,
 } as const;
+
+/** Dense product UI (calendar/booking/finance): see `mollureHierarchy.ts`. */

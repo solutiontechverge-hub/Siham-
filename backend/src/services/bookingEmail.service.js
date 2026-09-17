@@ -37,25 +37,57 @@ export const BOOKING_EMAIL_TYPES = {
 
 const CALENDAR_CLIENT_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 
-/** Pull client email from calendar notes meta or an email-shaped client_name. */
-export const extractCalendarClientEmail = (clientName, notes) => {
-  const fromName = String(clientName ?? "").trim();
-  if (CALENDAR_CLIENT_EMAIL_RE.test(fromName)) return fromName.toLowerCase();
-
+const parseCalendarNotesMeta = (notes) => {
   const raw = String(notes ?? "");
   const metaPart = raw.includes("---mollure-meta---")
     ? raw.split("---mollure-meta---").slice(1).join("---mollure-meta---").trim()
     : "";
-  if (metaPart) {
-    try {
-      const meta = JSON.parse(metaPart);
-      const fromMeta = String(meta?.clientEmail ?? "").trim();
-      if (CALENDAR_CLIENT_EMAIL_RE.test(fromMeta)) return fromMeta.toLowerCase();
-    } catch {
-      // ignore malformed meta
+  if (!metaPart) return null;
+  try {
+    return JSON.parse(metaPart);
+  } catch {
+    return null;
+  }
+};
+
+const normalizeCalendarEmail = (value) => {
+  const email = String(value ?? "").trim().toLowerCase();
+  return CALENDAR_CLIENT_EMAIL_RE.test(email) ? email : null;
+};
+
+/** Pull client email from calendar notes meta or an email-shaped client_name. */
+export const extractCalendarClientEmail = (clientName, notes) => {
+  const fromName = normalizeCalendarEmail(clientName);
+  if (fromName) return fromName;
+
+  const meta = parseCalendarNotesMeta(notes);
+  return normalizeCalendarEmail(meta?.clientEmail);
+};
+
+/**
+ * All client-facing recipients for calendar booking emails:
+ * primary clientEmail + any guest/person emails saved on the booking meta.
+ */
+export const extractCalendarRecipientEmails = (clientName, notes) => {
+  const emails = [];
+  const push = (value) => {
+    const email = normalizeCalendarEmail(value);
+    if (email && !emails.includes(email)) emails.push(email);
+  };
+
+  push(clientName);
+  const meta = parseCalendarNotesMeta(notes);
+  if (meta) {
+    push(meta.clientEmail);
+    if (Array.isArray(meta.guests)) {
+      for (const guest of meta.guests) push(guest?.email);
+    }
+    const people = meta.clientSnapshot?.people;
+    if (Array.isArray(people)) {
+      for (const person of people) push(person?.email);
     }
   }
-  return null;
+  return emails;
 };
 
 const EMAIL_BUILDERS = {
@@ -108,6 +140,7 @@ const loadBookingEmailContext = async (bookingId) => {
        b.unique_code,
        b.start_time,
        b.status,
+       b.notes,
        u.email AS customer_email,
        COALESCE(NULLIF(bs.salon_name, ''), NULLIF(bs.business_name, ''), 'Your salon') AS salon_name,
        COALESCE(
@@ -133,12 +166,42 @@ const loadBookingEmailContext = async (bookingId) => {
   }
 
   const row = result.rows[0];
+  const recipientEmails = extractCalendarRecipientEmails(null, row.notes);
+
+  // Calendar guest emails often live on calendar_entries.notes (same unique_code).
+  if (row.unique_code) {
+    const calendarResult = await query(
+      `SELECT client_name, notes
+       FROM calendar_entries
+       WHERE unique_code = $1
+       LIMIT 1`,
+      [row.unique_code],
+    );
+    const calendarRow = calendarResult.rows[0];
+    if (calendarRow) {
+      for (const email of extractCalendarRecipientEmails(
+        calendarRow.client_name,
+        calendarRow.notes,
+      )) {
+        if (!recipientEmails.includes(email)) recipientEmails.push(email);
+      }
+    }
+  }
+
+  const customerEmail = normalizeCalendarEmail(row.customer_email);
+  if (customerEmail && !recipientEmails.includes(customerEmail)) {
+    recipientEmails.unshift(customerEmail);
+  } else if (!recipientEmails.length && customerEmail) {
+    recipientEmails.push(customerEmail);
+  }
+
   return {
     bookingId: row.id,
     uniqueCode: row.unique_code,
     startTime: row.start_time,
     status: row.status,
-    customerEmail: row.customer_email,
+    customerEmail: recipientEmails[0] || customerEmail,
+    recipientEmails,
     salonName: row.salon_name,
     professionalName: row.professional_name,
     serviceName: row.service_name,
@@ -213,19 +276,26 @@ export const sendBookingClientEmail = async (bookingId, emailType, extras = {}) 
   }
 
   const ctx = await loadBookingEmailContext(bookingId);
-  if (!ctx?.customerEmail) {
+  const recipients = ctx?.recipientEmails?.length
+    ? ctx.recipientEmails
+    : ctx?.customerEmail
+      ? [ctx.customerEmail]
+      : [];
+  if (!recipients.length) {
     return { sent: false, reason: "booking_or_email_not_found" };
   }
 
   const { html, text } = config.build({ ...ctx, ...extras });
-  await sendMail({
-    to: ctx.customerEmail,
-    subject: extras.title || config.subject,
-    html,
-    text,
-  });
+  for (const to of recipients) {
+    await sendMail({
+      to,
+      subject: extras.title || config.subject,
+      html,
+      text,
+    });
+  }
 
-  return { sent: true, to: ctx.customerEmail };
+  return { sent: true, to: recipients };
 };
 
 export const sendBookingClientEmailOnce = async (bookingId, emailType, extras = {}) => {
@@ -617,8 +687,11 @@ const sameCalendarInstant = (left, right) => {
 };
 
 const loadCalendarEntryEmailContext = async (entry) => {
-  const customerEmail = extractCalendarClientEmail(entry?.client_name, entry?.notes);
-  if (!customerEmail) return null;
+  const recipientEmails = extractCalendarRecipientEmails(
+    entry?.client_name,
+    entry?.notes,
+  );
+  if (!recipientEmails.length) return null;
 
   const result = await query(
     `SELECT
@@ -659,7 +732,8 @@ const loadCalendarEntryEmailContext = async (entry) => {
     salonName: row.salon_name,
     professionalName: row.professional_name,
     serviceName: row.title || "Service",
-    customerEmail,
+    customerEmail: recipientEmails[0],
+    recipientEmails,
     hideCta: true,
   };
 };
@@ -696,7 +770,7 @@ export const notifyNonMollureCalendarClient = async (entry, options = {}) => {
     }
 
     const ctx = await loadCalendarEntryEmailContext(entry);
-    if (!ctx?.customerEmail) {
+    if (!ctx?.recipientEmails?.length) {
       return { sent: false, reason: "client_email_not_found" };
     }
 
@@ -746,14 +820,17 @@ export const notifyNonMollureCalendarClient = async (entry, options = {}) => {
     }
 
     const { html, text } = config.build({ ...ctx, ...extras });
-    await sendMail({
-      to: ctx.customerEmail,
-      subject: extras.title || config.subject,
-      html,
-      text,
-    });
+    const recipients = ctx.recipientEmails;
+    for (const to of recipients) {
+      await sendMail({
+        to,
+        subject: extras.title || config.subject,
+        html,
+        text,
+      });
+    }
 
-    return { sent: true, to: ctx.customerEmail };
+    return { sent: true, to: recipients };
   } catch (error) {
     console.error(
       `[booking-email] Non-Mollure calendar email failed for ${entry?.id}:`,

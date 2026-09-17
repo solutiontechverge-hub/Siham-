@@ -1,12 +1,9 @@
 "use client";
 
-import * as React from "react";
-import { Box, Paper, useMediaQuery } from "@mui/material";
+import { Box, Paper } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import MessagingBlockDialog from "./MessagingBlockDialog";
-import MessagingChatActionsMenu, {
-  type MessagingChatAction,
-} from "./MessagingChatActionsMenu";
+import MessagingChatActionsMenu from "./MessagingChatActionsMenu";
 import MessagingChatPanel from "./MessagingChatPanel";
 import MessagingConversationSidebar from "./MessagingConversationSidebar";
 import MessagingDeleteChatDialog, {
@@ -20,15 +17,9 @@ import MessagingLinkBookingDialog from "./MessagingLinkBookingDialog";
 import { getReportModalTitle } from "./messagingPeerLabels";
 import MessagingReportDialog from "./MessagingReportDialog";
 import MessagingSettingsDialog from "./MessagingSettingsDialog";
-import { useSnackbar } from "../AppSnackbar";
-import { useGetMessagingLinkableBookingsQuery } from "../../../store/services/messagingApi";
 import type { MessagingAudience } from "./messagingRoutes";
-import type { MessagingChatMessage } from "./messagingTypes";
-import { isMessageFromClient } from "./messagingUnread";
 import type { MessagingInboxNavigation } from "./useMessagingInbox";
-import { useMessagingInbox } from "./useMessagingInbox";
-
-type DeleteDialogMode = "single" | "bulk" | "clear";
+import { useMessagingPageView } from "./useMessagingPageView";
 
 export type MessagingPageViewProps = {
   audience: MessagingAudience;
@@ -49,109 +40,46 @@ export default function MessagingPageView({
 }: MessagingPageViewProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
-  const isCompactLayout = useMediaQuery(theme.breakpoints.down("md"));
-  const { showSnackbar } = useSnackbar();
-  const inbox = useMessagingInbox(audience, navigation, currentUserName);
-  const [mobileChatOpen, setMobileChatOpen] = React.useState(false);
-  const [settingsOpen, setSettingsOpen] = React.useState(false);
-  const [filtersOpen, setFiltersOpen] = React.useState(false);
-  const [actionsAnchor, setActionsAnchor] = React.useState<HTMLElement | null>(
-    null,
-  );
-  const [linkBookingOpen, setLinkBookingOpen] = React.useState(false);
-  const [reportOpen, setReportOpen] = React.useState(false);
-  const [blockOpen, setBlockOpen] = React.useState(false);
-  const [deleteOpen, setDeleteOpen] = React.useState(false);
-  const [deleteMode, setDeleteMode] =
-    React.useState<DeleteDialogMode>("single");
-  const [deletePresetScope, setDeletePresetScope] =
-    React.useState<MessagingDeleteScope>("me");
-  const [deleteMessageOpen, setDeleteMessageOpen] = React.useState(false);
-  const [messageToDelete, setMessageToDelete] =
-    React.useState<MessagingChatMessage | null>(null);
-
-  const activeThreadId = inbox.activeThread?.id ?? "";
   const {
-    data: linkableBookingsData,
-    isFetching: linkableBookingsLoading,
-    isSuccess: linkableBookingsReady,
-  } = useGetMessagingLinkableBookingsQuery(activeThreadId, {
-    skip: !activeThreadId,
-  });
-  const linkableBookings = linkableBookingsData?.bookings ?? [];
-  // Hide only after we know there are no peer bookings.
-  const canLinkToBooking = !(
-    linkableBookingsReady && linkableBookings.length === 0
-  );
-
-  React.useEffect(() => {
-    if (!isCompactLayout) setMobileChatOpen(false);
-  }, [isCompactLayout]);
-
-  React.useEffect(() => {
-    if (!isCompactLayout) return;
-    if (
-      (navigation?.bookingRef || navigation?.threadId || navigation?.seedThread) &&
-      inbox.activeThread
-    ) {
-      setMobileChatOpen(true);
-    }
-  }, [
-    inbox.activeThread,
-    isCompactLayout,
-    navigation?.bookingRef,
-    navigation?.seedThread,
-    navigation?.threadId,
-  ]);
-
-  const handleSelectThread = React.useCallback(
-    (threadId: string) => {
-      inbox.setActiveThreadId(threadId);
-      if (isCompactLayout) setMobileChatOpen(true);
-    },
-    [inbox, isCompactLayout],
-  );
-
-  const handleMobileBack = React.useCallback(() => {
-    setMobileChatOpen(false);
-  }, []);
-
-  const showSidebar = !isCompactLayout || !mobileChatOpen;
-  // When the inbox is empty, always show the chat pane empty-state (even on compact),
-  // otherwise the message disappears behind the list-only mobile layout.
-  const inboxIsEmpty = inbox.visibleThreads.length === 0;
-  const showChatPanel =
-    !isCompactLayout || mobileChatOpen || inboxIsEmpty;
-
-  const handleChatAction = (action: MessagingChatAction) => {
-    if (!inbox.activeThread) return;
-    switch (action) {
-      case "clearChat":
-        setDeleteMode("clear");
-        setDeleteOpen(true);
-        break;
-      case "deleteForMe":
-        setDeleteMode("single");
-        setDeletePresetScope("me");
-        setDeleteOpen(true);
-        break;
-      case "deleteForEveryone":
-        setDeleteMode("single");
-        setDeletePresetScope("everyone");
-        setDeleteOpen(true);
-        break;
-      case "block":
-        setBlockOpen(true);
-        break;
-      case "link":
-        if (!canLinkToBooking) return;
-        setLinkBookingOpen(true);
-        break;
-      case "report":
-        setReportOpen(true);
-        break;
-    }
-  };
+    inbox,
+    settingsOpen,
+    setSettingsOpen,
+    filtersOpen,
+    setFiltersOpen,
+    actionsAnchor,
+    setActionsAnchor,
+    linkBookingOpen,
+    setLinkBookingOpen,
+    reportOpen,
+    setReportOpen,
+    blockOpen,
+    setBlockOpen,
+    deleteOpen,
+    setDeleteOpen,
+    deleteMode,
+    deletePresetScope,
+    deleteMessageOpen,
+    linkableBookings,
+    linkableBookingsLoading,
+    canLinkToBooking,
+    showSidebar,
+    showChatPanel,
+    handleSelectThread,
+    handleChatAction,
+    handleRequestDelete,
+    handleDeleteMessageRequest,
+    handleCloseDeleteMessage,
+    handleConfirmDeleteMessage,
+    handleConfirmDeleteChat,
+    handleConfirmBlock,
+    handleApplyFilters,
+    handleCancelFilters,
+    emptyStateMessage,
+    composerDisabled,
+    composerDisabledHint,
+    chatBackHandler,
+    canDeleteMessageForEveryone,
+  } = useMessagingPageView({ audience, currentUserName, navigation });
 
   if (!inbox.store) {
     return null;
@@ -199,17 +127,7 @@ export default function MessagingPageView({
             selectAll={inbox.selectAll}
             onToggleSelect={inbox.toggleThreadSelection}
             onSelectAll={inbox.handleSelectAll}
-            onRequestDelete={() => {
-              if (inbox.selectedIds.size === 0) {
-                showSnackbar({
-                  severity: "warning",
-                  message: "Select at least one conversation to delete.",
-                });
-                return;
-              }
-              setDeleteMode("bulk");
-              setDeleteOpen(true);
-            }}
+            onRequestDelete={handleRequestDelete}
             onOpenSettings={() => setSettingsOpen(true)}
             onOpenFilters={() => setFiltersOpen(true)}
             onClose={embedded ? onClose : undefined}
@@ -229,34 +147,13 @@ export default function MessagingPageView({
             messageGroups={inbox.messageGroups}
             onSend={inbox.sendMessage}
             onOpenActions={setActionsAnchor}
-            onDeleteMessage={(message) => {
-              setMessageToDelete(message);
-              setDeleteMessageOpen(true);
-            }}
+            onDeleteMessage={handleDeleteMessageRequest}
             onClose={embedded ? onClose : undefined}
-            onBack={
-              isCompactLayout && mobileChatOpen ? handleMobileBack : undefined
-            }
-            composerDisabled={audience === "professional" && !inbox.canReply}
-            composerDisabledHint={
-              audience === "professional" && !inbox.canReply
-                ? "Reply when the client messages first, or when a requested, accepted, confirmed, or completed booking exists."
-                : undefined
-            }
+            onBack={chatBackHandler}
+            composerDisabled={composerDisabled}
+            composerDisabledHint={composerDisabledHint}
             peerReadAt={inbox.peerReadAt}
-            emptyStateMessage={
-              !inbox.activeThread
-                ? inbox.openedFromBooking
-                  ? "Opening this booking conversation…"
-                  : audience === "professional"
-                    ? inbox.search.trim()
-                      ? "No client conversations match your search. Try a client name or booking ID."
-                      : "No conversations yet. Clients appear here after they message you, or when they have a requested, confirmed, or completed booking."
-                    : inbox.search.trim()
-                      ? "No professionals match your search. Try a name or booking ID (e.g. B500844)."
-                      : "Browse professionals on the left and tap one to start chatting."
-                : "Select a conversation to start messaging"
-            }
+            emptyStateMessage={emptyStateMessage}
           />
         ) : null}
       </Paper>
@@ -278,14 +175,8 @@ export default function MessagingPageView({
         onChange={inbox.setDrawerFilters}
         audience={audience}
         embedded={embedded}
-        onApply={() => {
-          inbox.applyDrawerFilters();
-          setFiltersOpen(false);
-        }}
-        onCancel={() => {
-          inbox.resetDrawerFilters();
-          setFiltersOpen(false);
-        }}
+        onApply={handleApplyFilters}
+        onCancel={handleCancelFilters}
       />
 
       <MessagingChatActionsMenu
@@ -321,28 +212,17 @@ export default function MessagingPageView({
         mode={deleteMode}
         initialScope={deletePresetScope}
         onConfirm={(scope: MessagingDeleteScope) => {
-          if (deleteMode === "bulk") inbox.deleteSelectedThreads();
-          else inbox.clearChat(scope);
+          handleConfirmDeleteChat(scope);
         }}
       />
 
       <MessagingDeleteMessageDialog
         open={deleteMessageOpen}
-        onClose={() => {
-          setDeleteMessageOpen(false);
-          setMessageToDelete(null);
-        }}
+        onClose={handleCloseDeleteMessage}
         embedded={embedded}
-        canDeleteForEveryone={
-          messageToDelete
-            ? audience === "client"
-              ? isMessageFromClient(messageToDelete)
-              : !isMessageFromClient(messageToDelete)
-            : false
-        }
+        canDeleteForEveryone={canDeleteMessageForEveryone}
         onConfirm={(scope: MessagingMessageDeleteScope) => {
-          if (messageToDelete) inbox.deleteMessage(messageToDelete, scope);
-          setMessageToDelete(null);
+          handleConfirmDeleteMessage(scope);
         }}
       />
 
@@ -351,9 +231,7 @@ export default function MessagingPageView({
         audience={audience}
         onClose={() => setBlockOpen(false)}
         embedded={embedded}
-        onConfirm={() =>
-          inbox.activeThread && inbox.blockThread(inbox.activeThread.id)
-        }
+        onConfirm={handleConfirmBlock}
       />
     </Box>
   );

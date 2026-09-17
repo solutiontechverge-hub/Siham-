@@ -4,6 +4,7 @@ import {
   cacheClientBookingDraftSnapshot,
   enrichClientBookingRecord,
 } from "./clientBookingDraftCache";
+import { clearClientBookingCreateUiDraft } from "./clientBookingCreateUiDraft";
 
 export const CHECKOUT_REF_KEY = "mollure:checkout_booking_ref";
 export const ACTIVE_BOOKING_ID_KEY = "mollure:active_booking_id";
@@ -13,6 +14,33 @@ export const ACTIVE_BOOKING_CHANGED_EVENT = "mollure:active-booking-changed";
 export const EBR_DRAFT_LOCK_KEY = "mollure:ebr_draft_lock";
 /** Create-page URL to reopen after summary back (keeps `from=profile&t=`). */
 export const CREATE_RETURN_HREF_KEY = "mollure:create_return_href";
+export const SELECTED_SHOP_KEY = "mollure:selected_shop";
+
+/** Resolve FL/DL mode from selected-shop session + offering flags. */
+export function resolveSelectedShopLocationMode(args: {
+  shopId: string;
+  supportsFixedLocation: boolean;
+  supportsDesiredLocation: boolean;
+  defaultMode: "fixed" | "desired";
+}): "fixed" | "desired" {
+  if (!args.supportsFixedLocation) return "desired";
+  if (!args.supportsDesiredLocation) return "fixed";
+  if (typeof window === "undefined") return args.defaultMode;
+  try {
+    const raw = window.sessionStorage.getItem(SELECTED_SHOP_KEY);
+    if (!raw) return args.defaultMode;
+    const parsed = JSON.parse(raw) as {
+      shopId?: string;
+      locationMode?: "fixed" | "desired";
+    };
+    if (parsed.shopId === args.shopId && parsed.locationMode) {
+      return parsed.locationMode;
+    }
+  } catch {
+    // ignore
+  }
+  return args.defaultMode;
+}
 
 export function isEbrDraftLocked() {
   if (typeof window === "undefined") return false;
@@ -50,6 +78,7 @@ export function clearActiveBookingSession() {
   window.sessionStorage.removeItem(CHECKOUT_REF_KEY);
   window.sessionStorage.removeItem(ACTIVE_BOOKING_ID_KEY);
   window.sessionStorage.removeItem(ACTIVE_BOOKING_RECORD_KEY);
+  clearClientBookingCreateUiDraft();
 }
 
 export function setActiveBookingSession(record: ClientBookingRecord) {
@@ -68,7 +97,7 @@ export function setActiveBookingSession(record: ClientBookingRecord) {
       addressLabel: shop.addressLabel,
       locationMode: shop.locationMode,
     };
-    window.sessionStorage.setItem("mollure:selected_shop", JSON.stringify(payload));
+    window.sessionStorage.setItem(SELECTED_SHOP_KEY, JSON.stringify(payload));
   }
 }
 

@@ -2,6 +2,10 @@
 
 import { Stack, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
+import {
+  mollurePageSubtitleSx,
+  mollurePageTitleSx,
+} from "../../theme/mollureHierarchy";
 
 type AdminPageHeaderProps = {
   title: string;
@@ -26,11 +30,10 @@ export default function AdminPageHeader({
       sx={{ mb: 3 }}
     >
       <Stack spacing={0.5}>
-        <Typography variant="mainHeading">{title}</Typography>
+        <Typography sx={mollurePageTitleSx(tokens.navy)}>{title}</Typography>
         {description ? (
           <Typography
-            variant="description"
-            sx={{ color: tokens.bodyText, maxWidth: 640 }}
+            sx={mollurePageSubtitleSx(tokens.navy, { maxWidth: 640 })}
           >
             {description}
           </Typography>

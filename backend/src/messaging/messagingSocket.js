@@ -6,6 +6,7 @@ import {
   getThreadMessagesLegacy,
   purgeExpiredMessages,
 } from "./messaging.repository.js";
+import { logError } from "../utils/httpError.js";
 
 let messagingIo = null;
 
@@ -182,7 +183,7 @@ export function attachMessagingSocket(httpServer) {
           emitMessagingMessage(threadId, saved);
         }
       } catch (error) {
-        console.error("[messaging:socket] send failed:", error.message);
+        console.error("[messaging:socket] send failed:", error);
       }
     });
 
@@ -197,7 +198,10 @@ export function attachMessagingSocket(httpServer) {
         emitMessagingMessageDeleted(result.threadId, result);
         if (typeof callback === "function") callback({ ok: true, data: result });
       } catch (error) {
-        if (typeof callback === "function") callback({ ok: false, message: error.message });
+        logError("messagingSocket.deleteMessage", error);
+        if (typeof callback === "function") {
+          callback({ ok: false, message: "Failed to delete message." });
+        }
       }
     });
   });

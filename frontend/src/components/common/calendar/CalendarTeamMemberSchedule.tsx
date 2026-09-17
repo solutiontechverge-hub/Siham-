@@ -1,10 +1,15 @@
 "use client";
 
+import {
+  mollurePageSubtitleSx,
+  mollurePageTitleSx,
+  mollureSectionTitleSx,
+} from "../../../theme/mollureHierarchy";
+
 import AppButton from "../AppButton";
+import DenseRowIconActions from "../DenseRowIconActions";
 import * as React from "react";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
-import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import {
   Avatar,
@@ -15,11 +20,7 @@ import {
   Paper,
   Popover,
   Stack,
-  Table,
-  TableBody,
   TableCell,
-  TableContainer,
-  TableHead,
   TableRow,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -49,9 +50,14 @@ import {
   emptyAvailabilityDraft,
   type AvailabilityDraft,
 } from "./schedule.utils";
+import {
+  formatScheduleTimeRange,
+  scheduleBodyCellSx,
+  ScheduleStatusTabs,
+  ScheduleTableSection,
+  type ScheduleStatusTab,
+} from "./CalendarScheduleShared";
 import { BodyText, SubHeading } from "../../ui/typography";
-
-type ScheduleStatusTab = "active" | "archived";
 
 type DeleteTarget =
   { kind: "availability"; id: string } | { kind: "blocked"; id: string } | null;
@@ -69,166 +75,11 @@ type CalendarTeamMemberScheduleProps = {
   onBlockedChange: (next: readonly TeamScheduleBlockedEntry[]) => void;
 };
 
-const formatScheduleTime = (time: string) => {
-  const [hourRaw, minuteRaw] = time.split(":");
-  const hour = Number(hourRaw);
-  const minute = minuteRaw ?? "00";
-  if (Number.isNaN(hour)) return time;
-  return `${hour}:${minute}`;
-};
-
 const formatTimeRange = (range: TeamScheduleTimeRange) =>
-  `${formatScheduleTime(range.start)} - ${formatScheduleTime(range.end)}`;
+  formatScheduleTimeRange(range.start, range.end, "hyphen");
 
 const isDateInRange = (iso: string, from: string, to: string) =>
   iso >= from && iso <= to;
-
-function ScheduleStatusTabs({
-  value,
-  onChange,
-}: {
-  value: ScheduleStatusTab;
-  onChange: (next: ScheduleStatusTab) => void;
-}) {
-  const m = useTheme().palette.mollure;
-  const tabs: { id: ScheduleStatusTab; label: string }[] = [
-    { id: "active", label: "Active" },
-    { id: "archived", label: "Archived" },
-  ];
-
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        width: "100%",
-        borderRadius: "8px",
-        bgcolor: "#fff",
-        overflow: "hidden",
-        p: 0.35,
-        gap: 0.35,
-      }}
-    >
-      {tabs.map((tab) => {
-        const active = tab.id === value;
-        return (
-          <Box
-            key={tab.id}
-            role="button"
-            tabIndex={0}
-            onClick={() => onChange(tab.id)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") onChange(tab.id);
-            }}
-            sx={{
-              px: 2.5,
-              py: 0.75,
-              borderRadius: "6px",
-              fontSize: 13,
-              fontWeight: active ? 800 : 600,
-              color: alpha(m.navy, active ? 0.82 : 0.55),
-              bgcolor: active ? alpha(m.navy, 0.06) : "transparent",
-              cursor: "pointer",
-              userSelect: "none",
-            }}
-          >
-            {tab.label}
-          </Box>
-        );
-      })}
-    </Box>
-  );
-}
-
-function ScheduleTableSection({
-  title,
-  columns,
-  rows,
-  emptyLabel,
-}: {
-  title: string;
-  columns: readonly string[];
-  rows: React.ReactNode;
-  emptyLabel: string;
-}) {
-  const m = useTheme().palette.mollure;
-
-  const headCellSx = {
-    fontSize: 12,
-    fontWeight: 900,
-    color: alpha(m.navy, 0.62),
-    borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
-    bgcolor: alpha(m.navy, 0.03),
-    py: 1.1,
-    textAlign: "center",
-    whiteSpace: "nowrap",
-    borderLeft: 0,
-    borderRight: 0,
-  } as const;
-
-  const bodyCellSx = {
-    fontSize: 13,
-    fontWeight: 500,
-    color: alpha(m.navy, 0.82),
-    borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
-    py: 1.15,
-    textAlign: "center",
-    verticalAlign: "middle",
-    borderLeft: 0,
-    borderRight: 0,
-  } as const;
-
-  const hasRows = React.Children.count(rows) > 0;
-
-  return (
-    <Box>
-      <BodyText
-        sx={{
-          fontSize: 13,
-          fontWeight: 900,
-          color: alpha(m.navy, 0.58),
-          mb: 0.85,
-        }}
-      >
-        {title}
-      </BodyText>
-      <TableContainer
-        component={Paper}
-        elevation={0}
-        sx={{
-          borderRadius: "8px",
-          overflow: "hidden",
-          boxShadow: "none",
-        }}
-      >
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              {columns.map((column) => (
-                <TableCell key={column} sx={headCellSx}>
-                  {column}
-                </TableCell>
-              ))}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {hasRows ? (
-              rows
-            ) : (
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  sx={{ ...bodyCellSx, color: alpha(m.navy, 0.45) }}
-                >
-                  {emptyLabel}
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    </Box>
-  );
-}
 
 function DateRangeDropdown({
   entry,
@@ -371,17 +222,7 @@ export default function CalendarTeamMemberSchedule({
     [activeDateIso, blocked, isArchived],
   );
 
-  const bodyCellSx = {
-    fontSize: 13,
-    fontWeight: 500,
-    color: alpha(m.navy, 0.82),
-    borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
-    py: 1.15,
-    textAlign: "center",
-    verticalAlign: "middle",
-    borderLeft: 0,
-    borderRight: 0,
-  } as const;
+  const bodyCellSx = scheduleBodyCellSx(m.navy);
 
   const openAddAvailability = () => {
     setAvailabilityMode("add");
@@ -475,27 +316,6 @@ export default function CalendarTeamMemberSchedule({
     setDeleteTarget(null);
   };
 
-  const rowActions = (onEdit: () => void, onDelete: () => void) => (
-    <Stack direction="row" spacing={0.35} justifyContent="center">
-      <IconButton
-        size="small"
-        onClick={onEdit}
-        sx={{ width: 28, height: 28, borderRadius: "8px" }}
-      >
-        <EditOutlinedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
-      </IconButton>
-      <IconButton
-        size="small"
-        onClick={onDelete}
-        sx={{ width: 28, height: 28, borderRadius: "8px" }}
-      >
-        <DeleteOutlineRoundedIcon
-          sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }}
-        />
-      </IconButton>
-    </Stack>
-  );
-
   const membersWithRows = resources.filter((resource) => {
     const memberAvailability = filteredAvailability.filter(
       (entry) => entry.resourceId === resource.id,
@@ -542,24 +362,19 @@ export default function CalendarTeamMemberSchedule({
                 py: 1.75,
               }}
             >
-              <SubHeading
-                sx={{
-                  fontSize: 22,
-                  fontWeight: 800,
-                  color: alpha(m.navy, 0.9),
-                  lineHeight: 1.2,
-                }}
-              >
+              <SubHeading sx={mollurePageTitleSx(m.navy)}>
                 Team Member schedule
               </SubHeading>
-              <BodyText
-                sx={{ mt: 0.5, fontSize: 13, color: alpha(m.navy, 0.52) }}
-              >
+              <BodyText sx={mollurePageSubtitleSx(m.navy, { mt: 0.5 })}>
                 Set Availability and block a time slot for the team members.
               </BodyText>
             </Box>
 
-            <ScheduleStatusTabs value={statusTab} onChange={setStatusTab} />
+            <ScheduleStatusTabs
+              value={statusTab}
+              onChange={setStatusTab}
+              fullWidth
+            />
 
             <Stack
               direction="row"
@@ -668,9 +483,7 @@ export default function CalendarTeamMemberSchedule({
                       </Avatar>
                       <BodyText
                         sx={{
-                          fontSize: 14,
-                          fontWeight: 800,
-                          color: alpha(m.navy, 0.86),
+                          ...mollureSectionTitleSx(m.navy),
                         }}
                       >
                         {resource.name}
@@ -709,14 +522,15 @@ export default function CalendarTeamMemberSchedule({
                               </Stack>
                             </TableCell>
                             <TableCell sx={bodyCellSx}>
-                              {rowActions(
-                                () => openEditAvailability(entry),
-                                () =>
+                              <DenseRowIconActions
+                                onEdit={() => openEditAvailability(entry)}
+                                onDelete={() =>
                                   setDeleteTarget({
                                     kind: "availability",
                                     id: entry.id,
-                                  }),
-                              )}
+                                  })
+                                }
+                              />
                             </TableCell>
                           </TableRow>
                         ))}
@@ -754,14 +568,15 @@ export default function CalendarTeamMemberSchedule({
                               </Stack>
                             </TableCell>
                             <TableCell sx={bodyCellSx}>
-                              {rowActions(
-                                () => openEditBlocked(entry),
-                                () =>
+                              <DenseRowIconActions
+                                onEdit={() => openEditBlocked(entry)}
+                                onDelete={() =>
                                   setDeleteTarget({
                                     kind: "blocked",
                                     id: entry.id,
-                                  }),
-                              )}
+                                  })
+                                }
+                              />
                             </TableCell>
                           </TableRow>
                         ))}

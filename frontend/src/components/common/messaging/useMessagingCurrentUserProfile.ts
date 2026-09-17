@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useAppSelector } from "../../../store/hooks";
+import { CLIENT_PROFILE_KEY } from "../../../lib/auth-storage";
 import {
   useGetProfileQuery,
   type CompanyProfile,
@@ -20,7 +21,7 @@ function resolveProfilePictureUrl(url?: string | null): string | undefined {
 
 function readPersistedClientProfile(authedEmail?: string | null) {
   try {
-    const raw = window.localStorage.getItem("mollure:client_profile");
+    const raw = window.localStorage.getItem(CLIENT_PROFILE_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw) as {
       avatar_url?: string | null;

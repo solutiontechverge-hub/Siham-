@@ -1,5 +1,13 @@
 "use client";
 
+import {
+  mollureBodyMutedSx,
+  mollureBodySx,
+  mollureLabelSx,
+  mollurePageTitleSx,
+  mollureSectionTitleSx,
+} from "../../../theme/mollureHierarchy";
+
 import AppButton from "../AppButton";
 import * as React from "react";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
@@ -15,12 +23,12 @@ import ManualEntryLineCard from "../../sections/finance/ManualEntryLineCard";
 import ManualEntryLineEditModal from "../../sections/finance/ManualEntryLineEditModal";
 import ManualEntryUniqueItemModal from "../../sections/finance/ManualEntryUniqueItemModal";
 import {
+  buildManualEntryCatalogOptions,
   calculateManualEntryDiscountAmount,
   createManualEntryLineFromOption,
   formatEurAmount,
   formatManualEntryDiscountLabel,
   lineTotal,
-  parseFinancePrice,
   type ManualEntryCatalogOption,
   type ManualEntryDiscount,
   type ManualEntryLine,
@@ -77,48 +85,20 @@ export default function SalesAddOnCheckout({
   const [itemDrawerOpen, setItemDrawerOpen] = React.useState(false);
   const [uniqueItemOpen, setUniqueItemOpen] = React.useState(false);
 
-  const productOptions = React.useMemo<ManualEntryCatalogOption[]>(
+  const { productOptions, itemOptions, uniqueItemOptions } = React.useMemo(
     () =>
-      settings.products.map((product) => ({
-        id: product.id,
-        label: product.name,
-        unitPrice: parseFinancePrice(product.price),
-        vat: product.vat,
-      })),
-    [settings.products],
-  );
-
-  const itemOptions = React.useMemo<ManualEntryCatalogOption[]>(() => {
-    const setupServices = businessSetup?.service_details ?? [];
-    if (setupServices.length > 0) {
-      return setupServices.map((service) => ({
-        id: service.id,
-        label: service.service_title || service.category_title || "Service",
-        unitPrice: parseFinancePrice(String(service.price ?? "")),
-      }));
-    }
-    return settings.services.map((service) => ({
-      id: service.id,
-      label: service.service
-        ? `${service.category} - ${service.service}`
-        : service.category,
-      unitPrice: 0,
-      vat: service.vat,
-    }));
-  }, [businessSetup?.service_details, settings.services]);
-
-  const uniqueItemOptions = React.useMemo<ManualEntryCatalogOption[]>(
-    () =>
-      (settings.uniqueItems ?? []).map((item) => ({
-        id: item.id,
-        label: item.name,
-        unitPrice: parseFinancePrice(item.price),
-        vat: item.vat,
-        unit: item.unit,
-        discountType: item.discountType,
-        discountAmount: item.discountAmount,
-      })),
-    [settings.uniqueItems],
+      buildManualEntryCatalogOptions({
+        products: settings.products,
+        services: settings.services,
+        uniqueItems: settings.uniqueItems,
+        setupServices: businessSetup?.service_details,
+      }),
+    [
+      businessSetup?.service_details,
+      settings.products,
+      settings.services,
+      settings.uniqueItems,
+    ],
   );
 
   const [itemCatalogOverrides, setItemCatalogOverrides] = React.useState<
@@ -296,9 +276,7 @@ export default function SalesAddOnCheckout({
         >
           <ArrowBackRoundedIcon sx={{ fontSize: 20 }} />
         </IconButton>
-        <Typography
-          sx={{ fontSize: 16, fontWeight: 900, color: alpha(m.navy, 0.88) }}
-        >
+        <Typography sx={mollureSectionTitleSx(m.navy)}>
           Checkout
         </Typography>
       </Stack>
@@ -365,10 +343,7 @@ export default function SalesAddOnCheckout({
               <AppButton
                 tone="secondary"
                 onClick={() => setUniqueItemOpen(true)}
-                sx={{
-                  fontSize: 12.5,
-                  color: m.teal,
-                }}
+                sx={mollureBodySx(m.navy, { color: m.teal })}
               >
                 + Unique item
               </AppButton>
@@ -402,9 +377,7 @@ export default function SalesAddOnCheckout({
                 <Stack direction="row" justifyContent="space-between">
                   <Typography
                     sx={{
-                      fontSize: 12.5,
-                      fontWeight: 700,
-                      color: alpha(m.navy, 0.55),
+                      ...mollureBodyMutedSx(m.navy),
                     }}
                   >
                     Discount ({formatManualEntryDiscountLabel(discount)})
@@ -424,20 +397,10 @@ export default function SalesAddOnCheckout({
               <AppButton
                 variant="text"
                 onClick={() => setDiscountModalOpen(true)}
-                sx={{
-                  alignSelf: "flex-start",
-                  p: 0,
-                  minWidth: 0,
-                  textTransform: "none",
-                  fontWeight: 800,
-                  fontSize: 12.5,
-                  color: m.teal,
-                  textDecoration: "underline",
-                  "&:hover": {
+                sx={mollureLabelSx(m.navy, { alignSelf: "flex-start", p: 0, minWidth: 0, textTransform: "none", color: m.teal, textDecoration: "underline", "&:hover": {
                     bgcolor: "transparent",
                     textDecoration: "underline",
-                  },
-                }}
+                  } })}
               >
                 {discount && discount.amount > 0
                   ? "Edit Discount"
@@ -458,13 +421,7 @@ export default function SalesAddOnCheckout({
                 >
                   Final Price
                 </Typography>
-                <Typography
-                  sx={{
-                    fontSize: 18,
-                    fontWeight: 900,
-                    color: alpha(m.navy, 0.88),
-                  }}
-                >
+                <Typography sx={mollurePageTitleSx(m.navy)}>
                   {formatEurAmount(totalPrice)}
                 </Typography>
               </Stack>
@@ -576,9 +533,7 @@ export default function SalesAddOnCheckout({
         >
           <Typography
             sx={{
-              fontSize: 14,
-              fontWeight: 900,
-              color: alpha(m.navy, 0.86),
+              ...mollureSectionTitleSx(m.navy),
               mb: 1.25,
             }}
           >
@@ -668,13 +623,7 @@ export default function SalesAddOnCheckout({
             alignItems="baseline"
             sx={{ mb: 1 }}
           >
-            <Typography
-              sx={{
-                fontWeight: 900,
-                fontSize: 16,
-                color: m.headingText,
-              }}
-            >
+            <Typography sx={mollureSectionTitleSx(m.navy, { color: m.headingText })}>
               Total Price
             </Typography>
             <Typography sx={{ fontSize: 22, fontWeight: 900, color: m.headingText }}>

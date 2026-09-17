@@ -1,5 +1,12 @@
 "use client";
 
+import {
+  mollureBodyMutedSx,
+  mollurePageSubtitleSx,
+  mollurePageTitleSx,
+  mollureSectionTitleSx,
+} from "../../../theme/mollureHierarchy";
+
 import AppButton from "../AppButton";
 import AppTextField from "../AppTextField";
 import * as React from "react";
@@ -18,6 +25,8 @@ import {
 import { alpha, useTheme } from "@mui/material/styles";
 import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import { AppCalendarPanel } from "../AppDatePicker";
+import { formatCompactEuro } from "../booking-finance/formatBookingFinance";
+import { tomorrowIso } from "./calendar.utils";
 import type { SalesCheckoutPaymentMethod, SalesLineItem } from "./salesOverview.types";
 import {
   buildSplitPaymentAmounts,
@@ -54,19 +63,6 @@ type BookingCheckoutFlowProps = {
   onCancel: () => void;
   onSave: (result: BookingCheckoutResult) => void | Promise<void>;
 };
-
-function tomorrowIso(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().slice(0, 10);
-}
-
-function formatEur(amount: number): string {
-  const rounded = Math.round((amount + Number.EPSILON) * 100) / 100;
-  const abs = Math.abs(rounded);
-  const text = Number.isInteger(abs) ? String(abs) : abs.toFixed(2);
-  return `€${text}`;
-}
 
 const PAYMENT_OPTIONS: Array<{ id: SalesCheckoutPaymentMethod; label: string }> = [
   { id: "onlineDirect", label: "Online Direct" },
@@ -289,7 +285,7 @@ export default function BookingCheckoutFlow({
             ) : null}
           </Box>
           <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
-            {formatEur(share.paymentAmount)}
+            {formatCompactEuro(share.paymentAmount)}
           </Typography>
           <Radio
             checked={selected}
@@ -321,25 +317,21 @@ export default function BookingCheckoutFlow({
         >
           <CheckCircleRoundedIcon sx={{ fontSize: 42, color: m.teal }} />
         </Box>
-        <Typography
-          sx={{ fontSize: 20, fontWeight: 900, color: alpha(m.navy, 0.9), mb: 0.75 }}
-        >
+        <Typography sx={mollurePageTitleSx(m.navy, { mb: 0.75 })}>
           Payment Completed
         </Typography>
-        <Typography
-          sx={{ fontSize: 13.5, fontWeight: 700, color: alpha(m.navy, 0.55), mb: 2 }}
-        >
+        <Typography sx={mollurePageSubtitleSx(m.navy, { mb: 2 })}>
           {completed.payerLabel}
           {completed.payerName && completed.payerName !== completed.payerLabel
             ? ` · ${completed.payerName}`
             : ""}
         </Typography>
         <Typography sx={{ fontSize: 28, fontWeight: 900, color: m.teal, mb: 1.5 }}>
-          {formatEur(completed.amount)}
+          {formatCompactEuro(completed.amount)}
         </Typography>
         {completed.remainingUnpaidCount > 0 ? (
           <Typography
-            sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.55), mb: 2 }}
+            sx={mollureBodyMutedSx(m.navy, { mb: 2  })}
           >
             {completed.remainingUnpaidCount === 1
               ? "One guest payment remaining. Checkout stays available on this booking."
@@ -347,7 +339,7 @@ export default function BookingCheckoutFlow({
           </Typography>
         ) : (
           <Typography
-            sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.55), mb: 2 }}
+            sx={mollureBodyMutedSx(m.navy, { mb: 2  })}
           >
             This booking checkout is complete.
           </Typography>
@@ -385,7 +377,7 @@ export default function BookingCheckoutFlow({
               {
                 id: "single" as const,
                 title: "One person pays the full bill",
-                detail: `Charge ${formatEur(
+                detail: `Charge ${formatCompactEuro(
                   unpaidShares.reduce((sum, share) => sum + share.paymentAmount, 0),
                 )} to a single guest.`,
               },
@@ -474,7 +466,7 @@ export default function BookingCheckoutFlow({
                 </Typography>
               ) : null}
               <Typography sx={{ fontSize: 18, fontWeight: 900, color: m.headingText, mt: 0.5 }}>
-                {formatEur(amount)}
+                {formatCompactEuro(amount)}
               </Typography>
             </Box>
           ) : null}
@@ -624,7 +616,7 @@ export default function BookingCheckoutFlow({
           }}
         >
           <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
-            <Typography sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.86) }}>
+            <Typography sx={mollureSectionTitleSx(m.navy)}>
               {mode === "split" ? "Guest payment" : "After treatment Summary"}
             </Typography>
             <Box
@@ -659,7 +651,7 @@ export default function BookingCheckoutFlow({
                   {line.label}
                 </Typography>
                 <Typography sx={{ fontSize: 13, fontWeight: 800 }}>
-                  {formatEur(line.amount)}
+                  {formatCompactEuro(line.amount)}
                 </Typography>
               </Stack>
             ))}
@@ -667,7 +659,7 @@ export default function BookingCheckoutFlow({
           <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.75 }}>
             <Typography sx={{ fontSize: 13, fontWeight: 900 }}>Payment</Typography>
             <Typography sx={{ fontSize: 22, fontWeight: 900, color: m.teal }}>
-              {formatEur(amount)}
+              {formatCompactEuro(amount)}
             </Typography>
           </Stack>
           <Typography sx={{ fontSize: 12, fontWeight: 650, color: alpha(m.navy, 0.5) }}>

@@ -12,6 +12,7 @@ import {
 } from "./calendar.utils";
 import { parseCalendarEntryNotes, serializeCalendarEntryNotes } from "./bookingEventDetails";
 import type { CalendarBookingDetails } from "../../../app/professionals/fixed-location/calendar/calendar.data";
+import { UUID_RE } from "../../../lib/uuid";
 
 const statusToApi: Record<CalendarBookingStatus, CreateCalendarEntryRequest["status"]> = {
   Confirmed: "confirmed",
@@ -57,8 +58,6 @@ const locationFromApi: Record<string, CalendarBookingLocation> = {
   fixed: "FL",
   desired: "DL",
 };
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function filterUuidServiceIds(ids: readonly string[]): string[] {
   return ids.filter((id) => UUID_RE.test(id));

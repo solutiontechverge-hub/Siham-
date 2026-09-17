@@ -1,12 +1,15 @@
 "use client";
 
+import { mollureLabelSx } from "../../../theme/mollureHierarchy";
+
 import * as React from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
-import RemoveRoundedIcon from "@mui/icons-material/RemoveRounded";
-import { Box, ButtonBase, Checkbox, IconButton, Stack } from "@mui/material";
+import { Box, ButtonBase, Checkbox, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppSearchField from "../AppSearchField";
+import QtyStepper from "../QtyStepper";
 import { BodyText } from "../../ui/typography";
+import { bookingScreenTitleSx } from "./calendar.utils";
 import {
   formatProductUnitPrice,
   type BookingCatalogProduct,
@@ -77,9 +80,7 @@ function ProductRow({
       >
         <BodyText
           sx={{
-            fontSize: 12.5,
-            fontWeight: 900,
-            color: alpha(m.navy, 0.82),
+            ...mollureLabelSx(m.navy),
             lineHeight: 1.25,
           }}
         >
@@ -98,56 +99,13 @@ function ProductRow({
         </BodyText>
       </Box>
 
-      <Stack
-        direction="row"
-        alignItems="center"
-        sx={{
-          border: `1px solid ${alpha(m.navy, 0.12)}`,
-          borderRadius: "8px",
-          overflow: "hidden",
-          flexShrink: 0,
-        }}
-      >
-        <IconButton
-          size="small"
-          disabled={disabled || !checked || qty <= 1}
-          onClick={() => onQuantityChange(product.id, -1)}
-          sx={{
-            width: 30,
-            height: 30,
-            borderRadius: 0,
-            color: alpha(m.navy, 0.55),
-          }}
-        >
-          <RemoveRoundedIcon sx={{ fontSize: 16 }} />
-        </IconButton>
-        <BodyText
-          component="span"
-          sx={{
-            width: 24,
-            textAlign: "center",
-            fontSize: 12,
-            fontWeight: 900,
-            color: alpha(m.navy, 0.78),
-            lineHeight: 1,
-          }}
-        >
-          {qty}
-        </BodyText>
-        <IconButton
-          size="small"
-          disabled={disabled || !checked}
-          onClick={() => onQuantityChange(product.id, 1)}
-          sx={{
-            width: 30,
-            height: 30,
-            borderRadius: 0,
-            color: alpha(m.navy, 0.55),
-          }}
-        >
-          <AddRoundedIcon sx={{ fontSize: 16 }} />
-        </IconButton>
-      </Stack>
+      <QtyStepper
+        value={qty}
+        onDecrement={() => onQuantityChange(product.id, -1)}
+        onIncrement={() => onQuantityChange(product.id, 1)}
+        decrementDisabled={disabled || !checked || qty <= 1}
+        incrementDisabled={disabled || !checked}
+      />
 
       <Checkbox
         checked={checked}
@@ -194,9 +152,7 @@ export default function BookingSelectProductsScreen({
 
   return (
     <Stack spacing={1.5}>
-      <BodyText
-        sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 15 }}
-      >
+      <BodyText sx={bookingScreenTitleSx(m.navy)}>
         {heading}
       </BodyText>
 
@@ -263,12 +219,7 @@ export default function BookingSelectProductsScreen({
           </Box>
           <BodyText
             component="span"
-            sx={{
-              fontSize: 12.5,
-              fontWeight: 800,
-              color: alpha(m.navy, 0.6),
-              lineHeight: 1,
-            }}
+            sx={mollureLabelSx(m.navy, { color: alpha(m.navy, 0.6), lineHeight: 1 })}
           >
             {addButtonLabel}
           </BodyText>

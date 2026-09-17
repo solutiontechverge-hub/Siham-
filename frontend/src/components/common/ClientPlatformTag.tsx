@@ -3,10 +3,14 @@
 import * as React from "react";
 import { Box } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import type { Theme } from "@mui/material/styles";
 
 type ClientKind = "individual" | "company";
 
 export type ClientPlatformTagState = "guest" | "mollure" | "ic" | "cc" | null;
+
+/** Guest → navy; M / IC / BC → teal. Reuse anywhere client-type chips appear. */
+export type ClientPlatformTagTone = "navy" | "teal";
 
 export type ClientPlatformTagInput = {
   isMollure?: boolean;
@@ -14,12 +18,33 @@ export type ClientPlatformTagInput = {
   clientKind?: ClientKind | null;
 };
 
+type MollurePalette = Theme["palette"]["mollure"];
+
+/**
+ * Shared pill colors for client platform/type tags.
+ * - navy: Guest
+ * - teal: M / IC / BC
+ */
+export function clientPlatformTagToneColors(
+  m: MollurePalette,
+  tone: ClientPlatformTagTone = "navy",
+) {
+  return {
+    color: tone === "teal" ? m.teal : alpha(m.navy, 0.72),
+    bgcolor: tone === "teal" ? alpha(m.teal, 0.16) : alpha(m.navy, 0.06),
+    border: `1px solid ${
+      tone === "teal" ? alpha(m.teal, 0.4) : alpha(m.navy, 0.14)
+    }`,
+  };
+}
+
 /**
  * Client tags:
  * - Guest overlay → "Guest"
+ * - Mollure platform → "M" (when isMollure)
  * - Individual → "IC"
- * - Company → "CC"
- * - Mollure logo only when there is no IC/CC type tag
+ * - Company → "BC"
+ * M can sit beside IC/BC; non-Mollure clients get type tag only.
  */
 export function resolveClientPlatformTag(
   input: ClientPlatformTagInput,
@@ -87,14 +112,9 @@ function TagPill({
   tone = "navy",
 }: {
   label: string;
-  tone?: "navy" | "teal";
+  tone?: ClientPlatformTagTone;
 }) {
-  const m = useTheme().palette.mollure;
-  const color = tone === "teal" ? m.teal : alpha(m.navy, 0.72);
-  const bg =
-    tone === "teal" ? alpha(m.teal, 0.16) : alpha(m.navy, 0.06);
-  const border =
-    tone === "teal" ? alpha(m.teal, 0.4) : alpha(m.navy, 0.14);
+  const tones = clientPlatformTagToneColors(useTheme().palette.mollure, tone);
 
   return (
     <Box
@@ -108,9 +128,7 @@ function TagPill({
         minWidth: 28,
         px: 0.85,
         borderRadius: "999px",
-        bgcolor: bg,
-        color,
-        border: `1px solid ${border}`,
+        ...tones,
         fontSize: 11,
         fontWeight: 800,
         letterSpacing: "0.04em",
@@ -146,7 +164,7 @@ export default function ClientPlatformTag({
 
   const typeLabel =
     clientKind === "company"
-      ? "CC"
+      ? "BC"
       : clientKind === "individual"
         ? "IC"
         : null;
@@ -164,12 +182,16 @@ export default function ClientPlatformTag({
         lineHeight: 0,
       }}
     >
-      {typeLabel ? null : isMollure ? <MollureLogoMark size={16} /> : null}
+      {isMollure ? (
+        <Box component="span" aria-label="Mollure platform client">
+          <TagPill label="M" tone="teal" />
+        </Box>
+      ) : null}
       {typeLabel ? (
         <Box
           component="span"
           aria-label={
-            typeLabel === "CC" ? "Company Client" : "Individual Client"
+            typeLabel === "BC" ? "Company Client" : "Individual Client"
           }
         >
           <TagPill label={typeLabel} tone="teal" />

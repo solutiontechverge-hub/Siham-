@@ -13,6 +13,10 @@ import {
 import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
 import { alpha, useTheme } from "@mui/material/styles";
 import { AppSearchField } from "../common";
+import {
+  mollureLabelSx,
+  mollureBodyMutedSx,
+} from "../../theme/mollureHierarchy";
 import AdminDateRangeSelector from "./AdminDateRangeSelector";
 import type { AdminDashboardRangeValue } from "./dashboardRangeUtils";
 
@@ -133,25 +137,23 @@ export default function AdminDashboardHeader({
             }}
           >
             <Typography
-              sx={{
-                fontSize: 13,
+              sx={mollureLabelSx(tokens.navy, {
                 fontWeight: 600,
-                color: tokens.navy,
                 lineHeight: 1.15,
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
-              }}
+              })}
             >
               Admin User
             </Typography>
             <Typography
-              sx={{
+              sx={mollureBodyMutedSx(tokens.navy, {
                 fontSize: 11,
                 color: tokens.slate,
                 lineHeight: 1.15,
                 whiteSpace: "nowrap",
-              }}
+              })}
             >
               Super Admin
             </Typography>
@@ -167,14 +169,14 @@ export function AdminDashboardFooter() {
 
   return (
     <Typography
-      sx={{
+      sx={mollureBodyMutedSx(tokens.navy, {
         textAlign: "center",
         fontSize: 11,
         color: tokens.slate,
         mt: 1.5,
         pt: 1,
         borderTop: `1px solid ${tokens.cardBorder}`,
-      }}
+      })}
     >
       © 2025 Molur. All rights reserved.
     </Typography>
@@ -194,13 +196,12 @@ export function AdminSectionLink({
     <Typography
       component={Link}
       href={href}
-      sx={{
-        fontSize: 12,
+      sx={mollureLabelSx(tokens.navy, {
         fontWeight: 600,
         color: tokens.teal,
         textDecoration: "none",
         "&:hover": { textDecoration: "underline" },
-      }}
+      })}
     >
       {label}
     </Typography>

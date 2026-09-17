@@ -15,7 +15,7 @@ export const dashboardBookingSplit = [
 
 export const dashboardClientSplit = [
   { name: "Individual (IC)", value: 2840 },
-  { name: "Company (CC)", value: 620 },
+  { name: "Company (BC)", value: 620 },
 ];
 
 export const dashboardKpisByRange = {

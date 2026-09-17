@@ -14,6 +14,7 @@ import { exportReviewsToExcel } from "../../exportReviewsExcel";
 import { exportReviewsToPdf } from "../../exportReviewsPdf";
 import { PAGE_SIZE_OPTIONS } from "./reviews.data";
 import type { RatingRanges } from "./reviews.types";
+import { parseText } from "../../../../lib/inputSchema";
 
 const DEFAULT_RANGES: RatingRanges = ratingCategoryDefaults;
 
@@ -47,8 +48,14 @@ export function useAdminReviewsPage() {
     React.useState<FlaggedReviewRow | null>(null);
 
   const addKeyword = async () => {
-    const keyword = newKeyword.trim().toLowerCase();
-    if (!keyword || keywords.includes(keyword)) return;
+    const parsed = parseText(newKeyword, {
+      label: "Keyword",
+      min: 1,
+      max: 64,
+    });
+    if (!parsed.ok) return;
+    const keyword = parsed.value.toLowerCase();
+    if (keywords.includes(keyword)) return;
     await addAdminKeyword(keyword);
     setNewKeyword("");
   };
