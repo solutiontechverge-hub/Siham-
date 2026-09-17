@@ -84,6 +84,7 @@ export function useProfessionalFixedLocationCalendarOpenBookingDrawer({
     setShowPrepayment,
     setPrepaymentPercent,
     setPaymentMethod,
+    clearDrawerPrepaymentPaidOverride,
     setShowKilometerAllowance,
     setKilometerAllowanceDraft,
     setDesiredLocationDraft,
@@ -112,6 +113,7 @@ export function useProfessionalFixedLocationCalendarOpenBookingDrawer({
       },
     ) => {
       clearProfessionalBookingDrawerDraft();
+      clearDrawerPrepaymentPaidOverride();
       const allowTimeSelection = Boolean(options?.allowTimeSelection);
       const openCalendar = options?.openCalendar ?? allowTimeSelection;
       const calendarTouched = options?.calendarTouched ?? !allowTimeSelection;
@@ -231,6 +233,7 @@ export function useProfessionalFixedLocationCalendarOpenBookingDrawer({
       kilometerAllowanceEurPerKmDefault,
       lateRescheduleFeePercentDefault,
       prepaymentPercentDefault,
+      clearDrawerPrepaymentPaidOverride,
     ],
   );
   return { openBookingDrawer };

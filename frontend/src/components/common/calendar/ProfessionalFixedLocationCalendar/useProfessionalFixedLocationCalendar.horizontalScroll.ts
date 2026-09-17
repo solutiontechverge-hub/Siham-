@@ -1,12 +1,15 @@
 import * as React from "react";
-import { TEAM_NAV_VISIBLE_SLOTS, WEEK_DAY_MIN_PX } from "./professionalFixedLocationCalendar.data";
+import { WEEK_DAY_MIN_PX } from "./professionalFixedLocationCalendar.data";
 
 export type UseProfessionalFixedLocationCalendarHorizontalScrollArgs = {
   viewMode: string;
   activeDateIso: string;
   teamHeaderNeedsScroll: boolean;
+  teamHeaderVisibleSlots: number;
   teamHeaderResources: readonly unknown[];
   teamHeaderScrollContentWidth: string;
+  /** Day body column count — sync header↔body scroll only when equal to header count. */
+  dayViewBodyColumnCount: number;
   visibleDatesLength: number;
   displayedResourcesLength: number;
 };
@@ -14,9 +17,11 @@ export type UseProfessionalFixedLocationCalendarHorizontalScrollArgs = {
 export function useProfessionalFixedLocationCalendarHorizontalScroll({
   viewMode,
   activeDateIso,
-  teamHeaderNeedsScroll,
+  teamHeaderNeedsScroll: _teamHeaderNeedsScroll,
+  teamHeaderVisibleSlots,
   teamHeaderResources,
   teamHeaderScrollContentWidth,
+  dayViewBodyColumnCount,
   visibleDatesLength,
   displayedResourcesLength,
 }: UseProfessionalFixedLocationCalendarHorizontalScrollArgs) {
@@ -28,6 +33,11 @@ export function useProfessionalFixedLocationCalendarHorizontalScroll({
       canLeft: false,
       canRight: false,
     });
+
+  const dayHeaderBodyScrollAligned =
+    viewMode === "day" &&
+    dayViewBodyColumnCount > 1 &&
+    dayViewBodyColumnCount === teamHeaderResources.length;
 
   const refreshHorizontalScrollEdges = React.useCallback(
     (
@@ -57,17 +67,57 @@ export function useProfessionalFixedLocationCalendarHorizontalScroll({
   }, [refreshHorizontalScrollEdges]);
 
   const syncDayTeamHorizontalScroll = React.useCallback(
-    (_source: "header" | "body") => {
-      // Header (nav) and body (dynamic columns) can have different column counts —
-      // do not sync scrollLeft between them.
+    (source: "header" | "body") => {
       refreshWeekTeamHeaderScrollEdges();
+      if (!dayHeaderBodyScrollAligned || dayScrollSyncLockRef.current) return;
+      const header = weekTeamHeaderScrollRef.current;
+      const body = dayBodyScrollRef.current;
+      if (!header || !body) return;
+      dayScrollSyncLockRef.current = true;
+      if (source === "header") {
+        body.scrollLeft = header.scrollLeft;
+      } else {
+        header.scrollLeft = body.scrollLeft;
+      }
+      requestAnimationFrame(() => {
+        dayScrollSyncLockRef.current = false;
+      });
     },
-    [refreshWeekTeamHeaderScrollEdges],
+    [dayHeaderBodyScrollAligned, refreshWeekTeamHeaderScrollEdges],
   );
 
   const onTeamHeaderScroll = React.useCallback(() => {
+    if (dayHeaderBodyScrollAligned) {
+      syncDayTeamHorizontalScroll("header");
+      return;
+    }
+    // Focus/split: names above body must stay the leading prefix — snap back.
+    const header = weekTeamHeaderScrollRef.current;
+    if (viewMode === "day" && header && header.scrollLeft !== 0) {
+      header.scrollLeft = 0;
+    }
     refreshWeekTeamHeaderScrollEdges();
-  }, [refreshWeekTeamHeaderScrollEdges]);
+  }, [
+    dayHeaderBodyScrollAligned,
+    refreshWeekTeamHeaderScrollEdges,
+    syncDayTeamHorizontalScroll,
+    viewMode,
+  ]);
+
+  // Focus/split: pin leading header cells under body; do not leave scroll mid-roster.
+  React.useLayoutEffect(() => {
+    if (viewMode !== "day" || dayHeaderBodyScrollAligned) return;
+    const el = weekTeamHeaderScrollRef.current;
+    if (!el || el.scrollLeft === 0) return;
+    el.scrollLeft = 0;
+    refreshWeekTeamHeaderScrollEdges();
+  }, [
+    activeDateIso,
+    dayHeaderBodyScrollAligned,
+    refreshWeekTeamHeaderScrollEdges,
+    teamHeaderResources,
+    viewMode,
+  ]);
 
   React.useEffect(() => {
     const el = weekTeamHeaderScrollRef.current;
@@ -85,7 +135,8 @@ export function useProfessionalFixedLocationCalendarHorizontalScroll({
   const scrollTeamNav = React.useCallback(
     (el: HTMLDivElement | null, direction: -1 | 1): number | undefined => {
       if (!el) return undefined;
-      const step = el.clientWidth / TEAM_NAV_VISIBLE_SLOTS;
+      const slots = Math.max(1, teamHeaderVisibleSlots);
+      const step = el.clientWidth / slots;
       if (step <= 0) return undefined;
       const maxIndex = Math.max(
         0,
@@ -97,7 +148,7 @@ export function useProfessionalFixedLocationCalendarHorizontalScroll({
       el.scrollTo({ left: nextLeft, behavior: "smooth" });
       return nextLeft;
     },
-    [],
+    [teamHeaderVisibleSlots],
   );
 
   const scrollWeekTeamHeader = React.useCallback(
@@ -106,10 +157,12 @@ export function useProfessionalFixedLocationCalendarHorizontalScroll({
         weekTeamHeaderScrollRef.current,
         direction,
       );
+      // Only mirror into body when column counts match (filter-narrowed day).
+      // Focus/split: shorter body stays under leading header cells.
       if (
         typeof nextLeft === "number" &&
         viewMode === "day" &&
-        teamHeaderNeedsScroll
+        dayHeaderBodyScrollAligned
       ) {
         dayBodyScrollRef.current?.scrollTo({
           left: nextLeft,
@@ -117,7 +170,7 @@ export function useProfessionalFixedLocationCalendarHorizontalScroll({
         });
       }
     },
-    [scrollTeamNav, teamHeaderNeedsScroll, viewMode],
+    [dayHeaderBodyScrollAligned, scrollTeamNav, viewMode],
   );
 
   const weekDayCount = visibleDatesLength;

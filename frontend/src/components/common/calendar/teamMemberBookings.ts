@@ -36,6 +36,11 @@ export function collectEventTeamMemberIds(
 
   for (const service of details?.clientSnapshot?.services ?? []) {
     addAssignedTeamId(ids, service.teamMemberId);
+    addAssignedTeamId(ids, service.staffResourceId);
+  }
+
+  for (const person of details?.clientSnapshot?.people ?? []) {
+    addAssignedTeamId(ids, person.bufferTeamMemberId);
   }
 
   return [...ids];

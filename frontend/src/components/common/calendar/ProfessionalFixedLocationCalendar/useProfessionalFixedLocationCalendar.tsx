@@ -600,6 +600,8 @@ export function useProfessionalFixedLocationCalendar({
   const {
     postBookingPendingPayment,
     isDrawerPrepaymentPaid,
+    confirmDrawerPrepayment,
+    clearDrawerPrepaymentPaidOverride,
     prepaymentSectionTitle,
     drawerPriceDisplay,
     drawerPaymentMethod,
@@ -625,6 +627,7 @@ export function useProfessionalFixedLocationCalendar({
     selectedServices,
     selectedSlot,
     editingEventId,
+    setEvents,
     selectedClient,
     financeSettings,
     addClientSource,
@@ -780,7 +783,8 @@ export function useProfessionalFixedLocationCalendar({
     setActivityDetailItem(null);
     setBookingCheckoutOpen(false);
     setFocusSalesCardId(null);
-  }, []);
+    clearDrawerPrepaymentPaidOverride();
+  }, [clearDrawerPrepaymentPaidOverride]);
 
   const calendarFieldLabel = React.useMemo(() => {
     if ((isViewingBooking || slotCalendarTouched) && selectedSlot?.date) {
@@ -977,6 +981,7 @@ export function useProfessionalFixedLocationCalendar({
     teamHeaderScrollContentWidth,
     teamHeaderScrollOverflowSx,
     teamHeaderScrollReservePx,
+    teamHeaderVisibleSlots,
     teamMenuBookings,
     teamMenuResource,
     teamMenuResourceId,
@@ -1114,7 +1119,7 @@ export function useProfessionalFixedLocationCalendar({
       addClientSource,
       bookingPhoneDraft.phoneCode,
       bookingPhoneDraft.phoneNumber,
-      guestDraft.firstName,
+      guestDraft,
       nonMollureClientType,
       nonMollureDraft,
       paymentMethod,
@@ -1339,8 +1344,10 @@ export function useProfessionalFixedLocationCalendar({
     viewMode,
     activeDateIso,
     teamHeaderNeedsScroll,
+    teamHeaderVisibleSlots,
     teamHeaderResources,
     teamHeaderScrollContentWidth,
+    dayViewBodyColumnCount: dayViewMemberColumns.length,
     visibleDatesLength: visibleDates.length,
     displayedResourcesLength: displayedResources.length,
   });
@@ -1448,6 +1455,7 @@ export function useProfessionalFixedLocationCalendar({
         setBookingProjectDescription,
         setBookingProjectUploads,
         ...feeDrawerApply,
+        clearDrawerPrepaymentPaidOverride,
         setShowInternalNote,
         setBookingInternalNote,
         setShowKilometerAllowance,
@@ -1606,6 +1614,7 @@ export function useProfessionalFixedLocationCalendar({
         setBookingPhoneDraft,
         setDesiredLocationDraft,
         ...feeDrawerApply,
+        clearDrawerPrepaymentPaidOverride,
         setShowInternalNote,
         setBookingInternalNote,
         setShowKilometerAllowance,
@@ -1912,6 +1921,7 @@ export function useProfessionalFixedLocationCalendar({
       prepaymentPercent,
       prepaymentAmount,
       paymentMethod,
+      confirmPrepayment: isDrawerPrepaymentPaid,
       showLateCancellation,
       lateCancellationFeePercent,
       lateCancellationFeePercentCeiling,
@@ -2054,6 +2064,7 @@ export function useProfessionalFixedLocationCalendar({
     closeClientDetailsDrawer,
     closeNotInListPopover,
     closeTeamMenu,
+    confirmDrawerPrepayment,
     createFinanceTransaction,
     customBookingProducts,
     data,
@@ -2478,6 +2489,7 @@ export function useProfessionalFixedLocationCalendar({
     teamHeaderScrollContentWidth,
     teamHeaderScrollOverflowSx,
     teamHeaderScrollReservePx,
+    teamHeaderVisibleSlots,
     teamLabelById,
     teamMenuBookings,
     teamMenuResource,

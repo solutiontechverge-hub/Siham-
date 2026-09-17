@@ -1,8 +1,10 @@
 import * as React from "react";
 import { parseStoredEbrFromNotes } from "../bookingEventDetails";
 import {
+  allowComputedServiceAddCancelTags,
   detectServiceLineChanges,
   detectSilentUpdatedFields,
+  flattenBookingServices,
   isSilentSafeBookingChange,
   hasServiceReorderOnly,
   resolveLineChangeTags,
@@ -134,10 +136,19 @@ export function useProfessionalFixedLocationCalendarDrawerLineTagsResolve(
   ]);
   const drawerLineChangeSets = React.useMemo(() => {
     const ebr = parseStoredEbrFromNotes(drawerEbrNotes);
-    const original =
-      negotiationDetails?.originalServices ??
-      viewingBookingEvent?.details?.originalServices ??
-      [];
+    const original = flattenBookingServices({
+      services:
+        negotiationDetails?.originalServices ??
+        viewingBookingEvent?.details?.originalServices ??
+        [],
+      guests:
+        negotiationDetails?.originalGuests ??
+        viewingBookingEvent?.details?.originalGuests ??
+        savedBookingDetails?.originalGuests ??
+        // Create-era bookings omit originalGuests; last-saved guests are baseline.
+        viewingBookingEvent?.details?.guests ??
+        savedBookingDetails?.guests,
+    });
     const current = [
       ...selectedServices.map((service) => ({
         id: service.id,
@@ -146,7 +157,10 @@ export function useProfessionalFixedLocationCalendarDrawerLineTagsResolve(
         durationMins: service.durationMins,
         startTime: service.startTime,
         endTime: service.endTime,
-        staffResourceId: service.staffResourceId,
+        staffResourceId:
+          service.staffResourceId ?? service.teamMemberId ?? undefined,
+        teamMemberId:
+          service.teamMemberId ?? service.staffResourceId ?? undefined,
         guestId: service.guestId,
       })),
       ...bookingGuests.flatMap((guest) =>
@@ -157,7 +171,10 @@ export function useProfessionalFixedLocationCalendarDrawerLineTagsResolve(
           durationMins: service.durationMins,
           startTime: service.startTime,
           endTime: service.endTime,
-          staffResourceId: service.staffResourceId,
+          staffResourceId:
+            service.staffResourceId ?? service.teamMemberId ?? undefined,
+          teamMemberId:
+            service.teamMemberId ?? service.staffResourceId ?? undefined,
           guestId: guest.id,
         })),
       ),
@@ -173,6 +190,13 @@ export function useProfessionalFixedLocationCalendarDrawerLineTagsResolve(
       (showSilentFieldTags ||
         silentSafeDrawerEdit ||
         Boolean(savedBookingDetails?.silentUpdated));
+    // Create / view-after-create: no computed Added (empty or client-only
+    // original would otherwise tag every guest line). Persisted ids still win.
+    const allowComputedAddedCancelled = allowComputedServiceAddCancelTags({
+      hasExistingBooking: Boolean(viewingBookingEvent),
+      isEditingExisting,
+      awaitingLineApproval,
+    });
     const added =
       negotiationDetails?.addedServiceIds?.length
         ? negotiationDetails.addedServiceIds
@@ -180,7 +204,7 @@ export function useProfessionalFixedLocationCalendarDrawerLineTagsResolve(
           ? ebr.addedServiceIds
           : savedBookingDetails?.addedServiceIds?.length
             ? savedBookingDetails.addedServiceIds
-            : suppressComputedErLineTags
+            : !allowComputedAddedCancelled || suppressComputedErLineTags
               ? []
               : computed.added;
     const cancelled =
@@ -190,7 +214,7 @@ export function useProfessionalFixedLocationCalendarDrawerLineTagsResolve(
           ? ebr.cancelledServiceIds
           : savedBookingDetails?.cancelledServiceIds?.length
             ? savedBookingDetails.cancelledServiceIds
-            : suppressComputedErLineTags
+            : !allowComputedAddedCancelled || suppressComputedErLineTags
               ? []
               : computed.cancelled;
     const addedSet = new Set(added);
@@ -213,11 +237,15 @@ export function useProfessionalFixedLocationCalendarDrawerLineTagsResolve(
         savedBookingDetails?.originalGuests,
       currentGuests: bookingGuests,
     });
-    const editedSource = storedEdited.length
-      ? storedEdited
-      : reorderOnly || suppressComputedErLineTags
-        ? []
-        : computed.edited;
+    const editedSource = (() => {
+      if (reorderOnly || suppressComputedErLineTags) return [] as string[];
+      // Live ER: trust persisted negotiation tags until the client responds.
+      if (awaitingLineApproval && storedEdited.length) return storedEdited;
+      // Recompute when we have a baseline so stale notes.editedServiceIds
+      // (e.g. false multi-guest id collisions) do not sticky-badge on view.
+      if (original.length > 0) return computed.edited;
+      return [] as string[];
+    })();
     return {
       added,
       cancelled,
@@ -229,6 +257,7 @@ export function useProfessionalFixedLocationCalendarDrawerLineTagsResolve(
     awaitingLineApproval,
     bookingGuests,
     drawerEbrNotes,
+    isEditingExisting,
     negotiationDetails?.addedServiceIds,
     negotiationDetails?.cancelledServiceIds,
     negotiationDetails?.clientEditedServiceIds,
@@ -245,6 +274,9 @@ export function useProfessionalFixedLocationCalendarDrawerLineTagsResolve(
     selectedServices,
     showSilentFieldTags,
     silentSafeDrawerEdit,
+    viewingBookingEvent,
+    viewingBookingEvent?.details?.guests,
+    viewingBookingEvent?.details?.originalGuests,
     viewingBookingEvent?.details?.originalServices,
   ]);
   /** Per-item Edited / Added / Cancelled, plus Pending while client approval is outstanding. */

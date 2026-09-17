@@ -42,6 +42,8 @@ export function buildPersistDrawerDetails(input: {
   showPrepayment: boolean;
   prepaymentPercent: string;
   paymentMethod: "online" | "offline";
+  /** When true, persist prepaymentStatus confirmed (offline Save / temp Pay Now). */
+  confirmPrepayment?: boolean;
   showLateCancellation: boolean;
   lateCancellationFeePercent: string;
   lateCancellationFeePercentCeiling: string;
@@ -75,6 +77,7 @@ export function buildPersistDrawerDetails(input: {
     showPrepayment,
     prepaymentPercent,
     paymentMethod,
+    confirmPrepayment = false,
     showLateCancellation,
     lateCancellationFeePercent,
     lateCancellationFeePercentCeiling,
@@ -134,6 +137,8 @@ export function buildPersistDrawerDetails(input: {
         ? {
             requestDirection: "outgoing" as const,
             originalServices: selectedServices,
+            // Freeze guest baseline so first-view does not treat them as Added.
+            originalGuests: guestsForPersist,
           }
         : existingEvent?.details?.requestDirection
           ? {
@@ -141,18 +146,29 @@ export function buildPersistDrawerDetails(input: {
               ...(existingEvent.details.originalServices?.length
                 ? {
                     originalServices: existingEvent.details.originalServices,
+                    ...(existingEvent.details.originalGuests?.length
+                      ? {
+                          originalGuests: existingEvent.details.originalGuests,
+                        }
+                      : {}),
                   }
-                : { originalServices: selectedServices }),
+                : {
+                    originalServices: selectedServices,
+                    originalGuests: guestsForPersist,
+                  }),
             }
           : {
               requestDirection: "outgoing" as const,
               originalServices: selectedServices,
+              originalGuests: guestsForPersist,
             }),
     }),
     ...(showPrepayment
       ? {
           prepaymentStatus:
-            paymentMethod === "offline"
+            paymentMethod === "offline" ||
+            confirmPrepayment ||
+            existingEvent?.details?.prepaymentStatus === "confirmed"
               ? ("confirmed" as const)
               : (existingEvent?.details?.prepaymentStatus ??
                 ("pending" as const)),

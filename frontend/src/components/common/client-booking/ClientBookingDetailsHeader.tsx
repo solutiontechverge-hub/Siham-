@@ -451,9 +451,10 @@ export default function ClientBookingDetailsHeader({
         }}
       >
         {showConfirmedEditMenu ? (
-          <>
-            {onEditDateTime ? (
+          [
+            onEditDateTime ? (
               <MenuItem
+                key="edit-datetime"
                 onClick={() => {
                   setEditAnchor(null);
                   onEditDateTime();
@@ -462,12 +463,13 @@ export default function ClientBookingDetailsHeader({
               >
                 Date &amp; Time
               </MenuItem>
-            ) : null}
-            {onEditDateTime && onEditBookingDetails ? (
-              <Divider sx={{ my: 0 }} />
-            ) : null}
-            {onEditBookingDetails ? (
+            ) : null,
+            onEditDateTime && onEditBookingDetails ? (
+              <Divider key="edit-datetime-details-divider" sx={{ my: 0 }} />
+            ) : null,
+            onEditBookingDetails ? (
               <MenuItem
+                key="edit-details"
                 onClick={() => {
                   setEditAnchor(null);
                   onEditBookingDetails();
@@ -476,22 +478,23 @@ export default function ClientBookingDetailsHeader({
               >
                 Booking Details
               </MenuItem>
-            ) : null}
-            {locationMode === "desired" && onEditProject ? (
-              <>
-                <Divider sx={{ my: 0 }} />
-                <MenuItem
-                  onClick={() => {
-                    setEditAnchor(null);
-                    onEditProject();
-                  }}
-                  sx={menuItemSx}
-                >
-                  Project
-                </MenuItem>
-              </>
-            ) : null}
-          </>
+            ) : null,
+            locationMode === "desired" && onEditProject ? (
+              <Divider key="edit-project-divider" sx={{ my: 0 }} />
+            ) : null,
+            locationMode === "desired" && onEditProject ? (
+              <MenuItem
+                key="edit-project"
+                onClick={() => {
+                  setEditAnchor(null);
+                  onEditProject();
+                }}
+                sx={menuItemSx}
+              >
+                Project
+              </MenuItem>
+            ) : null,
+          ]
         ) : bookingRequestSent ? (
           <MenuItem
             disabled

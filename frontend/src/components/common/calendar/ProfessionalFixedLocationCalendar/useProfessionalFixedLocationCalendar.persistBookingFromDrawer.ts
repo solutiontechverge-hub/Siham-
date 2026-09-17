@@ -84,6 +84,8 @@ export type UseProfessionalFixedLocationCalendarPersistBookingFromDrawerArgs = {
   prepaymentPercent: string;
   prepaymentAmount: number;
   paymentMethod: "online" | "offline";
+  /** Matches offline Save confirmPrepayment / temp Pay Now paid override. */
+  confirmPrepayment: boolean;
   showLateCancellation: boolean;
   lateCancellationFeePercent: string;
   lateCancellationFeePercentCeiling: string;
@@ -164,6 +166,7 @@ export function useProfessionalFixedLocationCalendarPersistBookingFromDrawer({
   prepaymentPercent,
   prepaymentAmount,
   paymentMethod,
+  confirmPrepayment,
   showLateCancellation,
   lateCancellationFeePercent,
   lateCancellationFeePercentCeiling,
@@ -362,6 +365,7 @@ export function useProfessionalFixedLocationCalendarPersistBookingFromDrawer({
         showPrepayment,
         prepaymentPercent,
         paymentMethod,
+        confirmPrepayment,
         showLateCancellation,
         lateCancellationFeePercent,
         lateCancellationFeePercentCeiling,

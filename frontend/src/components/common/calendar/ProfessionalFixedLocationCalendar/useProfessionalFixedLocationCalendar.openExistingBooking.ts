@@ -93,6 +93,7 @@ export type UseProfessionalFixedLocationCalendarOpenExistingBookingArgs = {
     setShowPrepayment: (v: boolean) => void;
     setPrepaymentPercent: (v: string) => void;
     setPaymentMethod: (v: "online" | "offline") => void;
+    clearDrawerPrepaymentPaidOverride?: () => void;
     setShowLateCancellation: (v: boolean) => void;
     setLateCancellationFeePercent: (v: string) => void;
     setLateCancellationFeePercentCeiling: (v: string) => void;
@@ -244,6 +245,7 @@ export function useProfessionalFixedLocationCalendarOpenExistingBooking({
       a.setShowPrepayment(hydration.showPrepayment);
       a.setPrepaymentPercent(hydration.prepaymentPercent);
       a.setPaymentMethod(hydration.paymentMethod);
+      a.clearDrawerPrepaymentPaidOverride?.();
       a.setShowLateCancellation(hydration.showLateCancellation);
       a.setLateCancellationFeePercent(hydration.lateCancellationFeePercent);
       a.setLateCancellationFeePercentCeiling(

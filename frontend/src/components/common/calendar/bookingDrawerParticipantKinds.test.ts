@@ -49,4 +49,24 @@ assert.deepEqual(
   ["model", "planning", "buffer"],
 );
 
+assert.deepEqual(
+  resolveBookingDrawerParticipantKinds({
+    location: "FL",
+    projectEnabled: false,
+    extraGuestCount: 0,
+    primaryClientIsGuest: true,
+  }),
+  [],
+);
+
+assert.deepEqual(
+  resolveBookingDrawerParticipantKinds({
+    location: "DL",
+    projectEnabled: false,
+    extraGuestCount: 0,
+    primaryClientIsGuest: true,
+  }),
+  ["buffer"],
+);
+
 console.log("bookingDrawerParticipantKinds.test.ts passed");

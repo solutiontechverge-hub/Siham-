@@ -8,6 +8,8 @@ import { BodyText } from "../../../ui/typography";
 
 import AppTextField from "../../AppTextField";
 
+import AppCountryPhoneFields from "../../AppCountryPhoneFields";
+
 import { sanitizeNameInput } from "../../../../lib/field-input";
 
 import { useProfessionalFixedLocationCalendar } from "./useProfessionalFixedLocationCalendar";
@@ -89,7 +91,44 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerSubScreens
           />
         </Stack>
 
-        <Box sx={{ flex: 1, minHeight: 200 }} />
+        <AppCountryPhoneFields
+          countryCode={guestDraft.phoneCode}
+          phone={guestDraft.phoneNumber}
+          onCountryCodeChange={(dialCode) =>
+            setGuestDraft((p) => ({
+              ...p,
+              phoneCode: dialCode,
+            }))
+          }
+          onPhoneChange={(phone) =>
+            setGuestDraft((p) => ({
+              ...p,
+              phoneNumber: phone,
+            }))
+          }
+          countryCodeError={slotErrors.guestPhoneCode}
+          phoneError={slotErrors.guestPhoneNumber}
+          phonePlaceholder="+316xxxxxxxx"
+          required
+        />
+
+        <AppTextField
+          label="Email Address"
+          placeholder="Enter email address"
+          value={guestDraft.email}
+          onChange={(e) =>
+            setGuestDraft((p) => ({
+              ...p,
+              email: e.target.value,
+            }))
+          }
+          fullWidth
+          required
+          error={Boolean(slotErrors.guestEmail)}
+          helperText={slotErrors.guestEmail}
+        />
+
+        <Box sx={{ flex: 1, minHeight: 140 }} />
       </Stack>
   );
 }

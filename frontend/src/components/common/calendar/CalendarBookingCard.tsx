@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Avatar, Box, Stack } from "@mui/material";
+import { Avatar, Box, Stack, Tooltip } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import type { SxProps, Theme } from "@mui/material/styles";
 import Image from "next/image";
@@ -50,11 +50,19 @@ import { sanitizeInternalNoteText } from "./bookingEventDetails";
 import BookingIdTooltipLabel from "./BookingIdTooltipLabel";
 import { BookingCardTeamGroupIcon } from "./CalendarBookingCardTeamGroup";
 import {
+  isTeamSharedBooking,
+  teamSharedBookingTooltip,
+} from "./teamMemberBookings";
+import {
   getCalendarCardGapLines,
   getCalendarCardServiceLines,
   getOtherAssignedTeamMembers,
   layoutCalendarCardTimeline,
 } from "./calendarBookingCardServices";
+import {
+  resolveBookingIdAccentColor,
+  resolveCalendarBookingIdentity,
+} from "./calendar-overlap.utils";
 
 /** Single-service cards stay compact on the 24h grid. */
 const SINGLE_CARD_MIN_HEIGHT = 64;
@@ -138,6 +146,8 @@ export type CalendarBookingCardProps = {
   dense?: boolean;
   /** Week grid: exact start–end height, no nested service sub-cards. */
   weekSimple?: boolean;
+  /** Day multi-column lane owner — staff chip follows this, not a stale service assignee. */
+  laneResourceId?: string;
   teamMemberNameById?: ReadonlyMap<string, string>;
   teamResources?: readonly CalendarResource[];
   containerSx?: SxProps<Theme>;
@@ -181,6 +191,7 @@ export default function CalendarBookingCard({
   positioned = true,
   dense = false,
   weekSimple = false,
+  laneResourceId,
   teamMemberNameById,
   teamResources,
   containerSx,
@@ -222,6 +233,10 @@ export default function CalendarBookingCard({
       }),
     [event, teamMemberNameById, teamResources],
   );
+  const teamSharedTooltip = React.useMemo(() => {
+    if (!isTeamSharedBooking(event)) return "";
+    return teamSharedBookingTooltip(event, { nameById: teamMemberNameById });
+  }, [event, teamMemberNameById]);
   const isMultiService =
     !weekSimple &&
     (serviceLines.length > 1 ||
@@ -468,28 +483,47 @@ export default function CalendarBookingCard({
 
   if (isMultiService) {
     const mainBg = isIncomingEr ? alpha(m.teal, 0.14) : backgroundColor;
+    // Sub-card chrome only — main shell keeps status accent above.
+    const bookingAccent = resolveBookingIdAccentColor(
+      resolveCalendarBookingIdentity(event),
+      [
+        m.teal,
+        m.tealDark,
+        m.navy,
+        m.slate,
+        m.salesVolumeStackDark,
+        m.salesVolumeStackLight,
+        m.logoPrimary,
+        m.logoSecondary,
+        m.footer,
+        m.bodyText,
+      ],
+    );
+    const subAccentBorder = alpha(bookingAccent, 0.55);
     const subCardSurface =
       cardPattern === "dots"
         ? {
-            backgroundColor: mainBg,
+            backgroundColor: alpha(bookingAccent, 0.08),
             backgroundImage: [
               `radial-gradient(${alpha(m.navy, 0.14)} 1px, transparent 1.35px)`,
-              `linear-gradient(180deg, ${alpha("#fff", 0.45)} 0%, transparent 100%)`,
+              `linear-gradient(180deg, ${alpha("#fff", 0.55)} 0%, transparent 100%)`,
             ].join(", "),
             backgroundSize: "17px 17px, 100% 100%",
             backgroundPosition: "0 0, 0 0",
           }
         : cardPattern === "lines"
           ? {
-              backgroundColor: mainBg,
+              backgroundColor: alpha(bookingAccent, 0.08),
               backgroundImage: [
-                `repeating-linear-gradient(90deg, ${alpha(accentColor, 0.12)} 0 2px, transparent 2px 13px)`,
-                `linear-gradient(180deg, ${alpha("#fff", 0.5)} 0%, transparent 100%)`,
+                `repeating-linear-gradient(90deg, ${alpha(bookingAccent, 0.14)} 0 2px, transparent 2px 13px)`,
+                `linear-gradient(180deg, ${alpha("#fff", 0.55)} 0%, transparent 100%)`,
               ].join(", "),
               backgroundSize: "15px 100%, 100% 100%",
               backgroundPosition: "0 0, 0 0",
             }
-          : { backgroundColor: mainBg };
+          : {
+              backgroundColor: alpha(bookingAccent, 0.08),
+            };
 
     const bodyContent = (
       <Box sx={{ position: "relative", width: "100%", height: "100%" }}>
@@ -517,7 +551,7 @@ export default function CalendarBookingCard({
                   minHeight: 16,
                   zIndex: 0,
                   borderRadius: "3px",
-                  border: `1px dashed ${alpha(accentColor, 0.4)}`,
+                  border: `1px dashed ${alpha(bookingAccent, 0.35)}`,
                   bgcolor: alpha(m.navy, 0.04),
                   display: "flex",
                   alignItems: "center",
@@ -565,15 +599,15 @@ export default function CalendarBookingCard({
                 zIndex: 1,
                 boxSizing: "border-box",
                 borderRadius: "3px",
-                border: `1px solid ${borderColor}`,
+                border: `1px solid ${subAccentBorder}`,
                 borderLeft:
                   block.column === 0
-                    ? `3px solid ${accentColor}`
-                    : `1px solid ${borderColor}`,
+                    ? `3px solid ${bookingAccent}`
+                    : `1px solid ${subAccentBorder}`,
                 borderRight:
                   block.column > 0
-                    ? `3px solid ${accentColor}`
-                    : `1px solid ${borderColor}`,
+                    ? `3px solid ${bookingAccent}`
+                    : `1px solid ${subAccentBorder}`,
                 px: 0.55,
                 py: 0.4,
                 overflow: "hidden",
@@ -624,18 +658,23 @@ export default function CalendarBookingCard({
                 })()}
               </BodyText>
               {(() => {
-                const memberId = String(block.teamMemberId ?? "").trim();
+                const columnId = String(laneResourceId ?? "").trim();
+                const memberId =
+                  columnId || String(block.teamMemberId ?? "").trim();
                 const resource = memberId
                   ? teamResources?.find(
                       (item) => String(item.id) === memberId,
                     )
                   : undefined;
-                const memberName =
-                  firstNameLabel(resource?.name) ||
-                  firstNameLabel(block.teamMemberName) ||
-                  firstNameLabel(
-                    memberId ? teamMemberNameById?.get(memberId) : undefined,
-                  );
+                // Column context: lane owner wins. Else service assignee (week / no lane).
+                const memberName = columnId
+                  ? firstNameLabel(resource?.name) ||
+                    firstNameLabel(teamMemberNameById?.get(memberId))
+                  : firstNameLabel(resource?.name) ||
+                    firstNameLabel(block.teamMemberName) ||
+                    firstNameLabel(
+                      memberId ? teamMemberNameById?.get(memberId) : undefined,
+                    );
                 if (!memberName) return null;
                 const photoSrc = resource?.photoSrc?.trim() || undefined;
                 const initials = avatarInitials(
@@ -643,7 +682,7 @@ export default function CalendarBookingCard({
                   resource?.avatarText,
                 );
                 const onRight = block.column > 0;
-                return (
+                const chip = (
                   <Stack
                     direction={onRight ? "row-reverse" : "row"}
                     alignItems="center"
@@ -680,6 +719,18 @@ export default function CalendarBookingCard({
                       {memberName}
                     </BodyText>
                   </Stack>
+                );
+                if (!teamSharedTooltip) return chip;
+                return (
+                  <Tooltip
+                    title={teamSharedTooltip}
+                    placement="top"
+                    enterDelay={150}
+                  >
+                    <Box sx={{ minWidth: 0, width: "100%", cursor: "help" }}>
+                      {chip}
+                    </Box>
+                  </Tooltip>
                 );
               })()}
             </Box>

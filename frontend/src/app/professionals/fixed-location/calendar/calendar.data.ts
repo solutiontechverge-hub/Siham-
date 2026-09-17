@@ -101,6 +101,8 @@ export type CalendarBookingClientSnapshot = {
     endTime?: string;
     guestId?: string | null;
     teamMemberId?: string | null;
+    /** Older rows / lane writes may only set staffResourceId. */
+    staffResourceId?: string;
     teamMemberName?: string | null;
     originalPrice?: number;
     discountPct?: number;

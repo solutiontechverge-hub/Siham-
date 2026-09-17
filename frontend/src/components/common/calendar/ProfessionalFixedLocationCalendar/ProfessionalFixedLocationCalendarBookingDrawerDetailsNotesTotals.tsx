@@ -35,6 +35,8 @@ import BookingRequestAcceptedPanel from "../BookingRequestAcceptedPanel";
 
 import BookingDrawerTotalPriceCard from "../BookingDrawerTotalPriceCard";
 
+import { formatFinanceEuro } from "../../booking-finance/formatBookingFinance";
+
 import { useProfessionalFixedLocationCalendar } from "./useProfessionalFixedLocationCalendar";
 
 type Vm = ReturnType<typeof useProfessionalFixedLocationCalendar>;
@@ -49,6 +51,7 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsNotesTotalsBag 
   | "bookingTotalDiscount"
   | "bookingTotalForSave"
   | "canMutateDrawerContents"
+  | "confirmDrawerPrepayment"
   | "drawerPriceDisplay"
   | "handleBookingActionSelect"
   | "incomingClientNote"
@@ -94,6 +97,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsNot
     bookingTotalDiscount,
     bookingTotalForSave,
     canMutateDrawerContents,
+    confirmDrawerPrepayment,
     drawerPriceDisplay,
     handleBookingActionSelect,
     incomingClientNote,
@@ -272,6 +276,29 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsNot
                 prepaymentPercent={Number(prepaymentPercent) || 0}
                 prepaymentAmount={prepaymentAmount}
                 remainingAmount={remainingAfterPrepayment}
+                prepaidAction={
+                  showPrepayment &&
+                  !isDrawerPrepaymentPaid &&
+                  prepaymentAmount > 0 ? (
+                    <BodyText
+                      component="button"
+                      type="button"
+                      onClick={confirmDrawerPrepayment}
+                      sx={mollureLabelSx(m.navy, {
+                        border: 0,
+                        bgcolor: "transparent",
+                        p: 0,
+                        cursor: "pointer",
+                        color: m.teal,
+                        fontFamily: "inherit",
+                        "&:hover": { color: m.tealDark },
+                      })}
+                    >
+                      {/* ponytail: temp Stripe bypass — remove when real Pay Now is wired */}
+                      Pay Now {formatFinanceEuro(prepaymentAmount)}
+                    </BodyText>
+                  ) : undefined
+                }
                 extraRows={
                   kilometerAllowanceAmount > 0
                     ? [

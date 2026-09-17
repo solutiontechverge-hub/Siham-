@@ -15,9 +15,12 @@ import {
 } from "./professionalFixedLocationCalendar.data";
 import {
   buildBusyIntervalsForResource,
-  buildDayViewMemberColumnSource,
   filterResourcesForVisibleDates,
 } from "./useProfessionalFixedLocationCalendar.helpers";
+import {
+  buildDayViewTeamLayoutSource,
+  resolveDayViewColumnHeaderResources,
+} from "./useProfessionalFixedLocationCalendar.helpers.dayView";
 import type { UseProfessionalFixedLocationCalendarTeamArgs } from "./useProfessionalFixedLocationCalendar.team";
 
 /** Resource filter/rank + column layout (ponytail: subdomain of team). */
@@ -174,9 +177,10 @@ export function useProfessionalFixedLocationCalendarTeamLayout({
   ]);
 
   const hasTeamMembers = resources.length > 0;
-  const dayViewMemberColumnSource = React.useMemo(
+  // One source: body columns are always a prefix of headerResources (same order).
+  const dayViewTeamLayout = React.useMemo(
     () =>
-      buildDayViewMemberColumnSource({
+      buildDayViewTeamLayoutSource({
         viewMode,
         splitScreen,
         resourcesLength: resources.length,
@@ -187,6 +191,7 @@ export function useProfessionalFixedLocationCalendarTeamLayout({
         eventsMatchingDrawerFilters,
         activeDateIso,
         teamAll,
+        defaultVisibleSlots: TEAM_NAV_VISIBLE_SLOTS,
       }),
     [
       activeDateIso,
@@ -201,23 +206,33 @@ export function useProfessionalFixedLocationCalendarTeamLayout({
       viewMode,
     ],
   );
+  const dayViewMemberColumnSource = dayViewTeamLayout.memberColumns;
   const dayViewBodyGridTemplateColumns =
     dayViewMemberColumnSource.length > 1
       ? `repeat(${dayViewMemberColumnSource.length}, minmax(0, 1fr))`
       : "1fr";
+  // Focus group (selected + shared partners) fits without scroll; else default 3.
+  const teamHeaderVisibleSlots =
+    viewMode === "day"
+      ? dayViewTeamLayout.visibleSlots
+      : TEAM_NAV_VISIBLE_SLOTS;
   const dayViewBodyNeedsScroll =
     viewMode === "day" &&
-    dayViewMemberColumnSource.length > TEAM_NAV_VISIBLE_SLOTS;
+    dayViewMemberColumnSource.length > teamHeaderVisibleSlots;
   const dayViewBodyScrollContentWidth = dayViewBodyNeedsScroll
-    ? `calc(100% * ${dayViewMemberColumnSource.length} / ${TEAM_NAV_VISIBLE_SLOTS})`
+    ? `calc(100% * ${dayViewMemberColumnSource.length} / ${teamHeaderVisibleSlots})`
     : "100%";
   // Week always needs the date header row; day only needs a header when staff exist.
   const timelineHeaderRows =
     viewMode === "week" ? (hasTeamMembers ? 2 : 1) : hasTeamMembers ? 1 : 0;
-  // Header always lists nav members (not body columns).
-  const timelineHeaderMemberCount = teamNavResources.length;
+  // Day: full ordered roster in header; body uses focus/split columns only.
+  const teamHeaderResources =
+    viewMode === "day"
+      ? resolveDayViewColumnHeaderResources(dayViewTeamLayout)
+      : teamNavResources;
+  const timelineHeaderMemberCount = teamHeaderResources.length;
   const teamHeaderScrollReservePx =
-    hasTeamMembers && timelineHeaderMemberCount > TEAM_NAV_VISIBLE_SLOTS
+    hasTeamMembers && timelineHeaderMemberCount > teamHeaderVisibleSlots
       ? TEAM_NAV_SCROLLBAR_PX
       : 0;
   const timelineHeaderPx =
@@ -308,18 +323,28 @@ export function useProfessionalFixedLocationCalendarTeamLayout({
   ]);
 
   const dayViewMemberColumns = dayViewMemberColumnSource;
-  // Header = team nav only; body columns split separately (shared booking / filter).
-  const teamHeaderResources = teamNavResources;
   const teamHeaderMemberCount = teamHeaderResources.length;
-  const teamHeaderNeedsScroll = teamHeaderMemberCount > TEAM_NAV_VISIBLE_SLOTS;
-  const teamHeaderScrollContentWidth = teamHeaderNeedsScroll
-    ? `calc(100% * ${teamHeaderMemberCount} / ${TEAM_NAV_VISIBLE_SLOTS})`
+  // Focus/split: body is shorter than full roster — keep leading names locked
+  // under body lanes (no independent header scroll that would misalign names).
+  const dayFocusHeaderPinned =
+    viewMode === "day" &&
+    dayViewMemberColumnSource.length > 0 &&
+    dayViewMemberColumnSource.length !== teamHeaderMemberCount;
+  const teamHeaderWiderThanViewport =
+    teamHeaderMemberCount > teamHeaderVisibleSlots;
+  // Interactive scrollbar only when header↔body column counts match (can sync).
+  const teamHeaderNeedsScroll =
+    teamHeaderWiderThanViewport && !dayFocusHeaderPinned;
+  // Still size the strip so only the leading visibleSlots cells sit in view
+  // (clipped rest) when focus-pinned — never squeeze the full roster into 100%.
+  const teamHeaderScrollContentWidth = teamHeaderWiderThanViewport
+    ? `calc(100% * ${teamHeaderMemberCount} / ${teamHeaderVisibleSlots})`
     : "100%";
   const teamHeaderGridTemplateColumns =
     teamHeaderMemberCount > 0
       ? `repeat(${teamHeaderMemberCount}, minmax(0, 1fr))`
       : "1fr";
-  // Header scroll chrome follows nav member count.
+  // Header scroll chrome follows header member count.
   const teamHeaderScrollOverflowSx = {
     overflowX: teamHeaderNeedsScroll ? ("scroll" as const) : ("hidden" as const),
     overflowY: "hidden" as const,
@@ -379,6 +404,7 @@ export function useProfessionalFixedLocationCalendarTeamLayout({
     teamHeaderScrollContentWidth,
     teamHeaderScrollOverflowSx,
     teamHeaderScrollReservePx,
+    teamHeaderVisibleSlots,
     teamNavResources,
     timelineHeaderMemberCount,
     timelineHeaderPx,

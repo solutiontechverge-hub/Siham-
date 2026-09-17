@@ -50,6 +50,8 @@ export type ProfessionalFixedLocationCalendarDayWeekViewLaneColumnBookingsProps 
     weekDayCrowded: boolean;
     colIdx: number;
     laneColumnCount: number;
+    /** Column owner id — staff chips on day cards follow this lane. */
+    laneResourceId: string;
   };
 
 /** Week span cards + day clustered booking cards / ticket stacks */
@@ -59,6 +61,7 @@ export default function ProfessionalFixedLocationCalendarDayWeekViewLaneColumnBo
   weekDayCrowded,
   colIdx,
   laneColumnCount: laneColumnsLength,
+  laneResourceId,
 }: ProfessionalFixedLocationCalendarDayWeekViewLaneColumnBookingsProps) {
   const {
     businessResponseWindowInput,
@@ -186,6 +189,7 @@ export default function ProfessionalFixedLocationCalendarDayWeekViewLaneColumnBo
               top={top}
               rowPx={rowPx}
               slotHeight={height}
+              laneResourceId={laneResourceId}
               teamMemberNameById={resourceNameById}
               teamResources={data.resources}
               actionRailSide={actionRailSide}
@@ -207,6 +211,7 @@ export default function ProfessionalFixedLocationCalendarDayWeekViewLaneColumnBo
             height={height}
             left={6}
             right={6}
+            laneResourceId={laneResourceId}
             teamMemberNameById={resourceNameById}
             teamResources={data.resources}
             actionRailSide={actionRailSide}

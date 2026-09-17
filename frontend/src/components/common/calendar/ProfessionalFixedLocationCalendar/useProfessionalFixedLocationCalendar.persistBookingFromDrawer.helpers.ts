@@ -72,7 +72,8 @@ export function buildCurrentServicesForDiff(
 export function buildSuggestedServicesForEbr(
   selectedServices: BookingServiceLineItem[],
   guestsForPersist: PersistBookingGuest[],
-  snapshotServices: CalendarBookingServiceItem[],
+  // Client snapshot rows may use staffResourceId: null; only id/name/guestId are read.
+  snapshotServices: Array<{ id: string; name: string; guestId?: string | null }>,
 ): CalendarBookingServiceItem[] {
   return [
     ...selectedServices.map((service) => {

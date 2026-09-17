@@ -14,6 +14,8 @@ import {
   eventHasKnownTeamAssignment,
 } from "../teamMemberBookings";
 
+import { eventSticksToDayViewLane } from "./useProfessionalFixedLocationCalendar.helpers.dayView";
+
 import {
   getLocationAvailabilityBands,
   locationAvailabilityKindAtMinute,
@@ -131,28 +133,22 @@ export default function ProfessionalFixedLocationCalendarDayWeekViewLaneColumn({
 
   const laneEvents = eventsInRange.filter((event) => {
     if (event.date !== date) return false;
-    if (event.id.includes("::segment-")) {
-      if (String(event.resourceId) === String(resource.id)) {
-        return true;
-      }
-      const hasKnownTeam = knownResourceIds.has(String(event.resourceId));
-      return !hasKnownTeam && resource.id === fallbackTeamId;
-    }
+    const columnId = String(resource.id);
+    const eventResourceId = String(event.resourceId ?? "");
+    // Day: strict resourceId → lane (1-col and multi-col). Never belongs-to.
     if (viewMode === "day") {
-      if (eventBelongsToTeamMember(event, resource.id)) {
+      return eventSticksToDayViewLane(
+        event,
+        columnId,
+        knownResourceIds,
+        fallbackTeamId,
+      );
+    }
+    if (event.id.includes("::segment-")) {
+      if (eventResourceId === columnId) {
         return true;
       }
-      const hasKnownTeam =
-        Boolean(
-          event.resourceId && knownResourceIds.has(String(event.resourceId)),
-        ) ||
-        Boolean(
-          event.details?.services?.some(
-            (service) =>
-              service.teamMemberId &&
-              knownResourceIds.has(String(service.teamMemberId)),
-          ),
-        );
+      const hasKnownTeam = knownResourceIds.has(eventResourceId);
       return !hasKnownTeam && resource.id === fallbackTeamId;
     }
     if (viewMode === "week") {
@@ -235,7 +231,9 @@ export default function ProfessionalFixedLocationCalendarDayWeekViewLaneColumn({
           colIdx > 0 ? `1px solid ${alpha(m.navy, 0.07)}` : undefined,
         height: rows * rowPx,
         bgcolor: isActiveWeekDay ? alpha(m.teal, 0.02) : "transparent",
-        overflow: "visible",
+        // Day multi-col: clip so cards never paint into a neighbor lane.
+        overflow:
+          viewMode === "day" && laneColumnsLength > 1 ? "hidden" : "visible",
         scrollSnapAlign:
           viewMode === "week" || viewMode === "day" ? "start" : undefined,
         ...(isPastDay ? { opacity: 0.72 } : null),
@@ -322,6 +320,7 @@ export default function ProfessionalFixedLocationCalendarDayWeekViewLaneColumn({
         weekDayCrowded={weekDayCrowded}
         colIdx={colIdx}
         laneColumnCount={laneColumnsLength}
+        laneResourceId={resource.id}
       />
     </Box>
   );

@@ -97,11 +97,13 @@ export function useProfessionalFixedLocationCalendarDrawerUiGates({
       projectEnabled: slotLocation === "DL" && bookingProjectEnabled,
       extraGuestCount,
       maxFixedLocationGuests: FIXED_LOCATION_MAX_GUESTS,
+      primaryClientIsGuest: isGuestClientPath,
     });
   }, [
     bookingProjectEnabled,
     extraGuestCount,
     incomingRequestEditMode,
+    isGuestClientPath,
     isViewingExisting,
     showManualBookingParticipantActions,
     slotLocation,

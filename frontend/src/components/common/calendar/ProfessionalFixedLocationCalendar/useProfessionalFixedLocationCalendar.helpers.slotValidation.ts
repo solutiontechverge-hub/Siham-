@@ -8,6 +8,7 @@ import {
   getOptionalPhoneValidationErrors,
   getPhoneValidationErrors,
 } from "../../../../lib/phone-validation";
+import { parseEmail } from "../../../../lib/inputSchema";
 
 export type SlotValidationErrors = Partial<
   Record<
@@ -75,7 +76,12 @@ export type SlotValidationInput = {
     startTime: string;
     endTime: string;
   };
-  guestDraft: { firstName: string };
+  guestDraft: {
+    firstName: string;
+    email: string;
+    phoneCode: string;
+    phoneNumber: string;
+  };
   nonMollureDraft: {
     firstName: string;
     lastName: string;
@@ -204,6 +210,23 @@ export function computeSlotValidation(input: SlotValidationInput): {
     if (isBlank(input.guestDraft.firstName)) {
       isValid = false;
       errors.guestFirstName = "First name is required.";
+    }
+    const guestPhoneErrors = getPhoneValidationErrors(
+      input.guestDraft.phoneCode,
+      input.guestDraft.phoneNumber,
+    );
+    if (guestPhoneErrors.countryCode) {
+      isValid = false;
+      errors.guestPhoneCode = guestPhoneErrors.countryCode;
+    }
+    if (guestPhoneErrors.phone) {
+      isValid = false;
+      errors.guestPhoneNumber = guestPhoneErrors.phone;
+    }
+    const guestEmail = parseEmail(input.guestDraft.email);
+    if (!guestEmail.ok) {
+      isValid = false;
+      errors.guestEmail = guestEmail.error;
     }
     return { isValid, errors };
   }

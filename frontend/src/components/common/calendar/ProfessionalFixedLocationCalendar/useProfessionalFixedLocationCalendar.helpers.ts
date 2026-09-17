@@ -53,7 +53,14 @@ export type {
 } from "./useProfessionalFixedLocationCalendar.helpers.slotValidation";
 export { computeSlotValidation } from "./useProfessionalFixedLocationCalendar.helpers.slotValidation";
 
-export { buildDayViewMemberColumnSource, remountDayViewSegmentsOntoVisibleColumns } from "./useProfessionalFixedLocationCalendar.helpers.dayView";
+export {
+  buildDayViewMemberColumnSource,
+  buildDayViewTeamHeaderSource,
+  buildDayViewTeamLayoutSource,
+  eventSticksToDayViewLane,
+  remountDayViewSegmentsOntoVisibleColumns,
+  resolveDayViewColumnHeaderResources,
+} from "./useProfessionalFixedLocationCalendar.helpers.dayView";
 
 export {
   formatLateCancelNoticeLabel,

@@ -72,6 +72,8 @@ export type CalendarBookingTicketStackProps = {
   top: number;
   rowPx: number;
   slotHeight?: number;
+  /** Day lane column owner — forwarded to staff chips on each card. */
+  laneResourceId?: string;
   teamMemberNameById?: ReadonlyMap<string, string>;
   teamResources?: readonly CalendarResource[];
   actionRailSide?: "start" | "end";
@@ -92,6 +94,7 @@ export default function CalendarBookingTicketStack({
   top,
   rowPx,
   slotHeight,
+  laneResourceId,
   teamMemberNameById,
   teamResources,
   actionRailSide = "end",
@@ -214,6 +217,7 @@ export default function CalendarBookingTicketStack({
                   variant={isDense ? "default" : "ticket"}
                   positioned={false}
                   dense={isDense}
+                  laneResourceId={laneResourceId}
                   teamMemberNameById={teamMemberNameById}
                   teamResources={teamResources}
                   actionRailSide={actionRailSide}

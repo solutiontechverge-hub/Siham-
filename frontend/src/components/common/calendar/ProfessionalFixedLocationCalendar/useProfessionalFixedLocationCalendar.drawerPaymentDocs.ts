@@ -7,6 +7,7 @@ import {
   computeBookingPrice,
   resolveBookingPriceDisplay,
 } from "../bookingTotal";
+import { markNotesPrepaymentPaid } from "../bookingEventDetails";
 import { prepayBlocksConfirmation } from "../bookingAcknowledgment";
 import { isOfflinePaymentMethod } from "../../client-booking/checkoutPaymentOptions";
 import { resolveCalendarPrepaymentStatus } from "../prepaymentStatus";
@@ -30,6 +31,7 @@ export type UseProfessionalFixedLocationCalendarDrawerPaymentDocsArgs = {
   selectedServices: BookingServiceLineItem[];
   selectedSlot: SelectedSlot | null;
   editingEventId: string | null;
+  setEvents: React.Dispatch<React.SetStateAction<readonly CalendarEvent[]>>;
   selectedClient: {
     name: string;
     email: string;
@@ -56,17 +58,49 @@ export function useProfessionalFixedLocationCalendarDrawerPaymentDocs({
   selectedServices,
   selectedSlot,
   editingEventId,
+  setEvents,
   selectedClient,
   financeSettings,
   addClientSource,
 }: UseProfessionalFixedLocationCalendarDrawerPaymentDocsArgs) {
+  // ponytail: temp Stripe bypass — ceiling: local/test pay only; remove when real Pay Now checkout is wired.
+  const [drawerPrepaymentPaidOverride, setDrawerPrepaymentPaidOverride] =
+    React.useState(false);
+
   const postBookingPendingPayment = React.useMemo(
     () => resolvePostBookingPendingPayment(viewingBookingEvent),
     [viewingBookingEvent],
   );
   const isDrawerPrepaymentPaid =
-    viewingBookingEvent != null &&
-    resolveCalendarPrepaymentStatus(viewingBookingEvent) === "confirmed";
+    drawerPrepaymentPaidOverride ||
+    (viewingBookingEvent != null &&
+      resolveCalendarPrepaymentStatus(viewingBookingEvent) === "confirmed");
+
+  const confirmDrawerPrepayment = React.useCallback(() => {
+    // ponytail: temp Stripe bypass — sets prepaymentStatus confirmed like offline Save/confirmPrepayment; remove when real Pay Now is wired.
+    setDrawerPrepaymentPaidOverride(true);
+    if (!editingEventId) return;
+    setEvents((prev) =>
+      prev.map((event) => {
+        if (event.id !== editingEventId) return event;
+        const paidNotes = markNotesPrepaymentPaid(event.notes, paymentMethod);
+        return {
+          ...event,
+          ...(paidNotes ? { notes: paidNotes } : {}),
+          details: {
+            ...(event.details ?? {}),
+            showPrepayment: true,
+            prepaymentStatus: "confirmed" as const,
+            paymentMethod,
+          },
+        };
+      }),
+    );
+  }, [editingEventId, paymentMethod, setEvents]);
+
+  const clearDrawerPrepaymentPaidOverride = React.useCallback(() => {
+    setDrawerPrepaymentPaidOverride(false);
+  }, []);
   const prepaymentSectionTitle = isDrawerPrepaymentPaid
     ? "Prepaid"
     : "Prepayment";
@@ -202,6 +236,8 @@ export function useProfessionalFixedLocationCalendarDrawerPaymentDocs({
   return {
     postBookingPendingPayment,
     isDrawerPrepaymentPaid,
+    confirmDrawerPrepayment,
+    clearDrawerPrepaymentPaidOverride,
     prepaymentSectionTitle,
     drawerPriceDisplay,
     drawerPaymentMethod,
