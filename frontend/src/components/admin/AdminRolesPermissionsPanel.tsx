@@ -20,6 +20,12 @@ import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import RadioButtonCheckedIcon from "@mui/icons-material/RadioButtonChecked";
 import { alpha, useTheme } from "@mui/material/styles";
+import {
+  mollureSectionTitleSx,
+  mollureLabelSx,
+  mollureBodySx,
+  mollureBodyMutedSx,
+} from "../../theme/mollureHierarchy";
 import { AppButton, AppSearchField, AppTextField } from "../common";
 import AppCard from "../common/AppCard";
 import AdminUnderlineTabs from "./AdminUnderlineTabs";
@@ -88,7 +94,7 @@ function PermissionLegend() {
           alignItems="center"
         >
           {item.icon}
-          <Typography sx={{ fontSize: 11, color: tokens.bodyText }}>
+          <Typography sx={mollureBodyMutedSx(tokens.navy, { fontSize: 11, color: tokens.bodyText })}>
             {item.label}
           </Typography>
         </Stack>
@@ -209,7 +215,10 @@ export default function AdminRolesPermissionsPanel({
       id: "role",
       label: "Role",
       render: (r) => (
-        <Typography component="span" sx={{ fontSize: 13 }}>
+        <Typography
+          component="span"
+          sx={mollureBodySx(tokens.navy, { color: tokens.navy })}
+        >
           {roleLabels[r.role] ?? r.role}
         </Typography>
       ),
@@ -272,16 +281,12 @@ export default function AdminRolesPermissionsPanel({
           >
             <Box sx={{ px: pad.headerX, pt: 2.5, pb: 2 }}>
               <Typography
-                sx={{
-                  fontSize: 16,
-                  fontWeight: 600,
-                  color: tokens.textcolorgrey700,
-                }}
+                sx={mollureSectionTitleSx(tokens.navy, { fontWeight: 600, color: tokens.textcolorgrey700 })}
               >
                 Roles ({roles.length})
               </Typography>
               <Typography
-                sx={{ fontSize: 13, color: tokens.bodyText, mt: 0.5 }}
+                sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText, mt: 0.5 })}
               >
                 Create and manage roles for admin users.
               </Typography>
@@ -360,33 +365,19 @@ export default function AdminRolesPermissionsPanel({
                           useFlexGap
                         >
                           <Typography
-                            sx={{
-                              fontSize: 14,
-                              fontWeight: 600,
-                              color: tokens.navy,
-                            }}
+                            sx={mollureLabelSx(tokens.navy, { fontWeight: 600, color: tokens.navy })}
                           >
                             {role.name}
                           </Typography>
                           <RoleBadge kind={role.kind} />
                         </Stack>
                         <Typography
-                          sx={{
-                            fontSize: 12,
-                            color: tokens.bodyText,
-                            mt: 0.5,
-                            lineHeight: 1.45,
-                          }}
+                          sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText, mt: 0.5, lineHeight: 1.45 })}
                         >
                           {role.description}
                         </Typography>
                         <Typography
-                          sx={{
-                            fontSize: 11,
-                            color: tokens.slate,
-                            mt: 1,
-                            fontWeight: 600,
-                          }}
+                          sx={mollureLabelSx(tokens.navy, { fontSize: 11, fontWeight: 600, color: tokens.slate, mt: 1 })}
                         >
                           {users.filter((u) => u.role === role.id).length}{" "}
                           Admins
@@ -429,16 +420,12 @@ export default function AdminRolesPermissionsPanel({
           >
             <Box sx={{ px: pad.headerX, pt: 2.5, pb: 2 }}>
               <Typography
-                sx={{
-                  fontSize: 16,
-                  fontWeight: 600,
-                  color: tokens.textcolorgrey700,
-                }}
+                sx={mollureSectionTitleSx(tokens.navy, { fontWeight: 600, color: tokens.textcolorgrey700 })}
               >
                 Role Details
               </Typography>
               <Typography
-                sx={{ fontSize: 13, color: tokens.bodyText, mt: 0.5 }}
+                sx={mollureBodyMutedSx(tokens.navy, { color: tokens.bodyText, mt: 0.5 })}
               >
                 Manage role information and module permissions.
               </Typography>
@@ -554,20 +541,12 @@ export default function AdminRolesPermissionsPanel({
                                   </Box>
                                   <Box>
                                     <Typography
-                                      sx={{
-                                        fontSize: 13,
-                                        fontWeight: 600,
-                                        color: tokens.navy,
-                                      }}
+                                      sx={mollureLabelSx(tokens.navy, { fontWeight: 600, color: tokens.navy })}
                                     >
                                       {mod.label}
                                     </Typography>
                                     <Typography
-                                      sx={{
-                                        fontSize: 11,
-                                        color: tokens.bodyText,
-                                        mt: 0.25,
-                                      }}
+                                      sx={mollureBodyMutedSx(tokens.navy, { fontSize: 11, color: tokens.bodyText, mt: 0.25 })}
                                     >
                                       {mod.description}
                                     </Typography>

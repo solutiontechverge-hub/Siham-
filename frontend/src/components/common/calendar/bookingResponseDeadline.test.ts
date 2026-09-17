@@ -76,7 +76,7 @@ assert.equal(
     {
       status: "Requested",
       bookingScenario: "BR",
-      details: { requestDirection: "outgoing" },
+      details: {},
     },
     blank,
   ),

@@ -79,6 +79,9 @@ export const listingPageData = {
       { label: "Highest Rated → Lowest Rated", value: "rating_desc" },
     ],
   },
+  snackbarAddedMessage: "Added to the favourites",
+  emptyResultsMessage: "No professionals found. Try adjusting your filters.",
+  loadErrorFallback: "Unable to load listings.",
   cards: [
     {
       id: "1",

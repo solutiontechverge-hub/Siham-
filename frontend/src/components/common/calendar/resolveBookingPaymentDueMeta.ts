@@ -3,6 +3,7 @@ import { listSalesCardMetaForBooking, SALES_META_CHANGED_EVENT } from "./salesOv
 import type { SalesCardMetaRecord } from "./salesOverview.types";
 import { parseApiCalendarEventId } from "./bookingEventDetails";
 import { extractBookingId } from "./calendar.utils";
+import { formatFinanceDueDate } from "../booking-finance/formatBookingFinance";
 
 export type BookingPaymentDueMeta = {
   dueDateIso: string;
@@ -10,15 +11,6 @@ export type BookingPaymentDueMeta = {
   reissued: boolean;
   paymentDue: boolean;
 };
-
-function formatDueDateLabel(iso: string): string {
-  const d = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return iso;
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
-}
 
 function isPaymentDueFromMeta(meta: SalesCardMetaRecord): boolean {
   if (meta.canceled || meta.voided || meta.refunded) return false;
@@ -84,7 +76,7 @@ export function resolveBookingPaymentDueMeta(input: {
 
   return {
     dueDateIso: meta.dueDate,
-    dateLabel: formatDueDateLabel(meta.dueDate),
+    dateLabel: formatFinanceDueDate(meta.dueDate),
     reissued:
       meta.cardKind === "reissued_invoice" || Boolean(meta.reissuedAt),
     paymentDue: true,

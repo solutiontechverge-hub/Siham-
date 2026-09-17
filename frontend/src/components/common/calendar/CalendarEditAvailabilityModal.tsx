@@ -1,6 +1,8 @@
 "use client";
 
 import AppButton from "../AppButton";
+import { ModalCancelApplyFooter } from "../FinanceDrawerFooter";
+import { mollureBodySx } from "../../../theme/mollureHierarchy";
 import * as React from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
@@ -13,6 +15,7 @@ import type {
   CalendarBookingLocation,
   CalendarResource,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
+import { calendarModalFlexFieldSx } from "./calendar.utils";
 import type { ScheduleShift } from "./calendar-settings.types";
 
 export type EditAvailabilityDraft = {
@@ -65,23 +68,17 @@ export default function CalendarEditAvailabilityModal({
       maxWidth="sm"
       fullWidth
       footer={
-        <Box sx={{ px: 2.5, py: 2 }}>
-          <Stack direction="row" justifyContent="flex-end" spacing={1.25}>
-            <AppButton tone="secondary" onClick={onClose} sx={{ height: 38 }}>
-              Cancel
-            </AppButton>
-            <AppButton tone="primary" onClick={onApply} sx={{ height: 38 }}>
-              Save
-            </AppButton>
-          </Stack>
-        </Box>
+        <ModalCancelApplyFooter
+          onCancel={onClose}
+          onPrimary={onApply}
+          primaryLabel="Save"
+          buttonSx={{ height: 38 }}
+        />
       }
     >
       <Box sx={{ px: 2.5, py: 2 }}>
         <Stack spacing={1.75}>
-          <BodyText
-            sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.72) }}
-          >
+          <BodyText sx={mollureBodySx(m.navy)}>
             {resource?.name ?? "Team member"} · {draft.date}
           </BodyText>
 
@@ -116,9 +113,9 @@ export default function CalendarEditAvailabilityModal({
               spacing={1.25}
               alignItems="flex-end"
             >
-              <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Box sx={calendarModalFlexFieldSx}>
                 <AppTimePicker
-                  variant="wheel"
+                  variant="clock"
                   label="Start"
                   value={shift.start}
                   onChange={(val) =>
@@ -133,9 +130,9 @@ export default function CalendarEditAvailabilityModal({
                   sx={{ minHeight: 40, py: 0.5 }}
                 />
               </Box>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Box sx={calendarModalFlexFieldSx}>
                 <AppTimePicker
-                  variant="wheel"
+                  variant="clock"
                   label="End"
                   value={shift.end}
                   onChange={(val) =>

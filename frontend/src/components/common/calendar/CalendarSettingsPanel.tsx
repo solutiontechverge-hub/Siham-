@@ -8,16 +8,23 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { Box, IconButton, Paper, Stack, Tooltip } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import {
+  mollurePageTitleSx,
+  mollureSectionTitleSx,
+  mollureBodySx,
+} from "../../../theme/mollureHierarchy";
 import AppDropdown from "../AppDropdown";
-import AppTextField from "../AppTextField";
 import { BodyText, SubHeading } from "../../ui/typography";
 import { BUSINESS_SERVICE_CATEGORY_CATALOG } from "../../../data/businessServiceCategorySlider.data";
 import type { CalendarDesignDraft } from "./CalendarDesignModal";
 import { getCalendarDesignCategoryLabel } from "./CalendarDesignModal";
 import CalendarServiceOrderCard from "./CalendarServiceOrderCard";
 import {
+  CalendarDurationInput,
+  CalendarRulesLocationCard,
+} from "./CalendarDurationInput";
+import {
   type BookingRulesDraft,
-  type DurationParts,
   type PublicHoursState,
   formatPublicHoursSlotLabel,
 } from "./calendarSettings.types";
@@ -76,7 +83,7 @@ function SettingsSection({
         }}
       >
         <SubHeading
-          sx={{ fontSize: 15, fontWeight: 800, color: alpha(m.navy, 0.82) }}
+          sx={mollureSectionTitleSx(m.navy)}
         >
           {title}
         </SubHeading>
@@ -142,139 +149,6 @@ function EditSectionButton({
   );
 }
 
-function DurationInput({
-  label,
-  value,
-  onChange,
-  helperText,
-  disabled,
-}: {
-  label: string;
-  value: DurationParts;
-  onChange: (next: DurationParts) => void;
-  helperText?: string;
-  disabled?: boolean;
-}) {
-  const m = useTheme().palette.mollure;
-
-  const fieldSx = {
-    "& .MuiOutlinedInput-root": {
-      borderRadius: "8px",
-      bgcolor: "#fff",
-      fontSize: 14,
-      fontWeight: 700,
-    },
-    "& .MuiOutlinedInput-input": {
-      py: 1.1,
-      px: 1.5,
-    },
-    "& .MuiInputLabel-root": {
-      fontSize: 12.5,
-      fontWeight: 700,
-      color: alpha(m.navy, 0.72),
-    },
-  } as const;
-
-  const setPart = (part: keyof DurationParts, raw: string) => {
-    const digits = raw.replace(/\D/g, "").slice(0, 2);
-    onChange({ ...value, [part]: digits.padStart(2, "0") });
-  };
-
-  return (
-    <Box>
-      <BodyText
-        sx={{
-          fontSize: 12.5,
-          fontWeight: 700,
-          color: alpha(m.navy, 0.72),
-          mb: 0.85,
-        }}
-      >
-        {label}
-      </BodyText>
-      <Stack direction="row" spacing={1.25} alignItems="center">
-        <AppTextField
-          value={value.hours}
-          onChange={(e) => setPart("hours", e.target.value)}
-          disabled={disabled}
-          inputProps={{
-            inputMode: "numeric",
-            maxLength: 2,
-            "aria-label": `${label} hours`,
-          }}
-          sx={{ ...fieldSx, flex: 1, minWidth: 0 }}
-        />
-        <BodyText
-          sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.5) }}
-        >
-          h
-        </BodyText>
-        <AppTextField
-          value={value.minutes}
-          onChange={(e) => setPart("minutes", e.target.value)}
-          disabled={disabled}
-          inputProps={{
-            inputMode: "numeric",
-            maxLength: 2,
-            "aria-label": `${label} minutes`,
-          }}
-          sx={{ ...fieldSx, flex: 1, minWidth: 0 }}
-        />
-        <BodyText
-          sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.5) }}
-        >
-          min
-        </BodyText>
-      </Stack>
-      {helperText ? (
-        <BodyText
-          sx={{
-            mt: 1,
-            fontSize: 11.5,
-            color: alpha(m.navy, 0.45),
-            lineHeight: 1.45,
-          }}
-        >
-          {helperText}
-        </BodyText>
-      ) : null}
-    </Box>
-  );
-}
-
-function BookingRulesLocationCard({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  const m = useTheme().palette.mollure;
-  return (
-    <Box
-      sx={{
-        borderRadius: "8px",
-        border: `1px solid ${alpha(m.navy, 0.1)}`,
-        bgcolor: alpha(m.navy, 0.015),
-        px: 2,
-        py: 1.75,
-      }}
-    >
-      <BodyText
-        sx={{
-          fontSize: 13.5,
-          fontWeight: 800,
-          color: alpha(m.navy, 0.78),
-          mb: 1.5,
-        }}
-      >
-        {title}
-      </BodyText>
-      {children}
-    </Box>
-  );
-}
-
 function LocationBlock({
   title,
   scheduleLabel,
@@ -320,7 +194,7 @@ function LocationBlock({
         >
           <AccessTimeRoundedIcon sx={{ fontSize: 18, color: m.teal }} />
           <BodyText
-            sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.62) }}
+            sx={mollureBodySx(m.navy)}
           >
             {scheduleLabel}
           </BodyText>
@@ -475,9 +349,7 @@ export default function CalendarSettingsPanel({
           borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
         }}
       >
-        <SubHeading
-          sx={{ fontSize: 18, fontWeight: 800, color: alpha(m.navy, 0.72) }}
-        >
+        <SubHeading sx={mollurePageTitleSx(m.navy)}>
           Settings
         </SubHeading>
       </Box>
@@ -527,55 +399,109 @@ export default function CalendarSettingsPanel({
         >
           <Stack spacing={1.25}>
             {showFixed ? (
-              <BookingRulesLocationCard title="Fixed Location">
-                <DurationInput
+              <CalendarRulesLocationCard title="Fixed Location">
+                <CalendarDurationInput
                   label="Interval Between Bookings"
-                  value={bookingRules.fixed.intervalBetweenBookings}
-                  onChange={(next) =>
+                  hours={bookingRules.fixed.intervalBetweenBookings.hours}
+                  minutes={bookingRules.fixed.intervalBetweenBookings.minutes}
+                  onHoursChange={(hours) =>
                     onBookingRulesChange({
                       ...bookingRules,
-                      fixed: { intervalBetweenBookings: next },
+                      fixed: {
+                        intervalBetweenBookings: {
+                          ...bookingRules.fixed.intervalBetweenBookings,
+                          hours,
+                        },
+                      },
+                    })
+                  }
+                  onMinutesChange={(minutes) =>
+                    onBookingRulesChange({
+                      ...bookingRules,
+                      fixed: {
+                        intervalBetweenBookings: {
+                          ...bookingRules.fixed.intervalBetweenBookings,
+                          minutes,
+                        },
+                      },
                     })
                   }
                   helperText="Set the minimum time between consecutive bookings."
                   disabled={!bookingRulesEditing || isSaving}
+                  pad
                 />
-              </BookingRulesLocationCard>
+              </CalendarRulesLocationCard>
             ) : null}
             {showDesired ? (
-              <BookingRulesLocationCard title="Desired Location">
+              <CalendarRulesLocationCard title="Desired Location">
                 <Stack spacing={1.75}>
-                  <DurationInput
+                  <CalendarDurationInput
                     label="Interval Between Bookings"
-                    value={bookingRules.desired.intervalBetweenBookings}
-                    onChange={(next) =>
+                    hours={bookingRules.desired.intervalBetweenBookings.hours}
+                    minutes={
+                      bookingRules.desired.intervalBetweenBookings.minutes
+                    }
+                    onHoursChange={(hours) =>
                       onBookingRulesChange({
                         ...bookingRules,
                         desired: {
                           ...bookingRules.desired,
-                          intervalBetweenBookings: next,
+                          intervalBetweenBookings: {
+                            ...bookingRules.desired.intervalBetweenBookings,
+                            hours,
+                          },
+                        },
+                      })
+                    }
+                    onMinutesChange={(minutes) =>
+                      onBookingRulesChange({
+                        ...bookingRules,
+                        desired: {
+                          ...bookingRules.desired,
+                          intervalBetweenBookings: {
+                            ...bookingRules.desired.intervalBetweenBookings,
+                            minutes,
+                          },
                         },
                       })
                     }
                     disabled={!bookingRulesEditing || isSaving}
+                    pad
                   />
-                  <DurationInput
+                  <CalendarDurationInput
                     label="Minimum Timeslot"
-                    value={bookingRules.desired.minimumTimeslot}
-                    onChange={(next) =>
+                    hours={bookingRules.desired.minimumTimeslot.hours}
+                    minutes={bookingRules.desired.minimumTimeslot.minutes}
+                    onHoursChange={(hours) =>
                       onBookingRulesChange({
                         ...bookingRules,
                         desired: {
                           ...bookingRules.desired,
-                          minimumTimeslot: next,
+                          minimumTimeslot: {
+                            ...bookingRules.desired.minimumTimeslot,
+                            hours,
+                          },
+                        },
+                      })
+                    }
+                    onMinutesChange={(minutes) =>
+                      onBookingRulesChange({
+                        ...bookingRules,
+                        desired: {
+                          ...bookingRules.desired,
+                          minimumTimeslot: {
+                            ...bookingRules.desired.minimumTimeslot,
+                            minutes,
+                          },
                         },
                       })
                     }
                     helperText="Minimum required team member time at DL location."
                     disabled={!bookingRulesEditing || isSaving}
+                    pad
                   />
                 </Stack>
-              </BookingRulesLocationCard>
+              </CalendarRulesLocationCard>
             ) : null}
           </Stack>
         </SettingsSection>
@@ -594,9 +520,7 @@ export default function CalendarSettingsPanel({
             <Box>
               <BodyText
                 sx={{
-                  fontSize: 12.5,
-                  fontWeight: 700,
-                  color: alpha(m.navy, 0.62),
+                  ...mollureBodySx(m.navy),
                   mb: 1.1,
                 }}
               >
@@ -653,9 +577,7 @@ export default function CalendarSettingsPanel({
             <Box>
               <BodyText
                 sx={{
-                  fontSize: 12.5,
-                  fontWeight: 700,
-                  color: alpha(m.navy, 0.62),
+                  ...mollureBodySx(m.navy),
                   mb: 1.1,
                 }}
               >

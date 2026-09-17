@@ -22,48 +22,30 @@ function useMollureFieldSx() {
   const theme = useTheme();
   const m = theme.palette.mollure;
 
-  return React.useMemo(
-    () => ({
+  return React.useMemo(() => {
+    const fieldset = {
+      "& fieldset": { borderColor: m.inputBorder },
+      "&:hover fieldset": { borderColor: m.inputBorderHover },
+      "&.Mui-focused fieldset": { borderColor: m.teal },
+      "&.Mui-disabled": { bgcolor: alpha(m.navy, 0.04) },
+    };
+    const rootBase = {
+      borderRadius: "6px",
+      bgcolor: m.white ?? "#fff",
+      minHeight: 40,
+      alignItems: "center",
+      ...fieldset,
+    };
+
+    return {
       "& .MuiOutlinedInput-root": {
-        borderRadius: "6px",
-        bgcolor: m.white ?? "#fff",
-        minHeight: 40,
-        alignItems: "center",
-        "&:not(.MuiInputBase-multiline)": {
-          height: 40,
-        },
-        "& fieldset": {
-          borderColor: m.inputBorder,
-        },
-        "&:hover fieldset": {
-          borderColor: m.inputBorderHover,
-        },
-        "&.Mui-focused fieldset": {
-          borderColor: m.teal,
-        },
-        "&.Mui-disabled": {
-          bgcolor: alpha(m.navy, 0.04),
-        },
+        ...rootBase,
+        "&:not(.MuiInputBase-multiline)": { height: 40 },
       },
       // When sx is applied directly on Select (e.g. MollureLabeledSelect)
       "&.MuiOutlinedInput-root": {
-        borderRadius: "6px",
-        bgcolor: m.white ?? "#fff",
-        minHeight: 40,
+        ...rootBase,
         height: 40,
-        alignItems: "center",
-        "& fieldset": {
-          borderColor: m.inputBorder,
-        },
-        "&:hover fieldset": {
-          borderColor: m.inputBorderHover,
-        },
-        "&.Mui-focused fieldset": {
-          borderColor: m.teal,
-        },
-        "&.Mui-disabled": {
-          bgcolor: alpha(m.navy, 0.04),
-        },
       },
       "& .MuiOutlinedInput-input": {
         fontSize: "0.8125rem",
@@ -112,9 +94,8 @@ function useMollureFieldSx() {
         color: m.placeholder,
         opacity: 1,
       },
-    }),
-    [m.inputBorder, m.inputBorderHover, m.navy, m.placeholder, m.teal, m.white],
-  );
+    };
+  }, [m.inputBorder, m.inputBorderHover, m.navy, m.placeholder, m.teal, m.white]);
 }
 
 function MollureTopLabel({

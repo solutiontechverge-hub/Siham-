@@ -34,19 +34,21 @@ export async function uploadMessagingAttachments(
   if (!attachments.length) return [];
 
   const uploaded: MessagingAttachment[] = [];
-  const pending: { attachment: MessagingAttachment; file: File }[] = [];
-
+  const toUpload = attachments.filter((attachment) => needsUpload(attachment.url));
   for (const attachment of attachments) {
-    if (!needsUpload(attachment.url)) {
-      uploaded.push({
-        ...attachment,
-        url: resolveMessagingAttachmentUrl(attachment.url),
-      });
-      continue;
-    }
-    const file = await blobUrlToFile(attachment.url, attachment.name, attachment.mimeType ?? "");
-    pending.push({ attachment, file });
+    if (needsUpload(attachment.url)) continue;
+    uploaded.push({
+      ...attachment,
+      url: resolveMessagingAttachmentUrl(attachment.url),
+    });
   }
+
+  const pending = await Promise.all(
+    toUpload.map(async (attachment) => ({
+      attachment,
+      file: await blobUrlToFile(attachment.url, attachment.name, attachment.mimeType ?? ""),
+    })),
+  );
 
   if (!pending.length) return uploaded;
 

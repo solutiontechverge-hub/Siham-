@@ -1,20 +1,16 @@
 "use client";
 
-import * as React from "react";
-import {
-  Box,
-  FormControlLabel,
-  Radio,
-  RadioGroup,
-  Typography,
-} from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
-import AppModal, {
-  MessagingModalCancelButton,
-  MessagingModalPrimaryButton,
-} from "../AppModal";
+import { mollureBodyMutedSx } from "../../../theme/mollureHierarchy";
 
-export type MessagingDeleteScope = "me" | "everyone";
+import * as React from "react";
+import { Box, Typography } from "@mui/material";
+import { alpha, useTheme } from "@mui/material/styles";
+import MessagingDangerModal from "./MessagingDangerModal";
+import MessagingDeleteScopeRadios, {
+  type MessagingDeleteScopeOption,
+} from "./MessagingDeleteScopeRadios";
+
+export type MessagingDeleteScope = MessagingDeleteScopeOption;
 
 type Props = {
   open: boolean;
@@ -35,119 +31,51 @@ export default function MessagingDeleteChatDialog({
 }: Props) {
   const m = useTheme().palette.mollure;
   const [scope, setScope] = React.useState<MessagingDeleteScope>(initialScope);
+  const isBulk = mode === "bulk";
+  const isClear = mode === "clear";
 
   React.useEffect(() => {
     if (open) setScope(initialScope);
   }, [open, initialScope]);
 
-  const isBulk = mode === "bulk";
-  const isClear = mode === "clear";
-  const title = isClear
-    ? "Clear all messages in this chat?"
-    : isBulk
-      ? "Delete selected conversations?"
-      : "Do you want to delete this chat?";
+  const mutedBody = (
+    <Typography
+      sx={{
+        ...mollureBodyMutedSx(m.navy),
+        textAlign: "center",
+      }}
+    >
+      {isClear
+        ? "Messages will be removed from your view. The professional will stay in your list."
+        : "Selected conversations will be removed from your history."}
+    </Typography>
+  );
 
   return (
-    <AppModal
-      contentSx={{ px: 2.5 }}
-      footerVariant="actions"
-      headerTone="danger"
+    <MessagingDangerModal
       open={open}
-      title={title}
       onClose={onClose}
-      embedded={embedded}
-      footer={
-        <>
-          <MessagingModalCancelButton onClick={onClose} />
-          <MessagingModalPrimaryButton
-            label={isClear ? "Clear" : "Delete"}
-            onClick={() => {
-              onConfirm(isClear ? "me" : scope);
-              onClose();
-            }}
-          />
-        </>
+      title={
+        isClear
+          ? "Clear all messages in this chat?"
+          : isBulk
+            ? "Delete selected conversations?"
+            : "Do you want to delete this chat?"
       }
+      embedded={embedded}
+      primaryLabel={isClear ? "Clear" : "Delete"}
+      onPrimary={() => {
+        onConfirm(isClear ? "me" : scope);
+        onClose();
+      }}
     >
       <Box sx={{ py: 1.5 }}>
-        {isClear ? (
-          <Typography
-            sx={{
-              fontSize: 12.5,
-              fontWeight: 600,
-              color: alpha(m.navy, 0.5),
-              textAlign: "center",
-            }}
-          >
-            Messages will be removed from your view. The professional will stay
-            in your list.
-          </Typography>
-        ) : !isBulk ? (
-          <RadioGroup
-            value={scope}
-            onChange={(_, value) => setScope(value as MessagingDeleteScope)}
-          >
-            <FormControlLabel
-              value="me"
-              control={
-                <Radio
-                  size="small"
-                  sx={{
-                    color: alpha(m.navy, 0.35),
-                    "&.Mui-checked": { color: m.teal },
-                  }}
-                />
-              }
-              label={
-                <Typography
-                  sx={{
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: alpha(m.navy, 0.7),
-                  }}
-                >
-                  Delete for me
-                </Typography>
-              }
-            />
-            <FormControlLabel
-              value="everyone"
-              control={
-                <Radio
-                  size="small"
-                  sx={{
-                    color: alpha(m.navy, 0.35),
-                    "&.Mui-checked": { color: m.teal },
-                  }}
-                />
-              }
-              label={
-                <Typography
-                  sx={{
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: alpha(m.navy, 0.7),
-                  }}
-                >
-                  Delete for everyone
-                </Typography>
-              }
-            />
-          </RadioGroup>
+        {isClear || isBulk ? (
+          mutedBody
         ) : (
-          <Typography
-            sx={{
-              fontSize: 12.5,
-              fontWeight: 600,
-              color: alpha(m.navy, 0.5),
-              textAlign: "center",
-            }}
-          >
-            Selected conversations will be removed from your history.
-          </Typography>
+          <MessagingDeleteScopeRadios value={scope} onChange={setScope} />
         )}
       </Box>
-    </AppModal>
+    </MessagingDangerModal>
   );
 }

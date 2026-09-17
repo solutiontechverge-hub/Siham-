@@ -1,10 +1,9 @@
 "use client";
 
-import AppButton from "../AppButton";
 import * as React from "react";
-import { Box, Stack } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
+import { Box } from "@mui/material";
 import AppDrawer from "../AppDrawer";
+import { FinanceDrawerActionsFooter } from "../FinanceDrawerFooter";
 import MessagingFilterCheckboxList from "./MessagingFilterCheckboxList";
 import MessagingInsetOverlay from "./MessagingInsetOverlay";
 import type { MessagingDrawerFilters } from "./messagingTypes";
@@ -95,29 +94,6 @@ function FiltersContent({
   );
 }
 
-function FiltersFooter({
-  onCancel,
-  onApply,
-}: {
-  onCancel: () => void;
-  onApply: () => void;
-}) {
-  const m = useTheme().palette.mollure;
-
-  return (
-    <Box sx={{ px: 2.5, py: 2, width: "100%" }}>
-      <Stack direction="row" spacing={1.5} sx={{ width: "100%" }}>
-        <AppButton tone="secondary" fullWidth onClick={onCancel}>
-          Cancel
-        </AppButton>
-        <AppButton tone="primary" fullWidth onClick={onApply}>
-          Apply
-        </AppButton>
-      </Stack>
-    </Box>
-  );
-}
-
 export default function MessagingFiltersDrawer({
   open,
   onClose,
@@ -128,7 +104,16 @@ export default function MessagingFiltersDrawer({
   audience = "client",
   embedded = false,
 }: Props) {
-  const footer = <FiltersFooter onCancel={onCancel} onApply={onApply} />;
+  const footer = (
+    <FinanceDrawerActionsFooter
+      onCancel={onCancel}
+      onPrimary={onApply}
+      primaryLabel="Apply"
+      fullWidth
+      spacing={1.5}
+      stackSx={{ px: 2.5, py: 2 }}
+    />
+  );
   const body = (
     <FiltersContent filters={filters} onChange={onChange} audience={audience} />
   );

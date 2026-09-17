@@ -1,10 +1,8 @@
 "use client";
 
 import AppButton from "../../components/common/AppButton";
-import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useSearchParams } from "next/navigation";
 import {
   Box,
   Checkbox,
@@ -13,11 +11,8 @@ import {
   Paper,
   Stack,
 } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
-import { getApiErrorMessage } from "../../lib/api-error";
+import { alpha } from "@mui/material/styles";
 import SocialSignInButtons from "../../components/auth/SocialSignInButtons";
-import { useAuthSessionLogin } from "../../hooks/useAuthSessionLogin";
-import { useLoginMutation } from "../../store/services/authApi";
 import { SignupBg, SignupLs, SignupRs } from "../../../images";
 import {
   MarketingSiteHeader,
@@ -25,57 +20,34 @@ import {
   MollureAuthLabeledPasswordField,
 } from "../../components/common";
 import GuestGuard from "../../components/common/auth/GuestGuard";
-import type { AuthStripHeaderConfig } from "../../data/marketingShell.data";
 import { BodyText, SubHeading } from "../../components/ui/typography";
-import { useSnackbar } from "../../components/common/AppSnackbar";
+import { authLoginCopy } from "./authLogin.data";
+import {
+  useAuthLoginShell,
+  type AuthLoginShellProps,
+} from "./useAuthLoginShell";
 
-export type AuthLoginShellProps = {
-  header: AuthStripHeaderConfig;
-  /** “Create account” link target (client vs professional signup). */
-  signupHref: string;
-};
+export type { AuthLoginShellProps };
 
 export default function AuthLoginShell({
   header,
   signupHref,
 }: AuthLoginShellProps) {
-  const theme = useTheme();
-  const m = theme.palette.mollure;
-  const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect");
-  const { showSnackbar } = useSnackbar();
-  const { completeLogin } = useAuthSessionLogin();
-  const [email, setEmail] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [remember, setRemember] = React.useState(false);
-  const rememberRef = React.useRef(remember);
-  rememberRef.current = remember;
-  const [login, { isLoading }] = useLoginMutation();
-
-  const cardBorder = m.cardBorder ?? alpha(m.navy, 0.12);
-
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    try {
-      const rememberMe = rememberRef.current;
-      const result = await login({
-        email: email.trim().toLowerCase(),
-        password,
-        remember: rememberMe,
-      }).unwrap();
-
-      completeLogin(result.data, rememberMe, redirectTo);
-    } catch (error) {
-      showSnackbar({
-        severity: "error",
-        message: getApiErrorMessage(
-          error,
-          "Login failed. Please check your credentials.",
-        ),
-      });
-    }
-  };
+  const {
+    m,
+    cardBorder,
+    email,
+    setEmail,
+    password,
+    setPassword,
+    remember,
+    setRemember,
+    rememberRef,
+    isLoading,
+    handleSubmit,
+    completeLogin,
+    showSnackbar,
+  } = useAuthLoginShell();
 
   return (
     <GuestGuard>
@@ -203,7 +175,7 @@ export default function AuthLoginShell({
                         lineHeight: 1.2,
                       }}
                     >
-                      Sign In
+                      {authLoginCopy.title}
                     </SubHeading>
                     <BodyText
                       sx={{
@@ -213,7 +185,7 @@ export default function AuthLoginShell({
                         lineHeight: 1.45,
                       }}
                     >
-                      Welcome Back! Login To Access Your Account
+                      {authLoginCopy.subtitle}
                     </BodyText>
                   </Box>
 
@@ -221,8 +193,8 @@ export default function AuthLoginShell({
                     <Stack spacing={2}>
                       <MollureAuthLabeledField
                         type="email"
-                        fieldLabel="Email Address"
-                        placeholder="e.g Jane"
+                        fieldLabel={authLoginCopy.emailLabel}
+                        placeholder={authLoginCopy.emailPlaceholder}
                         value={email}
                         onChange={(event) => setEmail(event.target.value)}
                         required
@@ -231,8 +203,8 @@ export default function AuthLoginShell({
 
                       <MollureAuthLabeledPasswordField
                         typeWhenHidden="password"
-                        fieldLabel="Password"
-                        placeholder="Enter Password Here"
+                        fieldLabel={authLoginCopy.passwordLabel}
+                        placeholder={authLoginCopy.passwordPlaceholder}
                         value={password}
                         onChange={(event) => setPassword(event.target.value)}
                         required
@@ -267,7 +239,7 @@ export default function AuthLoginShell({
                                 setRemember(event.target.checked)
                               }
                               inputProps={{
-                                "aria-label": "Remember Me",
+                                "aria-label": authLoginCopy.rememberMe,
                               }}
                               sx={{
                                 color: alpha(m.navy, 0.35),
@@ -283,13 +255,13 @@ export default function AuthLoginShell({
                                 color: alpha(m.navy, 0.52),
                               }}
                             >
-                              Remember Me
+                              {authLoginCopy.rememberMe}
                             </BodyText>
                           }
                         />
 
                         <Link
-                          href="/auth/forgot-password"
+                          href={authLoginCopy.forgotPasswordHref}
                           style={{
                             fontSize: "0.8125rem",
                             color: alpha(m.navy, 0.52),
@@ -297,7 +269,7 @@ export default function AuthLoginShell({
                             fontWeight: 500,
                           }}
                         >
-                          Forget Password?
+                          {authLoginCopy.forgotPassword}
                         </Link>
                       </Box>
 
@@ -312,7 +284,9 @@ export default function AuthLoginShell({
                           minHeight: 44,
                         }}
                       >
-                        {isLoading ? "Signing in..." : "Sign In"}
+                        {isLoading
+                          ? authLoginCopy.submitting
+                          : authLoginCopy.submit}
                       </AppButton>
 
                       <Box
@@ -332,7 +306,7 @@ export default function AuthLoginShell({
                             backgroundColor: alpha(m.navy, 0.16),
                           }}
                         />
-                        or continue with
+                        {authLoginCopy.orContinueWith}
                         <Box
                           sx={{
                             height: "1px",
@@ -360,7 +334,7 @@ export default function AuthLoginShell({
                           pt: 0.5,
                         }}
                       >
-                        Don&apos;t have account?{" "}
+                        {authLoginCopy.noAccount}{" "}
                         <Link
                           href={signupHref}
                           style={{
@@ -369,7 +343,7 @@ export default function AuthLoginShell({
                             fontWeight: 700,
                           }}
                         >
-                          Create account
+                          {authLoginCopy.createAccount}
                         </Link>
                       </BodyText>
                     </Stack>

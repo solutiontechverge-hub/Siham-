@@ -1,14 +1,36 @@
-import type { MessagingAudience } from "./messagingRoutes";
-import { buildThreadPreviewFromMessage } from "./messagingPreview";
 import { createEmptyMessagingStore, isMockMessagingThreadId } from "./messagingMockData";
+import type { MessagingStore } from "./messagingTypes";
 import {
-  formatConversationTimeLabel,
-  getMessageTimestamp,
-  getThreadLastActivityIso,
-  isMessageWithinRetention,
-  withMessageCreatedAt,
-} from "./messagingRetention";
-import type { MessagingChatMessage, MessagingSettingsFilters, MessagingStore, MessagingThread } from "./messagingTypes";
+  filterToRetentionWindow,
+  mergeApiInboxIntoStore,
+  mergeApiInboxWithPrefs,
+  type MessagingPrefs,
+} from "./messagingStorage.merge";
+
+export {
+  upsertThreadIntoStore,
+  mergeApiInboxWithPrefs,
+  mergeApiInboxIntoStore,
+  mapDraftActiveThreadId,
+  filterToRetentionWindow,
+  refreshThreadPreview,
+} from "./messagingStorage.merge";
+export type { MessagingPrefs } from "./messagingStorage.merge";
+
+export {
+  applyMessageRetention,
+  applyAutoDeleteSettings,
+  filterVisibleMessages,
+  isThreadHiddenForAudience,
+  hideThreadsForAudience,
+  deleteMessagesForEveryone,
+  deleteMessagesForMe,
+  applyMessageDelete,
+  applyClearChat,
+  replaceThreadIdInStore,
+  normalizeBookingIdQuery,
+  threadMatchesSearch,
+} from "./messagingStorage.mutations";
 
 const STORAGE_KEY = "mollure:messaging:v1";
 const PREFS_KEY = "mollure:messaging:prefs:v1";
@@ -29,7 +51,7 @@ function stripMockThreads(store: MessagingStore): MessagingStore {
   return { ...store, threads, messagesByThreadId };
 }
 
-export function extractMessagingPrefs(store: MessagingStore) {
+export function extractMessagingPrefs(store: MessagingStore): MessagingPrefs {
   return {
     hiddenByAudience: store.hiddenByAudience ?? {},
     blockedThreadIds: store.blockedThreadIds ?? [],
@@ -51,182 +73,6 @@ export function loadMessagingPrefs() {
     // ignore
   }
   return extractMessagingPrefs(createEmptyMessagingStore());
-}
-
-/** Insert or refresh a thread so booking-open can select it before inbox refetch. */
-export function upsertThreadIntoStore(
-  store: MessagingStore,
-  thread: MessagingThread,
-): MessagingStore {
-  const existingIdx = store.threads.findIndex((item) => item.id === thread.id);
-  const threads = [...store.threads];
-  if (existingIdx >= 0) {
-    threads[existingIdx] = { ...threads[existingIdx], ...thread };
-  } else {
-    threads.unshift(thread);
-  }
-  return {
-    ...store,
-    threads,
-    messagesByThreadId: {
-      ...store.messagesByThreadId,
-      [thread.id]: store.messagesByThreadId[thread.id] ?? [],
-    },
-  };
-}
-
-export function mergeApiInboxWithPrefs(
-  api: Pick<MessagingStore, "threads" | "messagesByThreadId" | "peerLastReadAtByThreadId">,
-  prefs: ReturnType<typeof extractMessagingPrefs>,
-  audience?: MessagingAudience,
-): MessagingStore {
-  const threads = api.threads.map((thread) =>
-    refreshThreadPreview(thread, api.messagesByThreadId[thread.id] ?? [], audience),
-  );
-  return filterToRetentionWindow({
-    threads,
-    messagesByThreadId: api.messagesByThreadId,
-    peerLastReadAtByThreadId: api.peerLastReadAtByThreadId ?? {},
-    hiddenByAudience: prefs.hiddenByAudience,
-    blockedThreadIds: prefs.blockedThreadIds,
-    lastReadMessageIdByAudience: prefs.lastReadMessageIdByAudience,
-    presenceStatus: prefs.presenceStatus,
-  });
-}
-
-/** Keep a locally seeded booking link when the API inbox still reports unlinked. */
-function withPreservedBookingLink(
-  apiThread: MessagingThread,
-  local?: MessagingThread,
-): MessagingThread {
-  if (!local) return apiThread;
-  const localLinked = Boolean(local.bookingId?.trim()) && !local.unlinked;
-  const apiLinked = Boolean(apiThread.bookingId?.trim()) && !apiThread.unlinked;
-  if (!localLinked || apiLinked) return apiThread;
-  return {
-    ...apiThread,
-    bookingId: local.bookingId,
-    bookingMeta: local.bookingMeta,
-    bookingStatus: local.bookingStatus,
-    unlinked: false,
-  };
-}
-
-function threadProfessionalKey(thread: MessagingThread): string {
-  return thread.professionalUserId || thread.peerProfileId || thread.businessSetupId || thread.id;
-}
-
-function mergeMessageLists(
-  local: MessagingChatMessage[],
-  api: MessagingChatMessage[],
-): MessagingChatMessage[] {
-  const byId = new Map<string, MessagingChatMessage>();
-  for (const message of api) byId.set(message.id, withMessageCreatedAt(message));
-  for (const message of local) {
-    if (!byId.has(message.id)) byId.set(message.id, withMessageCreatedAt(message));
-  }
-  return Array.from(byId.values()).sort((a, b) => getMessageTimestamp(a) - getMessageTimestamp(b));
-}
-
-/** Merge a fresh API inbox into existing client state without dropping local messages or draft threads. */
-export function mergeApiInboxIntoStore(
-  current: MessagingStore,
-  api: Pick<MessagingStore, "threads" | "messagesByThreadId" | "peerLastReadAtByThreadId">,
-  prefs: ReturnType<typeof extractMessagingPrefs>,
-  audience?: MessagingAudience,
-): MessagingStore {
-  const apiProfessionalKeys = new Set(api.threads.map(threadProfessionalKey));
-
-  // Draft "Tap to start…" professionals are client-only; never carry them into the pro inbox.
-  // Also never keep legacy demo seed threads (lissa-j, craig-martha, …).
-  const keptDrafts =
-    audience === "professional"
-      ? []
-      : current.threads.filter((thread) => {
-          if (isMockMessagingThreadId(thread.id)) return false;
-          if (!thread.id.startsWith("draft:") && !thread.isNewConversation) return false;
-          return !apiProfessionalKeys.has(threadProfessionalKey(thread));
-        });
-
-  const localById = new Map(current.threads.map((thread) => [thread.id, thread]));
-  const apiThreads = api.threads
-    .filter((thread) => !isMockMessagingThreadId(thread.id))
-    .map((thread) => withPreservedBookingLink(thread, localById.get(thread.id)));
-  const apiThreadIds = new Set(apiThreads.map((thread) => thread.id));
-  const localOnlyThreads =
-    audience === "professional"
-      ? current.threads.filter(
-          (thread) =>
-            !thread.id.startsWith("draft:") &&
-            !thread.isNewConversation &&
-            !isMockMessagingThreadId(thread.id) &&
-            !apiThreadIds.has(thread.id),
-        )
-      : [];
-  const mergedThreads = [...apiThreads, ...localOnlyThreads, ...keptDrafts];
-  const messagesByThreadId: MessagingStore["messagesByThreadId"] = { ...current.messagesByThreadId };
-
-  for (const apiThread of apiThreads) {
-    const draftKeys = [
-      apiThread.businessSetupId ? `draft:setup-${apiThread.businessSetupId}` : null,
-      apiThread.peerProfileId ? `draft:setup-${apiThread.peerProfileId}` : null,
-      apiThread.professionalUserId ? `draft:${apiThread.professionalUserId}` : null,
-    ].filter(Boolean) as string[];
-
-    const draftMessages = draftKeys.flatMap((key) => messagesByThreadId[key] ?? []);
-    const localMessages = messagesByThreadId[apiThread.id] ?? [];
-    const apiMessages = api.messagesByThreadId[apiThread.id] ?? [];
-
-    messagesByThreadId[apiThread.id] = mergeMessageLists(
-      [...draftMessages, ...localMessages],
-      apiMessages,
-    );
-
-    for (const key of draftKeys) delete messagesByThreadId[key];
-  }
-
-  for (const draft of keptDrafts) {
-    if (!(draft.id in messagesByThreadId)) {
-      messagesByThreadId[draft.id] = current.messagesByThreadId[draft.id] ?? [];
-    }
-  }
-
-  for (const localThread of localOnlyThreads) {
-    if (!(localThread.id in messagesByThreadId)) {
-      messagesByThreadId[localThread.id] = current.messagesByThreadId[localThread.id] ?? [];
-    }
-  }
-
-  const threads = mergedThreads.map((thread) =>
-    refreshThreadPreview(thread, messagesByThreadId[thread.id] ?? [], audience),
-  );
-
-  return filterToRetentionWindow({
-    ...current,
-    threads,
-    messagesByThreadId,
-    peerLastReadAtByThreadId: {
-      ...current.peerLastReadAtByThreadId,
-      ...api.peerLastReadAtByThreadId,
-    },
-    hiddenByAudience: prefs.hiddenByAudience ?? current.hiddenByAudience,
-    blockedThreadIds: prefs.blockedThreadIds ?? current.blockedThreadIds,
-    lastReadMessageIdByAudience:
-      prefs.lastReadMessageIdByAudience ?? current.lastReadMessageIdByAudience,
-    presenceStatus: prefs.presenceStatus ?? current.presenceStatus,
-  });
-}
-
-export function mapDraftActiveThreadId(currentId: string, apiThreads: MessagingThread[]): string {
-  for (const thread of apiThreads) {
-    const draftKeys = [
-      thread.businessSetupId ? `draft:setup-${thread.businessSetupId}` : null,
-      thread.peerProfileId ? `draft:setup-${thread.peerProfileId}` : null,
-      thread.professionalUserId ? `draft:${thread.professionalUserId}` : null,
-    ].filter((key): key is string => Boolean(key));
-    if (draftKeys.includes(currentId)) return thread.id;
-  }
-  return currentId;
 }
 
 export const MESSAGING_UPDATED_EVENT = "mollure:messaging-updated";
@@ -254,6 +100,23 @@ export function loadMessagingRuntimeSnapshot(): Pick<
   } catch {
     return null;
   }
+}
+
+/** Strip blob/data URLs from attachments so localStorage does not crash or exceed quota. */
+function sanitizeStoreForPersistence(store: MessagingStore): MessagingStore {
+  const messagesByThreadId: MessagingStore["messagesByThreadId"] = {};
+  for (const [threadId, messages] of Object.entries(store.messagesByThreadId ?? {})) {
+    messagesByThreadId[threadId] = messages.map((msg) => ({
+      ...msg,
+      attachments: msg.attachments?.map((att) => ({
+        id: att.id,
+        name: att.name,
+        mimeType: att.mimeType ?? "application/octet-stream",
+        url: att.url.startsWith("blob:") || att.url.startsWith("data:") ? "" : att.url,
+      })),
+    }));
+  }
+  return { ...store, messagesByThreadId };
 }
 
 export function saveMessagingRuntimeSnapshot(store: MessagingStore): void {
@@ -328,23 +191,6 @@ export function loadMessagingStore(): MessagingStore {
   }
 }
 
-/** Strip blob/data URLs from attachments so localStorage does not crash or exceed quota. */
-function sanitizeStoreForPersistence(store: MessagingStore): MessagingStore {
-  const messagesByThreadId: MessagingStore["messagesByThreadId"] = {};
-  for (const [threadId, messages] of Object.entries(store.messagesByThreadId ?? {})) {
-    messagesByThreadId[threadId] = messages.map((msg) => ({
-      ...msg,
-      attachments: msg.attachments?.map((att) => ({
-        id: att.id,
-        name: att.name,
-        mimeType: att.mimeType ?? "application/octet-stream",
-        url: att.url.startsWith("blob:") || att.url.startsWith("data:") ? "" : att.url,
-      })),
-    }));
-  }
-  return { ...store, messagesByThreadId };
-}
-
 export function saveMessagingStore(store: MessagingStore): boolean {
   if (typeof window === "undefined") return true;
   try {
@@ -361,238 +207,4 @@ export function saveMessagingStore(store: MessagingStore): boolean {
   } catch {
     return false;
   }
-}
-
-export function isThreadHiddenForAudience(store: MessagingStore, audience: MessagingAudience, threadId: string) {
-  return (store.hiddenByAudience?.[audience] ?? []).includes(threadId);
-}
-
-export function hideThreadsForAudience(store: MessagingStore, audience: MessagingAudience, threadIds: string[]): MessagingStore {
-  const current = new Set(store.hiddenByAudience?.[audience] ?? []);
-  threadIds.forEach((id) => current.add(id));
-  return {
-    ...store,
-    hiddenByAudience: { ...store.hiddenByAudience, [audience]: Array.from(current) },
-  };
-}
-
-export function normalizeBookingIdQuery(query: string): string {
-  return query
-    .trim()
-    .replace(/^#/, "")
-    .replace(/^bk-?/i, "")
-    .replace(/^b/i, "")
-    .toLowerCase();
-}
-
-export function threadMatchesSearch(
-  thread: { name: string; bookingId: string; bookingMeta: string; peerEmail?: string },
-  query: string,
-): boolean {
-  const q = query.trim().toLowerCase();
-  if (!q) return true;
-  const normalizedBooking = normalizeBookingIdQuery(q);
-  const threadBooking = normalizeBookingIdQuery(thread.bookingId);
-  if (normalizedBooking && (threadBooking.includes(normalizedBooking) || thread.bookingMeta.toLowerCase().includes(q))) {
-    return true;
-  }
-  if (thread.peerEmail?.toLowerCase().includes(q)) return true;
-  return thread.name.toLowerCase().includes(q);
-}
-
-function refreshThreadPreview(
-  thread: MessagingThread,
-  messages: MessagingChatMessage[],
-  audience?: MessagingAudience,
-): MessagingThread {
-  const visible = messages.filter((m) => !m.deletedForEveryone);
-  const last = visible[visible.length - 1];
-  if (!last) {
-    return { ...thread, preview: "", previewSenderName: undefined, previewFromPeer: undefined, lastActivityAt: undefined, timeLabel: "" };
-  }
-  const lastActivityAt = getThreadLastActivityIso(messages, thread.lastActivityAt);
-  const previewFields = audience
-    ? buildThreadPreviewFromMessage(last, audience, thread.name)
-    : {
-        preview: last.deletedForEveryone ? "Message deleted" : last.body || (last.attachments?.[0]?.name ?? "Attachment"),
-        previewSenderName: last.senderName,
-        previewFromPeer: last.senderSide === "peer",
-      };
-  return {
-    ...thread,
-    ...previewFields,
-    lastActivityAt,
-    timeLabel: lastActivityAt ? formatConversationTimeLabel(lastActivityAt) : thread.timeLabel,
-  };
-}
-
-/** Keep only the last 30 days in local/offline views. Database purges older rows server-side. */
-export function filterToRetentionWindow(store: MessagingStore): MessagingStore {
-  const messagesByThreadId: MessagingStore["messagesByThreadId"] = {};
-  for (const [threadId, messages] of Object.entries(store.messagesByThreadId ?? {})) {
-    messagesByThreadId[threadId] = messages.map(withMessageCreatedAt).filter(isMessageWithinRetention);
-  }
-
-  const threads = store.threads.map((thread) =>
-    refreshThreadPreview(thread, messagesByThreadId[thread.id] ?? []),
-  );
-
-  return { ...store, threads, messagesByThreadId };
-}
-
-/** @deprecated Use filterToRetentionWindow */
-export const applyMessageRetention = filterToRetentionWindow;
-
-/** Auto-delete messages in threads that match enabled booking-status settings. */
-export function applyAutoDeleteSettings(store: MessagingStore, settings: MessagingSettingsFilters): MessagingStore {
-  const anyEnabled = Object.values(settings).some(Boolean);
-  if (!anyEnabled) return store;
-
-  const messagesByThreadId = { ...store.messagesByThreadId };
-  for (const thread of store.threads) {
-    const shouldDelete =
-      (settings.completed && thread.bookingStatus === "completed") ||
-      (settings.cancelled && thread.bookingStatus === "cancelled") ||
-      (settings.invalid && thread.bookingStatus === "invalid") ||
-      (settings.no_show && thread.bookingStatus === "no_show") ||
-      (settings.unlinked && Boolean(thread.unlinked));
-
-    if (shouldDelete) {
-      messagesByThreadId[thread.id] = [];
-    }
-  }
-
-  const threads = store.threads.map((thread) =>
-    refreshThreadPreview(thread, messagesByThreadId[thread.id] ?? []),
-  );
-
-  return applyMessageRetention({ ...store, threads, messagesByThreadId });
-}
-
-export function filterVisibleMessages(
-  messages: MessagingChatMessage[],
-  audience: MessagingAudience,
-): MessagingChatMessage[] {
-  return messages.filter((message) => {
-    if (message.deletedForEveryone) return true;
-    if (message.hiddenForAudience?.[audience]) return false;
-    return true;
-  });
-}
-
-export function deleteMessagesForEveryone(store: MessagingStore, threadId: string): MessagingStore {
-  const messages = (store.messagesByThreadId[threadId] ?? []).map((message) => ({
-    ...message,
-    deletedForEveryone: true,
-    body: "",
-    attachments: undefined,
-  }));
-  const messagesByThreadId = { ...store.messagesByThreadId, [threadId]: messages };
-  const threads = store.threads.map((thread) =>
-    thread.id === threadId ? refreshThreadPreview(thread, messages) : thread,
-  );
-  return { ...store, threads, messagesByThreadId };
-}
-
-export function deleteMessagesForMe(
-  store: MessagingStore,
-  audience: MessagingAudience,
-  threadId: string,
-): MessagingStore {
-  const messages = (store.messagesByThreadId[threadId] ?? []).map((message) => ({
-    ...message,
-    hiddenForAudience: { ...message.hiddenForAudience, [audience]: true },
-  }));
-  return hideThreadsForAudience({ ...store, messagesByThreadId: { ...store.messagesByThreadId, [threadId]: messages } }, audience, [threadId]);
-}
-
-export function applyMessageDelete(
-  store: MessagingStore,
-  audience: MessagingAudience,
-  threadId: string,
-  messageId: string,
-  scope: "me" | "everyone",
-): MessagingStore {
-  const messages = (store.messagesByThreadId[threadId] ?? []).map((message) => {
-    if (message.id !== messageId) return message;
-    if (scope === "everyone") {
-      return { ...message, deletedForEveryone: true, body: "", attachments: undefined };
-    }
-    return { ...message, hiddenForAudience: { ...message.hiddenForAudience, [audience]: true } };
-  });
-
-  const threads = store.threads.map((thread) =>
-    thread.id === threadId ? refreshThreadPreview(thread, messages.filter((m) => !m.hiddenForAudience?.[audience])) : thread,
-  );
-
-  return { ...store, threads, messagesByThreadId: { ...store.messagesByThreadId, [threadId]: messages } };
-}
-
-export function applyClearChat(
-  store: MessagingStore,
-  audience: MessagingAudience,
-  threadId: string,
-  scope: "me" | "everyone",
-): MessagingStore {
-  const messages = (store.messagesByThreadId[threadId] ?? []).map((message) => {
-    if (scope === "everyone") {
-      return { ...message, deletedForEveryone: true, body: "", attachments: undefined };
-    }
-    return { ...message, hiddenForAudience: { ...message.hiddenForAudience, [audience]: true } };
-  });
-
-  const visibleMessages =
-    scope === "everyone" ? messages : messages.filter((m) => !m.hiddenForAudience?.[audience]);
-
-  const threads = store.threads.map((thread) => {
-    if (thread.id !== threadId) return thread;
-    const refreshed = refreshThreadPreview(thread, visibleMessages);
-    if (refreshed.preview) return refreshed;
-    return {
-      ...refreshed,
-      preview: thread.isNewConversation ? "Tap to start a conversation" : "",
-    };
-  });
-
-  return { ...store, threads, messagesByThreadId: { ...store.messagesByThreadId, [threadId]: messages } };
-}
-
-export function replaceThreadIdInStore(store: MessagingStore, oldThreadId: string, newThreadId: string): MessagingStore {
-  if (oldThreadId === newThreadId) return store;
-  const messagesByThreadId = { ...store.messagesByThreadId };
-  messagesByThreadId[newThreadId] = messagesByThreadId[oldThreadId] ?? [];
-  delete messagesByThreadId[oldThreadId];
-
-  const hiddenByAudience = Object.fromEntries(
-    Object.entries(store.hiddenByAudience ?? {}).map(([aud, ids]) => [
-      aud,
-      (ids ?? []).map((id) => (id === oldThreadId ? newThreadId : id)),
-    ]),
-  );
-
-  const lastReadMessageIdByAudience = Object.fromEntries(
-    Object.entries(store.lastReadMessageIdByAudience ?? {}).map(([aud, map]) => [
-      aud,
-      Object.fromEntries(Object.entries(map ?? {}).map(([id, msgId]) => [id === oldThreadId ? newThreadId : id, msgId])),
-    ]),
-  );
-
-  const threads = store.threads.map((thread) =>
-    thread.id === oldThreadId
-      ? {
-          ...thread,
-          id: newThreadId,
-          isNewConversation: false,
-        }
-      : thread,
-  );
-
-  return {
-    ...store,
-    threads,
-    messagesByThreadId,
-    hiddenByAudience,
-    lastReadMessageIdByAudience,
-    blockedThreadIds: store.blockedThreadIds.map((id) => (id === oldThreadId ? newThreadId : id)),
-  };
 }

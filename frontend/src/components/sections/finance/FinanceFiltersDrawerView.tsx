@@ -1,9 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { Box, Checkbox, Divider, Stack, Typography } from "@mui/material";
+import { Box, Divider, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDrawer from "../../common/AppDrawer";
+import {
+  FilterDrawerCheckboxRow,
+  FilterDrawerSectionHeading,
+} from "../../common/FilterDrawerFields";
 import { FinanceDrawerFiltersFooter } from "../../common/FinanceDrawerFooter";
 
 type Option = { key: string; label: string };
@@ -72,81 +76,6 @@ const DEFAULT_SECTIONS: readonly FinanceFiltersSection[] = [
   },
 ];
 
-function FilterRow({
-  checked,
-  label,
-  onChange,
-}: {
-  checked: boolean;
-  label: string;
-  onChange: (next: boolean) => void;
-}) {
-  const m = useTheme().palette.mollure;
-
-  return (
-    <Box
-      component="label"
-      sx={{
-        display: "flex",
-        flexDirection: "row",
-        alignItems: "center",
-        gap: "8px",
-        margin: 0,
-        padding: "2px 0",
-        cursor: "pointer",
-        userSelect: "none",
-      }}
-    >
-      <Checkbox
-        size="small"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        disableRipple
-        sx={{
-          padding: 0,
-          margin: 0,
-          width: 18,
-          height: 18,
-          color: alpha(m.navy, 0.35),
-          "&.Mui-checked": { color: m.teal },
-          "& .MuiSvgIcon-root": { fontSize: 18 },
-        }}
-      />
-      <Typography
-        component="span"
-        sx={{
-          fontSize: 12,
-          lineHeight: "18px",
-          fontWeight: 500,
-          color: alpha(m.navy, 0.72),
-          margin: 0,
-          padding: 0,
-        }}
-      >
-        {label}
-      </Typography>
-    </Box>
-  );
-}
-
-function SectionHeading({ children }: { children: React.ReactNode }) {
-  const m = useTheme().palette.mollure;
-  return (
-    <Typography
-      component="div"
-      sx={{
-        fontSize: 12,
-        fontWeight: 900,
-        lineHeight: 1.2,
-        color: alpha(m.navy, 0.7),
-        mb: 0.75,
-      }}
-    >
-      {children}
-    </Typography>
-  );
-}
-
 export default function FinanceFiltersDrawerView({
   open,
   value,
@@ -189,10 +118,12 @@ export default function FinanceFiltersDrawerView({
       <Stack spacing={2}>
         {sections.map((section, idx) => (
           <Box key={section.title}>
-            <SectionHeading>{section.title}</SectionHeading>
+            <FilterDrawerSectionHeading>
+              {section.title}
+            </FilterDrawerSectionHeading>
             <Stack spacing={0.75}>
               {section.options.map((opt) => (
-                <FilterRow
+                <FilterDrawerCheckboxRow
                   key={opt.key}
                   label={opt.label}
                   checked={Boolean(draft[opt.key])}

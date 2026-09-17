@@ -34,7 +34,7 @@ export default function GlobalErrorPage({
           <BodyText
             sx={{ color: theme.palette.text.secondary, lineHeight: 1.7 }}
           >
-            {error?.message || "An unexpected error occurred."}
+            An unexpected error occurred. Please try again.
           </BodyText>
           <Stack direction="row" spacing={1.25} justifyContent="center">
             <AppButton

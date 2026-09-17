@@ -103,6 +103,10 @@ declare module "@mui/material/styles" {
     timelineGridHalfHourSlotBg: string;
     /** Slot row background at :15 / :45 */
     timelineGridNormalSlotBg: string;
+    /** Multi-service booking - lighter service sub-card fill */
+    calendarBookingSubCardBg: string;
+    /** Multi-service booking - lighter service sub-card border */
+    calendarBookingSubCardBorder: string;
     /** Soft status chip — overdue / pending / due */
     statusOrangeBg: string;
     statusOrangeFg: string;

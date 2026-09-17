@@ -8,6 +8,7 @@ import {
   submitReviewByToken,
 } from "../services/review.service.js";
 import { query } from "../db/index.js";
+import { sendCaughtError } from "../utils/httpError.js";
 
 export const getReviewInvite = async (req, res) => {
   try {
@@ -35,11 +36,7 @@ export const getReviewInvite = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message || "Failed to load review invite.",
-      data: null,
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to load review invite." });
   }
 };
 
@@ -56,11 +53,7 @@ export const submitReviewInvite = async (req, res) => {
       data: review,
     });
   } catch (error) {
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Failed to submit review.",
-      data: null,
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to submit review." });
   }
 };
 
@@ -139,11 +132,7 @@ export const getBookingReviewInvite = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Failed to load review invite.",
-      data: null,
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to load review invite." });
   }
 };
 
@@ -170,11 +159,7 @@ export const listReviews = async (req, res) => {
       data: { reviews, stats },
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message || "Failed to fetch reviews.",
-      data: null,
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to fetch reviews." });
   }
 };
 
@@ -197,11 +182,7 @@ export const createReviewReply = async (req, res) => {
       data: review,
     });
   } catch (error) {
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Failed to save reply.",
-      data: null,
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to save reply." });
   }
 };
 
@@ -215,10 +196,6 @@ export const removeReviewReply = async (req, res) => {
       data: review,
     });
   } catch (error) {
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Failed to delete reply.",
-      data: null,
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to delete reply." });
   }
 };

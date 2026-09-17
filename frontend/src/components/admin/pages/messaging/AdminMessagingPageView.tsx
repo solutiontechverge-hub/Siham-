@@ -5,6 +5,11 @@ import { useTheme } from "@mui/material/styles";
 import { AppButton, AppTextField } from "../../../common";
 import AdminPageHeader from "../../AdminPageHeader";
 import AdminSectionCard from "../../AdminSectionCard";
+import {
+  mollureLabelSx,
+  mollureBodySx,
+  mollureBodyMutedSx,
+} from "../../../../theme/mollureHierarchy";
 import type { AdminMessagingPageProps } from "./messaging.types";
 import { useAdminMessagingPage } from "./useAdminMessagingPage";
 
@@ -43,12 +48,11 @@ export default function AdminMessagingPageView({
           <Stack spacing={2}>
             <Box>
               <Typography
-                sx={{
-                  fontSize: 12,
-                  fontWeight: 600,
+                sx={mollureLabelSx(tokens.navy, {
                   color: tokens.slate,
+                  fontWeight: 600,
                   mb: 0.75,
-                }}
+                })}
               >
                 Recipients ({prefilledRecipients.length})
               </Typography>
@@ -100,7 +104,10 @@ export default function AdminMessagingPageView({
             <Stack spacing={0} divider={<Divider />}>
               {messages.length === 0 ? (
                 <Typography
-                  sx={{ fontSize: 14, color: tokens.bodyText, py: 2 }}
+                  sx={mollureBodySx(tokens.navy, {
+                    color: tokens.bodyText,
+                    py: 2,
+                  })}
                 >
                   No messages.
                 </Typography>
@@ -125,11 +132,10 @@ export default function AdminMessagingPageView({
                       alignItems="center"
                     >
                       <Typography
-                        sx={{
-                          fontSize: 14,
+                        sx={mollureLabelSx(tokens.navy, {
                           fontWeight: 600,
                           color: tokens.navy,
-                        }}
+                        })}
                       >
                         {msg.name}
                       </Typography>
@@ -152,13 +158,20 @@ export default function AdminMessagingPageView({
                         />
                       )}
                     </Stack>
-                    <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>
+                    <Typography
+                      sx={mollureBodyMutedSx(tokens.navy, {
+                        color: tokens.bodyText,
+                      })}
+                    >
                       {msg.email}
                     </Typography>
                     <Typography
-                      sx={{ fontSize: 12, color: tokens.slate, mt: 0.25 }}
+                      sx={mollureBodyMutedSx(tokens.navy, {
+                        color: tokens.slate,
+                        mt: 0.25,
+                      })}
                     >
-                      {msg.subject} Â· {msg.date}
+                      {msg.subject} · {msg.date}
                     </Typography>
                   </Box>
                 ))
@@ -173,14 +186,26 @@ export default function AdminMessagingPageView({
               <Stack spacing={2}>
                 <Box>
                   <Typography
-                    sx={{ fontSize: 13, fontWeight: 600, color: tokens.navy }}
+                    sx={mollureLabelSx(tokens.navy, {
+                      fontWeight: 600,
+                      color: tokens.navy,
+                    })}
                   >
                     {selected.name}
                   </Typography>
-                  <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>
+                  <Typography
+                    sx={mollureBodyMutedSx(tokens.navy, {
+                      color: tokens.bodyText,
+                    })}
+                  >
                     {selected.email}
                   </Typography>
-                  <Typography sx={{ fontSize: 12, color: tokens.slate, mt: 1 }}>
+                  <Typography
+                    sx={mollureBodyMutedSx(tokens.navy, {
+                      color: tokens.slate,
+                      mt: 1,
+                    })}
+                  >
                     {selected.body}
                   </Typography>
                 </Box>
@@ -201,11 +226,19 @@ export default function AdminMessagingPageView({
                     }}
                   >
                     <Typography
-                      sx={{ fontWeight: 700, color: tokens.teal, fontSize: 14 }}
+                      sx={mollureLabelSx(tokens.navy, {
+                        fontWeight: 700,
+                        color: tokens.teal,
+                      })}
                     >
                       MOLUR
                     </Typography>
-                    <Typography sx={{ fontSize: 11, color: tokens.bodyText }}>
+                    <Typography
+                      sx={mollureBodyMutedSx(tokens.navy, {
+                        fontSize: 11,
+                        color: tokens.bodyText,
+                      })}
+                    >
                       Standard email template
                     </Typography>
                   </Box>
@@ -243,7 +276,9 @@ export default function AdminMessagingPageView({
                 </Stack>
               </Stack>
             ) : (
-              <Typography sx={{ fontSize: 14, color: tokens.bodyText }}>
+              <Typography
+                sx={mollureBodySx(tokens.navy, { color: tokens.bodyText })}
+              >
                 Select a message to reply.
               </Typography>
             )}

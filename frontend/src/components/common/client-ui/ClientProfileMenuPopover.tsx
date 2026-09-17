@@ -6,23 +6,19 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Avatar, Box, Popover, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import { mollureBodyMutedSx, mollurePageTitleSx } from "../../../theme/mollureHierarchy";
 import { clearAuthSessionState } from "../../../lib/clearAuthSessionState";
 import { useAppDispatch } from "../../../store/hooks";
 import { useSnackbar } from "../AppSnackbar";
 import { queueSnackbarFlash } from "../../../lib/snackbarFlash";
+import {
+  getProfileMenuInitials,
+  profileMenuActiveBtnSx,
+  profileMenuOutlinedBtnSx,
+} from "../profileMenu.shared";
 
 function isMenuPathActive(pathname: string, match: string) {
   return pathname === match || pathname.startsWith(`${match}/`);
-}
-
-function getInitials(emailOrName?: string) {
-  const base = (emailOrName ?? "").trim();
-  if (!base) return "U";
-  const cleaned = base.split("@")[0] ?? base;
-  const parts = cleaned.split(/[._\s-]+/).filter(Boolean);
-  const a = (parts[0]?.[0] ?? "U").toUpperCase();
-  const b = (parts[1]?.[0] ?? "").toUpperCase();
-  return `${a}${b}`.slice(0, 2);
 }
 
 export type ClientProfileMenuPopoverProps = {
@@ -58,30 +54,8 @@ export default function ClientProfileMenuPopover({
     router.push("/auth/login");
   };
 
-  const outlinedBtnSx = {
-    borderRadius: "8px",
-    textTransform: "none",
-    fontWeight: 700,
-    color: tokens.navy,
-    borderColor: tokens.border,
-    py: 1.1,
-    "&:hover": {
-      borderColor: tokens.inputBorderHover,
-      bgcolor: "rgba(52, 74, 102, 0.03)",
-    },
-  } as const;
-
-  const activeBtnSx = {
-    ...outlinedBtnSx,
-    fontWeight: 800,
-    color: tokens.tealDark,
-    borderColor: tokens.teal,
-    bgcolor: alpha(tokens.teal, 0.12),
-    "&:hover": {
-      borderColor: tokens.tealDark,
-      bgcolor: alpha(tokens.teal, 0.18),
-    },
-  } as const;
+  const outlinedBtnSx = profileMenuOutlinedBtnSx(tokens);
+  const activeBtnSx = profileMenuActiveBtnSx(tokens);
 
   const menuItems = [
     { label: "Booking", href: "/clients/booking", match: "/clients/booking" },
@@ -120,20 +94,22 @@ export default function ClientProfileMenuPopover({
               fontSize: 14,
             }}
           >
-            {avatarSrc ? null : getInitials(name || email)}
+            {avatarSrc ? null : getProfileMenuInitials(name || email)}
           </Avatar>
           <Box sx={{ minWidth: 0 }}>
             <Typography
-              sx={{
-                fontWeight: 900,
+              sx={mollurePageTitleSx(tokens.navy, {
                 color: tokens.navy,
-                fontSize: 18,
-                lineHeight: 1.2,
-              }}
+              })}
             >
               {name}
             </Typography>
-            <Typography sx={{ color: tokens.slate, fontSize: 12.5, mt: 0.25 }}>
+            <Typography
+              sx={mollureBodyMutedSx(tokens.navy, {
+                color: tokens.slate,
+                mt: 0.25,
+              })}
+            >
               {email}
             </Typography>
           </Box>

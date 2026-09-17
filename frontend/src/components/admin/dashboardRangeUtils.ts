@@ -98,7 +98,7 @@ export function getDashboardKpiMetrics(range: AdminDashboardRangeValue) {
     { label: "New Professionals", value: raw.newProfessionals, trend: trends[0], icon: "business" as const },
     { label: "New Clients", value: raw.newClients, trend: trends[1], icon: "people" as const },
     { label: "New Individual Clients (IC)", value: raw.newIC, trend: trends[2], icon: "person" as const },
-    { label: "New Company Clients (CC)", value: raw.newCC, trend: trends[3], icon: "company" as const },
+    { label: "New Company Clients (BC)", value: raw.newCC, trend: trends[3], icon: "company" as const },
     { label: "Total Online Bookings", value: raw.onlineBookings, trend: trends[4], icon: "online" as const },
     { label: "Total Offline Bookings", value: raw.offlineBookings, trend: trends[5], icon: "offline" as const },
   ];

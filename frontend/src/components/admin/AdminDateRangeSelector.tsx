@@ -5,26 +5,27 @@ import CalendarTodayOutlinedIcon from "@mui/icons-material/CalendarTodayOutlined
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import {
-  Box,
   ButtonBase,
   ClickAwayListener,
   MenuItem,
   MenuList,
   Paper,
-  Popover,
   Popper,
   Stack,
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import { AppButton, AppCalendarPanel } from "../common";
 import type { AdminTimeRange } from "./AdminTimeRangeFilter";
+import {
+  AdminDateRangeCalendar,
+  useAdminDateRangeDraft,
+} from "./AdminDateRangeCalendar";
 import {
   RANGE_OPTIONS,
   getRangeLabel,
-  isDateInRange,
   type AdminDashboardRangeValue,
 } from "./dashboardRangeUtils";
+import { mollureLabelSx } from "../../theme/mollureHierarchy";
 
 type AdminDateRangeSelectorProps = {
   value: AdminDashboardRangeValue;
@@ -41,14 +42,16 @@ export default function AdminDateRangeSelector({
 
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [calendarOpen, setCalendarOpen] = React.useState(false);
-  const [draftStart, setDraftStart] = React.useState(value.customStart);
-  const [draftEnd, setDraftEnd] = React.useState(value.customEnd);
-  const [pickingEnd, setPickingEnd] = React.useState(false);
-
-  React.useEffect(() => {
-    setDraftStart(value.customStart);
-    setDraftEnd(value.customEnd);
-  }, [value.customStart, value.customEnd]);
+  const {
+    draftStart,
+    draftEnd,
+    pickingEnd,
+    setDraftStart,
+    setDraftEnd,
+    setPickingEnd,
+    handleDayPick,
+    normalizeRange,
+  } = useAdminDateRangeDraft(value.customStart, value.customEnd);
 
   const handlePresetSelect = (preset: AdminTimeRange) => {
     if (preset === "custom") {
@@ -63,33 +66,18 @@ export default function AdminDateRangeSelector({
     setCalendarOpen(false);
   };
 
-  const handleDayPick = (iso: string) => {
-    if (!pickingEnd || !draftStart) {
-      setDraftStart(iso);
-      setDraftEnd("");
-      setPickingEnd(true);
-      return;
-    }
-    if (iso < draftStart) {
-      setDraftEnd(draftStart);
-      setDraftStart(iso);
-    } else {
-      setDraftEnd(iso);
-    }
-    setPickingEnd(false);
-  };
-
   const handleApplyCustom = () => {
-    if (!draftStart) return;
-    const end = draftEnd || draftStart;
-    const [start, finish] =
-      draftStart <= end ? [draftStart, end] : [end, draftStart];
+    const range = normalizeRange();
+    if (!range) return;
+    const [start, finish] = range;
     onChange({ preset: "custom", customStart: start, customEnd: finish });
     setCalendarOpen(false);
   };
 
-  const rangeStart = draftStart;
-  const rangeEnd = draftEnd || draftStart;
+  const hintSuffix =
+    draftStart && draftEnd
+      ? ` · ${getRangeLabel({ preset: "custom", customStart: draftStart, customEnd: draftEnd })}`
+      : "";
 
   return (
     <>
@@ -120,12 +108,11 @@ export default function AdminDateRangeSelector({
             sx={{ fontSize: 18, color: tokens.teal, flexShrink: 0 }}
           />
           <Typography
-            sx={{
-              fontSize: 13,
+            sx={mollureLabelSx(tokens.navy, {
               fontWeight: 600,
               color: tokens.navy,
               whiteSpace: "nowrap",
-            }}
+            })}
           >
             {getRangeLabel(value)}
           </Typography>
@@ -183,94 +170,26 @@ export default function AdminDateRangeSelector({
         </ClickAwayListener>
       </Popper>
 
-      <Popover
+      <AdminDateRangeCalendar
         open={calendarOpen}
         anchorEl={anchorRef.current}
         onClose={() => setCalendarOpen(false)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-        transformOrigin={{ vertical: "top", horizontal: "left" }}
-        slotProps={{
-          paper: {
-            sx: {
-              mt: 0.75,
-              borderRadius: 3,
-              border: `1px solid ${tokens.cardBorder}`,
-              boxShadow: "0 12px 40px rgba(16, 35, 63, 0.12)",
-              overflow: "hidden",
-            },
+        draftStart={draftStart}
+        draftEnd={draftEnd}
+        pickingEnd={pickingEnd}
+        onDayPick={handleDayPick}
+        title="Custom date range"
+        hintSuffix={hintSuffix}
+        secondaryAction={{
+          label: "Cancel",
+          onClick: () => {
+            setCalendarOpen(false);
+            setDraftStart(value.customStart);
+            setDraftEnd(value.customEnd);
           },
         }}
-      >
-        <Box sx={{ p: 2, width: { xs: 310, sm: 340 } }}>
-          <Typography
-            sx={{ fontSize: 14, fontWeight: 600, color: tokens.navy, mb: 0.5 }}
-          >
-            Custom date range
-          </Typography>
-          <Typography sx={{ fontSize: 12, color: tokens.bodyText, mb: 1.5 }}>
-            {pickingEnd ? "Select end date" : "Select start date"}
-            {draftStart && draftEnd
-              ? ` · ${getRangeLabel({ preset: "custom", customStart: draftStart, customEnd: draftEnd })}`
-              : ""}
-          </Typography>
-
-          <AppCalendarPanel
-            value={pickingEnd && draftEnd ? draftEnd : draftStart}
-            onChange={handleDayPick}
-            compact
-            daySx={(iso) => {
-              if (!rangeStart) return undefined;
-              const end = rangeEnd || rangeStart;
-              const inRange = isDateInRange(iso, rangeStart, end);
-              const isEdge = iso === rangeStart || iso === draftEnd;
-              if (isEdge) {
-                return {
-                  bgcolor: tokens.teal,
-                  color: tokens.white,
-                  fontWeight: 700,
-                };
-              }
-              if (inRange) {
-                return {
-                  bgcolor: alpha(tokens.teal, 0.14),
-                  color: tokens.tealDark,
-                  fontWeight: 600,
-                };
-              }
-              return undefined;
-            }}
-          />
-
-          <Stack
-            direction="row"
-            spacing={1}
-            justifyContent="flex-end"
-            sx={{ mt: 2 }}
-          >
-            <AppButton
-              variant="outlined"
-              size="small"
-              onClick={() => {
-                setCalendarOpen(false);
-                setDraftStart(value.customStart);
-                setDraftEnd(value.customEnd);
-              }}
-              sx={{ textTransform: "none" }}
-            >
-              Cancel
-            </AppButton>
-            <AppButton
-              variant="contained"
-              size="small"
-              onClick={handleApplyCustom}
-              disabled={!draftStart}
-              sx={{ textTransform: "none" }}
-            >
-              Apply
-            </AppButton>
-          </Stack>
-        </Box>
-      </Popover>
+        onApply={handleApplyCustom}
+      />
     </>
   );
 }

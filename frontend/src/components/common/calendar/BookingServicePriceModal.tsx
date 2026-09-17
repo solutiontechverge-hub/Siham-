@@ -1,11 +1,12 @@
 "use client";
 
-import AppButton from "../AppButton";
+import { ModalCancelApplyFooter } from "../FinanceDrawerFooter";
 import * as React from "react";
 import { InputAdornment, MenuItem, Stack } from "@mui/material";
 import MollureFormField from "../MollureFormField";
 import AppModal from "../AppModal";
 import type { BookingServicePriceType } from "../../../data/bookingServiceEdit.data";
+import { BOOKING_CATALOG_PRICE_TYPE_OPTIONS } from "../../../data/bookingUniqueItem.data";
 import { sanitizeDecimalInput } from "../../../lib/field-input";
 
 export type BookingServicePriceValue = {
@@ -19,14 +20,6 @@ type BookingServicePriceModalProps = {
   onClose: () => void;
   onApply: (price: BookingServicePriceValue) => void;
 };
-
-const PRICE_TYPE_OPTIONS: Array<{
-  value: BookingServicePriceType;
-  label: string;
-}> = [
-  { value: "fixed", label: "Fixed price" },
-  { value: "starting_from", label: "Starting from" },
-];
 
 export default function BookingServicePriceModal({
   open,
@@ -60,19 +53,12 @@ export default function BookingServicePriceModal({
       title="Add Price"
       maxWidth="xs"
       footer={
-        <Stack
-          direction="row"
+        <ModalCancelApplyFooter
+          onCancel={onClose}
+          onPrimary={handleApply}
+          buttonSx={{}}
           spacing={1}
-          justifyContent="flex-end"
-          sx={{ px: 2.5, py: 2 }}
-        >
-          <AppButton tone="secondary" onClick={onClose}>
-            Cancel
-          </AppButton>
-          <AppButton tone="primary" onClick={handleApply}>
-            Apply
-          </AppButton>
-        </Stack>
+        />
       }
     >
       <Stack spacing={1.5} sx={{ px: 2.5, pb: 2 }}>
@@ -91,7 +77,7 @@ export default function BookingServicePriceModal({
             },
           }}
         >
-          {PRICE_TYPE_OPTIONS.map((option) => (
+          {BOOKING_CATALOG_PRICE_TYPE_OPTIONS.map((option) => (
             <MenuItem key={option.value} value={option.value}>
               {option.label}
             </MenuItem>

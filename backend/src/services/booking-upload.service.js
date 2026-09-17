@@ -2,10 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 import { getUploadsDir } from "../config/uploads-dir.js";
-
-function isImageMime(mimeType = "") {
-  return String(mimeType).toLowerCase().startsWith("image/");
-}
+import { isImageMime } from "../utils/file-content.js";
 
 export async function saveBookingAttachments(userId, files = []) {
   if (!files.length) return [];
@@ -15,7 +12,7 @@ export async function saveBookingAttachments(userId, files = []) {
 
   const saved = [];
   for (const file of files) {
-    const ext = path.extname(file.originalname || "").toLowerCase() || "";
+    const ext = file.detectedExt || path.extname(file.originalname || "").toLowerCase() || "";
     const filename = `${randomUUID()}${ext}`;
     const absolutePath = path.join(userDir, filename);
     await fs.writeFile(absolutePath, file.buffer);
@@ -24,9 +21,7 @@ export async function saveBookingAttachments(userId, files = []) {
       id: `booking-att-${randomUUID()}`,
       name: file.originalname || filename,
       mimeType,
-      kind: isImageMime(mimeType) || [".jpg", ".jpeg", ".png", ".webp", ".gif", ".heic", ".heif"].includes(ext)
-        ? "image"
-        : "document",
+      kind: isImageMime(mimeType) ? "image" : "document",
       url: `/uploads/bookings/${userId}/${filename}`,
     });
   }

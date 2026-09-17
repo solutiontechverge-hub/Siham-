@@ -2,10 +2,13 @@
 
 import * as React from "react";
 import CalendarTodayOutlinedIcon from "@mui/icons-material/CalendarTodayOutlined";
-import { Box, ButtonBase, Popover, Stack, Typography } from "@mui/material";
+import { ButtonBase, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import { AppButton, AppCalendarPanel } from "../common";
-import { isDateInRange } from "./dashboardRangeUtils";
+import {
+  AdminDateRangeCalendar,
+  useAdminDateRangeDraft,
+} from "./AdminDateRangeCalendar";
+import { mollureBodySx } from "../../theme/mollureHierarchy";
 
 type AdminFilterDateRangeProps = {
   start: string;
@@ -43,39 +46,21 @@ export default function AdminFilterDateRange({
   const tokens = useTheme().palette.mollure;
   const anchorRef = React.useRef<HTMLButtonElement>(null);
   const [open, setOpen] = React.useState(false);
-  const [draftStart, setDraftStart] = React.useState(start);
-  const [draftEnd, setDraftEnd] = React.useState(end);
-  const [pickingEnd, setPickingEnd] = React.useState(false);
-
-  React.useEffect(() => {
-    setDraftStart(start);
-    setDraftEnd(end);
-  }, [start, end]);
-
-  const rangeStart = draftStart;
-  const rangeEnd = draftEnd || draftStart;
-
-  const handleDayPick = (iso: string) => {
-    if (!pickingEnd || !draftStart) {
-      setDraftStart(iso);
-      setDraftEnd("");
-      setPickingEnd(true);
-      return;
-    }
-    if (iso < draftStart) {
-      setDraftEnd(draftStart);
-      setDraftStart(iso);
-    } else {
-      setDraftEnd(iso);
-    }
-    setPickingEnd(false);
-  };
+  const {
+    draftStart,
+    draftEnd,
+    pickingEnd,
+    setDraftStart,
+    setDraftEnd,
+    setPickingEnd,
+    handleDayPick,
+    normalizeRange,
+  } = useAdminDateRangeDraft(start, end);
 
   const handleApply = () => {
-    if (!draftStart) return;
-    const finish = draftEnd || draftStart;
-    const [from, to] =
-      draftStart <= finish ? [draftStart, finish] : [finish, draftStart];
+    const range = normalizeRange();
+    if (!range) return;
+    const [from, to] = range;
     onChange(from, to);
     setOpen(false);
   };
@@ -120,101 +105,31 @@ export default function AdminFilterDateRange({
           sx={{ fontSize: 18, color: tokens.teal, flexShrink: 0 }}
         />
         <Typography
-          sx={{
-            fontSize: 12,
+          sx={mollureBodySx(tokens.navy, {
             fontWeight: 500,
             color:
               start || end ? tokens.navy : (tokens.placeholder ?? tokens.slate),
             textAlign: "left",
             flex: 1,
             whiteSpace: "nowrap",
-          }}
+          })}
         >
           {formatRangeLabel(start, end, placeholder)}
         </Typography>
       </ButtonBase>
 
-      <Popover
+      <AdminDateRangeCalendar
         open={open}
         anchorEl={anchorRef.current}
         onClose={() => setOpen(false)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-        transformOrigin={{ vertical: "top", horizontal: "left" }}
-        slotProps={{
-          paper: {
-            sx: {
-              mt: 0.75,
-              borderRadius: 3,
-              border: `1px solid ${tokens.cardBorder}`,
-              boxShadow: "0 12px 40px rgba(16, 35, 63, 0.12)",
-              overflow: "hidden",
-            },
-          },
-        }}
-      >
-        <Box sx={{ p: 2, width: { xs: 310, sm: 340 } }}>
-          <Typography
-            sx={{ fontSize: 14, fontWeight: 600, color: tokens.navy, mb: 0.5 }}
-          >
-            Select date range
-          </Typography>
-          <Typography sx={{ fontSize: 12, color: tokens.bodyText, mb: 1.5 }}>
-            {pickingEnd ? "Select end date" : "Select start date"}
-          </Typography>
-
-          <AppCalendarPanel
-            value={pickingEnd && draftEnd ? draftEnd : draftStart}
-            onChange={handleDayPick}
-            compact
-            daySx={(iso) => {
-              if (!rangeStart) return undefined;
-              const end = rangeEnd || rangeStart;
-              const inRange = isDateInRange(iso, rangeStart, end);
-              const isEdge = iso === rangeStart || iso === draftEnd;
-              if (isEdge) {
-                return {
-                  bgcolor: tokens.teal,
-                  color: tokens.white,
-                  fontWeight: 700,
-                };
-              }
-              if (inRange) {
-                return {
-                  bgcolor: alpha(tokens.teal, 0.14),
-                  color: tokens.tealDark,
-                  fontWeight: 600,
-                };
-              }
-              return undefined;
-            }}
-          />
-
-          <Stack
-            direction="row"
-            spacing={1}
-            justifyContent="flex-end"
-            sx={{ mt: 2 }}
-          >
-            <AppButton
-              variant="outlined"
-              size="small"
-              onClick={handleClear}
-              sx={{ textTransform: "none" }}
-            >
-              Clear
-            </AppButton>
-            <AppButton
-              variant="contained"
-              size="small"
-              onClick={handleApply}
-              disabled={!draftStart}
-              sx={{ textTransform: "none" }}
-            >
-              Apply
-            </AppButton>
-          </Stack>
-        </Box>
-      </Popover>
+        draftStart={draftStart}
+        draftEnd={draftEnd}
+        pickingEnd={pickingEnd}
+        onDayPick={handleDayPick}
+        title="Select date range"
+        secondaryAction={{ label: "Clear", onClick: handleClear }}
+        onApply={handleApply}
+      />
     </>
   );
 }

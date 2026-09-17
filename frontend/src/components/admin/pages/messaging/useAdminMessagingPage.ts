@@ -8,6 +8,7 @@ import {
   useReplyAdminMessageMutation,
 } from "../../../../store/services/adminApi";
 import type { MessagingRecipient } from "./messaging.types";
+import { INPUT_LIMITS, parseText } from "../../../../lib/inputSchema";
 
 function parseRecipients(searchParams: URLSearchParams): MessagingRecipient[] {
   const emails =
@@ -56,8 +57,14 @@ export function useAdminMessagingPage() {
   const selected = messages.find((m) => m.id === selectedId);
 
   const handleSend = async () => {
-    if (!selected || !reply.trim()) return;
-    await replyAdminMessage({ id: selected.id, reply: reply.trim() });
+    if (!selected) return;
+    const parsed = parseText(reply, {
+      label: "Reply",
+      min: 1,
+      max: INPUT_LIMITS.messageMax,
+    });
+    if (!parsed.ok) return;
+    await replyAdminMessage({ id: selected.id, reply: parsed.value });
     setReply("");
   };
 

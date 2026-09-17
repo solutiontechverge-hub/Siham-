@@ -1,7 +1,17 @@
 "use client";
 
 import * as React from "react";
+import { getApiErrorMessage } from "../../../../lib/api-error";
 import { getPhoneValidationErrors } from "../../../../lib/phone-validation";
+import {
+  parseCoc,
+  parseEmail,
+  parsePersonName,
+  parseText,
+  parseVat,
+  rejectInvalid,
+  INPUT_LIMITS,
+} from "../../../../lib/inputSchema";
 import { DEFAULT_DIAL_CODE } from "../../../../lib/phoneDefaults";
 import type { ClientRecord } from "./data/clientList";
 import {
@@ -36,18 +46,6 @@ export type {
   EditIndividualFormState,
 } from "./client.types";
 export { emptyEditCompanyForm, emptyEditIndividualForm } from "./client.types";
-
-function getApiErrorMessage(error: unknown, fallback: string): string {
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "data" in error &&
-    typeof (error as { data?: { message?: string } }).data?.message === "string"
-  ) {
-    return (error as { data: { message: string } }).data.message;
-  }
-  return fallback;
-}
 
 function parseDobForApi(raw: string): string | undefined {
   const v = raw.trim();
@@ -139,27 +137,35 @@ export function useFixedLocationClientPage() {
   }, []);
 
   const validateCompany = React.useCallback(() => {
-    const next: Partial<Record<string, string>> = {};
-    if (!coLegalName.trim()) next.legalName = "Legal name is required";
-    if (!coCoc.trim()) next.coc = "COC is required";
-    if (!coVat.trim()) next.vat = "VAT is required";
-    if (!coContactFirst.trim()) next.contactFirst = "First name is required";
-    if (!coContactLast.trim()) next.contactLast = "Last name is required";
+    const parsed = rejectInvalid({
+      legalName: parseText(coLegalName, {
+        label: "Legal name",
+        max: INPUT_LIMITS.textShort,
+      }),
+      coc: parseCoc(coCoc),
+      vat: parseVat(coVat),
+      contactFirst: parsePersonName(coContactFirst, { label: "First name" }),
+      contactLast: parsePersonName(coContactLast, { label: "Last name" }),
+      street: parseText(coStreet, { label: "Street", max: INPUT_LIMITS.textShort }),
+      streetNumber: parseText(coStreetNumber, {
+        label: "Number",
+        max: INPUT_LIMITS.streetNumber,
+      }),
+      postal: parseText(coPostal, {
+        label: "Postal code",
+        max: INPUT_LIMITS.postalCode,
+      }),
+      email: parseEmail(coEmail),
+    });
+    const next: Partial<Record<string, string>> = parsed.ok
+      ? {}
+      : { ...parsed.errors };
     if (!coGender) next.gender = "Please select gender";
-    if (!coStreet.trim()) next.street = "Street is required";
-    if (!coStreetNumber.trim()) next.streetNumber = "Number is required";
-    if (!coPostal.trim()) next.postal = "Postal code is required";
     if (!coProvince) next.province = "Please select province";
     if (!coMunicipality) next.municipality = "Please select municipality";
     const coPhoneErrors = getPhoneValidationErrors(coCountryCode, coPhone);
     if (coPhoneErrors.countryCode) next.countryCode = coPhoneErrors.countryCode;
     if (coPhoneErrors.phone) next.phone = coPhoneErrors.phone;
-    const email = coEmail.trim();
-    if (!email) {
-      next.email = "Email is required";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      next.email = "Enter a valid email address";
-    }
     setCompErrors(next);
     return Object.keys(next).length === 0;
   }, [
@@ -180,9 +186,14 @@ export function useFixedLocationClientPage() {
   ]);
 
   const validateIndividual = React.useCallback(() => {
-    const next: Partial<Record<string, string>> = {};
-    if (!indFirstName.trim()) next.firstName = "First name is required";
-    if (!indLastName.trim()) next.lastName = "Last name is required";
+    const parsed = rejectInvalid({
+      firstName: parsePersonName(indFirstName, { label: "First name" }),
+      lastName: parsePersonName(indLastName, { label: "Last name" }),
+      email: parseEmail(indEmail),
+    });
+    const next: Partial<Record<string, string>> = parsed.ok
+      ? {}
+      : { ...parsed.errors };
     if (!indGender) next.gender = "Please select gender";
     const dob = indDob.trim();
     if (!dob) {
@@ -206,12 +217,6 @@ export function useFixedLocationClientPage() {
     const indPhoneErrors = getPhoneValidationErrors(indCountryCode, indPhone);
     if (indPhoneErrors.countryCode) next.countryCode = indPhoneErrors.countryCode;
     if (indPhoneErrors.phone) next.phone = indPhoneErrors.phone;
-    const email = indEmail.trim();
-    if (!email) {
-      next.email = "Email is required";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      next.email = "Enter a valid email address";
-    }
     setIndErrors(next);
     return Object.keys(next).length === 0;
   }, [indCountryCode, indDob, indEmail, indFirstName, indGender, indLastName, indPhone]);
@@ -387,6 +392,20 @@ export function useFixedLocationClientPage() {
       setNonMollureTypeError("Please select a client type");
       return false;
     }
+    const noteParsed = parseText(nonMollureTechnicalNote, {
+      required: false,
+      label: "Technical note",
+      min: INPUT_LIMITS.notesMin,
+      max: null,
+    });
+    if (!noteParsed.ok) {
+      setSnackbar({
+        open: true,
+        message: noteParsed.error,
+        severity: "error",
+      });
+      return false;
+    }
     if (nonMollureClientType === "Individual Client") {
       if (!validateIndividual()) return false;
       const email = indEmail.trim().toLowerCase();
@@ -401,7 +420,7 @@ export function useFixedLocationClientPage() {
           phone: indPhone.trim(),
           gender: indGender || undefined,
           date_of_birth: parseDobForApi(indDob),
-          technical_note: nonMollureTechnicalNote.trim() || undefined,
+          technical_note: noteParsed.value || undefined,
         }).unwrap();
 
         setAddNonMollureOpen(false);
@@ -436,7 +455,7 @@ export function useFixedLocationClientPage() {
           phone: coPhone.trim(),
           business_address: `${coStreet.trim()} ${coStreetNumber.trim()}, ${coMunicipality.trim()} ${coPostal.trim()}`.trim(),
           detail_email: email,
-          technical_note: nonMollureTechnicalNote.trim() || undefined,
+          technical_note: noteParsed.value || undefined,
         }).unwrap();
 
         setAddNonMollureOpen(false);
@@ -592,6 +611,70 @@ export function useFixedLocationClientPage() {
     }
     setEditPhoneErrors({});
 
+    const editSchema =
+      viewClient.kind === "company"
+        ? rejectInvalid({
+            legalName: parseText(editCompanyForm.legalName, {
+              required: false,
+              label: "Legal name",
+              max: INPUT_LIMITS.textShort,
+            }),
+            coc: parseCoc(editCompanyForm.coc, { required: false }),
+            vat: parseVat(editCompanyForm.vat, { required: false }),
+            contactFirst: parsePersonName(editCompanyForm.contactFirst, {
+              required: false,
+              label: "First name",
+            }),
+            contactLast: parsePersonName(editCompanyForm.contactLast, {
+              required: false,
+              label: "Last name",
+            }),
+            email: parseEmail(editCompanyForm.email, { required: false }),
+            street: parseText(editCompanyForm.street, {
+              required: false,
+              label: "Street",
+              max: INPUT_LIMITS.textShort,
+            }),
+            technicalNote: parseText(editCompanyForm.technicalNote, {
+              required: false,
+              label: "Technical note",
+              min: INPUT_LIMITS.notesMin,
+              max: null,
+            }),
+          })
+        : rejectInvalid({
+            firstName: parsePersonName(editIndividualForm.firstName, {
+              required: false,
+              label: "First name",
+            }),
+            lastName: parsePersonName(editIndividualForm.lastName, {
+              required: false,
+              label: "Last name",
+            }),
+            email: parseEmail(editIndividualForm.email, { required: false }),
+            residentialAddress: parseText(editIndividualForm.residentialAddress, {
+              required: false,
+              label: "Address",
+              max: INPUT_LIMITS.textMedium,
+            }),
+            technicalNote: parseText(editIndividualForm.technicalNote, {
+              required: false,
+              label: "Technical note",
+              min: INPUT_LIMITS.notesMin,
+              max: null,
+            }),
+          });
+
+    if (!editSchema.ok) {
+      const first = Object.values(editSchema.errors).find(Boolean);
+      setSnackbar({
+        open: true,
+        message: first || "Please check client details.",
+        severity: "error",
+      });
+      return false;
+    }
+
     try {
       if (viewClient.kind === "company") {
         const email = editCompanyForm.email.trim().toLowerCase();
@@ -654,11 +737,25 @@ export function useFixedLocationClientPage() {
     async (note: string) => {
       if (!viewClientId) return;
       const trimmed = note.trim();
+      const parsed = parseText(trimmed, {
+        required: false,
+        label: "Technical note",
+        min: INPUT_LIMITS.notesMin,
+        max: null,
+      });
+      if (!parsed.ok) {
+        setSnackbar({
+          open: true,
+          message: parsed.error,
+          severity: "error",
+        });
+        return;
+      }
 
       try {
         await updateProfessionalClientTechnicalNote({
           id: viewClientId,
-          technical_note: trimmed,
+          technical_note: parsed.value,
         }).unwrap();
         setSnackbar({ open: true, message: "Technical note saved", severity: "success" });
       } catch (error) {

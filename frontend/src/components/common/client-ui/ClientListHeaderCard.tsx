@@ -3,6 +3,10 @@
 import * as React from "react";
 import { Box, Paper } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import {
+  mollurePageSubtitleSx,
+  mollurePageTitleSx,
+} from "../../../theme/mollureHierarchy";
 import { Typography } from "../../ui/typography";
 
 type ClientListHeaderCardProps = {
@@ -29,26 +33,9 @@ export default function ClientListHeaderCard({
       }}
     >
       <Box>
-        <Typography
-          sx={{
-            fontWeight: 900,
-            color: alpha(m.navy, 0.9),
-            fontSize: 20,
-            lineHeight: 1.15,
-            letterSpacing: "-0.01em",
-          }}
-        >
-          {title}
-        </Typography>
+        <Typography sx={mollurePageTitleSx(m.navy)}>{title}</Typography>
         {subtitle ? (
-          <Typography
-            sx={{
-              mt: 0.4,
-              color: alpha(m.navy, 0.6),
-              fontSize: 13,
-              fontWeight: 600,
-            }}
-          >
+          <Typography sx={mollurePageSubtitleSx(m.navy, { mt: 0.4 })}>
             {subtitle}
           </Typography>
         ) : null}

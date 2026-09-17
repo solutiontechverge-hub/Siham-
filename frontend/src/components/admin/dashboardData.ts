@@ -107,7 +107,7 @@ export const dashboardKpiMetrics = [
   { label: "New Professionals", value: 128, trend: 18.7, icon: "business" as const },
   { label: "New Clients", value: 245, trend: 23.9, icon: "people" as const },
   { label: "New Individual Clients (IC)", value: 178, trend: 20.4, icon: "person" as const },
-  { label: "New Company Clients (CC)", value: 67, trend: 15.2, icon: "company" as const },
+  { label: "New Company Clients (BC)", value: 67, trend: 15.2, icon: "company" as const },
   { label: "Total Online Bookings", value: 1264, trend: 21.3, icon: "online" as const },
   { label: "Total Offline Bookings", value: 842, trend: 12.6, icon: "offline" as const },
 ];

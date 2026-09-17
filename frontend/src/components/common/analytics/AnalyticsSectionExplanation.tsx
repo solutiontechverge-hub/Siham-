@@ -1,5 +1,7 @@
 "use client";
 
+import { mollureLabelSx } from "../../../theme/mollureHierarchy";
+
 import * as React from "react";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import { Box, ButtonBase, Collapse, Stack } from "@mui/material";
@@ -57,7 +59,7 @@ export default function AnalyticsSectionExplanation({
           },
         }}
       >
-        <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: m.teal }}>
+        <BodyText sx={mollureLabelSx(m.navy, { color: m.teal })}>
           {label}
         </BodyText>
         <KeyboardArrowDownRoundedIcon
@@ -125,9 +127,7 @@ export default function AnalyticsSectionExplanation({
                       <Box key={item.title}>
                         <BodyText
                           sx={{
-                            fontSize: 12.5,
-                            fontWeight: 800,
-                            color: alpha(m.navy, 0.72),
+                            ...mollureLabelSx(m.navy),
                             mb: 0.35,
                           }}
                         >

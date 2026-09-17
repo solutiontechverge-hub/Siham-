@@ -1,15 +1,10 @@
 "use client";
 
+import { mollureLabelSx } from "../../../theme/mollureHierarchy";
+
 import * as React from "react";
-import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
 import { Avatar, Box, Paper, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import {
-  parseTimeLabelToMinutes,
-  serviceTimeRangeLabel,
-} from "../../../app/clients/booking/booking-time";
-import { ServiceSummaryMetaLine } from "../ServiceSummaryMetaLine";
-import BookingEditedTag, { BookingChangeTags } from "../calendar/BookingEditedTag";
 import BookingPriceBreakdown from "../booking-finance/BookingPriceBreakdown";
 import {
   lineDiscountAmountFromItems,
@@ -18,178 +13,18 @@ import {
 } from "../calendar/bookingTotal";
 import type { ManualEntryDiscount } from "../../sections/finance/manualEntry.data";
 import type { BookingEditTagVariant } from "../calendar/bookingRequestNegotiation";
-import { resolveLineChangeTags } from "../calendar/bookingRequestNegotiation";
-import {
-  buildBookingSummarySections,
-  bookingParticipantDisplayHeading,
-  participantHeadingOrdinal,
-  participantOrdinals,
-  planningScheduleMeta,
-  resolveTeamMemberFirstName,
-} from "./buildBookingSummarySections";
-import {
-  extraBookingParticipantIds,
-  resolveBookingLineOwnerId,
-} from "../../../data/bookingChronologicalBlocks";
+import { buildBookingSummarySections } from "./buildBookingSummarySections";
 import ProjectUploadThumb from "./ProjectUploadThumb";
 import type { BookingEditSuggestedProduct } from "./bookingEditRequest";
 import type { ClientBookingDraft, ClientBookingSummarySection } from "./types";
 import BookingSummaryNote from "./BookingSummaryNote";
-import BookingLineAmount from "../calendar/BookingLineAmount";
-import { clientLineDiscountLabel } from "../../../data/bookingLinePricing";
 import { BodyText } from "../../ui/typography";
+import OutcomeChangesNoteBlock, {
+  type OutcomeChangesNote,
+} from "./OutcomeChangesNoteBlock";
+import ClientBookingPaymentChronology from "./ClientBookingPaymentChronology";
 
 export type ClientBookingPrepaymentState = "none" | "required" | "paid";
-
-type OutcomeChangesNote = {
-  scheduleLabel?: string;
-  services?: Array<{ name: string; price: number }>;
-  products?: Array<{ name: string; price: number }>;
-};
-
-function OutcomeChangesNoteBlock({
-  note,
-  variant,
-}: {
-  note: OutcomeChangesNote;
-  variant: "accepted" | "rejected";
-}) {
-  const m = useTheme().palette.mollure;
-  const isAccepted = variant === "accepted";
-  const accent = isAccepted ? m.success : "#C67A00";
-  return (
-    <Paper
-      elevation={0}
-      sx={{
-        mt: 1.25,
-        borderRadius: "10px",
-        border: `1px solid ${alpha(accent, 0.28)}`,
-        bgcolor: alpha(accent, 0.06),
-        px: 1.75,
-        py: 1.35,
-      }}
-    >
-      <BodyText
-        sx={{
-          m: 0,
-          fontSize: 12.5,
-          fontWeight: 900,
-          color: alpha(m.navy, 0.82),
-          mb: 0.85,
-        }}
-      >
-        {isAccepted
-          ? "Professional has accepted your new changes"
-          : "Professional has rejected your new changes"}
-      </BodyText>
-      {note.scheduleLabel ? (
-        <BodyText
-          sx={{
-            m: 0,
-            fontSize: 12,
-            fontWeight: 700,
-            color: alpha(m.navy, 0.68),
-            mb: 0.5,
-          }}
-        >
-          {isAccepted ? "Updated time" : "Requested time"}: {note.scheduleLabel}
-        </BodyText>
-      ) : null}
-      {note.services?.length ? (
-        <Box sx={{ mt: 0.35 }}>
-          <BodyText
-            sx={{
-              m: 0,
-              fontSize: 12,
-              fontWeight: 800,
-              color: alpha(m.navy, 0.55),
-              mb: 0.35,
-            }}
-          >
-            {isAccepted ? "Updated services" : "Requested services"}
-          </BodyText>
-          <Stack spacing={0.35}>
-            {note.services.map((service, index) => (
-              <Stack
-                key={`${service.name}-${index}`}
-                direction="row"
-                justifyContent="space-between"
-                spacing={1}
-              >
-                <BodyText
-                  sx={{
-                    m: 0,
-                    fontSize: 12.5,
-                    fontWeight: 900,
-                    color: alpha(m.navy, 0.72),
-                  }}
-                >
-                  {service.name}
-                </BodyText>
-                <BodyText
-                  sx={{
-                    m: 0,
-                    fontSize: 12.5,
-                    fontWeight: 900,
-                    color: alpha(m.navy, 0.72),
-                  }}
-                >
-                  €{service.price}
-                </BodyText>
-              </Stack>
-            ))}
-          </Stack>
-        </Box>
-      ) : null}
-      {note.products?.length ? (
-        <Box sx={{ mt: 0.75 }}>
-          <BodyText
-            sx={{
-              m: 0,
-              fontSize: 12,
-              fontWeight: 800,
-              color: alpha(m.navy, 0.55),
-              mb: 0.35,
-            }}
-          >
-            {isAccepted ? "Updated products" : "Requested products"}
-          </BodyText>
-          <Stack spacing={0.35}>
-            {note.products.map((product, index) => (
-              <Stack
-                key={`${product.name}-${index}`}
-                direction="row"
-                justifyContent="space-between"
-                spacing={1}
-              >
-                <BodyText
-                  sx={{
-                    m: 0,
-                    fontSize: 12.5,
-                    fontWeight: 900,
-                    color: alpha(m.navy, 0.72),
-                  }}
-                >
-                  {product.name}
-                </BodyText>
-                <BodyText
-                  sx={{
-                    m: 0,
-                    fontSize: 12.5,
-                    fontWeight: 900,
-                    color: alpha(m.navy, 0.72),
-                  }}
-                >
-                  €{product.price}
-                </BodyText>
-              </Stack>
-            ))}
-          </Stack>
-        </Box>
-      ) : null}
-    </Paper>
-  );
-}
 
 type Props = {
   draft: ClientBookingDraft | null;
@@ -279,47 +114,6 @@ export default function ClientBookingPaymentDetailsCard({
     () => buildBookingSummarySections(draft),
     [draft],
   );
-  const bookingStartMinutes = React.useMemo(
-    () =>
-      draft?.selectedTime ? parseTimeLabelToMinutes(draft.selectedTime) : 0,
-    [draft?.selectedTime],
-  );
-
-  const serviceChangeTags = React.useCallback(
-    (serviceId: string) => {
-      const erTags = resolveLineChangeTags(serviceId, {
-        editedIds: editedServiceIds,
-        addedIds: addedServiceIds,
-        cancelledIds: cancelledServiceIds,
-        awaitingApproval: changesAwaitingApproval,
-      });
-      if (erTags.length) return erTags;
-      return updatedServiceIds.includes(serviceId) ? ["updated" as const] : [];
-    },
-    [
-      addedServiceIds,
-      cancelledServiceIds,
-      changesAwaitingApproval,
-      editedServiceIds,
-      updatedServiceIds,
-    ],
-  );
-
-  const productChangeTags = React.useCallback(
-    (productId: string) =>
-      resolveLineChangeTags(productId, {
-        editedIds: editedProductIds,
-        addedIds: addedProductIds,
-        cancelledIds: cancelledProductIds,
-        awaitingApproval: changesAwaitingApproval,
-      }),
-    [
-      addedProductIds,
-      cancelledProductIds,
-      changesAwaitingApproval,
-      editedProductIds,
-    ],
-  );
 
   const listedProducts = products.length
     ? products
@@ -357,12 +151,6 @@ export default function ClientBookingPaymentDetailsCard({
     services: draft?.services,
     products: listedProducts,
   });
-  const catalogHeadingSx = {
-    fontSize: 12.5,
-    fontWeight: 800,
-    color: alpha(m.navy, 0.72),
-    mb: 1,
-  } as const;
 
   const fallbackRequesterSection: ClientBookingSummarySection[] =
     sections.length === 0 && (draft?.services?.length ?? 0) > 0
@@ -414,205 +202,6 @@ export default function ClientBookingPaymentDetailsCard({
     Boolean(project?.description?.trim()) ||
     (project?.uploads?.length ?? 0) > 0;
 
-  const renderService = (
-    service: ClientBookingDraft["services"][number],
-    section: ClientBookingSummarySection,
-  ) => {
-    const teamFirst = resolveTeamMemberFirstName(
-      service.teamMemberId,
-      draft?.teamMembers,
-      service.teamMemberName,
-    );
-    const sectionStartMinutes = section.startTime
-      ? parseTimeLabelToMinutes(section.startTime)
-      : bookingStartMinutes;
-    const serviceOffset = section.items
-      .slice(
-        0,
-        section.items.findIndex((item) => item.id === service.id),
-      )
-      .reduce((sum, item) => sum + item.durationMins, 0);
-    const serviceStartMinutes = service.startTime
-      ? parseTimeLabelToMinutes(service.startTime)
-      : sectionStartMinutes + serviceOffset;
-    const timeRange = draft?.selectedTime
-      ? serviceTimeRangeLabel(serviceStartMinutes, service.durationMins)
-      : undefined;
-    const changeTags = serviceChangeTags(service.id);
-
-    return (
-      <Box
-        key={service.id}
-        sx={{
-          borderRadius: "10px",
-          border: `1px solid ${alpha(m.navy, 0.08)}`,
-          px: 1.5,
-          py: 1.15,
-          bgcolor: "#fff",
-        }}
-      >
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="center"
-          spacing={1.5}
-        >
-          <Box sx={{ minWidth: 0 }}>
-            <BodyText
-              sx={{
-                m: 0,
-                fontSize: 13,
-                fontWeight: 900,
-                color: alpha(m.navy, 0.86),
-                lineHeight: 1.25,
-              }}
-            >
-              {service.name}
-            </BodyText>
-            <ServiceSummaryMetaLine
-              timeRange={timeRange}
-              durationLabel={`${service.durationMins} Mins`}
-            />
-            {teamFirst ? (
-              <Stack
-                direction="row"
-                alignItems="center"
-                spacing={0.45}
-                sx={{ mt: 0.45 }}
-              >
-                <PersonOutlineRoundedIcon
-                  sx={{ fontSize: 14, color: alpha(m.navy, 0.4) }}
-                />
-                <BodyText
-                  sx={{
-                    m: 0,
-                    fontSize: 10.5,
-                    fontWeight: 700,
-                    color: alpha(m.navy, 0.48),
-                  }}
-                >
-                  By {teamFirst}
-                </BodyText>
-              </Stack>
-            ) : null}
-            {changeTags.length ? (
-              <BookingChangeTags
-                variants={changeTags}
-                signpostTitle={editTagSignpostTitle}
-                onSignpostClick={onEditTagSignpostClick}
-              />
-            ) : null}
-          </Box>
-          <BookingLineAmount
-            amount={service.price}
-            originalAmount={service.originalPrice}
-            discountLabel={clientLineDiscountLabel(service)}
-          />
-        </Stack>
-      </Box>
-    );
-  };
-
-  const renderCatalogItem = (
-    item: {
-      id: string;
-      name: string;
-      price: number;
-      quantity?: number;
-      originalPrice?: number;
-      discountType?: "fixed" | "percentage";
-      discountAmount?: number;
-      discountPct?: number;
-    },
-  ) => (
-    <Box
-      key={item.id}
-      sx={{
-        borderRadius: "10px",
-        border: `1px solid ${alpha(m.navy, 0.08)}`,
-        px: 1.5,
-        py: 1.15,
-        bgcolor: "#fff",
-      }}
-    >
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        alignItems="center"
-        spacing={1.5}
-      >
-        <Stack
-          direction="row"
-          alignItems="center"
-          spacing={0.75}
-          sx={{ minWidth: 0, flexWrap: "wrap" }}
-        >
-          <BodyText
-            sx={{
-              m: 0,
-              fontSize: 13,
-              fontWeight: 900,
-              color: alpha(m.navy, 0.86),
-              lineHeight: 1.25,
-            }}
-          >
-            {item.quantity && item.quantity > 1
-              ? `${item.name} ×${item.quantity}`
-              : item.name}
-          </BodyText>
-          {(() => {
-            const productTags = productChangeTags(item.id);
-            return productTags.length ? (
-              <BookingChangeTags
-                variants={productTags}
-                signpostTitle={editTagSignpostTitle}
-                onSignpostClick={onEditTagSignpostClick}
-              />
-            ) : null;
-          })()}
-        </Stack>
-        <BookingLineAmount
-          amount={item.price}
-          originalAmount={item.originalPrice}
-          discountLabel={clientLineDiscountLabel(item)}
-        />
-      </Stack>
-    </Box>
-  );
-
-  const renderPersonHeader = (name: string, showUpdated?: boolean) => (
-    <Stack
-      direction="row"
-      alignItems="center"
-      spacing={1.25}
-      sx={{ mb: 1.15 }}
-    >
-      <Avatar
-        sx={{
-          width: 34,
-          height: 34,
-          bgcolor: alpha(m.teal, 0.12),
-          color: m.teal,
-          fontWeight: 900,
-          fontSize: 14,
-        }}
-      >
-        {name.charAt(0).toUpperCase()}
-      </Avatar>
-      <BodyText
-        sx={{
-          m: 0,
-          fontWeight: 900,
-          fontSize: 13,
-          color: m.headingText,
-        }}
-      >
-        {name}
-      </BodyText>
-      {showUpdated ? <BookingEditedTag variant="updated" /> : null}
-    </Stack>
-  );
-
   const nestedCardSx = {
     borderRadius: "10px",
     border: `1px solid ${alpha(m.navy, 0.08)}`,
@@ -620,206 +209,6 @@ export default function ClientBookingPaymentDetailsCard({
     px: 1.5,
     py: 1.25,
   } as const;
-
-  const requesterSectionKey =
-    chronologicalSections.find(
-      (section) => section.isRequester || section.participantType === "requester",
-    )?.key ?? "";
-  const requesterParticipantId =
-    chronologicalSections.find(
-      (section) => section.isRequester || section.participantType === "requester",
-    )?.participantId ||
-    String(requesterSectionKey).split("::")[0] ||
-    "requester";
-  const extraParticipantIds = React.useMemo(
-    () => extraBookingParticipantIds(draft?.people),
-    [draft?.people],
-  );
-
-  const catalogItemsForSection = (
-    items: typeof catalogProducts,
-    section: ClientBookingSummarySection,
-  ) => {
-    const participantId =
-      section.participantId ||
-      String(section.key).split("::")[0] ||
-      section.key;
-    const isFirstBlockForPerson =
-      chronologicalSections.find((row) => {
-        const rowId =
-          row.participantId || String(row.key).split("::")[0] || row.key;
-        return rowId === participantId;
-      })?.key === section.key;
-    if (!isFirstBlockForPerson) return [];
-    return items.filter((item) => {
-      const ownerId = resolveBookingLineOwnerId(
-        (item as { guestId?: string | null }).guestId,
-        requesterParticipantId,
-        extraParticipantIds,
-      );
-      return ownerId === participantId || ownerId === section.key;
-    });
-  };
-
-  const renderCatalogGroup = (
-    heading: string,
-    items: Array<{
-      id: string;
-      name: string;
-      price: number;
-      quantity?: number;
-      originalPrice?: number;
-      discountType?: "fixed" | "percentage";
-      discountAmount?: number;
-      discountPct?: number;
-    }>,
-  ) => {
-    if (!items.length) return null;
-    return (
-      <Box>
-        <BodyText sx={catalogHeadingSx}>{heading}</BodyText>
-        <Stack spacing={1}>
-          {items.map((item) => renderCatalogItem(item))}
-        </Stack>
-      </Box>
-    );
-  };
-
-  const renderSectionBlock = (
-    section: ClientBookingSummarySection,
-    heading?: string,
-    asPersonCard?: boolean,
-    hideRoleHeading?: boolean,
-  ) => {
-    const services = section.items;
-    const products = catalogItemsForSection(catalogProducts, section);
-    const uniqueItems = catalogItemsForSection(catalogUniqueItems, section);
-    const personName = section.title?.trim() || "";
-    const roleHeading = heading?.trim() || "";
-    const showInnerName = asPersonCard && Boolean(personName || roleHeading);
-    const participantId =
-      section.participantId ||
-      String(section.key).split("::")[0] ||
-      section.key;
-    const isFirstPersonBlock =
-      chronologicalSections.find((row) => {
-        const rowId =
-          row.participantId || String(row.key).split("::")[0] || row.key;
-        return rowId === participantId;
-      })?.key === section.key;
-    const isIdentityPerson =
-      section.participantType === "guest" ||
-      section.participantType === "model";
-    const showGuestUpdated =
-      isFirstPersonBlock &&
-      isIdentityPerson &&
-      updatedGuestIds.includes(String(participantId));
-    return (
-    <Box key={section.key}>
-      {asPersonCard && roleHeading && !hideRoleHeading ? (
-        <BodyText
-          sx={{
-            m: 0,
-            fontSize: 12,
-            fontWeight: 900,
-            color: alpha(m.navy, 0.65),
-            mb: 0.75,
-          }}
-        >
-          {roleHeading}
-        </BodyText>
-      ) : !asPersonCard && roleHeading && !hideRoleHeading ? (
-        <BodyText
-          sx={{
-            m: 0,
-            fontSize: 12,
-            fontWeight: 900,
-            color: alpha(m.navy, 0.65),
-            mb: 1,
-          }}
-        >
-          {roleHeading}
-        </BodyText>
-      ) : null}
-    <Box sx={asPersonCard ? nestedCardSx : undefined}>
-      {showInnerName
-        ? renderPersonHeader(personName || roleHeading, showGuestUpdated)
-        : null}
-      <Stack spacing={1.5}>
-      {(() => {
-        const meta = planningScheduleMeta(section);
-        const rawActivity = section.planningItem?.activity?.trim() || "";
-        const activity =
-          rawActivity &&
-          rawActivity.toLowerCase() !== "buffer" &&
-          rawActivity !== roleHeading &&
-          rawActivity !== personName
-            ? rawActivity
-            : "";
-        const isTimedParticipant =
-          section.participantType === "buffer" ||
-          section.participantType === "planning";
-        const showSchedule =
-          isTimedParticipant ||
-          Boolean(activity) ||
-          (services.length > 0 &&
-            (Boolean(meta.timeRange) || Boolean(meta.durationLabel)));
-        if (!showSchedule) return null;
-        return (
-        <Box
-          sx={{
-            borderRadius: "10px",
-            border: `1px solid ${alpha(m.navy, 0.08)}`,
-            px: 1.5,
-            py: 1.15,
-            bgcolor: "#fff",
-          }}
-        >
-          {activity ? (
-            <BodyText
-              sx={{
-                m: 0,
-                fontSize: 12.5,
-                fontWeight: 900,
-                color: alpha(m.navy, 0.82),
-                mb: 0.35,
-              }}
-            >
-              {activity}
-            </BodyText>
-          ) : null}
-          {meta.timeRange || meta.durationLabel || section.teamMemberLabel ? (
-            <ServiceSummaryMetaLine
-              timeRange={meta.timeRange}
-              durationLabel={meta.durationLabel}
-              staffName={section.teamMemberLabel}
-            />
-          ) : null}
-          {scheduleChangeTags.length ? (
-            <BookingChangeTags
-              variants={scheduleChangeTags}
-              signpostTitle={editTagSignpostTitle}
-              onSignpostClick={onEditTagSignpostClick}
-            />
-          ) : null}
-        </Box>
-        );
-      })()}
-      {services.length ? (
-        <Box>
-          <BodyText sx={catalogHeadingSx}>Service</BodyText>
-          <Stack spacing={1}>
-            {services.map((service) => renderService(service, section))}
-          </Stack>
-        </Box>
-      ) : null}
-      {renderCatalogGroup("Product", products)}
-      {renderCatalogGroup("Unique item", uniqueItems)}
-      </Stack>
-    </Box>
-    </Box>
-    );
-  };
 
   return (
     <Paper
@@ -873,9 +262,7 @@ export default function ClientBookingPaymentDetailsCard({
             <BodyText
               sx={{
                 m: 0,
-                fontSize: 12.5,
-                fontWeight: 900,
-                color: alpha(m.navy, 0.82),
+                ...mollureLabelSx(m.navy),
                 lineHeight: 1.2,
               }}
             >
@@ -966,45 +353,24 @@ export default function ClientBookingPaymentDetailsCard({
           </Box>
         ) : null}
 
-        <Stack spacing={2}>
-          {(() => {
-            const ordinals = participantOrdinals(chronologicalSections);
-            return chronologicalSections.map((section) => {
-            const isRequester = Boolean(
-              section.isRequester || section.participantType === "requester",
-            );
-            const requesterAppearanceIndex = chronologicalSections
-              .filter(
-                (row) => row.isRequester || row.participantType === "requester",
-              )
-              .findIndex((row) => row.key === section.key);
-            const asPersonCard =
-              section.participantType === "planning" ||
-              section.participantType === "buffer" ||
-              section.participantType === "guest" ||
-              section.participantType === "model" ||
-              (isRequester && requesterAppearanceIndex > 0);
-            const heading = bookingParticipantDisplayHeading(
-              section,
-              participantHeadingOrdinal(section, ordinals),
-            );
-            const hideRoleHeading = isRequester && requesterAppearanceIndex === 0;
-            return renderSectionBlock(
-              section,
-              heading,
-              asPersonCard,
-              hideRoleHeading,
-            );
-          });
-          })()}
-
-          {chronologicalSections.length === 0 ? (
-            <>
-              {renderCatalogGroup("Product", catalogProducts)}
-              {renderCatalogGroup("Unique item", catalogUniqueItems)}
-            </>
-          ) : null}
-        </Stack>
+        <ClientBookingPaymentChronology
+          chronologicalSections={chronologicalSections}
+          draft={draft}
+          catalogProducts={catalogProducts}
+          catalogUniqueItems={catalogUniqueItems}
+          editedServiceIds={editedServiceIds}
+          addedServiceIds={addedServiceIds}
+          cancelledServiceIds={cancelledServiceIds}
+          updatedGuestIds={updatedGuestIds}
+          updatedServiceIds={updatedServiceIds}
+          editedProductIds={editedProductIds}
+          addedProductIds={addedProductIds}
+          cancelledProductIds={cancelledProductIds}
+          changesAwaitingApproval={changesAwaitingApproval}
+          scheduleChangeTags={scheduleChangeTags}
+          editTagSignpostTitle={editTagSignpostTitle}
+          onEditTagSignpostClick={onEditTagSignpostClick}
+        />
 
         <Box sx={{ mt: 2 }}>
           <BookingPriceBreakdown
@@ -1045,17 +411,7 @@ export default function ClientBookingPaymentDetailsCard({
                   component="button"
                   type="button"
                   onClick={onPayNow}
-                  sx={{
-                    border: 0,
-                    bgcolor: "transparent",
-                    p: 0,
-                    cursor: "pointer",
-                    color: m.teal,
-                    fontSize: 12.5,
-                    fontWeight: 800,
-                    fontFamily: "inherit",
-                    "&:hover": { color: m.tealDark },
-                  }}
+                  sx={mollureLabelSx(m.navy, { border: 0, bgcolor: "transparent", p: 0, cursor: "pointer", color: m.teal, fontFamily: "inherit", "&:hover": { color: m.tealDark } })}
                 >
                   {payNowLabel}
                 </BodyText>

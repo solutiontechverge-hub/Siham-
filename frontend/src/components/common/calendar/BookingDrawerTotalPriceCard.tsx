@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import BookingPriceBreakdown from "../booking-finance/BookingPriceBreakdown";
 import type { BookingPriceBreakdownRow } from "../booking-finance/bookingFinance.types";
 import type { ManualEntryDiscount } from "../../sections/finance/manualEntry.data";
@@ -19,6 +20,7 @@ type BookingDrawerTotalPriceCardProps = {
   prepaymentPercent?: number;
   prepaymentAmount?: number;
   remainingAmount?: number;
+  prepaidAction?: ReactNode;
   extraRows?: readonly BookingPriceBreakdownRow[];
 };
 
@@ -36,6 +38,7 @@ export default function BookingDrawerTotalPriceCard({
   prepaymentPercent = 0,
   prepaymentAmount = 0,
   remainingAmount,
+  prepaidAction,
   extraRows = [],
 }: BookingDrawerTotalPriceCardProps) {
   return (
@@ -52,6 +55,7 @@ export default function BookingDrawerTotalPriceCard({
       prepaidAmount={showPrepayment ? prepaymentAmount : 0}
       remainingAmount={showPrepayment ? remainingAmount : undefined}
       prepaymentPaid={prepaymentPaid}
+      prepaidAction={prepaidAction}
       extraRows={extraRows}
     />
   );

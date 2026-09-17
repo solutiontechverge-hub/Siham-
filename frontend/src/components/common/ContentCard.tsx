@@ -2,10 +2,14 @@
 
 import * as React from "react";
 import { Box, Stack, type PaperProps } from "@mui/material";
-import { alpha, type SxProps, type Theme } from "@mui/material/styles";
+import { alpha, useTheme, type SxProps, type Theme } from "@mui/material/styles";
 import AppCard from "./AppCard";
 import { BodyText, SubHeading } from "../ui/typography";
 import { MOLLURE_HEADING_BODY_GAP_PX } from "../../theme/spacing";
+import {
+  mollurePageSubtitleSx,
+  mollurePageTitleSx,
+} from "../../theme/mollureHierarchy";
 
 type ContentCardProps = Omit<PaperProps, "title"> & {
   title?: React.ReactNode;
@@ -13,7 +17,7 @@ type ContentCardProps = Omit<PaperProps, "title"> & {
   description?: React.ReactNode;
   actions?: React.ReactNode;
   children?: React.ReactNode;
-  withAccent?: boolean; // ✅ NEW PROP
+  withAccent?: boolean;
 };
 
 export default function ContentCard({
@@ -22,20 +26,16 @@ export default function ContentCard({
   description,
   title,
   titleSx,
-  withAccent = false, // default OFF
+  withAccent = false,
   ...props
 }: ContentCardProps) {
+  const headingGap = `${MOLLURE_HEADING_BODY_GAP_PX}px`;
+  const m = useTheme().palette.mollure;
+
   return (
     <AppCard {...props}>
-      <Box
-        sx={{
-          position: "relative",
-          borderRadius: 3,
-          overflow: "hidden",
-        }}
-      >
-        {/* ✅ LEFT LINE ONLY IF ENABLED */}
-        {withAccent && (
+      <Box sx={{ position: "relative", borderRadius: 3, overflow: "hidden" }}>
+        {withAccent ? (
           <Box
             sx={(theme) => ({
               position: "absolute",
@@ -45,15 +45,11 @@ export default function ContentCard({
               width: 6,
               borderRadius: "0 6px 6px 0",
               bgcolor: theme.palette.primary.main,
-              boxShadow: `4px 0 18px ${alpha(
-                theme.palette.primary.main,
-                0.25,
-              )}`,
+              boxShadow: `4px 0 18px ${alpha(theme.palette.primary.main, 0.25)}`,
             })}
           />
-        )}
+        ) : null}
 
-        {/* ✅ CONDITIONAL PADDING */}
         <Stack
           spacing={0}
           sx={{
@@ -61,10 +57,10 @@ export default function ContentCard({
             pl: withAccent ? (t) => `calc(${t.spacing(3)} + 12px)` : 3,
           }}
         >
-          {title && (
+          {title ? (
             <SubHeading
               sx={[
-                { color: "mollure.textcolorgrey700" },
+                mollurePageTitleSx(m.navy),
                 ...(titleSx
                   ? Array.isArray(titleSx)
                     ? titleSx
@@ -74,27 +70,21 @@ export default function ContentCard({
             >
               {title}
             </SubHeading>
-          )}
+          ) : null}
 
-          {description && (
+          {description ? (
             <BodyText
-              sx={{
-                mt: title ? `${MOLLURE_HEADING_BODY_GAP_PX}px` : 0,
+              sx={mollurePageSubtitleSx(m.navy, {
+                mt: title ? headingGap : 0,
                 lineHeight: 1.65,
-              }}
-              color="text.secondary"
+              })}
             >
               {description}
             </BodyText>
-          )}
+          ) : null}
 
           {children ? (
-            <Box
-              sx={{
-                mt:
-                  title || description ? `${MOLLURE_HEADING_BODY_GAP_PX}px` : 0,
-              }}
-            >
+            <Box sx={{ mt: title || description ? headingGap : 0 }}>
               {children}
             </Box>
           ) : null}

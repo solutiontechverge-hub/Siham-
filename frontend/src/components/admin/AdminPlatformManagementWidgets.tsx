@@ -15,6 +15,11 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import {
+  mollureLabelSx,
+  mollureBodySx,
+  mollureBodyMutedSx,
+} from "../../theme/mollureHierarchy";
 import { AppButton } from "../common";
 import AdminSectionCard from "./AdminSectionCard";
 import { AdminSectionLink } from "./AdminDashboardHeader";
@@ -34,17 +39,16 @@ function CardFooterLink({ href, label }: { href: string; label: string }) {
     <Typography
       component={Link}
       href={href}
-      sx={{
+      sx={mollureLabelSx(tokens.navy, {
         display: "inline-flex",
         alignItems: "center",
         gap: 0.5,
-        fontSize: 12,
         fontWeight: 600,
         color: tokens.teal,
         textDecoration: "none",
         mt: 1.5,
         "&:hover": { textDecoration: "underline" },
-      }}
+      })}
     >
       {label}
       <ArrowForwardOutlinedIcon sx={{ fontSize: 14 }} />
@@ -72,7 +76,7 @@ function InfoBox({ children }: { children: React.ReactNode }) {
         sx={{ fontSize: 16, color: tokens.teal, mt: 0.15, flexShrink: 0 }}
       />
       <Typography
-        sx={{ fontSize: 11.5, color: tokens.bodyText, lineHeight: 1.45 }}
+        sx={mollureBodyMutedSx(tokens.navy, { fontSize: 11.5, color: tokens.bodyText, lineHeight: 1.45 })}
       >
         {children}
       </Typography>
@@ -94,7 +98,7 @@ export function RankingWeightSummaryWidget() {
           href="/admin/listing-ranking"
           size="small"
           variant="outlined"
-          sx={{ textTransform: "none", fontSize: 12, fontWeight: 600 }}
+          sx={{ textTransform: "none", ...mollureLabelSx(tokens.navy, { fontWeight: 600 }) }}
         >
           Manage Weights
         </AppButton>
@@ -112,12 +116,12 @@ export function RankingWeightSummaryWidget() {
               sx={{ mb: 0.5 }}
             >
               <Typography
-                sx={{ fontSize: 12, fontWeight: 500, color: tokens.navy }}
+                sx={mollureBodySx(tokens.navy, { fontWeight: 500, color: tokens.navy })}
               >
                 {factor.label}
               </Typography>
               <Typography
-                sx={{ fontSize: 12, fontWeight: 700, color: tokens.tealDark }}
+                sx={mollureBodySx(tokens.navy, { fontWeight: 700, color: tokens.tealDark })}
               >
                 {factor.weight}%
               </Typography>
@@ -178,7 +182,7 @@ export function FlaggedReviewsWidget() {
             </Avatar>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography
-                sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}
+                sx={mollureLabelSx(tokens.navy, { fontWeight: 600, color: tokens.navy })}
                 noWrap
               >
                 {review.professional}
@@ -246,7 +250,7 @@ export function RecentReportsWidget() {
               </Avatar>
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Typography
-                  sx={{ fontSize: 12, fontWeight: 500, color: tokens.navy }}
+                  sx={mollureBodySx(tokens.navy, { fontWeight: 500, color: tokens.navy })}
                   noWrap
                 >
                   Reported: {report.reported}
@@ -320,11 +324,11 @@ export function RecentContactMessagesWidget() {
               </Box>
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Typography
-                  sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}
+                  sx={mollureLabelSx(tokens.navy, { fontWeight: 600, color: tokens.navy })}
                 >
                   {message.category}
                 </Typography>
-                <Typography sx={{ fontSize: 11, color: tokens.bodyText }}>
+                <Typography sx={mollureBodyMutedSx(tokens.navy, { fontSize: 11, color: tokens.bodyText })}>
                   {message.sender}
                 </Typography>
                 <Typography
@@ -366,7 +370,7 @@ export function ReviewRatingCategoriesWidget() {
           href="/admin/reviews"
           size="small"
           variant="outlined"
-          sx={{ textTransform: "none", fontSize: 12, fontWeight: 600 }}
+          sx={{ textTransform: "none", ...mollureLabelSx(tokens.navy, { fontWeight: 600 }) }}
         >
           Edit Ranges
         </AppButton>
@@ -393,11 +397,11 @@ export function ReviewRatingCategoriesWidget() {
             </Typography>
             <Box sx={{ flex: 1 }}>
               <Typography
-                sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}
+                sx={mollureLabelSx(tokens.navy, { fontWeight: 600, color: tokens.navy })}
               >
                 {cat.label}
               </Typography>
-              <Typography sx={{ fontSize: 11, color: tokens.bodyText }}>
+              <Typography sx={mollureBodyMutedSx(tokens.navy, { fontSize: 11, color: tokens.bodyText })}>
                 {cat.min.toFixed(1)} – {cat.max.toFixed(1)}
               </Typography>
             </Box>
@@ -472,22 +476,21 @@ export function SeoQuickLinksWidget() {
                 </Box>
                 <Box sx={{ minWidth: 0 }}>
                   <Typography
-                    sx={{
-                      fontSize: 13,
+                    sx={mollureLabelSx(tokens.navy, {
                       fontWeight: 600,
                       color: tokens.navy,
                       lineHeight: 1.3,
-                    }}
+                    })}
                   >
                     {link.title}
                   </Typography>
                   <Typography
-                    sx={{
+                    sx={mollureBodyMutedSx(tokens.navy, {
                       fontSize: 11,
                       color: tokens.bodyText,
                       mt: 0.35,
                       lineHeight: 1.4,
-                    }}
+                    })}
                   >
                     {link.description}
                   </Typography>

@@ -39,6 +39,7 @@ import type { ClientNotificationItem } from "../../../data/clientNotifications.d
 import { useAppSelector } from "../../../store/hooks";
 import { getPersistedAuthSession } from "../../../lib/auth-storage";
 import ProfessionalProfileMenuPopover from "../ProfessionalProfileMenuPopover";
+import { getProfileMenuInitials } from "../profileMenu.shared";
 
 export type MarketingNavItem = {
   label: string;
@@ -75,16 +76,6 @@ function isNavActive(pathname: string, item: MarketingNavItem): boolean {
   const mode = match ?? (href === "/" ? "exact" : "prefix");
   if (mode === "exact") return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
-}
-
-function getInitials(emailOrName?: string) {
-  const base = (emailOrName ?? "").trim();
-  if (!base) return "U";
-  const cleaned = base.split("@")[0] ?? base;
-  const parts = cleaned.split(/[._\s-]+/).filter(Boolean);
-  const a = (parts[0]?.[0] ?? "U").toUpperCase();
-  const b = (parts[1]?.[0] ?? "").toUpperCase();
-  return `${a}${b}`.slice(0, 2);
 }
 
 function toDisplayName(userName?: string, userLabel?: string) {
@@ -491,7 +482,7 @@ export default function MollureMarketingHeader({
                         {userAvatarSrc
                           ? null
                           : mounted
-                            ? getInitials(userLabel)
+                            ? getProfileMenuInitials(userLabel)
                             : "U"}
                       </Avatar>
                       <Typography

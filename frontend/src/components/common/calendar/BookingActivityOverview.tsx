@@ -6,6 +6,7 @@ import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import { Box, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import { mollureSectionTitleSx, mollureBodySx, mollureBodyMutedSx } from "../../../theme/mollureHierarchy";
 import type { ActivityComparison, ActivityComparisonRow } from "./buildActivityComparison";
 import type { BookingActivityItem } from "./bookingActivity.types";
 
@@ -228,7 +229,7 @@ function CancellationActivityDetails({ item }: { item: BookingActivityItem }) {
           >
             <Stack direction="row" spacing={0.45} alignItems="center">
               <CalendarMonthRoundedIcon
-                sx={{ fontSize: 15, color: alpha(m.navy, 0.4) }}
+                sx={mollureSectionTitleSx(m.navy, { color: alpha(m.navy, 0.4) })}
               />
               <Typography
                 sx={{
@@ -242,7 +243,7 @@ function CancellationActivityDetails({ item }: { item: BookingActivityItem }) {
             </Stack>
             <Stack direction="row" spacing={0.45} alignItems="center">
               <AccessTimeRoundedIcon
-                sx={{ fontSize: 15, color: alpha(m.navy, 0.4) }}
+                sx={mollureSectionTitleSx(m.navy, { color: alpha(m.navy, 0.4) })}
               />
               <Typography
                 sx={{
@@ -256,7 +257,7 @@ function CancellationActivityDetails({ item }: { item: BookingActivityItem }) {
             </Stack>
           </Stack>
           <Typography
-            sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.62) }}
+            sx={mollureBodySx(m.navy)}
           >
             {item.professionalName || "Professional"}
           </Typography>
@@ -295,9 +296,7 @@ function CancellationActivityDetails({ item }: { item: BookingActivityItem }) {
           >
             <Typography
               sx={{
-                fontSize: 12.5,
-                fontWeight: 700,
-                color: alpha(m.navy, 0.72),
+                ...mollureBodySx(m.navy),
                 lineHeight: 1.5,
               }}
             >
@@ -745,13 +744,13 @@ export default function BookingActivityOverview({
   return (
     <Stack spacing={1.5}>
       <Typography
-        sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}
+        sx={mollureSectionTitleSx(m.navy)}
       >
         {title}
       </Typography>
 
       {!items.length ? (
-        <Typography sx={{ fontSize: 12.5, color: alpha(m.navy, 0.55), py: 2 }}>
+        <Typography sx={mollureBodyMutedSx(m.navy, { py: 2 })}>
           {emptyMessage}
         </Typography>
       ) : (

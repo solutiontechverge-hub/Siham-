@@ -118,6 +118,7 @@ const multiStaffBooking: CalendarBooking = {
   location_type: "fixed",
   notes: multiStaffNotes,
   status: "confirmed",
+  total_price: 0,
   unique_code: "ol-multi-1",
   date: "2026-09-10",
   start: "09:00",
@@ -141,6 +142,14 @@ const mirroredEntry: CalendarEntry = {
   end: "09:30",
   start_time: "2026-09-10T09:00:00",
   end_time: "2026-09-10T09:30:00",
+  start_date: null,
+  end_date: null,
+  blocked_time_start: null,
+  blocked_time_end: null,
+  booking_type: "online",
+  service_ids: ["svc-1"],
+  created_at: "2026-09-10T08:00:00",
+  updated_at: "2026-09-10T08:00:00",
 };
 
 const mergedOnce = mergeCalendarOverviewEvents(

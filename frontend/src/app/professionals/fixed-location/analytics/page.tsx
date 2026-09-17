@@ -1,8 +1,14 @@
 "use client";
 
 import { Suspense } from "react";
-import ProfessionalFixedLocationAnalytics from "../../../../components/common/ProfessionalFixedLocationAnalytics";
+import dynamic from "next/dynamic";
+import DynamicChunkFallback from "../../../../components/common/DynamicChunkFallback";
 import { useFixedLocationAnalyticsPage } from "./useFixedLocationAnalyticsPage";
+
+const ProfessionalFixedLocationAnalytics = dynamic(
+  () => import("../../../../components/common/ProfessionalFixedLocationAnalytics"),
+  { ssr: false, loading: () => <DynamicChunkFallback /> },
+);
 
 function AnalyticsContent() {
   const { data } = useFixedLocationAnalyticsPage();
@@ -11,7 +17,7 @@ function AnalyticsContent() {
 
 export default function FixedLocationAnalyticsPage() {
   return (
-    <Suspense>
+    <Suspense fallback={<DynamicChunkFallback />}>
       <AnalyticsContent />
     </Suspense>
   );

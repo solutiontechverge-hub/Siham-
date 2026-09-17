@@ -12,6 +12,7 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import { mollureLabelSx } from "../../../theme/mollureHierarchy";
 import type {
   ReviewFilterServiceGroup,
   ReviewFiltersState,
@@ -107,12 +108,11 @@ export default function ClientReviewsFilterPanel({
 
       <Box sx={{ p: 1.5 }}>
         <Typography
-          sx={{
+          sx={mollureLabelSx(m.navy, {
             fontWeight: 900,
-            fontSize: 12.5,
             color: alpha(m.navy, 0.72),
             mb: 1,
-          }}
+          })}
         >
           Service Types
         </Typography>
@@ -241,12 +241,11 @@ export default function ClientReviewsFilterPanel({
         </Paper>
 
         <Typography
-          sx={{
+          sx={mollureLabelSx(m.navy, {
             fontWeight: 900,
-            fontSize: 12.5,
             color: alpha(m.navy, 0.72),
             mb: 1,
-          }}
+          })}
         >
           Rating
         </Typography>

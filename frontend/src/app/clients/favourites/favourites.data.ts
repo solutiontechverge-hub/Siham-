@@ -8,5 +8,6 @@ export const favouritesPageData = {
   pagination: {
     pageSize: 6,
   },
+  snackbarRemovedMessage: "Item Removed",
 } as const;
 

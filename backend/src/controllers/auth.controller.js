@@ -18,6 +18,7 @@ import {
   isS3UploadConfigured,
   uploadProfileMulterFilesToS3,
 } from "../services/s3-upload.service.js";
+import { logError, sendCaughtError } from "../utils/httpError.js";
 
 const SALT_ROUNDS = 12;
 const USER_TYPES = ["individual", "company", "professional"];
@@ -272,13 +273,7 @@ export const register = async (req, res) => {
     });
   } catch (error) {
     await client.query("ROLLBACK");
-    return res.status(500).json({
-      success: false,
-      message: "Failed to register user.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to register user." });
   } finally {
     client.release();
   }
@@ -358,13 +353,7 @@ export const login = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to login.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to login." });
   }
 };
 
@@ -453,13 +442,7 @@ export const refreshSession = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to refresh session.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to refresh session." });
   }
 };
 
@@ -518,12 +501,8 @@ export const forgotPassword = async (req, res) => {
     });
   } catch (error) {
     await client.query("ROLLBACK");
-    return res.status(500).json({
-      success: false,
-      message: "Failed to process forgot password request.",
-      data: {
-        error: error.message,
-      },
+    return sendCaughtError(res, error, {
+      fallbackMessage: "Failed to process forgot password request.",
     });
   } finally {
     client.release();
@@ -594,13 +573,7 @@ export const verifyOtp = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to verify OTP.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to verify OTP." });
   }
 };
 
@@ -667,13 +640,7 @@ export const resetPassword = async (req, res) => {
     });
   } catch (error) {
     await client.query("ROLLBACK");
-    return res.status(500).json({
-      success: false,
-      message: "Failed to reset password.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to reset password." });
   } finally {
     client.release();
   }
@@ -795,13 +762,7 @@ export const verifyEmail = async (req, res) => {
     return respondVerified(verification.user_id);
   } catch (error) {
     await client.query("ROLLBACK");
-    return res.status(500).json({
-      success: false,
-      message: "Failed to verify email.",
-      data: {
-        error: error.message,
-      },
-    });
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to verify email." });
   } finally {
     client.release();
   }

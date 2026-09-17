@@ -6,7 +6,22 @@ import { isTeamSharedBooking } from "./teamMemberBookings";
 export function resolveCalendarBookingIdentity(
   event: Pick<CalendarEvent, "id" | "bookingCode">,
 ) {
-  return event.bookingCode?.trim() || resolveParentCalendarEventId(event.id);
+  return event.bookingCode?.trim() || resolveParentCalendarEventId(String(event.id ?? ""));
+}
+
+/** Stable hash → palette index (same booking id → same accent across columns). */
+export function resolveBookingIdAccentColor(
+  bookingIdentity: string,
+  accents: readonly string[],
+): string {
+  if (!accents.length) return "#21B8BF";
+  const key = bookingIdentity.trim().toLowerCase();
+  let hash = 2166136261;
+  for (let i = 0; i < key.length; i++) {
+    hash ^= key.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return accents[(hash >>> 0) % accents.length]!;
 }
 
 /** One card per booking identity × staff column × start (drops mirrored duplicates). */

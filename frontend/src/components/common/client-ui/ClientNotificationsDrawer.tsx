@@ -9,6 +9,7 @@ import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
 import { Box, Divider, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { Typography } from "../../ui/typography";
+import { mollureBodyMutedSx } from "../../../theme/mollureHierarchy";
 import type { ClientNotificationItem } from "../../../data/clientNotifications.data";
 import AppDrawer from "../AppDrawer";
 
@@ -155,7 +156,9 @@ export default function ClientNotificationsDrawer({
                     sx={{ fontSize: 16, color: alpha(m.slate, 0.65) }}
                   />
                   <Typography
-                    sx={{ color: alpha(m.slate, 0.8), fontSize: 12.5 }}
+                    sx={mollureBodyMutedSx(m.navy, {
+                      color: alpha(m.slate, 0.8),
+                    })}
                   >
                     {n.timeLabel}
                   </Typography>

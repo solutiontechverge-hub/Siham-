@@ -7,26 +7,24 @@ import { usePathname, useRouter } from "next/navigation";
 import ReportProblemRoundedIcon from "@mui/icons-material/ReportProblemRounded";
 import { Avatar, Box, Popover, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import { mollureBodyMutedSx, mollurePageTitleSx } from "../../theme/mollureHierarchy";
 import { clearAuthSessionState } from "../../lib/clearAuthSessionState";
 import { useAppDispatch } from "../../store/hooks";
 import { useSnackbar } from "./AppSnackbar";
 import { queueSnackbarFlash } from "../../lib/snackbarFlash";
 import AppModal from "./AppModal";
+import ModalConfirmBody from "./ModalConfirmBody";
+import { ModalCancelApplyFooter } from "./FinanceDrawerFooter";
+import {
+  getProfileMenuInitials,
+  profileMenuActiveBtnSx,
+  profileMenuOutlinedBtnSx,
+} from "./profileMenu.shared";
 
 function isMenuPathActive(pathname: string, matches: readonly string[]) {
   return matches.some(
     (match) => pathname === match || pathname.startsWith(`${match}/`),
   );
-}
-
-function getInitials(emailOrName?: string) {
-  const base = (emailOrName ?? "").trim();
-  if (!base) return "U";
-  const cleaned = base.split("@")[0] ?? base;
-  const parts = cleaned.split(/[._\s-]+/).filter(Boolean);
-  const a = (parts[0]?.[0] ?? "U").toUpperCase();
-  const b = (parts[1]?.[0] ?? "").toUpperCase();
-  return `${a}${b}`.slice(0, 2);
 }
 
 export type ProfessionalProfileMenuPopoverProps = {
@@ -80,30 +78,8 @@ export default function ProfessionalProfileMenuPopover({
     });
   };
 
-  const outlinedBtnSx = {
-    borderRadius: "8px",
-    textTransform: "none",
-    fontWeight: 700,
-    color: tokens.navy,
-    borderColor: tokens.border,
-    py: 1.1,
-    "&:hover": {
-      borderColor: tokens.inputBorderHover,
-      bgcolor: "rgba(52, 74, 102, 0.03)",
-    },
-  } as const;
-
-  const activeBtnSx = {
-    ...outlinedBtnSx,
-    fontWeight: 800,
-    color: tokens.tealDark,
-    borderColor: tokens.teal,
-    bgcolor: alpha(tokens.teal, 0.12),
-    "&:hover": {
-      borderColor: tokens.tealDark,
-      bgcolor: alpha(tokens.teal, 0.18),
-    },
-  } as const;
+  const outlinedBtnSx = profileMenuOutlinedBtnSx(tokens);
+  const activeBtnSx = profileMenuActiveBtnSx(tokens);
 
   const deleteBtnSx = {
     borderRadius: "8px",
@@ -156,50 +132,6 @@ export default function ProfessionalProfileMenuPopover({
     },
   ] as const;
 
-  const deleteDialogFooter = (
-    <Stack
-      direction="row"
-      spacing={1}
-      justifyContent="center"
-      sx={{ px: 2.5, py: 2 }}
-    >
-      <AppButton
-        onClick={closeDeleteDialog}
-        variant="outlined"
-        sx={{
-          borderRadius: "8px",
-          textTransform: "none",
-          fontWeight: 800,
-          borderColor: alpha(tokens.navy, 0.14),
-          color: alpha(tokens.navy, 0.72),
-          bgcolor: "#fff",
-          height: 34,
-          px: 2.25,
-          minWidth: 92,
-        }}
-      >
-        Cancel
-      </AppButton>
-      <AppButton
-        variant="contained"
-        disableElevation
-        onClick={handleConfirmDeleteAccount}
-        sx={{
-          borderRadius: "8px",
-          textTransform: "none",
-          fontWeight: 900,
-          bgcolor: tokens.teal,
-          "&:hover": { bgcolor: tokens.tealDark },
-          height: 34,
-          px: 2.25,
-          minWidth: 92,
-        }}
-      >
-        Delete account
-      </AppButton>
-    </Stack>
-  );
-
   return (
     <>
       <Popover
@@ -232,21 +164,21 @@ export default function ProfessionalProfileMenuPopover({
                 fontSize: 14,
               }}
             >
-              {avatarSrc ? null : getInitials(name || email)}
+              {avatarSrc ? null : getProfileMenuInitials(name || email)}
             </Avatar>
             <Box sx={{ minWidth: 0 }}>
               <Typography
-                sx={{
-                  fontWeight: 900,
+                sx={mollurePageTitleSx(tokens.navy, {
                   color: tokens.navy,
-                  fontSize: 18,
-                  lineHeight: 1.2,
-                }}
+                })}
               >
                 {name}
               </Typography>
               <Typography
-                sx={{ color: tokens.slate, fontSize: 12.5, mt: 0.25 }}
+                sx={mollureBodyMutedSx(tokens.navy, {
+                  color: tokens.slate,
+                  mt: 0.25,
+                })}
               >
                 {email}
               </Typography>
@@ -306,38 +238,32 @@ export default function ProfessionalProfileMenuPopover({
         title="Delete account"
         contentMinHeight={220}
         headerTone="danger"
-        footer={deleteDialogFooter}
+        footer={
+          <ModalCancelApplyFooter
+            onCancel={closeDeleteDialog}
+            onPrimary={handleConfirmDeleteAccount}
+            primaryLabel="Delete account"
+            primaryTone="danger"
+            justifyContent="center"
+            buttonSx={{ height: 40 }}
+            spacing={1}
+          />
+        }
       >
-        <Box sx={{ px: 2.5, py: 3, textAlign: "center" }}>
-          <Box
-            sx={{
-              width: 52,
-              height: 52,
-              borderRadius: "14px",
-              mx: "auto",
-              mb: 1.5,
-              bgcolor: alpha("#E53935", 0.1),
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
+        <ModalConfirmBody
+          icon={
             <ReportProblemRoundedIcon sx={{ fontSize: 30, color: "#E53935" }} />
-          </Box>
-          <Typography
-            sx={{
-              fontWeight: 900,
-              color: alpha(tokens.navy, 0.82),
-              fontSize: 15,
-              lineHeight: 1.45,
-              maxWidth: 300,
-              mx: "auto",
-            }}
-          >
-            This will permanently delete your professional account and cannot be
-            undone.
-          </Typography>
-        </Box>
+          }
+          iconFrame="rounded"
+          iconColor="#E53935"
+          iconFrameSize={52}
+          bodyMaxWidth={300}
+          bodyOpacity={0.82}
+          py={3}
+          px={2.5}
+          bodySx={{ fontSize: 15, lineHeight: 1.45 }}
+          body="This will permanently delete your professional account and cannot be undone."
+        />
       </AppModal>
     </>
   );

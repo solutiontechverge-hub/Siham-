@@ -1,6 +1,5 @@
 "use client";
 
-import * as React from "react";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
 import {
   Box,
@@ -10,61 +9,45 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
-import { useSearchParams } from "next/navigation";
+import { alpha } from "@mui/material/styles";
+import {
+  mollurePageSubtitleSx,
+  mollurePageTitleSx,
+} from "../../../theme/mollureHierarchy";
 import AppButton from "../../../components/common/AppButton";
 import AppTextField from "../../../components/common/AppTextField";
+import { writeReviewCopy } from "./writeReview.data";
 import {
-  useGetReviewInviteQuery,
-  useSubmitReviewInviteMutation,
-} from "../../../store/services/reviewsApi";
+  useWriteReviewPage,
+  type WriteReviewInviteError,
+} from "./useWriteReviewPage";
 
 export default function WriteReviewPage() {
-  const m = useTheme().palette.mollure;
-  const searchParams = useSearchParams();
-  const token = searchParams?.get("token")?.trim() ?? "";
-  const { data, isLoading, isError, error } = useGetReviewInviteQuery(token, {
-    skip: !token,
-  });
-  const [submitReview, submitState] = useSubmitReviewInviteMutation();
-  const [rating, setRating] = React.useState(5);
-  const [body, setBody] = React.useState("");
-  const [done, setDone] = React.useState(false);
-  const [errorMessage, setErrorMessage] = React.useState("");
-
-  const invite = data?.data;
-
-  React.useEffect(() => {
-    if (invite?.alreadySubmitted) setDone(true);
-  }, [invite?.alreadySubmitted]);
-
-  const handleSubmit = async () => {
-    setErrorMessage("");
-    if (!token) {
-      setErrorMessage("Missing review token.");
-      return;
-    }
-    if (body.trim().length < 3) {
-      setErrorMessage("Please write at least a few words about your visit.");
-      return;
-    }
-    try {
-      await submitReview({ token, rating, body: body.trim() }).unwrap();
-      setDone(true);
-    } catch (err) {
-      const message =
-        (err as { data?: { message?: string } })?.data?.message ||
-        "Could not submit your review. Please try again.";
-      setErrorMessage(message);
-    }
-  };
+  const {
+    m,
+    token,
+    invite,
+    isLoading,
+    isError,
+    error,
+    rating,
+    setRating,
+    body,
+    setBody,
+    done,
+    errorMessage,
+    handleSubmit,
+    isSubmitting,
+  } = useWriteReviewPage();
 
   if (!token) {
     return (
       <Box sx={{ minHeight: "100vh", bgcolor: "mollure.pageBg", py: 6 }}>
         <Container maxWidth="sm">
           <Paper sx={{ p: 3, borderRadius: "12px" }}>
-            <Typography sx={{ fontWeight: 800 }}>Invalid review link.</Typography>
+            <Typography sx={{ fontWeight: 800 }}>
+              {writeReviewCopy.invalidLink}
+            </Typography>
           </Paper>
         </Container>
       </Box>
@@ -92,8 +75,8 @@ export default function WriteReviewPage() {
         <Container maxWidth="sm">
           <Paper sx={{ p: 3, borderRadius: "12px" }}>
             <Typography sx={{ fontWeight: 800 }}>
-              {(error as { data?: { message?: string } })?.data?.message ||
-                "This review invite is invalid or no longer available."}
+              {(error as WriteReviewInviteError)?.data?.message ||
+                writeReviewCopy.inviteUnavailable}
             </Typography>
           </Paper>
         </Container>
@@ -112,26 +95,26 @@ export default function WriteReviewPage() {
             border: `1px solid ${alpha(m.navy, 0.08)}`,
           }}
         >
-          <Typography
-            sx={{ fontWeight: 900, fontSize: 22, color: alpha(m.navy, 0.9) }}
-          >
-            Write a review
+          <Typography sx={mollurePageTitleSx(m.navy)}>
+            {writeReviewCopy.title}
           </Typography>
-          <Typography
-            sx={{ mt: 0.75, fontSize: 13.5, color: alpha(m.navy, 0.55) }}
-          >
+          <Typography sx={mollurePageSubtitleSx(m.navy, { mt: 0.75 })}>
             {invite.salonName}
             {invite.teamMemberName ? ` · ${invite.teamMemberName}` : ""}
             {invite.serviceName ? ` · ${invite.serviceName}` : ""}
           </Typography>
 
           {done || invite.alreadySubmitted ? (
-            <Typography sx={{ mt: 3, fontWeight: 700, color: alpha(m.navy, 0.7) }}>
-              Thank you! Your review has been submitted.
+            <Typography
+              sx={{ mt: 3, fontWeight: 700, color: alpha(m.navy, 0.7) }}
+            >
+              {writeReviewCopy.thankYou}
             </Typography>
           ) : invite.expired ? (
-            <Typography sx={{ mt: 3, fontWeight: 700, color: alpha(m.navy, 0.7) }}>
-              This review invite has expired.
+            <Typography
+              sx={{ mt: 3, fontWeight: 700, color: alpha(m.navy, 0.7) }}
+            >
+              {writeReviewCopy.expired}
             </Typography>
           ) : (
             <Stack spacing={2} sx={{ mt: 3 }}>
@@ -150,7 +133,7 @@ export default function WriteReviewPage() {
                         cursor: "pointer",
                         p: 0.25,
                       }}
-                      aria-label={`Rate ${value} stars`}
+                      aria-label={writeReviewCopy.rateAria(value)}
                     >
                       <StarRoundedIcon
                         sx={{
@@ -166,7 +149,7 @@ export default function WriteReviewPage() {
               <AppTextField
                 multiline
                 minRows={4}
-                placeholder="Share your experience..."
+                placeholder={writeReviewCopy.bodyPlaceholder}
                 value={body}
                 onChange={(e) =>
                   setBody(
@@ -184,9 +167,11 @@ export default function WriteReviewPage() {
               <AppButton
                 tone="primary"
                 onClick={handleSubmit}
-                disabled={submitState.isLoading}
+                disabled={isSubmitting}
               >
-                {submitState.isLoading ? "Submitting..." : "Submit review"}
+                {isSubmitting
+                  ? writeReviewCopy.submitting
+                  : writeReviewCopy.submit}
               </AppButton>
             </Stack>
           )}

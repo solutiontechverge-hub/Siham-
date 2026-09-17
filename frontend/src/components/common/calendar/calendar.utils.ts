@@ -1,3 +1,5 @@
+import { alpha } from "@mui/material/styles";
+import { mollureSectionTitleSx } from "../../../theme/mollureHierarchy";
 import type {
   CalendarBlock,
   CalendarBookingLocation,
@@ -5,10 +7,18 @@ import type {
   CalendarBookingType,
   CalendarEvent,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
+import { UUID_RE } from "../../../lib/uuid";
 import {
   isOutgoingPlainBookingRequestRejected,
   statusChipSx as bookingStatusChipSx,
 } from "./bookingStatus";
+
+/** Row cell wrapper sx for date/day/time pairs in calendar modals. */
+export const calendarModalFlexFieldSx = { flex: 1, minWidth: 0 } as const;
+
+/** @deprecated Prefer mollureSectionTitleSx — kept for existing booking screen imports. */
+export const bookingScreenTitleSx = mollureSectionTitleSx;
+
 
 export type Interval = { startMin: number; endMin: number };
 
@@ -182,16 +192,81 @@ export function siblingCalendarBlocks<T extends CalendarBlock>(
   return blocks.filter((block) => calendarBlockLogicalKey(block) === key);
 }
 
-const CALENDAR_ENTRY_UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-/** Resolve a persisted calendar_entries UUID from a UI block id (`blk-<uuid>`). */
+/**
+ * Resolve a persisted calendar_entries UUID from a UI block id.
+ * Accepts `blk-<uuid>` and multi-day `blk-<uuid>-YYYY-MM-DD`.
+ */
 export function calendarEntryIdFromBlockId(blockId: string): string | null {
   const raw = String(blockId ?? "").trim();
   if (!raw) return null;
   const withoutPrefix = raw.startsWith("blk-") ? raw.slice(4) : raw;
   if (!withoutPrefix || withoutPrefix.startsWith("local-")) return null;
-  return CALENDAR_ENTRY_UUID_RE.test(withoutPrefix) ? withoutPrefix : null;
+  if (UUID_RE.test(withoutPrefix)) return withoutPrefix;
+  const withDate = withoutPrefix.match(
+    /^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})-\d{4}-\d{2}-\d{2}$/i,
+  );
+  return withDate?.[1] ?? null;
+}
+
+/** Stable UI id for one day of a persisted blocked-time entry. */
+export function blockedCalendarBlockId(entryId: string, dateIso: string) {
+  return `blk-${entryId}-${dateIso}`;
+}
+
+/** Expand a blocked calendar entry across start_date…end_date (one UI block per day). */
+export function expandBlockedEntryToBlocks(
+  entry: {
+    id: string;
+    team_member_id?: string | null;
+    title?: string | null;
+    date?: string | null;
+    start?: string | null;
+    end?: string | null;
+    start_date?: string | null;
+    end_date?: string | null;
+    blocked_time_start?: string | null;
+    blocked_time_end?: string | null;
+  },
+  fallbackResourceId: string,
+): CalendarBlock[] {
+  const startDate =
+    wallClockDateFromDateTime(entry.start_date) ||
+    wallClockDateFromDateTime(entry.blocked_time_start) ||
+    wallClockDateFromDateTime(entry.date) ||
+    null;
+  const endDate =
+    wallClockDateFromDateTime(entry.end_date) ||
+    wallClockDateFromDateTime(entry.blocked_time_end) ||
+    startDate;
+  if (!startDate) return [];
+
+  const start =
+    entry.start ||
+    wallClockTimeFromDateTime(entry.blocked_time_start) ||
+    "08:00";
+  const end =
+    entry.end || wallClockTimeFromDateTime(entry.blocked_time_end) || "09:00";
+  const resourceId = String(
+    entry.team_member_id ?? fallbackResourceId ?? "",
+  );
+  const title = entry.title || "Blocked";
+  const rangeEnd = endDate && endDate >= startDate ? endDate : startDate;
+
+  const blocks: CalendarBlock[] = [];
+  let cursor = startDate;
+  while (cursor <= rangeEnd) {
+    blocks.push({
+      id: blockedCalendarBlockId(entry.id, cursor),
+      resourceId,
+      date: cursor,
+      start,
+      end,
+      title,
+      kind: "unavailable",
+    });
+    cursor = addDaysIso(cursor, 1);
+  }
+  return blocks;
 }
 
 export function calendarBlockOverlapsBooking(
@@ -564,6 +639,11 @@ export function addDaysIso(iso: string, days: number) {
   return `${y}-${m}-${d}`;
 }
 
+/** Local calendar tomorrow as `YYYY-MM-DD`. */
+export function tomorrowIso() {
+  return addDaysIso(toIsoLocalDate(new Date()), 1);
+}
+
 export function startOfWeekIso(iso: string) {
   const dt = parseIsoDate(iso);
   const dow = dt.getUTCDay();
@@ -651,6 +731,17 @@ export function fmtMinToTime(min: number) {
 
 export function sumIntervalsMins(intervals: readonly Interval[]) {
   return intervals.reduce((acc, it) => acc + Math.max(0, it.endMin - it.startMin), 0);
+}
+
+/** Busy mins / available mins — same metric as day-view occupancy % bars. */
+export function dailyBookingOccupancyRatio(
+  busy: readonly Interval[],
+  availability: readonly Interval[],
+): number {
+  const bookedMins = sumIntervalsMins(mergeIntervals(busy));
+  const availableMins = sumIntervalsMins(availability);
+  if (availableMins <= 0) return bookedMins > 0 ? 1 : 0;
+  return Math.max(0, Math.min(1, bookedMins / availableMins));
 }
 
 export const blockTitleFromDraft = (draft: BlockTimeDraft) =>

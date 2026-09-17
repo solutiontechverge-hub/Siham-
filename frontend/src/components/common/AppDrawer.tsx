@@ -14,6 +14,10 @@ import {
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import useOverlayScrollLock from "../../hooks/useOverlayScrollLock";
+import {
+  mollurePageSubtitleSx,
+  mollurePageTitleSx,
+} from "../../theme/mollureHierarchy";
 import { BodyText, SubHeading } from "../ui/typography";
 
 /** Canonical right-panel drawer width — shared across all app drawers. */
@@ -187,18 +191,14 @@ export default function AppDrawer({
             ) : null}
             <Box sx={{ minWidth: 0 }}>
               <SubHeading
-                sx={{
-                  fontSize: subtitle ? 18 : 16,
-                  color: alpha(m.navy, 0.9),
-                  fontWeight: 800,
-                }}
+                sx={mollurePageTitleSx(m.navy, {
+                  fontSize: subtitle ? undefined : 16,
+                })}
               >
                 {title}
               </SubHeading>
               {subtitle ? (
-                <BodyText
-                  sx={{ mt: 0.4, color: alpha(m.navy, 0.62), fontSize: 13 }}
-                >
+                <BodyText sx={mollurePageSubtitleSx(m.navy, { mt: 0.4 })}>
                   {subtitle}
                 </BodyText>
               ) : null}
