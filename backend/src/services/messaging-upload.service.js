@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 import { getUploadsDir } from "../config/uploads-dir.js";
+import { extensionFromOriginalName } from "../utils/file-content.js";
 
 export async function saveMessagingAttachments(userId, files = []) {
   if (!files.length) return [];
@@ -11,7 +12,7 @@ export async function saveMessagingAttachments(userId, files = []) {
 
   const saved = [];
   for (const file of files) {
-    const ext = file.detectedExt || path.extname(file.originalname || "").toLowerCase() || "";
+    const ext = file.detectedExt || extensionFromOriginalName(file.originalname) || "";
     const filename = `${randomUUID()}${ext}`;
     const absolutePath = path.join(userDir, filename);
     await fs.writeFile(absolutePath, file.buffer);

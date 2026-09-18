@@ -41,10 +41,12 @@ export function useProfessionalFixedLocationCalendarDrawerScrollFocus({
     restoreBookingDrawerScrollRef.current = true;
   }, []);
 
-  React.useEffect(() => {
+  // Layout (not effect): set pending focus before the scroll pass below runs.
+  React.useLayoutEffect(() => {
     if (!showInlineGuestField || editingInlineGuestId) return;
-    focusBookingDrawerSection("inline-participant-form");
-  }, [editingInlineGuestId, focusBookingDrawerSection, showInlineGuestField]);
+    pendingBookingDrawerFocusRef.current = "inline-participant-form";
+    restoreBookingDrawerScrollRef.current = true;
+  }, [editingInlineGuestId, showInlineGuestField]);
 
   React.useLayoutEffect(() => {
     if (slotBookingScreen !== "new-booking") return;
@@ -67,7 +69,11 @@ export function useProfessionalFixedLocationCalendarDrawerScrollFocus({
             `[data-booking-section="${escaped}"]`,
           );
           if (node) {
-            node.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            // start: bring Guest section top into view when + Add Guest opens
+            node.scrollIntoView({
+              behavior: "smooth",
+              block: sectionId === "inline-participant-form" ? "start" : "nearest",
+            });
             pendingBookingDrawerFocusRef.current = null;
             return;
           }
@@ -79,7 +85,7 @@ export function useProfessionalFixedLocationCalendarDrawerScrollFocus({
       cancelled = true;
       window.cancelAnimationFrame(frame);
     };
-  }, [bookingGuests, showInlineGuestField, slotBookingScreen]);
+  }, [bookingGuests, editingInlineGuestId, showInlineGuestField, slotBookingScreen]);
 
   return {
     bookingDrawerBodyRef,

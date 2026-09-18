@@ -1,5 +1,5 @@
-import path from "path";
 import multer from "multer";
+import { extensionFromOriginalName } from "../utils/file-content.js";
 
 const storage = multer.memoryStorage();
 
@@ -10,6 +10,7 @@ const allowedMimeTypes = new Set([
   "image/webp",
 ]);
 
+// ponytail: keep HEIC/HEIF out of profile/logo (prebuilt sharp has no HEVC). Convert to JPEG in assertTrustedUploadFile when sharp/HEVC is available, then allow.
 const allowedExtensions = new Set([".jpg", ".jpeg", ".png", ".webp"]);
 
 export const upload = multer({
@@ -18,7 +19,7 @@ export const upload = multer({
     fileSize: 5 * 1024 * 1024,
   },
   fileFilter: (_req, file, cb) => {
-    const ext = path.extname(file.originalname || "").toLowerCase();
+    const ext = extensionFromOriginalName(file.originalname);
     if (!allowedExtensions.has(ext)) {
       return cb(new Error("Only .jpg, .jpeg, .png, and .webp image files are allowed."));
     }

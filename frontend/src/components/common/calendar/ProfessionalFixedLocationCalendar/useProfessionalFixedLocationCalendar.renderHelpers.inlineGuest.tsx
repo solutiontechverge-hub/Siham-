@@ -64,7 +64,7 @@ export function createRenderInlineGuestFields({
           {inlineGuestParticipantType === "model" ? "Model" : "Guest"}
         </BodyText>
       ) : null}
-      <Stack direction="row" spacing={1.25} sx={{ mb: 1.25 }}>
+      <Stack spacing={1.25} sx={{ mb: 1.25 }}>
         <AppTextField
           label="First Name"
           placeholder="Enter first name"
@@ -76,6 +76,7 @@ export function createRenderInlineGuestFields({
             }))
           }
           fullWidth
+          required
           disabled={isViewingExisting}
         />
         <AppTextField

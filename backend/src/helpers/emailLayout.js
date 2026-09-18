@@ -13,11 +13,13 @@ export const escapeHtml = (value) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
+/** Public web origin for email deep-links (verify-email, login, etc.). */
 export const getFrontendBaseUrl = () =>
-  (process.env.FRONTEND_URL || process.env.APP_FRONTEND_URL || "http://localhost:3000").replace(
-    /\/$/,
-    "",
-  );
+  (
+    process.env.FRONTEND_URL ||
+    process.env.APP_FRONTEND_URL ||
+    "https://web--mollure-backend--sc4tt92szkkg.code.run"
+  ).replace(/\/$/, "");
 
 export const logoBlock = () => `
   <div style="text-align:center;padding:28px 24px 12px;">

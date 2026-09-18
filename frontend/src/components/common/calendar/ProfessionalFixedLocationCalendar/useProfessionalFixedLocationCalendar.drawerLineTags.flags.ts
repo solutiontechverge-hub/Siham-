@@ -61,6 +61,12 @@ export function useProfessionalFixedLocationCalendarDrawerLineTagsFlags(
     isViewingBooking &&
     canDiscardEbr(viewingBookingEvent) &&
     !isEditingExisting;
+  /** Initiator can withdraw pending Confirmed ER until the other party accepts. */
+  const showWithdrawEr =
+    isViewingBooking &&
+    viewingBookingEvent?.status === "Confirmed" &&
+    viewingBookingEvent?.bookingScenario === "ER" &&
+    viewingBookingEvent?.details?.requestDirection === "outgoing";
   const showExpiredResponseBanner = shouldShowExpiredResponseBanner(
     viewingBookingEvent,
     businessResponseWindowInput,
@@ -82,6 +88,7 @@ export function useProfessionalFixedLocationCalendarDrawerLineTagsFlags(
     incomingClientNote,
     incomingErNote,
     showDiscardEbr,
+    showWithdrawEr,
     showExpiredResponseBanner,
     negotiationDetails,
     drawerEbrNotes,

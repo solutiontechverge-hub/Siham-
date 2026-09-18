@@ -3,6 +3,9 @@
  * Returns a canonical MIME or null if unrecognized / unsafe.
  */
 
+import path from "path";
+
+// ponytail: prebuilt sharp reports heif but only AVIF (no HEVC). Do not add a converter dep; store HEIC as-is. Windows Chrome uses existing file-chip via img onError. Native HEVC in sharp if display-on-Windows is required.
 const IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif"]);
 
 const EXT_BY_MIME = {
@@ -50,6 +53,15 @@ function sniffHeifFamily(buf) {
   if (["heic", "heix", "heim", "heis"].includes(brand)) return "image/heic";
   if (["heif", "hevc", "hevx", "mif1", "msf1"].includes(brand)) return "image/heif";
   return null;
+}
+
+/**
+ * Multer `originalname` can be a Windows path (`C:\Users\foo\photo.jpg`).
+ * POSIX `path.extname` of that string is empty, so upload filters reject it.
+ */
+export function extensionFromOriginalName(originalName) {
+  const base = String(originalName || "").split(/[/\\]/).pop() || "";
+  return path.extname(base).toLowerCase();
 }
 
 /** @returns {string | null} canonical MIME */
@@ -122,9 +134,7 @@ export function assertTrustedUploadFile(file, { allowedMimes }) {
     throw Object.assign(new Error("Empty file upload."), { statusCode: 400 });
   }
 
-  const hintExt = (file.originalname && file.originalname.includes("."))
-    ? `.${file.originalname.split(".").pop().toLowerCase()}`
-    : "";
+  const hintExt = extensionFromOriginalName(file.originalname);
 
   const sniffed = sniffMimeFromBuffer(file.buffer, hintExt);
   if (!sniffed || !allowedMimes.has(sniffed)) {

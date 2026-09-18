@@ -1,6 +1,7 @@
 /** Must match backend `upload.middleware.js` (multer) rules. */
 export const PROFILE_IMAGE_FILE_ACCEPT = ".jpg,.jpeg,.png,.webp";
 
+// ponytail: keep HEIC/HEIF out of profile/logo (prebuilt sharp has no HEVC). Convert to JPEG on upload when sharp/HEVC is available, then allow.
 const ALLOWED_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp"]);
 const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
 

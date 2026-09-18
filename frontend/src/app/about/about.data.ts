@@ -1,14 +1,16 @@
 /** Copy and media for the About (Our Story) page — typography: headings 600, body 400; colors from theme. */
 
+import { AboutGearsPhotoSrc, AboutHeroBannerSrc } from "../../../images";
+
 export const aboutPageData = {
   hero: {
     title: "Our Story, Vision, And Values",
     subtitle: "Discover The Principles And Ideas That Shape Everything We Do.",
-    imageSrc: "/about/hero-banner.png",
+    imageSrc: AboutHeroBannerSrc,
     imageAlt: "Hand holding a light bulb — ideas and vision for Mollure.",
   },
   split: {
-    imageSrc: "/about/about-gears-photo.png",
+    imageSrc: AboutGearsPhotoSrc,
     imageAlt:
       "Two hands meshing silver and gold gears over salon tools — precision and care.",
     panelTitle: "About Us",

@@ -23,6 +23,7 @@ import ClientBookingPoliciesAccordion from "./ClientBookingPoliciesAccordion";
 import ClientBookingChangeResponsePanel from "./ClientBookingChangeResponsePanel";
 import ClientEbrResponseActions from "./ClientEbrResponseActions";
 import EditRequestIncomingNote from "./EditRequestIncomingNote";
+import WithdrawErButton from "./WithdrawErButton";
 import InlineTimedSnackbar from "../InlineTimedSnackbar";
 import { isResponseWindowOverdue } from "../calendar/bookingResponseDeadline";
 import ClientBookingPaymentMethodSelector from "./ClientBookingPaymentMethodSelector";
@@ -50,6 +51,7 @@ export default function ClientBookingDetailsView({
     address,
     bookedDateLabel,
     bookedTimeLabel,
+    bookedEndTimeLabel,
     bookingStatus,
     bookingInvoiceType,
     bookingNotesMeta,
@@ -100,6 +102,7 @@ export default function ClientBookingDetailsView({
     handlePayCancellationFee,
     handlePayNow,
     handleSendBookingRequest,
+    handleWithdrawEr,
     hasProfessionalSuggestedEdits,
     headerName,
     incomingProfessionalNote,
@@ -116,6 +119,7 @@ export default function ClientBookingDetailsView({
     isPrepaid,
     isPrepaymentPaid,
     isSubmittingRequest,
+    isWithdrawingEr,
     kilometerAllowanceAmount,
     lineTagComparisonMode,
     listTab,
@@ -164,6 +168,7 @@ export default function ClientBookingDetailsView({
     showRejectedResponsePanel,
     showRequestResponseActions,
     showStatusUpdated,
+    showWithdrawEr,
     silentFieldUpdates,
     stripeDialogOpen,
     user,
@@ -241,6 +246,7 @@ export default function ClientBookingDetailsView({
             apiBookingId={activeBooking?.apiBookingId}
             bookedDateLabel={bookedDateLabel}
             bookedTimeLabel={bookedTimeLabel}
+            bookedEndTimeLabel={bookedEndTimeLabel}
             bookingStatus={bookingStatus}
             bookingRequestSent={isBookingRequestSent}
             bookingRequestDirection={activeBooking?.bookingRequestDirection}
@@ -395,6 +401,15 @@ export default function ClientBookingDetailsView({
                     value={selectedPaymentMethod}
                     onChange={setSelectedPaymentMethod}
                   />
+                ) : null}
+
+                {showWithdrawEr ? (
+                  <Box sx={{ mt: 2 }}>
+                    <WithdrawErButton
+                      isLoading={isWithdrawingEr}
+                      onClick={() => void handleWithdrawEr()}
+                    />
+                  </Box>
                 ) : null}
 
                 {incomingProfessionalNote ? (

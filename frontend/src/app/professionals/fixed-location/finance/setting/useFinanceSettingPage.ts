@@ -20,6 +20,7 @@ import type {
   ServiceDraft,
   SettingsTab,
 } from "./setting.types";
+import { PROFILE_IMAGE_INVALID_MESSAGE } from "../../../../../lib/profileImageUpload";
 
 export function useFinanceSettingPage() {
   const theme = useTheme();
@@ -320,6 +321,21 @@ export function useInvoiceSettingsSection() {
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const type = String(file.type || "").toLowerCase();
+    const name = String(file.name || "").toLowerCase();
+    if (
+      type === "image/heic" ||
+      type === "image/heif" ||
+      name.endsWith(".heic") ||
+      name.endsWith(".heif")
+    ) {
+      showSnackbar({
+        severity: "error",
+        message: PROFILE_IMAGE_INVALID_MESSAGE,
+      });
+      e.target.value = "";
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       const url = typeof reader.result === "string" ? reader.result : null;

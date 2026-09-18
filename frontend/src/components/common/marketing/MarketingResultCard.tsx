@@ -5,6 +5,11 @@ import Image from "next/image";
 import { Box, Card, CardContent } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import type { ProfessionalResultIconKey } from "../../../app/professionals/professionals.data";
+import {
+  ProfessionalsResultMoreBookingsSrc,
+  ProfessionalsResultMoreTimeSrc,
+  ProfessionalsResultOnePlaceSrc,
+} from "../../../../images";
 import { BodyText, CardTitle } from "../../ui/typography";
 
 export type MarketingResultCardProps = {
@@ -18,15 +23,15 @@ const RESULT_ICONS: Record<
   { src: string; alt: string }
 > = {
   moreTime: {
-    src: "/professionals/results/more-time.png",
+    src: ProfessionalsResultMoreTimeSrc,
     alt: "More time",
   },
   moreBookings: {
-    src: "/professionals/results/more-bookings.png",
+    src: ProfessionalsResultMoreBookingsSrc,
     alt: "More bookings",
   },
   onePlace: {
-    src: "/professionals/results/one-place.png",
+    src: ProfessionalsResultOnePlaceSrc,
     alt: "Everything in one place",
   },
 };

@@ -296,9 +296,13 @@ function renderScenarioBadge(
       {badge.showExternalLink ? (
         <OpenInNewRoundedIcon sx={{ fontSize: 11, color: "inherit" }} />
       ) : badge.label === "ER" &&
+        !badge.responseIndicators?.includes("suggestion_for_change") &&
+        !badge.showAcceptedIcon &&
         badge.requestDirection === "incoming" ? (
         <BookingRequestReceivedIcon size={10} />
       ) : badge.label === "ER" &&
+        !badge.responseIndicators?.includes("suggestion_for_change") &&
+        !badge.showAcceptedIcon &&
         badge.requestDirection === "outgoing" ? (
         <BookingRequestSentIcon size={10} />
       ) : null}
@@ -444,13 +448,20 @@ export default function BookingTimelineCard({
     Boolean(prepaymentIndicator) &&
     !embeddedIndicatorKeys.has(prepaymentIndicator!) &&
     !standaloneResponseList.includes(prepaymentIndicator!);
-  const showStandaloneResponse = standaloneResponseList.length > 0;
+  const showStandaloneResponse = uniqueIndicators(
+    standaloneResponseList.filter(
+      (item) => item !== prepaymentIndicator,
+    ),
+  ).length > 0;
+  const standaloneResponseVisible = standaloneResponseList.filter(
+    (item) => item !== prepaymentIndicator,
+  );
   const showPaymentDueIcon =
     paymentDue?.showIcon !== false && Boolean(paymentDue?.dateLabel);
   const paymentDueOverlaps =
     showPaymentDueIcon &&
-    (standaloneResponseList.includes("waiting_for_payment") ||
-      standaloneResponseList.includes("overdue_payment") ||
+    (standaloneResponseVisible.includes("waiting_for_payment") ||
+      standaloneResponseVisible.includes("overdue_payment") ||
       embeddedIndicatorKeys.has("waiting_for_payment") ||
       embeddedIndicatorKeys.has("overdue_payment"));
   const showProfile =
@@ -614,7 +625,7 @@ export default function BookingTimelineCard({
             </Tooltip>
           ) : null}
           {showStandaloneResponse
-            ? renderResponseIndicators(standaloneResponseList)
+            ? renderResponseIndicators(standaloneResponseVisible)
             : null}
           {showPaymentDueIcon && !paymentDueOverlaps ? (
             <Tooltip title="Waiting for payment" placement="top">

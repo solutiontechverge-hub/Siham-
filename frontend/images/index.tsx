@@ -1,3 +1,5 @@
+/** App image registry — import from `images` (this folder). Public URL strings for `/public` assets. */
+
 export const Logo = require("./logo.svg");
 export const LogoOnDark = require("./logo-on-dark.svg");
 export const Profile = require("./avatar.svg");
@@ -5,7 +7,6 @@ export const ListingBG = require("./BG.svg");
 export const FixedLocationIcon = require("./Fixed-location.svg");
 export const DesiredLocationIcon = require("./Desired-location.svg");
 export const KidsIcon = require("./kids-icon.svg");
-export const SearchIcon = require("./Search.svg");
 export const ArrowDown = require("./arrow-down.svg");
 
 export const ListingImage1 = require("./Rectangle 104.svg");
@@ -17,10 +18,9 @@ export const ListingImage6 = require("./Rectangle 109.svg");
 
 export const DD = require("./dd.svg");
 export const AboutHeroImage = require("./about/about-header.svg");
-export const AboutHeroPhoto = require("./about/about-hero-photo.jpg");
 export const AboutUsImage = require("./about/about-us.svg");
 export const AboutStarIcon = require("./about/about-star.svg");
-export const ContactUsImage = require("././contact-us.svg"); 
+export const ContactUsImage = require("./contact-us.svg");
 export const ProfessionalsHeroImage = require("./profesional-landing.svg");
 export const CombinableServicesIcon = require("./professionals/combinable-services-icon.png");
 export const ProjectBookingsIcon = require("./professionals/project-bookings-icon.png");
@@ -49,3 +49,11 @@ export const HowItWorksSuggestionForChangeIcon = require("./how-it-works/suggest
 export const HowItWorksDesiredLocationClockIcon = require("./how-it-works/desired-location-clock.svg");
 export const HowItWorksBookingEditedBellIcon = require("./how-it-works/booking-edited-bell.svg");
 export const HowItWorksBookingCommunicationChatIcon = require("./how-it-works/booking-communication-chat.svg");
+
+// `/public` paths (Next.js static)
+export const AboutHeroBannerSrc = "/about/hero-banner.png";
+export const AboutGearsPhotoSrc = "/about/about-gears-photo.png";
+export const ProfessionalsHeroSrc = "/professionals/hero.png";
+export const ProfessionalsResultMoreTimeSrc = "/professionals/results/more-time.png";
+export const ProfessionalsResultMoreBookingsSrc = "/professionals/results/more-bookings.png";
+export const ProfessionalsResultOnePlaceSrc = "/professionals/results/one-place.png";

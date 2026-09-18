@@ -8,8 +8,6 @@ import { BodyText } from "../../../ui/typography";
 
 import AppTextField from "../../AppTextField";
 
-import AppCountryPhoneFields from "../../AppCountryPhoneFields";
-
 import { sanitizeNameInput } from "../../../../lib/field-input";
 
 import { useProfessionalFixedLocationCalendar } from "./useProfessionalFixedLocationCalendar";
@@ -59,73 +57,34 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerSubScreens
           </Box>
         </Stack>
 
-        <Stack direction="row" spacing={1.25}>
-          <AppTextField
-            label="First Name"
-            placeholder="Enter first name"
-            value={guestDraft.firstName}
-            onChange={(e) =>
-              setGuestDraft((p) => ({
-                ...p,
-                firstName: sanitizeNameInput(e.target.value),
-              }))
-            }
-            fullWidth
-            required
-            error={Boolean(slotErrors.guestFirstName)}
-            helperText={slotErrors.guestFirstName}
-          />
-          <AppTextField
-            label="Last Name"
-            placeholder="Enter last name (optional)"
-            value={guestDraft.lastName}
-            onChange={(e) =>
-              setGuestDraft((p) => ({
-                ...p,
-                lastName: sanitizeNameInput(e.target.value),
-              }))
-            }
-            fullWidth
-            error={Boolean(slotErrors.guestLastName)}
-            helperText={slotErrors.guestLastName}
-          />
-        </Stack>
-
-        <AppCountryPhoneFields
-          countryCode={guestDraft.phoneCode}
-          phone={guestDraft.phoneNumber}
-          onCountryCodeChange={(dialCode) =>
-            setGuestDraft((p) => ({
-              ...p,
-              phoneCode: dialCode,
-            }))
-          }
-          onPhoneChange={(phone) =>
-            setGuestDraft((p) => ({
-              ...p,
-              phoneNumber: phone,
-            }))
-          }
-          countryCodeError={slotErrors.guestPhoneCode}
-          phoneError={slotErrors.guestPhoneNumber}
-          phonePlaceholder="+316xxxxxxxx"
-          required
-        />
-
         <AppTextField
-          label="Email Address"
-          placeholder="Enter email address"
-          value={guestDraft.email}
+          label="First Name"
+          placeholder="Enter first name"
+          value={guestDraft.firstName}
           onChange={(e) =>
             setGuestDraft((p) => ({
               ...p,
-              email: e.target.value,
+              firstName: sanitizeNameInput(e.target.value),
             }))
           }
           fullWidth
           required
-          error={Boolean(slotErrors.guestEmail)}
-          helperText={slotErrors.guestEmail}
+          error={Boolean(slotErrors.guestFirstName)}
+          helperText={slotErrors.guestFirstName}
+        />
+        <AppTextField
+          label="Last Name"
+          placeholder="Enter last name (optional)"
+          value={guestDraft.lastName}
+          onChange={(e) =>
+            setGuestDraft((p) => ({
+              ...p,
+              lastName: sanitizeNameInput(e.target.value),
+            }))
+          }
+          fullWidth
+          error={Boolean(slotErrors.guestLastName)}
+          helperText={slotErrors.guestLastName}
         />
 
         <Box sx={{ flex: 1, minHeight: 140 }} />

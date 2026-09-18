@@ -362,6 +362,9 @@ export default function ProfessionalSignupPageView() {
                 {data.acceptPrefix}{" "}
                 <Link
                   href={data.links.terms.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
                   style={{
                     color: m.teal,
                     fontWeight: 600,
@@ -373,6 +376,9 @@ export default function ProfessionalSignupPageView() {
                 {" & "}
                 <Link
                   href={data.links.policies.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
                   style={{
                     color: m.teal,
                     fontWeight: 600,

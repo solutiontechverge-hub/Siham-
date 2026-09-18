@@ -296,6 +296,9 @@ export default function CompanySignupPageView() {
                 {data.acceptPrefix}{" "}
                 <Link
                   href={data.links.terms.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
                   style={{
                     color: m.teal,
                     fontWeight: 600,
@@ -307,6 +310,9 @@ export default function CompanySignupPageView() {
                 {" & "}
                 <Link
                   href={data.links.policies.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
                   style={{
                     color: m.teal,
                     fontWeight: 600,

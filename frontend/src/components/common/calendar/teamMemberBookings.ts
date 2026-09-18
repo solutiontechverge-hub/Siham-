@@ -57,6 +57,12 @@ export function isTeamSharedBooking(
   return collectEventTeamMemberIds(event).length > 1;
 }
 
+/**
+ * Day multi-lane gutter bridge between shared-booking segment cards.
+ * Solid grey, status-agnostic — a step darker than timeline hour slots (#DCDFE3).
+ */
+export const SHARED_BOOKING_LANE_CONNECTOR_BG = "#C5CBD3";
+
 function firstTeamName(value: string | undefined) {
   const name = value?.trim();
   if (!name) return "";

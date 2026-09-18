@@ -1,3 +1,4 @@
+import { ProfessionalsHeroSrc } from "../../../images";
 import { professionalsMarketingFooter, professionalsMarketingHeader } from "../../data/marketingShell.data";
 
 export type ProfessionalFeatureIconKey =
@@ -38,7 +39,7 @@ export const professionalsPageData = {
       "Manage Appointments, Payments And Customer\nCommunication, All In One Place.",
     primaryAction: "Get Started",
     primaryActionHref: "/auth/login",
-    imageSrc: "/professionals/hero.png",
+    imageSrc: ProfessionalsHeroSrc,
     heroCards: [
       { title: "Built for", subtitle: "Salons & Freelancers" },
       { title: "Structured", subtitle: "Booking logic" },

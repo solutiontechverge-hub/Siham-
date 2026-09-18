@@ -27,7 +27,11 @@ export function resolveBookingResponseIndicators(
     event.bookingScenario === "EBR" ||
     event.bookingScenario === "ER";
 
-  if (details?.responseStatus === "suggestion_for_change" || event.bookingScenario === "EBR") {
+  if (
+    details?.responseStatus === "suggestion_for_change" ||
+    event.bookingScenario === "EBR" ||
+    event.bookingScenario === "ER"
+  ) {
     indicators.push("suggestion_for_change");
   }
 
@@ -47,6 +51,8 @@ export function resolveBookingResponseIndicators(
       // BR sent with prepayment outstanding (client checkout), or pending API status.
       indicators.push("waiting_for_prepayment");
     }
+  } else if (prepayRequired && prepayPaid) {
+    indicators.push("prepaid");
   }
 
   if (event.status === "Completed" && details?.waitingForPayment && !details?.refunded) {
@@ -79,15 +85,15 @@ export function resolveBookingResponseIndicators(
   return indicators;
 }
 
-const SETTLED_BOOKING_INDICATORS: ReadonlySet<BookingIndicatorVariant> = new Set(
-  ["prepaid", "refund_completed"],
-);
+const HIDDEN_SETTLED_INDICATORS: ReadonlySet<BookingIndicatorVariant> = new Set([
+  "refund_completed",
+]);
 
-/** Hide settled ticks — only keep icons that still need a response or payment. */
+/** Hide refund-completed tick from action rows; prepaid stays visible after pay. */
 export function isActionRequiredBookingIndicator(
   indicator: BookingIndicatorVariant,
 ): boolean {
-  return !SETTLED_BOOKING_INDICATORS.has(indicator);
+  return !HIDDEN_SETTLED_INDICATORS.has(indicator);
 }
 
 export function actionRequiredBookingIndicators(

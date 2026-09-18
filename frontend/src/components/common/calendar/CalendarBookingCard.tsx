@@ -51,6 +51,7 @@ import BookingIdTooltipLabel from "./BookingIdTooltipLabel";
 import { BookingCardTeamGroupIcon } from "./CalendarBookingCardTeamGroup";
 import {
   isTeamSharedBooking,
+  SHARED_BOOKING_LANE_CONNECTOR_BG,
   teamSharedBookingTooltip,
 } from "./teamMemberBookings";
 import {
@@ -161,6 +162,11 @@ export type CalendarBookingCardProps = {
   onOpenSplitWithTeamMember?: (partnerId: string) => void;
   /** Place profile/actions on the lane's outer edge (split-view aware). */
   actionRailSide?: "start" | "end";
+  /**
+   * Day multi-lane: paint gutter bridge toward adjacent shared segments
+   * (`start` = left inset, `end` = right inset).
+   */
+  sharedLaneConnect?: false | "start" | "end" | "both";
   responseTimeConfigured?: boolean;
   /** Live business-template response window (drives dynamic overdue). */
   responseTime?: ResponseWindowInput | null;
@@ -173,7 +179,9 @@ function scenarioBadgeResponseIndicators(
   if (label === "BR" || label === "EBR") return responseIndicators;
   if (label === "ER" || label === "E") {
     return responseIndicators.filter(
-      (indicator) => indicator === "overdue_response",
+      (indicator) =>
+        indicator === "suggestion_for_change" ||
+        indicator === "overdue_response",
     );
   }
   return [];
@@ -201,6 +209,7 @@ export default function CalendarBookingCard({
   onOpenMessages,
   onOpenSplitWithTeamMember,
   actionRailSide = "end",
+  sharedLaneConnect = false,
   responseTimeConfigured,
   responseTime,
 }: CalendarBookingCardProps) {
@@ -380,7 +389,7 @@ export default function CalendarBookingCard({
             ? resolveProfessionalBookingRequestDirection(event)
             : undefined,
         responseIndicators:
-          indicator === "EBR"
+          indicator === "EBR" || indicator === "ER"
             ? scenarioBadgeResponseIndicators(indicator, responseIndicators)
             : [],
         prepaymentStatus:
@@ -423,6 +432,7 @@ export default function CalendarBookingCard({
       if (!raw?.length) return raw;
       const skip = new Set<string>();
       if (prepaymentIconVariant === "pending") skip.add("waiting_for_prepayment");
+      if (prepaymentIconVariant === "confirmed") skip.add("prepaid");
       if (prepaymentIconVariant === "canceled_or_invalid") {
         skip.add("refund_pending");
       }
@@ -480,6 +490,49 @@ export default function CalendarBookingCard({
       bookingId={bookingRef}
     />
   );
+
+  const connectorBg = SHARED_BOOKING_LANE_CONNECTOR_BG;
+  const connectStart =
+    sharedLaneConnect === "start" || sharedLaneConnect === "both";
+  const connectEnd =
+    sharedLaneConnect === "end" || sharedLaneConnect === "both";
+  const startInsetPx = typeof left === "number" ? left : 6;
+  const endInsetPx = typeof right === "number" ? right : 6;
+  const sharedLaneConnectors =
+    connectStart || connectEnd ? (
+      <>
+        {connectStart ? (
+          <Box
+            aria-hidden
+            sx={{
+              position: "absolute",
+              top: 0,
+              bottom: 0,
+              right: "100%",
+              width: startInsetPx,
+              bgcolor: connectorBg,
+              pointerEvents: "none",
+              zIndex: 9,
+            }}
+          />
+        ) : null}
+        {connectEnd ? (
+          <Box
+            aria-hidden
+            sx={{
+              position: "absolute",
+              top: 0,
+              bottom: 0,
+              left: "100%",
+              width: endInsetPx,
+              bgcolor: connectorBg,
+              pointerEvents: "none",
+              zIndex: 9,
+            }}
+          />
+        ) : null}
+      </>
+    ) : null;
 
   if (isMultiService) {
     const mainBg = isIncomingEr ? alpha(m.teal, 0.14) : backgroundColor;
@@ -763,6 +816,7 @@ export default function CalendarBookingCard({
           ...(Array.isArray(containerSx) ? containerSx : [containerSx]),
         ]}
       >
+        {sharedLaneConnectors}
         {teamGroup}
         <BookingTimelineCard
           {...sharedCardProps}
@@ -818,6 +872,7 @@ export default function CalendarBookingCard({
         ...(Array.isArray(containerSx) ? containerSx : [containerSx]),
       ]}
     >
+      {sharedLaneConnectors}
       {teamGroup}
       <BookingTimelineCard
         {...sharedCardProps}

@@ -16,6 +16,8 @@ import {
   minutesSinceMidnight,
 } from "../calendar.utils";
 
+import { isTeamSharedBooking } from "../teamMemberBookings";
+
 import {
   useProfessionalFixedLocationCalendar,
 } from "./useProfessionalFixedLocationCalendar";
@@ -53,6 +55,16 @@ export type ProfessionalFixedLocationCalendarDayWeekViewLaneColumnBookingsProps 
     /** Column owner id — staff chips on day cards follow this lane. */
     laneResourceId: string;
   };
+
+function sharedLaneConnectForColumn(
+  colIdx: number,
+  laneColumnCount: number,
+): false | "start" | "end" | "both" {
+  if (laneColumnCount <= 1) return false;
+  if (colIdx <= 0) return "end";
+  if (colIdx >= laneColumnCount - 1) return "start";
+  return "both";
+}
 
 /** Week span cards + day clustered booking cards / ticket stacks */
 export default function ProfessionalFixedLocationCalendarDayWeekViewLaneColumnBookings({
@@ -181,6 +193,11 @@ export default function ProfessionalFixedLocationCalendarDayWeekViewLaneColumnBo
             ? ("start" as const)
             : ("end" as const);
 
+        const sharedLaneConnect =
+          viewMode === "day" && isTeamSharedBooking(cluster[0])
+            ? sharedLaneConnectForColumn(colIdx, laneColumnsLength)
+            : false;
+
         if (cluster.length > 1) {
           return (
             <CalendarBookingTicketStack
@@ -215,6 +232,7 @@ export default function ProfessionalFixedLocationCalendarDayWeekViewLaneColumnBo
             teamMemberNameById={resourceNameById}
             teamResources={data.resources}
             actionRailSide={actionRailSide}
+            sharedLaneConnect={sharedLaneConnect}
             serviceColor={resolveServiceColor(ev)}
             statusColor={resolveStatusColor(ev)}
             responseTimeConfigured={responseTimeConfigured}
