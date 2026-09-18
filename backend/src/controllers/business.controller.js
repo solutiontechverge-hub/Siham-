@@ -60,7 +60,7 @@ import {
 import {
   buildApprovedEditRequest,
   buildPendingEditRequest,
-  buildRejectedClear,
+  buildRejectedEditRequest,
   isEditRequestPending,
   parseEditRequest,
 } from "../helpers/bookingEditRequest.js";
@@ -3408,7 +3408,15 @@ export const manageBookingEditRequest = async (req, res) => {
           data: null,
         });
       }
-      nextEditRequest = buildRejectedClear().value;
+      const rejected = buildRejectedEditRequest(existingEr);
+      if (rejected.error) {
+        return res.status(400).json({
+          success: false,
+          message: rejected.error,
+          data: null,
+        });
+      }
+      nextEditRequest = rejected.value;
       message = "Edit request rejected.";
       notificationEvent = BOOKING_NOTIFICATION_EVENTS.ER_REJECTED;
     }

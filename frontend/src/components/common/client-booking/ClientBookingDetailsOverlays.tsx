@@ -24,7 +24,7 @@ import type { ClientBookingDraft } from "./types";
 
 /* ponytail: loose overlay bag — mirrors orchestrator return; tighten when dialog props unify */
 type Props = {
-  m: { white: string; navy: string };
+  m: { white: string; navy: string; success: string; successDark: string };
   cancelDialogOpen: boolean;
   setCancelDialogOpen: (open: boolean) => void;
   handleConfirmCancelBooking: (reason: string) => void;
@@ -320,9 +320,15 @@ export default function ClientBookingDetailsOverlays(props: Props) {
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.15}>
               <AppButton
                 fullWidth
-                tone="primary"
+                variant="contained"
+                disableElevation
                 onClick={() => setEbrAction("accept")}
-                sx={{ minHeight: 44 }}
+                sx={{
+                  minHeight: 44,
+                  bgcolor: m.success,
+                  color: "#fff",
+                  "&:hover": { bgcolor: m.successDark, color: "#fff" },
+                }}
               >
                 {CLIENT_BOOKING_DETAILS_COPY.acceptSuggestedChanges}
               </AppButton>

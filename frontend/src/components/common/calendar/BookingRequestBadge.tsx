@@ -179,7 +179,9 @@ export function resolveBookingRequestBadgeState(
     | null
     | undefined,
 ): BookingRequestBadgeState {
-  if (!event || event.bookingScenario !== "BR") return "sent";
+  if (!event) return "sent";
+  if (event.status === "BR Accepted") return "accepted";
+  if (event.bookingScenario !== "BR") return "sent";
   if (event.status === "Confirmed" || event.status === "Completed")
     return "accepted";
   if (event.status === "Invalid") return "rejected";

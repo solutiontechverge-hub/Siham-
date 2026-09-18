@@ -78,19 +78,24 @@ export function buildBookingSummarySections(
     productGuestIds,
   });
 
-  return blocks.map((block) => ({
-    key: block.key,
-    title: block.title,
-    items: block.items,
-    planningItem: block.planningItem,
-    teamMemberLabel: block.teamMemberLabel,
-    isRequester: block.isRequester,
-    participantType:
-      block.participantType === "requester" ? "requester" : block.participantType,
-    startTime: block.startTime,
-    endTime: block.endTime,
-    participantId: block.participantId,
-  }));
+  // Client-facing summaries only — pro calendar/drawer still shows buffers.
+  return blocks
+    .filter((block) => block.participantType !== "buffer")
+    .map((block) => ({
+      key: block.key,
+      title: block.title,
+      items: block.items,
+      planningItem: block.planningItem,
+      teamMemberLabel: block.teamMemberLabel,
+      isRequester: block.isRequester,
+      participantType:
+        block.participantType === "requester"
+          ? "requester"
+          : block.participantType,
+      startTime: block.startTime,
+      endTime: block.endTime,
+      participantId: block.participantId,
+    }));
 }
 
 export function resolveTeamMemberFirstName(

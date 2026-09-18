@@ -164,8 +164,9 @@ export function useClientBookingDetails({
     !isEbrIncoming;
   const isIncomingConfirmedEr =
     bookingStatus === "confirmed" &&
-    hasApiPendingEr &&
-    apiErInitiatedBy === "professional";
+    (hasApiPendingEr
+      ? apiErInitiatedBy === "professional"
+      : editRequest.isPending && editRequest.initiatedBy === "professional");
   /** Client-sent Confirmed ER awaiting professional accept — show Withdraw ER. */
   const showWithdrawEr =
     bookingStatus === "confirmed" &&

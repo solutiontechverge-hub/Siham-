@@ -70,6 +70,8 @@ import {
 
 import BookingStartEndTimeRow from "../../BookingStartEndTimeRow";
 
+import BookingResponseExpiryBanner from "../BookingResponseExpiryBanner";
+
 import { useProfessionalFixedLocationCalendar } from "./useProfessionalFixedLocationCalendar";
 
 type Vm = ReturnType<typeof useProfessionalFixedLocationCalendar>;
@@ -77,10 +79,12 @@ type Vm = ReturnType<typeof useProfessionalFixedLocationCalendar>;
 export type ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderNoticesStatusBag = Pick<
   Vm,
   | "businessResponseWindowInput"
+  | "handleRestartResponseTime"
   | "m"
   | "openActivityComparison"
   | "responseTimeConfigured"
   | "selectedSlot"
+  | "showExpiredResponseBanner"
   | "viewingBookingEvent"
   | "viewingBookingPaymentDue"
 >;
@@ -94,10 +98,12 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
 }: Props) {
   const {
     businessResponseWindowInput,
+    handleRestartResponseTime,
     m,
     openActivityComparison,
     responseTimeConfigured,
     selectedSlot,
+    showExpiredResponseBanner,
     viewingBookingEvent,
     viewingBookingPaymentDue,
   } = bag;
@@ -105,7 +111,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
   if (!viewingBookingEvent) return null;
 
   return (
-    <>
+    <Stack spacing={1.25}>
       <Box>
         <BodyText
           sx={{
@@ -139,6 +145,12 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
           </BodyText>
         </Box>
       </Box>
+
+      {showExpiredResponseBanner ? (
+        <BookingResponseExpiryBanner
+          onRestart={() => void handleRestartResponseTime()}
+        />
+      ) : null}
 
       <Box>
         <BodyText
@@ -431,6 +443,6 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
         start={selectedSlot?.start ?? viewingBookingEvent.start}
         end={selectedSlot?.end ?? viewingBookingEvent.end}
       />
-    </>
+    </Stack>
   );
 }

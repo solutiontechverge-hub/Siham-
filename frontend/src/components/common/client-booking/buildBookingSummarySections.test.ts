@@ -74,10 +74,8 @@ assert.equal(types.includes("requester"), true);
 assert.equal(types.includes("guest"), true);
 assert.equal(types.includes("planning"), true);
 assert.equal(types.includes("model"), true);
-
-assert.equal(types.includes("buffer"), true);
-
-assert.deepEqual(types, ["requester", "guest", "model", "planning", "buffer"]);
+assert.equal(types.includes("buffer"), false);
+assert.deepEqual(types, ["requester", "guest", "model", "planning"]);
 
 const guestSection = sections.find((section) => section.participantType === "guest");
 assert.equal(guestSection?.title.includes("Sara") || guestSection?.title === "Sara Guest", true);
@@ -101,15 +99,18 @@ assert.equal(
   bookingParticipantDisplayHeading(planningSection!),
   "Planning Details",
 );
-
-const bufferSection = sections.find(
-  (section) => section.participantType === "buffer",
-);
 assert.equal(
-  bookingParticipantDisplayHeading(bufferSection!),
+  bookingParticipantDisplayHeading({
+    participantType: "buffer",
+    isRequester: false,
+    title: "meeting",
+  }),
   "Buffer",
 );
-const bufferMeta = planningScheduleMeta(bufferSection!);
+const bufferMeta = planningScheduleMeta({
+  startTime: "11:00 AM",
+  endTime: "11:15 AM",
+});
 assert.equal(Boolean(bufferMeta.timeRange), true);
 assert.equal(bufferMeta.durationLabel, "15 Mins");
 

@@ -75,6 +75,8 @@ export function calendarBookingStatusLabel(
     event.details?.prepaymentStatus === "confirmed" &&
     method.startsWith("offline");
   if (prepaidOffline) return "Prepaid Offline";
+  // BR Accepted is an internal accept step — chip shows Confirmed; BR is the indicator.
+  if (event.status === "BR Accepted") return "Confirmed";
   return event.status;
 }
 
@@ -96,7 +98,9 @@ export function professionalCalendarDisplayStatus(
     "status" | "details" | "bookingType" | "bookingScenario"
   >,
 ): CalendarBookingStatus {
-  return professionalWaitingForClientPrepay(event) ? "Requested" : event.status;
+  if (professionalWaitingForClientPrepay(event)) return "Requested";
+  if (event.status === "BR Accepted") return "Confirmed";
+  return event.status;
 }
 
 /** Professional calendar chip — BR Accepted with unpaid prepay reads as Requested. */
@@ -238,13 +242,14 @@ export function resolveBookingScenario(
     return event.details.ackScenario;
   }
   const scenario = event.bookingScenario;
+  // BR Accepted → keep BR indicator (accepted badge), not as the status label.
+  if (event.status === "BR Accepted") return "BR";
   // BR / EBR are pending-request markers only — clear once accepted or rejected
   // unless an OK acknowledgement is still outstanding.
   if (scenario === "BR" || scenario === "EBR") {
     if (event.status !== "Requested") return undefined;
     return scenario;
   }
-  if (event.status === "BR Accepted") return undefined;
   // Confirmed Edit (E) — booking changed after ER/EBR accept.
   if (scenario === "E") {
     if (event.status !== "Confirmed") return undefined;
