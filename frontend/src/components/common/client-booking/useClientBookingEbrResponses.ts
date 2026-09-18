@@ -18,6 +18,7 @@ import {
 import {
   clearEbrSuggestionsFromNotes,
   markClientEbrAcceptedInNotes,
+  markClientEbrRejectedInNotes,
   parseCalendarEntryNotes,
   parseStoredEbrFromNotes,
   parseStoredErFromNotes,
@@ -417,6 +418,7 @@ export function useClientBookingEbrResponses(input: {
   const handleConfirmEbrReject = React.useCallback(async () => {
     if (!bookingRef) return;
 
+    // Confirmed ER: keep Confirmed + rejected ER indicator (never Invalid).
     if (isIncomingConfirmedEr) {
       if (!apiBookingId) return;
       try {
@@ -443,16 +445,22 @@ export function useClientBookingEbrResponses(input: {
       return;
     }
 
+    // Invalid only for pending BR/EBR (requested). Confirmed stays confirmed.
+    const bookingIsRequested =
+      String(activeBooking?.status ?? "").toLowerCase() === "requested";
+
     if (!isIncomingBr) {
       clientRejectSuggestedChanges(bookingRef);
     }
     if (apiBookingId) {
       try {
-        const clearedNotes = clearEbrSuggestionsFromNotes(activeBooking?.notes);
+        const nextNotes = bookingIsRequested
+          ? clearEbrSuggestionsFromNotes(activeBooking?.notes)
+          : markClientEbrRejectedInNotes(activeBooking?.notes);
         await updateMyBooking({
           id: apiBookingId,
-          status: "invalid",
-          notes: clearedNotes,
+          status: bookingIsRequested || isIncomingBr ? "invalid" : "confirmed",
+          notes: nextNotes,
         }).unwrap();
         await refreshActiveBooking();
       } catch (error) {
@@ -470,10 +478,13 @@ export function useClientBookingEbrResponses(input: {
         return;
       }
     }
-    clearBookingEditRequest(bookingRef);
+    if (bookingIsRequested || isIncomingBr) {
+      clearBookingEditRequest(bookingRef);
+    }
     editRequest.refresh();
   }, [
     activeBooking?.notes,
+    activeBooking?.status,
     apiBookingId,
     bookingRef,
     editRequest,

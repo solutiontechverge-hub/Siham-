@@ -213,6 +213,7 @@ export function mapCalendarBookingToEvent(
       }
     : notesEr;
   const isErPending = Boolean(erMeta && erMeta.status === "pending");
+  const isErRejected = Boolean(erMeta && erMeta.status === "rejected");
   const bookingRef = booking.unique_code || String(booking.id);
   if (status === "Confirmed") {
     syncEditRequestFromBookingApi(bookingRef, apiEr ?? null);
@@ -468,6 +469,17 @@ export function mapCalendarBookingToEvent(
         ? {
             editRequestNote: erMeta.note,
             editRequestInitiatedBy: erMeta.initiatedBy,
+          }
+        : {}),
+      ...(isErRejected
+        ? {
+            editRequestStatus: "rejected" as const,
+            ...(erMeta?.note
+              ? {
+                  editRequestNote: erMeta.note,
+                  editRequestInitiatedBy: erMeta.initiatedBy,
+                }
+              : {}),
           }
         : {}),
       ...(parsedNotes
