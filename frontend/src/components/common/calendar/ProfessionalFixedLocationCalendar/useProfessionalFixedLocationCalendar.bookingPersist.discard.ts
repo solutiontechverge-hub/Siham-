@@ -51,6 +51,8 @@ export function useProfessionalFixedLocationCalendarBookingPersistDiscard(
     });
   }, [editingEventId, persistEventStatus, showSnackbar]);
 
+  const [isWithdrawingEr, setIsWithdrawingEr] = React.useState(false);
+
   const handleDiscardConfirmedEr = React.useCallback(async () => {
     if (!editingEventId || !viewingBookingEvent) return;
     const parsed = parseApiCalendarEventId(editingEventId);
@@ -104,6 +106,15 @@ export function useProfessionalFixedLocationCalendarBookingPersistDiscard(
     showSnackbar,
     viewingBookingEvent,
   ]);
+
+  const handleWithdrawEr = React.useCallback(async () => {
+    setIsWithdrawingEr(true);
+    try {
+      await handleDiscardConfirmedEr();
+    } finally {
+      setIsWithdrawingEr(false);
+    }
+  }, [handleDiscardConfirmedEr]);
 
   const handleRestartResponseTime = React.useCallback(async () => {
     if (!editingEventId || !viewingBookingEvent) return;
@@ -192,6 +203,8 @@ export function useProfessionalFixedLocationCalendarBookingPersistDiscard(
   return {
     handleDiscardBr,
     handleDiscardConfirmedEr,
+    handleWithdrawEr,
+    isWithdrawingEr,
     handleRestartResponseTime,
     handleDiscardEbr,
   };

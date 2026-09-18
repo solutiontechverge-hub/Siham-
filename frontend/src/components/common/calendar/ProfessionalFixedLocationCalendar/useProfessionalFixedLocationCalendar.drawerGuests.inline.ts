@@ -1,6 +1,5 @@
 import * as React from "react";
 import { FIXED_LOCATION_MAX_GUESTS } from "../../../../app/clients/booking/booking.page.data";
-import { getOptionalPhoneValidationErrors } from "../../../../lib/phone-validation";
 import type { UseProfessionalFixedLocationCalendarDrawerGuestsArgs } from "./useProfessionalFixedLocationCalendar.drawerGuests";
 
 /** Inline guest add/edit/cancel handlers (ponytail: subdomain of drawerGuests). */
@@ -24,19 +23,20 @@ export function useProfessionalFixedLocationCalendarDrawerGuestsInline(
   } = args;
 
   const addInlineGuest = React.useCallback(() => {
-    const guestName =
-      `${inlineGuestDraft.firstName.trim()} ${inlineGuestDraft.lastName.trim()}`.trim();
-    const email = inlineGuestDraft.email.trim();
-    const phoneCode = inlineGuestDraft.phoneCode;
-    const phoneNumber = inlineGuestDraft.phoneNumber.trim();
-    const phoneErrors = getOptionalPhoneValidationErrors(phoneCode, phoneNumber);
-    if (phoneErrors.countryCode || phoneErrors.phone) {
+    const firstName = inlineGuestDraft.firstName.trim();
+    if (!firstName) {
       showSnackbar({
         severity: "warning",
-        message: phoneErrors.phone || phoneErrors.countryCode || "Invalid phone.",
+        message: "First name is required.",
       });
       return;
     }
+    const guestName =
+      `${firstName} ${inlineGuestDraft.lastName.trim()}`.trim();
+    // ponytail: email/phone not collected in Add Guest UI; preserve draft on edit only
+    const email = inlineGuestDraft.email.trim();
+    const phoneCode = inlineGuestDraft.phoneCode;
+    const phoneNumber = inlineGuestDraft.phoneNumber.trim();
 
     if (editingInlineGuestId) {
       setBookingGuests((prev) =>

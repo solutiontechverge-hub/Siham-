@@ -64,10 +64,11 @@ import {
 } from "../bookingResponseStatus";
 
 import {
-  isActionRequiredPrepaymentStatus,
   resolveCalendarPrepaymentStatus,
   toPrepaymentIconVariant,
 } from "../prepaymentStatus";
+
+import BookingStartEndTimeRow from "../../BookingStartEndTimeRow";
 
 import { useProfessionalFixedLocationCalendar } from "./useProfessionalFixedLocationCalendar";
 
@@ -79,6 +80,7 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderNot
   | "m"
   | "openActivityComparison"
   | "responseTimeConfigured"
+  | "selectedSlot"
   | "viewingBookingEvent"
   | "viewingBookingPaymentDue"
 >;
@@ -95,6 +97,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
     m,
     openActivityComparison,
     responseTimeConfigured,
+    selectedSlot,
     viewingBookingEvent,
     viewingBookingPaymentDue,
   } = bag;
@@ -199,7 +202,9 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
                   ? responseIndicators
                   : indicator === "ER"
                     ? responseIndicators.filter(
-                        (item) => item === "overdue_response",
+                        (item) =>
+                          item === "suggestion_for_change" ||
+                          item === "overdue_response",
                       )
                     : [];
               const comparisonSignpost =
@@ -267,7 +272,8 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
                             </Box>
                           </Tooltip>
                         ))}
-                        {indicator === "ER" ? (
+                        {indicator === "ER" &&
+                        !badgeResponses.includes("suggestion_for_change") ? (
                           resolveProfessionalBookingRequestDirection(
                             viewingBookingEvent,
                           ) === "incoming" ? (
@@ -331,20 +337,20 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
 
             const standalonePrepayment =
               prepayment &&
-              isActionRequiredPrepaymentStatus(prepayment) &&
               !professionalWaitingForClientPrepay(viewingBookingEvent) &&
               (scenarioIndicators.length === 0 || hasBr)
                 ? prepayment
                 : undefined;
 
-            // Settled prepaid is not an action icon â€” only pending / refund.
             const prepaymentAsIndicator =
               standalonePrepayment === "pending"
                 ? ("waiting_for_prepayment" as const)
-                : standalonePrepayment === "canceled" ||
-                    standalonePrepayment === "invalid"
-                  ? ("refund_pending" as const)
-                  : null;
+                : standalonePrepayment === "confirmed"
+                  ? ("prepaid" as const)
+                  : standalonePrepayment === "canceled" ||
+                      standalonePrepayment === "invalid"
+                    ? ("refund_pending" as const)
+                    : null;
 
             const filteredResponses = standaloneResponses.filter(
               (item) => item !== prepaymentAsIndicator,
@@ -420,6 +426,11 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
           ) : null}
         </Box>
       </Box>
+
+      <BookingStartEndTimeRow
+        start={selectedSlot?.start ?? viewingBookingEvent.start}
+        end={selectedSlot?.end ?? viewingBookingEvent.end}
+      />
     </>
   );
 }

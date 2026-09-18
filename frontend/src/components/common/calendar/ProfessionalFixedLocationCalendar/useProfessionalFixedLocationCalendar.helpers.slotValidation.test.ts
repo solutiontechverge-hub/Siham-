@@ -25,9 +25,9 @@ const baseGuestInput = (): SlotValidationInput => ({
   },
   guestDraft: {
     firstName: "Jane",
-    email: "jane@example.com",
-    phoneCode: "+31",
-    phoneNumber: "612345678",
+    email: "",
+    phoneCode: "",
+    phoneNumber: "",
   },
   nonMollureDraft: {
     firstName: "",
@@ -75,16 +75,19 @@ const baseGuestInput = (): SlotValidationInput => ({
   const result = computeSlotValidation(input);
   assert.equal(result.isValid, false);
   assert.ok(result.errors.guestFirstName);
-  assert.ok(result.errors.guestEmail);
-  assert.ok(result.errors.guestPhoneCode || result.errors.guestPhoneNumber);
+  assert.equal(result.errors.guestEmail, undefined);
+  assert.equal(result.errors.guestPhoneCode, undefined);
+  assert.equal(result.errors.guestPhoneNumber, undefined);
 }
 
 {
+  // Email/phone no longer required on Add Guest screen (fields hidden).
   const input = baseGuestInput();
   input.guestDraft.email = "not-an-email";
+  input.guestDraft.phoneNumber = "";
   const result = computeSlotValidation(input);
-  assert.equal(result.isValid, false);
-  assert.match(String(result.errors.guestEmail), /valid/i);
+  assert.equal(result.isValid, true);
+  assert.deepEqual(result.errors, {});
 }
 
-console.log("slotValidation guest required phone/email: ok");
+console.log("slotValidation guest first-name only: ok");

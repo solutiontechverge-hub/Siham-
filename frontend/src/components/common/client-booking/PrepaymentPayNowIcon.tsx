@@ -2,7 +2,7 @@
 
 import BookingGuidelineIcon from "../calendar/BookingGuidelineIcon";
 
-/** Waiting for prepayment — product guideline hourglass PNG. */
+/** Waiting for prepayment — product guideline PNG. */
 export default function PrepaymentPayNowIcon({ size = 28 }: { size?: number }) {
-  return <BookingGuidelineIcon variant="response_time_active" size={size} />;
+  return <BookingGuidelineIcon variant="waiting_for_prepayment" size={size} />;
 }

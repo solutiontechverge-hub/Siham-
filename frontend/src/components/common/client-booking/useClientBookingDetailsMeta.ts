@@ -3,12 +3,42 @@
 import * as React from "react";
 import { parseTimeLabelToMinutes, buildWallClockDateTimeIso } from "../../../app/clients/booking/booking-time";
 import {
+  fmtTimeLabel,
+  parseClockToMinutes,
+} from "../calendar/calendar.utils";
+import {
   computePrepaidAmount,
   formatBookedDateLabel,
   resolveBookingAddressLabel,
   resolvePrimaryProfessional,
 } from "./clientBookingDetails.helpers";
 import type { ClientBookingDraft } from "./types";
+
+/** Booking-level end clock: max service endTime, else start + sum(durations). */
+export function resolveClientBookingEndClock(
+  draft: ClientBookingDraft | null | undefined,
+): string {
+  if (!draft) return "";
+  let maxEnd: number | null = null;
+  for (const service of draft.services ?? []) {
+    const endMin = service.endTime?.trim()
+      ? parseClockToMinutes(service.endTime.trim())
+      : null;
+    if (endMin != null && (maxEnd == null || endMin > maxEnd)) maxEnd = endMin;
+  }
+  if (maxEnd != null) return fmtTimeLabel(maxEnd);
+
+  const startMin = draft.selectedTime?.trim()
+    ? parseClockToMinutes(draft.selectedTime.trim()) ??
+      parseTimeLabelToMinutes(draft.selectedTime)
+    : null;
+  if (startMin == null || !Number.isFinite(startMin)) return "";
+  const duration = (draft.services ?? []).reduce(
+    (sum, service) => sum + (Number(service.durationMins) || 0),
+    0,
+  );
+  return duration > 0 ? fmtTimeLabel(startMin + duration) : "";
+}
 
 export function useClientBookingDetailsMeta(input: {
   draft: ClientBookingDraft | null;
@@ -81,6 +111,10 @@ export function useClientBookingDetailsMeta(input: {
     [input.draft?.selectedDateISO],
   );
   const bookedTimeLabel = input.draft?.selectedTime ?? "";
+  const bookedEndTimeLabel = React.useMemo(
+    () => resolveClientBookingEndClock(input.draft),
+    [input.draft],
+  );
 
   const headerName =
     input.user?.display_name ||
@@ -118,6 +152,7 @@ export function useClientBookingDetailsMeta(input: {
     address,
     bookedDateLabel,
     bookedTimeLabel,
+    bookedEndTimeLabel,
     headerName,
     policySections,
     prepaidAmount,

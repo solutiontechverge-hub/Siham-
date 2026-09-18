@@ -8,7 +8,9 @@ import {
   BodyText,
 } from "../../../ui/typography";
 
-import { Box } from "@mui/material";
+import { Box, Stack } from "@mui/material";
+
+import BookingStartEndTimeRow from "../../BookingStartEndTimeRow";
 
 import { useProfessionalFixedLocationCalendar } from "./useProfessionalFixedLocationCalendar";
 
@@ -24,13 +26,16 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderBag
   | "businessResponseWindowInput"
   | "handleBookingActionSelect"
   | "handleRestartResponseTime"
+  | "isMollureClientPath"
   | "isViewingBooking"
   | "lateCancellationFeeAmount"
   | "m"
   | "noShowFeeAmount"
   | "openActivityComparison"
+  | "openBookingMessages"
   | "postBookingPendingPayment"
   | "responseTimeConfigured"
+  | "selectedSlot"
   | "setBookingActionAnchor"
   | "setFocusSalesCardId"
   | "setSlotDrawerTab"
@@ -40,6 +45,7 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderBag
   | "viewingBookingEvent"
   | "viewingBookingOverlapsBlockTime"
   | "viewingBookingPaymentDue"
+  | "viewingBookingUnread"
 >;
 
 export type ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderProps = {
@@ -51,6 +57,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
   const {
     isViewingBooking,
     m,
+    selectedSlot,
     viewingBookingEvent,
   } = bag;
 
@@ -62,16 +69,22 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
           <ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderNotices bag={bag} />
         </Box>
       ) : (
-        <BodyText
-          sx={{
-            fontWeight: 900,
-            color: alpha(m.navy, 0.88),
-            fontSize: 16,
-            letterSpacing: "-0.01em",
-          }}
-        >
-          New Booking
-        </BodyText>
+        <Stack spacing={1.25}>
+          <BodyText
+            sx={{
+              fontWeight: 900,
+              color: alpha(m.navy, 0.88),
+              fontSize: 16,
+              letterSpacing: "-0.01em",
+            }}
+          >
+            New Booking
+          </BodyText>
+          <BookingStartEndTimeRow
+            start={selectedSlot?.start}
+            end={selectedSlot?.end}
+          />
+        </Stack>
       )}
     </>
   );

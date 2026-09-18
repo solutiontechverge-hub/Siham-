@@ -32,10 +32,12 @@ import type { ClientBookingSummarySection } from "../../../components/common/cli
 import { ServiceSummaryMetaLine } from "../../../components/common/ServiceSummaryMetaLine";
 import {
   CLIENT_BOOKING_MIN_LEAD_ERROR,
+  fmtMinutesToIsoTime,
   fmtMinutesToTimeLabel,
   parseTimeLabelToMinutes,
   serviceTimeRangeLabel,
 } from "./booking-time";
+import BookingStartEndTimeRow from "../../../components/common/BookingStartEndTimeRow";
 import type { Service } from "./booking.page.types";
 
 export type ClientBookingPaymentSummaryPanelProps = {
@@ -156,6 +158,11 @@ export default function ClientBookingPaymentSummaryPanel({
           label={isDesiredLocation ? "Desired Location" : "Fixed Location"}
           size="small"
           sx={{ ...locationModeChipSx, mt: 0.75 }}
+        />
+        <BookingStartEndTimeRow
+          start={fmtMinutesToIsoTime(bookingStartMinutes)}
+          end={fmtMinutesToIsoTime(bookingEndMinutes)}
+          sx={{ mt: 1 }}
         />
       </Box>
       <Divider />

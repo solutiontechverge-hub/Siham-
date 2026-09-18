@@ -18,6 +18,7 @@ import {
   mollureLabelSx,
 } from "../../../theme/mollureHierarchy";
 import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
+import { FillImageOrFallback } from "../../../components/common/client-booking/ProjectUploadThumb";
 
 export type ClientBookingProjectUpload = {
   id: string;
@@ -181,7 +182,16 @@ export default function ClientBookingProjectDetailsPanel({
             spacing={1}
             sx={{ overflowX: "auto", pb: 0.5 }}
           >
-            {projectUploads.map((img) => (
+            {projectUploads.map((img) => {
+              const isPdf =
+                img.name.toLowerCase().endsWith(".pdf") ||
+                img.file?.type === "application/pdf";
+              const src = resolveMediaUrl(img.previewUrl) || img.previewUrl;
+              const canBeImage =
+                !isPdf &&
+                (img.file?.type.startsWith("image/") ||
+                  (!img.file && Boolean(src)));
+              return (
               <Box
                 key={img.id}
                 sx={{
@@ -223,35 +233,23 @@ export default function ClientBookingProjectDetailsPanel({
                     justifyContent: "center",
                   }}
                 >
-                  {img.file?.type.startsWith("image/") ||
-                  (!img.file &&
-                    Boolean(
-                      resolveMediaUrl(img.previewUrl) || img.previewUrl,
-                    )) ? (
-                    <Box
-                      component="img"
-                      src={
-                        resolveMediaUrl(img.previewUrl) || img.previewUrl
-                      }
-                      alt={img.name}
-                      sx={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                        display: "block",
-                      }}
-                    />
-                  ) : (
-                    <Typography
-                      sx={{
-                        fontSize: 10,
-                        fontWeight: 800,
-                        color: alpha(m.navy, 0.45),
-                      }}
-                    >
-                      PDF
-                    </Typography>
-                  )}
+                  <FillImageOrFallback
+                    src={canBeImage ? src : null}
+                    alt={img.name}
+                    fallback={
+                      isPdf ? (
+                        <Typography
+                          sx={{
+                            fontSize: 10,
+                            fontWeight: 800,
+                            color: alpha(m.navy, 0.45),
+                          }}
+                        >
+                          PDF
+                        </Typography>
+                      ) : null
+                    }
+                  />
                 </Box>
                 <Typography
                   sx={{
@@ -268,7 +266,8 @@ export default function ClientBookingProjectDetailsPanel({
                   {img.name}
                 </Typography>
               </Box>
-            ))}
+              );
+            })}
           </Stack>
         </Box>
       ) : null}

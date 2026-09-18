@@ -2,16 +2,24 @@ import type { BookingDrawerParticipantKind } from "./BookingDrawerParticipantAct
 
 export const DEFAULT_FIXED_LOCATION_MAX_GUESTS = 1;
 
-/** Sticky footer: FL guest; DL guest (no project) / model+planning (project) + buffer. */
+/**
+ * Sticky footer kinds:
+ * - FL → guest
+ * - DL IC (or BC without project) → guest + buffer
+ * - DL BC + project → model + planning + buffer
+ */
 export function resolveBookingDrawerParticipantKinds({
   location,
   projectEnabled,
+  isCompanyClient = false,
   extraGuestCount,
   maxFixedLocationGuests = DEFAULT_FIXED_LOCATION_MAX_GUESTS,
   primaryClientIsGuest = false,
 }: {
   location: string;
   projectEnabled: boolean;
+  /** BC only — IC desired-location always uses guest semantics, never model. */
+  isCompanyClient?: boolean;
   extraGuestCount: number;
   maxFixedLocationGuests?: number;
   /** Primary client is Guest — hide + Add Guest (extra guests only for non-guest primaries). */
@@ -22,7 +30,7 @@ export function resolveBookingDrawerParticipantKinds({
     kinds = extraGuestCount < maxFixedLocationGuests ? ["guest"] : [];
   } else if (location !== "DL") {
     kinds = [];
-  } else if (projectEnabled) {
+  } else if (isCompanyClient && projectEnabled) {
     kinds = ["model", "planning", "buffer"];
   } else {
     kinds = ["guest", "buffer"];

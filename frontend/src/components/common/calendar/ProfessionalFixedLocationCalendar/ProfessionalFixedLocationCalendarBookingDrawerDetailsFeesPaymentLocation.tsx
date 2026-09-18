@@ -173,7 +173,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsFee
                         Amount/Per Kilometer
                       </BodyText>
 
-                      <Stack direction="row" spacing={1}>
+                      <Stack spacing={1}>
                         <AppTextField
                           label="EUR/Km"
                           placeholder="0"
@@ -255,7 +255,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsFee
                   >
                     Visit Address
                   </BodyText>
-                  <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
+                  <Stack spacing={1}>
                     <AppTextField
                       label="Street"
                       placeholder="Enter street"
@@ -282,8 +282,6 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsFee
                       disabled={isViewingExisting}
                       fullWidth
                     />
-                  </Stack>
-                  <Stack direction="row" spacing={1}>
                     <AppTextField
                       label="Postal Code"
                       placeholder="Enter postal code"

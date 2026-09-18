@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
 import { Box, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -15,6 +16,34 @@ type Props = {
   height?: number;
 };
 
+/** Cover img that falls back to existing non-image UI when the browser cannot render (e.g. HEIC on Chrome). */
+export function FillImageOrFallback({
+  src,
+  alt,
+  fallback,
+}: {
+  src?: string | null;
+  alt: string;
+  fallback: React.ReactNode;
+}) {
+  const [previewFailed, setPreviewFailed] = React.useState(false);
+  if (!src || previewFailed) return fallback;
+  return (
+    <Box
+      component="img"
+      src={src}
+      alt={alt}
+      onError={() => setPreviewFailed(true)}
+      sx={{
+        width: "100%",
+        height: "100%",
+        objectFit: "cover",
+        display: "block",
+      }}
+    />
+  );
+}
+
 export default function ProjectUploadThumb({
   upload,
   width = 88,
@@ -22,7 +51,7 @@ export default function ProjectUploadThumb({
 }: Props) {
   const m = useTheme().palette.mollure;
   const href = projectUploadHref(upload);
-  const showImage = Boolean(href) && isProjectUploadImage(upload);
+  const canPreview = Boolean(href) && isProjectUploadImage(upload);
 
   return (
     <Box
@@ -50,23 +79,15 @@ export default function ProjectUploadThumb({
           overflow: "hidden",
         }}
       >
-        {showImage ? (
-          <Box
-            component="img"
-            src={href}
-            alt={upload.name || "Upload"}
-            sx={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              display: "block",
-            }}
-          />
-        ) : (
-          <InsertDriveFileOutlinedIcon
-            sx={{ fontSize: 26, color: alpha(m.navy, 0.4) }}
-          />
-        )}
+        <FillImageOrFallback
+          src={canPreview ? href : null}
+          alt={upload.name || "Upload"}
+          fallback={
+            <InsertDriveFileOutlinedIcon
+              sx={{ fontSize: 26, color: alpha(m.navy, 0.4) }}
+            />
+          }
+        />
       </Box>
       <Typography
         sx={{

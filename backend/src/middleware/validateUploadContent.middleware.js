@@ -4,6 +4,7 @@ import {
 } from "../utils/file-content.js";
 
 /** Image-only uploads (profile, logo, business media). */
+// ponytail: no HEIC here until assertTrustedUploadFile can JPEG-convert (sharp/HEVC).
 export const IMAGE_UPLOAD_MIMES = new Set([
   "image/jpeg",
   "image/png",

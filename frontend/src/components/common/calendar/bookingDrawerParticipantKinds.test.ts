@@ -31,19 +31,34 @@ assert.deepEqual(
   [],
 );
 
+// DL + BC, Project off → Add Guest (+ Buffer), never Model.
 assert.deepEqual(
   resolveBookingDrawerParticipantKinds({
     location: "DL",
     projectEnabled: false,
+    isCompanyClient: true,
     extraGuestCount: 0,
   }),
   ["guest", "buffer"],
 );
 
+// DL + IC: always Guest (+ Buffer); Project checkbox does not appear.
 assert.deepEqual(
   resolveBookingDrawerParticipantKinds({
     location: "DL",
     projectEnabled: true,
+    isCompanyClient: false,
+    extraGuestCount: 0,
+  }),
+  ["guest", "buffer"],
+);
+
+// DL + BC, Project on → Add Model + Add Planning (+ Buffer).
+assert.deepEqual(
+  resolveBookingDrawerParticipantKinds({
+    location: "DL",
+    projectEnabled: true,
+    isCompanyClient: true,
     extraGuestCount: 2,
   }),
   ["model", "planning", "buffer"],
@@ -63,6 +78,7 @@ assert.deepEqual(
   resolveBookingDrawerParticipantKinds({
     location: "DL",
     projectEnabled: false,
+    isCompanyClient: true,
     extraGuestCount: 0,
     primaryClientIsGuest: true,
   }),

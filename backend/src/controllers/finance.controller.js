@@ -1135,7 +1135,7 @@ export const createStripeConnectOnboardingLink = async (req, res) => {
 
     const refreshUrl =
       req.body?.refreshUrl ??
-      `${process.env.FRONTEND_URL ?? "http://localhost:3000"}/professionals/finance/setting`;
+      `${process.env.FRONTEND_URL ?? "https://web--mollure-backend--sc4tt92szkkg.code.run"}/professionals/finance/setting`;
     const returnUrl = req.body?.returnUrl ?? refreshUrl;
 
     const link = await stripe.accountLinks.create({

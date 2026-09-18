@@ -34,6 +34,8 @@ export type UseProfessionalFixedLocationCalendarDrawerUiGatesArgs = {
   bookingGuests: readonly BookingGuest[];
   slotLocation: CalendarBookingLocation;
   bookingProjectEnabled: boolean;
+  /** BC client — required so IC DL never resolves to Add Model. */
+  isSelectedCompanyClient: boolean;
   slotBookingScreen: SlotBookingScreen;
   editingEventId: string | null;
   isGuestClientPath: boolean;
@@ -63,6 +65,7 @@ export function useProfessionalFixedLocationCalendarDrawerUiGates({
   bookingGuests,
   slotLocation,
   bookingProjectEnabled,
+  isSelectedCompanyClient,
   slotBookingScreen,
   editingEventId,
   isGuestClientPath,
@@ -95,6 +98,7 @@ export function useProfessionalFixedLocationCalendarDrawerUiGates({
     return resolveBookingDrawerParticipantKinds({
       location: slotLocation,
       projectEnabled: slotLocation === "DL" && bookingProjectEnabled,
+      isCompanyClient: isSelectedCompanyClient,
       extraGuestCount,
       maxFixedLocationGuests: FIXED_LOCATION_MAX_GUESTS,
       primaryClientIsGuest: isGuestClientPath,
@@ -104,6 +108,7 @@ export function useProfessionalFixedLocationCalendarDrawerUiGates({
     extraGuestCount,
     incomingRequestEditMode,
     isGuestClientPath,
+    isSelectedCompanyClient,
     isViewingExisting,
     showManualBookingParticipantActions,
     slotLocation,

@@ -107,6 +107,8 @@ export function useProfessionalFixedLocationCalendarBookingPersist(
     handleRejectConfirmedEr: er.handleRejectConfirmedEr,
     handleDiscardBr: discard.handleDiscardBr,
     handleDiscardConfirmedEr: discard.handleDiscardConfirmedEr,
+    handleWithdrawEr: discard.handleWithdrawEr,
+    isWithdrawingEr: discard.isWithdrawingEr,
     handleRestartResponseTime: discard.handleRestartResponseTime,
     handleAcceptIncomingRequest: incoming.handleAcceptIncomingRequest,
     handleRejectIncomingRequest: incoming.handleRejectIncomingRequest,

@@ -31,8 +31,6 @@ import {
 import { bookingStatusChipColors } from "./clientBookingStatus";
 import BookingRequestBadge from "../../../components/common/calendar/BookingRequestBadge";
 import BookingIndicatorIcon from "../../../components/common/calendar/BookingIndicatorIcon";
-import BookingRequestReceivedIcon from "../../../components/common/calendar/BookingRequestReceivedIcon";
-import BookingRequestSentIcon from "../../../components/common/calendar/BookingRequestSentIcon";
 import { AppPagination, AppSearchField } from "../../../components/common";
 import { getBookingEditRequest } from "../../../components/common/client-booking/bookingEditRequest";
 import { syncEditRequestFromBookingApi } from "../../../components/common/client-booking/syncEditRequestFromApi";
@@ -266,6 +264,10 @@ export default function ClientBookingListView({ listTab }: Props) {
                 const erNote =
                   (incomingEr?.note || outgoingEr?.note || "").trim() || "";
                 const waitingForPrepayment = isWaitingForPrepayment(b);
+                const showPrepaidIcon =
+                  Boolean(b.requiresPrepayment) &&
+                  Boolean(b.prepaid) &&
+                  !waitingForPrepayment;
                 const waitingForPayment = paymentDue;
                 const isSilentUpdated = Boolean(b.silentUpdated);
                 const isConfirmedEdited =
@@ -475,6 +477,21 @@ export default function ClientBookingListView({ listTab }: Props) {
                                   size={16}
                                 />
                               </Box>
+                            ) : showPrepaidIcon ? (
+                              <Box
+                                sx={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                }}
+                                title="Prepayment received"
+                                aria-label="Prepayment received"
+                              >
+                                <BookingIndicatorIcon
+                                  variant="prepaid"
+                                  size={16}
+                                />
+                              </Box>
                             ) : null}
                             {waitingForPayment ? (
                               <Box
@@ -510,35 +527,26 @@ export default function ClientBookingListView({ listTab }: Props) {
                                   height: 22,
                                   px: 0.75,
                                   borderRadius: "999px",
-                                  border: `1px solid ${alpha(m.teal, 0.35)}`,
-                                  bgcolor: alpha(m.teal, 0.08),
+                                  border: `1px solid ${alpha(m.navy, 0.25)}`,
+                                  bgcolor: alpha("#fff", 0.72),
                                 }}
-                                title={
-                                  incomingEr
-                                    ? "Edit request received"
-                                    : "Edit request sent"
-                                }
-                                aria-label={
-                                  incomingEr
-                                    ? "Edit request received"
-                                    : "Edit request sent"
-                                }
+                                title="Suggestion for change"
+                                aria-label="Suggestion for change"
                               >
                                 <Typography
                                   sx={{
                                     fontSize: 10,
                                     fontWeight: 900,
-                                    color: m.teal,
+                                    color: alpha(m.navy, 0.78),
                                     lineHeight: 1,
                                   }}
                                 >
                                   ER
                                 </Typography>
-                                {incomingEr ? (
-                                  <BookingRequestReceivedIcon size={10} />
-                                ) : (
-                                  <BookingRequestSentIcon size={10} />
-                                )}
+                                <BookingIndicatorIcon
+                                  variant="suggestion_for_change"
+                                  size={14}
+                                />
                               </Box>
                             ) : null}
                           </Stack>

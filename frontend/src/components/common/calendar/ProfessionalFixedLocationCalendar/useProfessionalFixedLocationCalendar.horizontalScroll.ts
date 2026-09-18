@@ -91,20 +91,15 @@ export function useProfessionalFixedLocationCalendarHorizontalScroll({
       syncDayTeamHorizontalScroll("header");
       return;
     }
-    // Focus/split: names above body must stay the leading prefix — snap back.
-    const header = weekTeamHeaderScrollRef.current;
-    if (viewMode === "day" && header && header.scrollLeft !== 0) {
-      header.scrollLeft = 0;
-    }
+    // Focus/split: header scrolls alone (body stays on focus columns).
     refreshWeekTeamHeaderScrollEdges();
   }, [
     dayHeaderBodyScrollAligned,
     refreshWeekTeamHeaderScrollEdges,
     syncDayTeamHorizontalScroll,
-    viewMode,
   ]);
 
-  // Focus/split: pin leading header cells under body; do not leave scroll mid-roster.
+  // Focus/split: snap header back to leading prefix when focus/date/roster changes.
   React.useLayoutEffect(() => {
     if (viewMode !== "day" || dayHeaderBodyScrollAligned) return;
     const el = weekTeamHeaderScrollRef.current;
@@ -114,8 +109,10 @@ export function useProfessionalFixedLocationCalendarHorizontalScroll({
   }, [
     activeDateIso,
     dayHeaderBodyScrollAligned,
+    dayViewBodyColumnCount,
     refreshWeekTeamHeaderScrollEdges,
     teamHeaderResources,
+    teamHeaderVisibleSlots,
     viewMode,
   ]);
 

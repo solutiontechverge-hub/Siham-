@@ -8,7 +8,6 @@ import {
   getOptionalPhoneValidationErrors,
   getPhoneValidationErrors,
 } from "../../../../lib/phone-validation";
-import { parseEmail } from "../../../../lib/inputSchema";
 
 export type SlotValidationErrors = Partial<
   Record<
@@ -211,23 +210,7 @@ export function computeSlotValidation(input: SlotValidationInput): {
       isValid = false;
       errors.guestFirstName = "First name is required.";
     }
-    const guestPhoneErrors = getPhoneValidationErrors(
-      input.guestDraft.phoneCode,
-      input.guestDraft.phoneNumber,
-    );
-    if (guestPhoneErrors.countryCode) {
-      isValid = false;
-      errors.guestPhoneCode = guestPhoneErrors.countryCode;
-    }
-    if (guestPhoneErrors.phone) {
-      isValid = false;
-      errors.guestPhoneNumber = guestPhoneErrors.phone;
-    }
-    const guestEmail = parseEmail(input.guestDraft.email);
-    if (!guestEmail.ok) {
-      isValid = false;
-      errors.guestEmail = guestEmail.error;
-    }
+    // ponytail: email/phone hidden on Add Guest UI; keep draft fields for API elsewhere
     return { isValid, errors };
   }
 

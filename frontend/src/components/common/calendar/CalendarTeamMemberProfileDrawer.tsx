@@ -122,6 +122,9 @@ export default function CalendarTeamMemberProfileDrawer({
     NonNullable<BusinessTeamMember["personal_documents"]>
   >([]);
   const [pendingDocumentFiles, setPendingDocumentFiles] = React.useState<File[]>([]);
+  const [failedDocPreviews, setFailedDocPreviews] = React.useState(
+    () => new Set<string>(),
+  );
 
   const documentInputId = React.useId();
 
@@ -163,6 +166,7 @@ export default function CalendarTeamMemberProfileDrawer({
     setPersonalNote(member.personal_note ?? "");
     setPersonalDocuments(member.personal_documents ?? []);
     setPendingDocumentFiles([]);
+    setFailedDocPreviews(new Set());
     setLocationTab("FL");
   }, [open, memberId, member, businessCategories, serviceContext]);
 
@@ -706,9 +710,14 @@ export default function CalendarTeamMemberProfileDrawer({
                 <Stack spacing={1}>
                   {personalDocuments.map((doc, index) => {
                     const docUrl = resolveMediaUrl(doc.url);
-                    const isImage = /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(
+                    const docKey = `saved:${index}:${doc.url}`;
+                    const isImageFile = /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(
                       doc.filename ?? "",
                     );
+                    const isImage =
+                      isImageFile &&
+                      Boolean(docUrl) &&
+                      !failedDocPreviews.has(docKey);
 
                     return (
                       <Box
@@ -736,6 +745,13 @@ export default function CalendarTeamMemberProfileDrawer({
                               unoptimized
                               sizes="360px"
                               style={{ objectFit: "cover" }}
+                              onError={() =>
+                                setFailedDocPreviews((prev) =>
+                                  prev.has(docKey)
+                                    ? prev
+                                    : new Set(prev).add(docKey),
+                                )
+                              }
                             />
                           </Box>
                         ) : null}
@@ -779,6 +795,9 @@ export default function CalendarTeamMemberProfileDrawer({
                   })}
                   {pendingDocumentFiles.map((file, index) => {
                     const previewUrl = pendingDocumentPreviewUrls[index];
+                    const pendingKey = `pending:${index}:${file.name}`;
+                    const showPreview =
+                      Boolean(previewUrl) && !failedDocPreviews.has(pendingKey);
 
                     return (
                       <Box
@@ -790,7 +809,7 @@ export default function CalendarTeamMemberProfileDrawer({
                           overflow: "hidden",
                         }}
                       >
-                        {previewUrl ? (
+                        {showPreview && previewUrl ? (
                           <Box
                             sx={{
                               position: "relative",
@@ -806,6 +825,13 @@ export default function CalendarTeamMemberProfileDrawer({
                               unoptimized
                               sizes="360px"
                               style={{ objectFit: "cover" }}
+                              onError={() =>
+                                setFailedDocPreviews((prev) =>
+                                  prev.has(pendingKey)
+                                    ? prev
+                                    : new Set(prev).add(pendingKey),
+                                )
+                              }
                             />
                           </Box>
                         ) : null}
@@ -821,7 +847,7 @@ export default function CalendarTeamMemberProfileDrawer({
                             alignItems="center"
                             sx={{ minWidth: 0 }}
                           >
-                            {!previewUrl ? (
+                            {!showPreview ? (
                               <InsertDriveFileRoundedIcon
                                 sx={{ fontSize: 20, color: m.teal }}
                               />

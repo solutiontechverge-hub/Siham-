@@ -1,5 +1,5 @@
-import path from "path";
 import crypto from "crypto";
+import { extensionFromOriginalName } from "../utils/file-content.js";
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 
 const getRegion = () => process.env.AWS_REGION?.trim();
@@ -41,7 +41,7 @@ function safeExtension(originalName, mimetype, detectedExt) {
   }
   const fromMime = extensionFromMime(mimetype);
   if (fromMime) return fromMime;
-  const fromName = path.extname(originalName || "");
+  const fromName = extensionFromOriginalName(originalName);
   if (/^\.[a-z0-9]{2,5}$/i.test(fromName)) {
     return fromName.toLowerCase();
   }

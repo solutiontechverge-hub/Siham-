@@ -37,6 +37,7 @@ import { useLazyGetBookingReviewInviteQuery } from "../../../store/services/revi
 import BookingRequestStatusRow, {
   type BookingRequestRowMode,
 } from "./BookingRequestStatusRow";
+import BookingStartEndTimeRow from "../BookingStartEndTimeRow";
 import { BookingChangeTags } from "../calendar/BookingEditedTag";
 import { useBookingEditRequest } from "./useBookingEditRequest";
 import { useRouter } from "next/navigation";
@@ -47,6 +48,8 @@ type Props = {
   apiBookingId?: string;
   bookedDateLabel?: string;
   bookedTimeLabel?: string;
+  /** Booking end clock (HH:MM or AM/PM) for the status time row. */
+  bookedEndTimeLabel?: string;
   bookingStatus?: ClientBookingStatus;
   bookingRequestSent?: boolean;
   bookingRequestDirection?: BookingRequestDirection;
@@ -89,6 +92,7 @@ export default function ClientBookingDetailsHeader({
   apiBookingId,
   bookedDateLabel = "",
   bookedTimeLabel = "",
+  bookedEndTimeLabel = "",
   bookingStatus = "confirmed",
   bookingRequestSent = false,
   bookingRequestDirection,
@@ -437,6 +441,11 @@ export default function ClientBookingDetailsHeader({
             />
           </Stack>
         </Stack>
+        <BookingStartEndTimeRow
+          start={bookedTimeLabel}
+          end={bookedEndTimeLabel}
+          sx={{ mt: 1.25 }}
+        />
       </Box>
       <Divider />
 

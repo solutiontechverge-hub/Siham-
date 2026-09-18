@@ -198,7 +198,11 @@ assert.deepEqual(
   ["tm-ali", "tm-saad", "tm-hama"],
   "header filter: only filtered members, same ordering",
 );
-assert.equal(headerFiltered.visibleSlots, 3, "filter: slots fit filtered roster");
+assert.equal(
+  headerFiltered.visibleSlots,
+  2,
+  "filter+shared: viewport = divide size, rest scroll",
+);
 
 // Alignment: body columns must equal header prefix (shared booking).
 const sharedLayout = buildDayViewTeamLayoutSource({
@@ -330,6 +334,15 @@ assert.deepEqual(
   resolveDayViewColumnHeaderResources(filterSharedLayout).map((r) => r.id),
   filterSharedLayout.memberColumns.map((r) => r.id),
   "filter+shared: display headers === body",
+);
+assert.equal(
+  filterSharedLayout.visibleSlots,
+  2,
+  "filter+shared: visible slots = divide count",
+);
+assert.ok(
+  filterSharedLayout.headerResources.length > filterSharedLayout.visibleSlots,
+  "filter+shared: remainder after divide sits in scroller",
 );
 
 // ali+saad shared booking: each segment sticks to its assignee column only.

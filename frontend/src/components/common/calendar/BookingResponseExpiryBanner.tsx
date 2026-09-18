@@ -36,7 +36,7 @@ export default function BookingResponseExpiryBanner({
     >
       <Stack direction="row" spacing={1.25} alignItems="flex-start">
         <WarningAmberRoundedIcon
-          sx={{ fontSize: 20, color: "#E85D5D", mt: 0.15, flexShrink: 0 }}
+          sx={{ fontSize: 20, color: m.statusRedFg, mt: 0.15, flexShrink: 0 }}
         />
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography
