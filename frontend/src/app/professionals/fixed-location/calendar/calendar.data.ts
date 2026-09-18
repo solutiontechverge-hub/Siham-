@@ -202,6 +202,8 @@ export type CalendarBookingDetails = {
   /** Incoming Confirmed ER note (receiver UI). */
   editRequestNote?: string;
   editRequestInitiatedBy?: "professional" | "client";
+  /** Settled ER outcome — rejected shows ER + cross while status stays Confirmed. */
+  editRequestStatus?: "pending" | "approved" | "rejected";
   /** Keep BR/EBR/ER/E visible until the counterparty taps OK. */
   needsOk?: boolean;
   /** Scenario to show while needsOk is true (status may already be Confirmed). */

@@ -76,7 +76,26 @@ export function buildApprovedEditRequest(existing) {
   };
 }
 
-/** Reject clears the ER so a new one can be sent immediately. */
+/**
+ * Reject keeps booking Confirmed and marks ER rejected (UI: ER + cross).
+ * A new ER can still be sent — only `pending` blocks send.
+ */
+export function buildRejectedEditRequest(existing) {
+  const er = parseEditRequest(existing);
+  if (!er || er.status !== "pending") {
+    return { error: "No pending edit request to reject." };
+  }
+  return {
+    value: {
+      ...er,
+      status: "rejected",
+      responded_at: new Date().toISOString(),
+      edit_grant_active: false,
+    },
+  };
+}
+
+/** @deprecated Prefer buildRejectedEditRequest — kept for any legacy callers. */
 export function buildRejectedClear() {
   return { value: null };
 }

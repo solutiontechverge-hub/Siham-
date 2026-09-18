@@ -24,9 +24,9 @@ export const ACTIVITY_DRAWER_TITLES = {
 export const CLIENT_BOOKING_DETAILS_COPY = {
   sendBookingRequest: "Send booking request",
   ok: "Ok",
-  acceptSuggestedChanges: "Accept suggested changes",
+  acceptSuggestedChanges: "ACCEPT",
   suggestChanges: "Suggest changes",
-  reject: "Reject",
+  reject: "REJECT",
   payCancellationFeeTitle: "Pay cancellation fee",
   payCancellationFeeSubtitlePrefix: "Cancellation fee for booking",
   activeLabelBooking: "Booking",

@@ -71,7 +71,7 @@ export default function BookingResponseActions({
             "&:hover": { bgcolor: m.successDark, color: "#fff" },
           }}
         >
-          Accept
+          ACCEPT
         </AppButton>
         ) : null}
         {showSuggestChange ? (
@@ -91,7 +91,7 @@ export default function BookingResponseActions({
           onClick={onReject}
           sx={ACTION_SX}
         >
-          Reject
+          REJECT
         </AppButton>
       </Stack>
     </Stack>

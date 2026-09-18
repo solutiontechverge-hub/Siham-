@@ -66,14 +66,23 @@ export function useProfessionalFixedLocationCalendarBookingPersistEr(
         id: parsed.id,
         action: "reject",
       }).unwrap();
-      syncEditRequestFromBookingApi(bookingRef, result.data?.edit_request);
+      const er = result.data?.edit_request;
+      syncEditRequestFromBookingApi(bookingRef, er);
       setEvents((prev) =>
         prev.map((event) =>
           event.id === editingEventId
             ? {
                 ...event,
-                status: "Confirmed",
+                status: "Confirmed" as const,
                 bookingScenario: undefined,
+                details: {
+                  ...(event.details ?? {}),
+                  editRequestStatus:
+                    er?.status === "rejected" ? ("rejected" as const) : undefined,
+                  editRequestNote: er?.note ?? event.details?.editRequestNote,
+                  editRequestInitiatedBy:
+                    er?.initiated_by ?? event.details?.editRequestInitiatedBy,
+                },
               }
             : event,
         ),

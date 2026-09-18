@@ -65,8 +65,25 @@ export function useProfessionalFixedLocationCalendarBookingPersistDiscard(
         action: "reject",
       }).unwrap();
       syncEditRequestFromBookingApi(bookingRef, result.data?.edit_request);
+      const er = result.data?.edit_request as
+        | {
+            status?: string;
+            note?: string;
+            initiated_by?: "client" | "professional";
+          }
+        | null
+        | undefined;
       const details = { ...(viewingBookingEvent.details ?? {}) };
       delete details.requestDirection;
+      if (er?.status === "rejected") {
+        details.editRequestStatus = "rejected";
+        if (er.note) details.editRequestNote = er.note;
+        if (er.initiated_by) details.editRequestInitiatedBy = er.initiated_by;
+      } else {
+        delete details.editRequestStatus;
+        delete details.editRequestNote;
+        delete details.editRequestInitiatedBy;
+      }
       const nextNotes = serializeCalendarEntryNotes(
         details.internalNote ?? "",
         details,

@@ -4,7 +4,8 @@ import type { ClientBookingStatus } from "./clientBookingRecords";
 
 const CLIENT_TO_CALENDAR: Record<Exclude<ClientBookingStatus, "draft">, CalendarBookingStatus> = {
   requested: "Requested",
-  br_accepted: "BR Accepted",
+  // Chip theme matches Confirmed; BR accepted is a separate indicator.
+  br_accepted: "Confirmed",
   confirmed: "Confirmed",
   in_progress: "In Progress",
   completed: "Completed",
@@ -24,7 +25,8 @@ export function bookingStatusLabel(
     case "requested":
       return "Requested";
     case "br_accepted":
-      return "BR Accepted";
+      // Internal accept step — primary chip is Confirmed; BR is the indicator.
+      return "Confirmed";
     case "confirmed":
       return options?.edited ? "Confirmed Edited" : "Confirmed";
     case "in_progress":

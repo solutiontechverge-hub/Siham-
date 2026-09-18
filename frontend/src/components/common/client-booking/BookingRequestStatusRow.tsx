@@ -147,7 +147,8 @@ export default function BookingRequestStatusRow({
         edited: showEditScenario && chipStatus === "confirmed",
       });
 
-  // BR only while still pending (draft sent / requested) — hide after accept or reject.
+  // BR pending (draft/requested) or accepted indicator (br_accepted → Confirmed chip + BR✓).
+  const showBrAcceptedPill = bookingStatus === "br_accepted";
   const showBrPill =
     !isCompleted &&
     !isTerminal &&
@@ -157,9 +158,10 @@ export default function BookingRequestStatusRow({
     rowMode === "default" &&
     bookingStatus !== "confirmed" &&
     bookingStatus !== "in_progress" &&
-    (isDraft
-      ? bookingRequestSent
-      : bookingRequestSent || bookingStatus === "requested");
+    (showBrAcceptedPill ||
+      (isDraft
+        ? bookingRequestSent
+        : bookingRequestSent || bookingStatus === "requested"));
 
   return (
     <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
@@ -231,7 +233,7 @@ export default function BookingRequestStatusRow({
       {showBrPill ? (
         <BookingRequestBadge
           iconSize={12}
-          state="sent"
+          state={showBrAcceptedPill ? "accepted" : "sent"}
           direction={bookingRequestDirection}
         />
       ) : null}

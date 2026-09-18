@@ -17,7 +17,6 @@ type Vm = ReturnType<typeof useProfessionalFixedLocationCalendar>;
 export type ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderNoticesBag = Pick<
   Vm,
   | "businessResponseWindowInput"
-  | "handleBookingActionSelect"
   | "handleRestartResponseTime"
   | "m"
   | "openActivityComparison"
