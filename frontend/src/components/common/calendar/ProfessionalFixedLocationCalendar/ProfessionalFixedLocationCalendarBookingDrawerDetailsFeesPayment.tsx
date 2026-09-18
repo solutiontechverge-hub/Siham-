@@ -10,6 +10,8 @@ import ProfessionalFixedLocationCalendarBookingDrawerDetailsFeesPaymentProtectiv
 
 import ProfessionalFixedLocationCalendarBookingDrawerDetailsFeesPaymentPrepayment from "./ProfessionalFixedLocationCalendarBookingDrawerDetailsFeesPaymentPrepayment";
 
+import WithdrawErButton from "../../client-booking/WithdrawErButton";
+
 type Vm = ReturnType<typeof useProfessionalFixedLocationCalendar>;
 
 export type ProfessionalFixedLocationCalendarBookingDrawerDetailsFeesPaymentBag = Pick<
@@ -24,8 +26,10 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsFeesPaymentBag 
   | "exceededCancellationWindow"
   | "fixedLocationAddress"
   | "grid"
+  | "handleWithdrawEr"
   | "isDrawerPrepaymentPaid"
   | "isViewingExisting"
+  | "isWithdrawingEr"
   | "kilometerAllowanceAmount"
   | "kilometerAllowanceDraft"
   | "lateCancelNoticeLabel"
@@ -74,6 +78,7 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsFeesPaymentBag 
   | "showLateRescheduling"
   | "showNoShowFee"
   | "showPrepayment"
+  | "showWithdrawEr"
   | "silentFieldUpdates"
   | "slotErrors"
   | "slotLocation"
@@ -87,6 +92,12 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsFeesPaymentProp
 export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsFeesPayment({ bag }: ProfessionalFixedLocationCalendarBookingDrawerDetailsFeesPaymentProps) {
   return (
     <>
+      {bag.showWithdrawEr ? (
+        <WithdrawErButton
+          isLoading={bag.isWithdrawingEr}
+          onClick={() => void bag.handleWithdrawEr()}
+        />
+      ) : null}
       <ProfessionalFixedLocationCalendarBookingDrawerDetailsFeesPaymentLocation bag={bag} />
       <ProfessionalFixedLocationCalendarBookingDrawerDetailsFeesPaymentContact bag={bag} />
       <ProfessionalFixedLocationCalendarBookingDrawerDetailsFeesPaymentProtective bag={bag} />

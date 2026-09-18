@@ -1,5 +1,5 @@
-import path from "path";
 import multer from "multer";
+import { extensionFromOriginalName } from "../utils/file-content.js";
 
 const storage = multer.memoryStorage();
 
@@ -46,7 +46,7 @@ export const messagingUpload = multer({
     files: 8,
   },
   fileFilter: (_req, file, cb) => {
-    const ext = path.extname(file.originalname || "").toLowerCase();
+    const ext = extensionFromOriginalName(file.originalname);
     if (!ALLOWED_EXT.has(ext)) {
       return cb(new Error("Unsupported file type for messaging attachments."));
     }

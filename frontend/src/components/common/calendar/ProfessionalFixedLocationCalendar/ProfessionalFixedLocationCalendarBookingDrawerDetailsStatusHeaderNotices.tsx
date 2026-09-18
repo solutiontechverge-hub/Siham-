@@ -23,6 +23,7 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderNot
   | "openActivityComparison"
   | "postBookingPendingPayment"
   | "responseTimeConfigured"
+  | "selectedSlot"
   | "setFocusSalesCardId"
   | "setSlotDrawerTab"
   | "showExpiredResponseBanner"

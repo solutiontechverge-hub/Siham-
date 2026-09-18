@@ -324,19 +324,12 @@ export function useProfessionalFixedLocationCalendarTeamLayout({
 
   const dayViewMemberColumns = dayViewMemberColumnSource;
   const teamHeaderMemberCount = teamHeaderResources.length;
-  // Focus/split: body is shorter than full roster — keep leading names locked
-  // under body lanes (no independent header scroll that would misalign names).
-  const dayFocusHeaderPinned =
-    viewMode === "day" &&
-    dayViewMemberColumnSource.length > 0 &&
-    dayViewMemberColumnSource.length !== teamHeaderMemberCount;
   const teamHeaderWiderThanViewport =
     teamHeaderMemberCount > teamHeaderVisibleSlots;
-  // Interactive scrollbar only when header↔body column counts match (can sync).
-  const teamHeaderNeedsScroll =
-    teamHeaderWiderThanViewport && !dayFocusHeaderPinned;
-  // Still size the strip so only the leading visibleSlots cells sit in view
-  // (clipped rest) when focus-pinned — never squeeze the full roster into 100%.
+  // Focus prefix fills visibleSlots; remainder stays in the horizontal scroller.
+  // Body sync only when column counts match (see horizontalScroll); otherwise
+  // header scrolls alone and resets to 0 when focus/resources change.
+  const teamHeaderNeedsScroll = teamHeaderWiderThanViewport;
   const teamHeaderScrollContentWidth = teamHeaderWiderThanViewport
     ? `calc(100% * ${teamHeaderMemberCount} / ${teamHeaderVisibleSlots})`
     : "100%";

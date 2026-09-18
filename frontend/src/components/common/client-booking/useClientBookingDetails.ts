@@ -166,6 +166,12 @@ export function useClientBookingDetails({
     bookingStatus === "confirmed" &&
     hasApiPendingEr &&
     apiErInitiatedBy === "professional";
+  /** Client-sent Confirmed ER awaiting professional accept — show Withdraw ER. */
+  const showWithdrawEr =
+    bookingStatus === "confirmed" &&
+    (hasApiPendingEr
+      ? apiErInitiatedBy === "client"
+      : editRequest.isPending && editRequest.initiatedBy === "client");
   const incomingProfessionalNote = (
     isIncomingConfirmedEr
       ? apiEditRequest?.note || editRequest.note
@@ -268,6 +274,7 @@ export function useClientBookingDetails({
     address,
     bookedDateLabel,
     bookedTimeLabel,
+    bookedEndTimeLabel,
     headerName,
     policySections,
     prepaidAmount,
@@ -390,6 +397,8 @@ export function useClientBookingDetails({
     handleConfirmEbrSuggest,
     handleAcknowledgeRejected,
     handleAcknowledgeCounterpartyAction,
+    handleWithdrawEr,
+    isWithdrawingEr,
   } = useClientBookingEbrResponses({
     bookingRef,
     apiBookingId,
@@ -564,6 +573,7 @@ export function useClientBookingDetails({
     apiBookingId,
     bookedDateLabel,
     bookedTimeLabel,
+    bookedEndTimeLabel,
     bookingStatus,
     bookingInvoiceType,
     bookingNotesMeta,
@@ -614,6 +624,7 @@ export function useClientBookingDetails({
     handlePayCancellationFee,
     handlePayNow,
     handleSendBookingRequest,
+    handleWithdrawEr,
     hasProfessionalSuggestedEdits,
     headerName,
     incomingProfessionalNote,
@@ -630,6 +641,7 @@ export function useClientBookingDetails({
     isPrepaid,
     isPrepaymentPaid,
     isSubmittingRequest,
+    isWithdrawingEr,
     kilometerAllowanceAmount,
     lineTagComparisonMode,
     listTab,
@@ -679,6 +691,7 @@ export function useClientBookingDetails({
     showRejectedResponsePanel,
     showRequestResponseActions,
     showStatusUpdated,
+    showWithdrawEr,
     silentFieldUpdates,
     stripeDialogOpen,
     user,

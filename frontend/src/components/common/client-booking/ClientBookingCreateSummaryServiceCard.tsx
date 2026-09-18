@@ -13,6 +13,7 @@ import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
 import { Box, Chip, Divider, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import {
+  fmtMinutesToIsoTime,
   fmtMinutesToTimeLabel,
   serviceTimeRangeLabel,
 } from "../../../app/clients/booking/booking-time";
@@ -25,6 +26,7 @@ import {
 } from "./buildBookingSummarySections";
 import { locationModeChipSx } from "./locationModeChipSx";
 import BookingSummaryNote from "./BookingSummaryNote";
+import BookingStartEndTimeRow from "../BookingStartEndTimeRow";
 import BookingLineAmount from "../calendar/BookingLineAmount";
 import { ServiceSummaryMetaLine } from "../ServiceSummaryMetaLine";
 import { clientLineDiscountLabel } from "../../../data/bookingLinePricing";
@@ -173,6 +175,12 @@ export default function ClientBookingCreateSummaryServiceCard({
             label={isDesired ? "Desired Location" : "Fixed Location"}
             size="small"
             sx={{ ...locationModeChipSx, mt: 0.75 }}
+          />
+
+          <BookingStartEndTimeRow
+            start={fmtMinutesToIsoTime(bookingStartMinutes)}
+            end={fmtMinutesToIsoTime(bookingEndMinutes)}
+            sx={{ mt: 1.25 }}
           />
         </Box>
 

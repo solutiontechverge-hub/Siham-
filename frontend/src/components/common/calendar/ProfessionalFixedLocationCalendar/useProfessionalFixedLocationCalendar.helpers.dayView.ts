@@ -232,12 +232,18 @@ export function buildDayViewTeamLayoutSource<
   const bodyCount =
     splitScreen || teamAll ? focusGroupLength : headerResources.length;
   const memberColumns = headerResources.slice(0, bodyCount);
-  // Viewport slots must equal body columns whenever body is the focus prefix
-  // (selected-only / split). Otherwise N names sit above one full-width lane.
-  const visibleSlots =
-    splitScreen || teamAll
-      ? Math.max(1, bodyCount)
-      : Math.max(1, Math.min(defaultVisibleSlots, headerResources.length || 1));
+  // Viewport = divide/focus size when shared (or All/split body); else default.
+  // Cap at defaultVisibleSlots so huge focus groups still scroll.
+  const preferFocusViewport =
+    Boolean(splitScreen) || teamAll || focusGroupLength > 1;
+  const visibleSlots = Math.max(
+    1,
+    Math.min(
+      preferFocusViewport ? focusGroupLength : defaultVisibleSlots,
+      defaultVisibleSlots,
+      headerResources.length || 1,
+    ),
+  );
 
   return {
     headerResources,

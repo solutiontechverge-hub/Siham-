@@ -604,6 +604,44 @@ export function useClientBookingEbrResponses(input: {
     updateMyBooking,
   ]);
 
+  const [isWithdrawingEr, setIsWithdrawingEr] = React.useState(false);
+  const handleWithdrawEr = React.useCallback(async () => {
+    if (!bookingRef || !apiBookingId) return;
+    setIsWithdrawingEr(true);
+    try {
+      const result = await manageBookingEditRequest({
+        id: apiBookingId,
+        action: "reject",
+      }).unwrap();
+      syncEditRequestFromBookingApi(
+        bookingRef,
+        result.data?.edit_request as Parameters<
+          typeof syncEditRequestFromBookingApi
+        >[1],
+      );
+      await refreshActiveBooking();
+      editRequest.refresh();
+      showSnackbar({
+        severity: "success",
+        message: "Edit request withdrawn.",
+      });
+    } catch (error) {
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Unable to withdraw edit request."),
+      });
+    } finally {
+      setIsWithdrawingEr(false);
+    }
+  }, [
+    apiBookingId,
+    bookingRef,
+    editRequest,
+    manageBookingEditRequest,
+    refreshActiveBooking,
+    showSnackbar,
+  ]);
+
   return {
     returnToBookingDetailsStart,
     handleConfirmEbrAccept,
@@ -611,5 +649,7 @@ export function useClientBookingEbrResponses(input: {
     handleConfirmEbrSuggest,
     handleAcknowledgeRejected,
     handleAcknowledgeCounterpartyAction,
+    handleWithdrawEr,
+    isWithdrawingEr,
   };
 }

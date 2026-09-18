@@ -13,7 +13,6 @@ import {
 import type { ReactNode } from "react";
 import BookingRequestBadge from "../calendar/BookingRequestBadge";
 import BookingRequestReceivedIcon from "../calendar/BookingRequestReceivedIcon";
-import BookingRequestSentIcon from "../calendar/BookingRequestSentIcon";
 import BookingIndicatorIcon from "../calendar/BookingIndicatorIcon";
 import EditRequestIndicatorIcon from "./EditRequestIndicatorIcon";
 
@@ -221,10 +220,10 @@ export default function BookingRequestStatusRow({
         <ScenarioPill label="ER" title={erSignpostTitle} onClick={onErClick}>
           {rowMode === "professional_rejected" ? (
             <EditRequestIndicatorIcon variant="rejected" />
-          ) : bookingRequestDirection === "incoming" ? (
-            <BookingRequestReceivedIcon size={11} />
           ) : (
-            <BookingRequestSentIcon size={11} />
+            <Box sx={{ display: "grid", placeItems: "center", lineHeight: 0 }}>
+              <BookingIndicatorIcon variant="suggestion_for_change" size={14} />
+            </Box>
           )}
         </ScenarioPill>
       ) : null}
@@ -268,6 +267,14 @@ export default function BookingRequestStatusRow({
           }}
         >
           <BookingIndicatorIcon variant="waiting_for_prepayment" size={16} />
+        </Box>
+      ) : requiresPrepayment && prepaymentPaid && !isTerminal ? (
+        <Box
+          title="Prepayment received"
+          aria-label="Prepayment received"
+          sx={{ display: "grid", placeItems: "center" }}
+        >
+          <BookingIndicatorIcon variant="prepaid" size={16} />
         </Box>
       ) : null}
 

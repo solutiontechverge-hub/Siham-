@@ -30,6 +30,8 @@ import {
   resolveMediaUrl,
 } from "../../../../lib/resolveMediaUrl";
 
+import { FillImageOrFallback } from "../../client-booking/ProjectUploadThumb";
+
 import { useProfessionalFixedLocationCalendar } from "./useProfessionalFixedLocationCalendar";
 
 type Vm = ReturnType<typeof useProfessionalFixedLocationCalendar>;
@@ -261,35 +263,28 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsPro
                               justifyContent: "center",
                             }}
                           >
-                            {img.previewUrl &&
-                            !img.name
-                              .toLowerCase()
-                              .endsWith(".pdf") ? (
-                              <Box
-                                component="img"
-                                src={
-                                  resolveMediaUrl(img.previewUrl) ??
-                                  img.previewUrl
-                                }
-                                alt={img.name}
-                                sx={{
-                                  width: "100%",
-                                  height: "100%",
-                                  objectFit: "cover",
-                                  display: "block",
-                                }}
-                              />
-                            ) : (
-                              <BodyText
-                                sx={{
-                                  fontSize: 10,
-                                  fontWeight: 800,
-                                  color: alpha(m.navy, 0.45),
-                                }}
-                              >
-                                PDF
-                              </BodyText>
-                            )}
+                            <FillImageOrFallback
+                              src={
+                                img.name.toLowerCase().endsWith(".pdf")
+                                  ? null
+                                  : (resolveMediaUrl(img.previewUrl) ??
+                                    img.previewUrl)
+                              }
+                              alt={img.name}
+                              fallback={
+                                img.name.toLowerCase().endsWith(".pdf") ? (
+                                  <BodyText
+                                    sx={{
+                                      fontSize: 10,
+                                      fontWeight: 800,
+                                      color: alpha(m.navy, 0.45),
+                                    }}
+                                  >
+                                    PDF
+                                  </BodyText>
+                                ) : null
+                              }
+                            />
                           </Box>
                           <BodyText
                             sx={{

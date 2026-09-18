@@ -2,13 +2,17 @@
 
 import * as React from "react";
 
+import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 
 import {
+  Badge,
   Divider,
+  IconButton,
   Menu,
   MenuItem,
   Stack,
+  Tooltip,
 } from "@mui/material";
 
 import {
@@ -39,13 +43,16 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderAct
   | "bookingActionAnchor"
   | "businessResponseWindowInput"
   | "handleBookingActionSelect"
+  | "isMollureClientPath"
   | "lateCancellationFeeAmount"
   | "m"
   | "noShowFeeAmount"
+  | "openBookingMessages"
   | "setBookingActionAnchor"
   | "showLateCancellation"
   | "showNoShowFee"
   | "viewingBookingEvent"
+  | "viewingBookingUnread"
 >;
 
 type Props = {
@@ -57,16 +64,23 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
     bookingActionAnchor,
     businessResponseWindowInput,
     handleBookingActionSelect,
+    isMollureClientPath,
     lateCancellationFeeAmount,
     m,
     noShowFeeAmount,
+    openBookingMessages,
     setBookingActionAnchor,
     showLateCancellation,
     showNoShowFee,
     viewingBookingEvent,
+    viewingBookingUnread,
   } = bag;
 
   if (!viewingBookingEvent) return null;
+
+  const chatIcon = (
+    <ChatBubbleOutlineRoundedIcon sx={{ fontSize: 18 }} />
+  );
 
   return (
             <Stack
@@ -75,16 +89,55 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
               justifyContent="space-between"
               spacing={1}
             >
-              <BodyText
-                sx={{
-                  fontWeight: 900,
-                  color: alpha(m.navy, 0.88),
-                  fontSize: 16,
-                  letterSpacing: "-0.01em",
-                }}
-              >
-                Booking Details
-              </BodyText>
+              <Stack direction="row" alignItems="center" spacing={0.5}>
+                <BodyText
+                  sx={{
+                    fontWeight: 900,
+                    color: alpha(m.navy, 0.88),
+                    fontSize: 16,
+                    letterSpacing: "-0.01em",
+                  }}
+                >
+                  Booking Details
+                </BodyText>
+                {isMollureClientPath ? (
+                  <Tooltip title="Open chat with client">
+                    <IconButton
+                      size="small"
+                      aria-label="Open messaging"
+                      onClick={() =>
+                        openBookingMessages(viewingBookingEvent)
+                      }
+                      sx={{
+                        color: alpha(m.navy, 0.45),
+                        p: 0.35,
+                      }}
+                    >
+                      {viewingBookingUnread > 0 ? (
+                        <Badge
+                          badgeContent={
+                            viewingBookingUnread > 9
+                              ? "9+"
+                              : viewingBookingUnread
+                          }
+                          color="error"
+                          sx={{
+                            "& .MuiBadge-badge": {
+                              fontSize: 10,
+                              minWidth: 16,
+                              height: 16,
+                            },
+                          }}
+                        >
+                          {chatIcon}
+                        </Badge>
+                      ) : (
+                        chatIcon
+                      )}
+                    </IconButton>
+                  </Tooltip>
+                ) : null}
+              </Stack>
               {(() => {
                 return showProfessionalActionMenu(
                   viewingBookingEvent,

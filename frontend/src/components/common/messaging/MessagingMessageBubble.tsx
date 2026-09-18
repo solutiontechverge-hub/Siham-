@@ -49,8 +49,9 @@ function AttachmentCard({
 }) {
   const m = useTheme().palette.mollure;
   const attachmentUrl = resolveMessagingAttachmentUrl(attachment.url);
+  const [previewFailed, setPreviewFailed] = React.useState(false);
   const canPreview =
-    Boolean(attachmentUrl) && isImageAttachment(attachment.mimeType);
+    Boolean(attachmentUrl) && isImageAttachment(attachment.mimeType) && !previewFailed;
   const [downloading, setDownloading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -98,6 +99,7 @@ function AttachmentCard({
           component="img"
           src={attachmentUrl}
           alt={attachment.name}
+          onError={() => setPreviewFailed(true)}
           sx={{
             maxWidth: "100%",
             maxHeight: 160,

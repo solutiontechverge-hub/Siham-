@@ -148,7 +148,10 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerFooterPart
         }}
         onAddModel={() => {
           beginExistingBookingEdit();
-          openInlineGuestForm("model");
+          // IC DL never shows this kind; keep guest semantics if it does.
+          openInlineGuestForm(
+            isSelectedCompanyClient ? "model" : "guest",
+          );
         }}
         onAddGuestModel={() => {
           beginExistingBookingEdit();
