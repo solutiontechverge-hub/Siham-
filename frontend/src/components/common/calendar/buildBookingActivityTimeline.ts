@@ -439,6 +439,28 @@ function hasComparisonMode(
   );
 }
 
+function hasRealEditActivitySignal(input: {
+  scenario?: string | null;
+  editReqStatus?: string | null;
+  storedEbrStatus?: string | null;
+  lastEditedBy?: string | null;
+  hasPersistedLineEdits: boolean;
+}): boolean {
+  if (input.scenario === "EBR" || input.scenario === "ER") return true;
+  if (input.editReqStatus && input.editReqStatus !== "none") return true;
+  if (input.storedEbrStatus && input.storedEbrStatus !== "none") return true;
+  if (input.lastEditedBy) return true;
+  return input.hasPersistedLineEdits;
+}
+
+function isEditRequestActivityKind(kind: BookingActivityKind): boolean {
+  return (
+    kind === "edit_request_sent" ||
+    kind === "edit_request_suggest" ||
+    kind === "edit_request_accepted"
+  );
+}
+
 function injectMissingComparisonItem(
   items: BookingActivityItem[],
   comparison: ActivityComparison | null,
@@ -546,7 +568,7 @@ function enrichItemsWithComparison(
     originalForHeal.length > 0
       ? detectServiceLineChanges(originalForHeal, currentForHeal)
       : { added: [] as string[], edited: [] as string[], cancelled: [] as string[] };
-  const hasPersistedOrHealedLineEdits = Boolean(
+  const hasPersistedLineEdits = Boolean(
     input.currentDetails?.editedServiceIds?.length ||
       input.currentDetails?.addedServiceIds?.length ||
       input.currentDetails?.cancelledServiceIds?.length ||
@@ -555,13 +577,33 @@ function enrichItemsWithComparison(
       notesDetails?.editedServiceIds?.length ||
       notesDetails?.addedServiceIds?.length ||
       notesDetails?.cancelledServiceIds?.length ||
-      notesDetails?.scheduleEdited ||
-      healedLineChanges.edited.length ||
-      healedLineChanges.added.length ||
-      healedLineChanges.cancelled.length,
+      notesDetails?.scheduleEdited,
   );
+  // Heal only when an ER/EBR baseline exists and we already know an edit happened.
+  const allowHealLineDiffs =
+    hasPersistedLineEdits ||
+    Boolean(lastEditedBy) ||
+    scenario === "EBR" ||
+    scenario === "ER";
+  const hasHealedLineEdits =
+    allowHealLineDiffs &&
+    Boolean(
+      healedLineChanges.edited.length ||
+        healedLineChanges.added.length ||
+        healedLineChanges.cancelled.length,
+    );
+  const hasPersistedOrHealedLineEdits =
+    hasPersistedLineEdits || hasHealedLineEdits;
   const hasProfessionalLineEdits =
     lastEditedBy === "professional" && hasPersistedOrHealedLineEdits;
+
+  const allowEditActivity = hasRealEditActivitySignal({
+    scenario,
+    editReqStatus: editReq.status,
+    storedEbrStatus: storedEbr?.status,
+    lastEditedBy,
+    hasPersistedLineEdits: hasPersistedOrHealedLineEdits,
+  });
 
   const comparisonMode: ActivityComparisonMode =
     scenario === "ER" ||
@@ -576,17 +618,19 @@ function enrichItemsWithComparison(
       ? "er"
       : "ebr";
 
-  const editComparison = resolveComparisonForBooking({
-    mode: comparisonMode,
-    notesDetails,
-    ebr: storedEbr,
-    editReq,
-    currentDetails: input.currentDetails,
-    currentDateISO: input.currentDateISO,
-    currentStart: input.currentStart,
-    bookingDate: booking?.booking_date,
-    bookingStart: booking?.start_time,
-  });
+  const editComparison = allowEditActivity
+    ? resolveComparisonForBooking({
+        mode: comparisonMode,
+        notesDetails,
+        ebr: storedEbr,
+        editReq,
+        currentDetails: input.currentDetails,
+        currentDateISO: input.currentDateISO,
+        currentStart: input.currentStart,
+        bookingDate: booking?.booking_date,
+        bookingStart: booking?.start_time,
+      })
+    : null;
 
   const silentComparison =
     input.currentDetails?.silentUpdated || notesDetails?.silentUpdated
@@ -603,7 +647,11 @@ function enrichItemsWithComparison(
         })
       : null;
 
-  let next = items.map((item) => {
+  let next = allowEditActivity
+    ? items
+    : items.filter((item) => !isEditRequestActivityKind(item.kind));
+
+  next = next.map((item) => {
     if (
       item.kind === "edit_request_sent" ||
       item.kind === "edit_request_suggest" ||
@@ -650,7 +698,10 @@ function enrichItemsWithComparison(
     lastEditedBy,
     clientName: input.clientName,
   };
-  next = injectMissingComparisonItem(next, editComparison, injectInput);
+  // Only invent edit-request activity when a real ER/EBR signal exists.
+  if (allowEditActivity) {
+    next = injectMissingComparisonItem(next, editComparison, injectInput);
+  }
   next = injectMissingComparisonItem(next, silentComparison, injectInput);
 
   return next;
@@ -810,13 +861,14 @@ function synthesizeBookingActivity(
     }
 
     const editReq = getBookingEditRequest(code);
+    const storedEbr = parseStoredEbrFromNotes(booking.notes);
+    // Do not invent EBR activity from scenario alone (fresh create can look like EBR).
     const hasEbr =
-      currentScenario === "EBR" ||
-      currentScenario === "ER" ||
       editReq.status === "pending" ||
       editReq.status === "suggested" ||
       editReq.status === "approved" ||
-      editReq.status === "rejected";
+      editReq.status === "rejected" ||
+      Boolean(storedEbr && storedEbr.status !== "none");
 
     if (hasEbr) {
       const ebrAt =

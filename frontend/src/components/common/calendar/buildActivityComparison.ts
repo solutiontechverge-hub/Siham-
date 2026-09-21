@@ -253,14 +253,25 @@ export function buildActivityComparison(
       }
     } else {
       const lineChanges = detectServiceLineChanges(originalServices, currentServices);
+      // Empty baseline (fresh create) must not treat every catalog line as Added.
+      const allowComputedLineDiffs = originalServices.length > 0;
       const added = new Set(
-        [...(input.addedServiceIds ?? []), ...lineChanges.added].map(String),
+        [
+          ...(input.addedServiceIds ?? []),
+          ...(allowComputedLineDiffs ? lineChanges.added : []),
+        ].map(String),
       );
       const cancelled = new Set(
-        [...(input.cancelledServiceIds ?? []), ...lineChanges.cancelled].map(String),
+        [
+          ...(input.cancelledServiceIds ?? []),
+          ...(allowComputedLineDiffs ? lineChanges.cancelled : []),
+        ].map(String),
       );
       const edited = new Set(
-        [...(input.editedServiceIds ?? []), ...lineChanges.edited].map(String),
+        [
+          ...(input.editedServiceIds ?? []),
+          ...(allowComputedLineDiffs ? lineChanges.edited : []),
+        ].map(String),
       );
       const originalById = new Map(originalServices.map((s) => [s.id, s]));
       const currentById = new Map(currentServices.map((s) => [s.id, s]));

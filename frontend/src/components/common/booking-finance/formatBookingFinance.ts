@@ -94,6 +94,30 @@ export function prepaidBreakdownLabel(percent: number, paid = false): string {
   return label ? `${word} (${label}%)` : word;
 }
 
+/** Remaining row label — uses prepaid % when known, else amount/total. */
+export function remainingBreakdownLabel(
+  prepaidPercent: number,
+  remainingAmount?: number,
+  totalPrice?: number,
+): string {
+  let remainingPercent = 0;
+  if (prepaidPercent > 0) {
+    remainingPercent = Math.max(0, 100 - prepaidPercent);
+  } else if (
+    totalPrice != null &&
+    totalPrice > 0 &&
+    remainingAmount != null &&
+    Number.isFinite(remainingAmount)
+  ) {
+    remainingPercent =
+      Math.round(
+        ((remainingAmount / totalPrice) * 100 + Number.EPSILON) * 100,
+      ) / 100;
+  }
+  const label = formatFinancePercent(remainingPercent);
+  return label ? `Remaining (${label}%)` : "Remaining";
+}
+
 export function formatOfflinePrepaymentVisitNote(
   shopName?: string | null,
   bookingDateTime?: string | null,

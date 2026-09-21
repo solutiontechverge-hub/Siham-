@@ -294,8 +294,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
                             <BookingRequestSentIcon size={12} />
                           )
                         ) : null}
-                        {indicator === "EBR" &&
-                        prepaymentVariant === "canceled_or_invalid" ? (
+                        {indicator === "EBR" && prepaymentVariant ? (
                           <PrepaymentStatusIcon
                             variant={prepaymentVariant}
                             size={18}
@@ -330,12 +329,21 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
             const prepayment =
               resolveCalendarPrepaymentStatus(viewingBookingEvent);
             const hasBr = scenarioIndicators.includes("BR");
+            const confirmedPrepaidStandalone =
+              prepayment === "confirmed" &&
+              !professionalWaitingForClientPrepay(viewingBookingEvent);
 
             if (scenarioIndicators.length && !hasBr) {
-              if (!responseIndicators.includes("overdue_response"))
-                return null;
+              // Still allow the prepaid icon through when prepayment is already paid.
               if (
-                scenarioIndicators.some((indicator) => indicator === "ER")
+                !responseIndicators.includes("overdue_response") &&
+                !confirmedPrepaidStandalone
+              ) {
+                return null;
+              }
+              if (
+                scenarioIndicators.some((indicator) => indicator === "ER") &&
+                !confirmedPrepaidStandalone
               ) {
                 return null;
               }
@@ -347,10 +355,14 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
                 ? responseIndicators
                 : [];
 
+            // Confirmed prepaid always surfaces unless the EBR chip already renders it.
+            const ebrOwnsPrepaymentIcon = scenarioIndicators.includes("EBR");
             const standalonePrepayment =
               prepayment &&
               !professionalWaitingForClientPrepay(viewingBookingEvent) &&
-              (scenarioIndicators.length === 0 || hasBr)
+              (prepayment === "confirmed"
+                ? !ebrOwnsPrepaymentIcon
+                : scenarioIndicators.length === 0 || hasBr)
                 ? prepayment
                 : undefined;
 

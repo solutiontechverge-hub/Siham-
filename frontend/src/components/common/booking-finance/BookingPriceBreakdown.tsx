@@ -10,6 +10,7 @@ import type { BookingPriceBreakdownRow } from "./bookingFinance.types";
 import {
   formatFinanceEuro,
   prepaidBreakdownLabel,
+  remainingBreakdownLabel,
 } from "./formatBookingFinance";
 
 type BookingPriceBreakdownProps = {
@@ -130,6 +131,122 @@ export default function BookingPriceBreakdown({
       Math.round((totalPrice + Number.EPSILON) * 100) / 100;
   const extraAfterDivider = extraRows.filter((row) => row.amount !== 0);
 
+  const totalRow = (
+    <FinanceRow
+      emphasize
+      label="Total Price:"
+      value={
+        hasAddonBreakdown || showStrike ? (
+          <Stack alignItems="flex-end" spacing={0.35} sx={{ minWidth: 0 }}>
+            {showStrike && originalPrice != null ? (
+              <BodyText
+                component="span"
+                sx={{
+                  m: 0,
+                  fontSize: 13,
+                  fontWeight: 800,
+                  color: alpha(m.navy, 0.42),
+                  textDecoration: "line-through",
+                }}
+              >
+                {formatFinanceEuro(originalPrice)}
+              </BodyText>
+            ) : null}
+            <BodyText
+              component="span"
+              sx={{
+                m: 0,
+                fontSize: 16,
+                fontWeight: 950,
+                color: alpha(m.navy, 0.88),
+              }}
+            >
+              {formatFinanceEuro(totalPrice)}
+            </BodyText>
+            <Stack
+              direction="row"
+              spacing={0.75}
+              flexWrap="wrap"
+              justifyContent="flex-end"
+              useFlexGap
+              sx={{ alignItems: "center" }}
+            >
+              {lineDiscountAmount > 0 ? (
+                <BodyText
+                  component="span"
+                  sx={{
+                    m: 0,
+                    fontSize: 12,
+                    fontWeight: 800,
+                    color: m.teal,
+                  }}
+                >
+                  −{formatFinanceEuro(lineDiscountAmount)} Discount
+                </BodyText>
+              ) : null}
+              {bookingDiscountAmount > 0 && bookingTotalDiscount ? (
+                <BodyText
+                  component="span"
+                  sx={{
+                    m: 0,
+                    fontSize: 12,
+                    fontWeight: 800,
+                    color: m.teal,
+                  }}
+                >
+                  {bookingTotalDiscount.type === "percentage"
+                    ? `${bookingTotalDiscount.amount}% Discount`
+                    : `${formatManualEntryDiscountLabel(bookingTotalDiscount)} Discount`}
+                </BodyText>
+              ) : null}
+              {lateCancellationFeeAmount > 0 ? (
+                <BodyText
+                  component="span"
+                  sx={{
+                    m: 0,
+                    fontSize: 12,
+                    fontWeight: 800,
+                    color: alpha(m.navy, 0.55),
+                  }}
+                >
+                  +{formatFinanceEuro(lateCancellationFeeAmount)} Cancel fee
+                </BodyText>
+              ) : null}
+              {lateRescheduleFeeAmount > 0 ? (
+                <BodyText
+                  component="span"
+                  sx={{
+                    m: 0,
+                    fontSize: 12,
+                    fontWeight: 800,
+                    color: alpha(m.navy, 0.55),
+                  }}
+                >
+                  +{formatFinanceEuro(lateRescheduleFeeAmount)} Late fee
+                </BodyText>
+              ) : null}
+              {noShowFeeAmount > 0 ? (
+                <BodyText
+                  component="span"
+                  sx={{
+                    m: 0,
+                    fontSize: 12,
+                    fontWeight: 800,
+                    color: alpha(m.navy, 0.55),
+                  }}
+                >
+                  +{formatFinanceEuro(noShowFeeAmount)} No-show fee
+                </BodyText>
+              ) : null}
+            </Stack>
+          </Stack>
+        ) : (
+          formatFinanceEuro(totalPrice)
+        )
+      }
+    />
+  );
+
   return (
     <Box
       sx={
@@ -142,128 +259,34 @@ export default function BookingPriceBreakdown({
           : {
               borderRadius: "10px",
               border: `1px solid ${alpha(m.navy, 0.1)}`,
-              bgcolor: "#fff",
+              bgcolor: alpha(m.navy, 0.04),
               px: 2,
               py: 1.6,
             }
       }
     >
-      <FinanceRow
-        emphasize
-        label="Total Price:"
-        value={
-          hasAddonBreakdown || showStrike ? (
-            <Stack alignItems="flex-end" spacing={0.35} sx={{ minWidth: 0 }}>
-              {showStrike && originalPrice != null ? (
-                <BodyText
-                  component="span"
-                  sx={{
-                    m: 0,
-                    fontSize: 13,
-                    fontWeight: 800,
-                    color: alpha(m.navy, 0.42),
-                    textDecoration: "line-through",
-                  }}
-                >
-                  {formatFinanceEuro(originalPrice)}
-                </BodyText>
-              ) : null}
-              <BodyText
-                component="span"
-                sx={{
-                  m: 0,
-                  fontSize: 16,
-                  fontWeight: 950,
-                  color: alpha(m.navy, 0.88),
-                }}
-              >
-                {formatFinanceEuro(totalPrice)}
-              </BodyText>
-              <Stack
-                direction="row"
-                spacing={0.75}
-                flexWrap="wrap"
-                justifyContent="flex-end"
-                useFlexGap
-                sx={{ alignItems: "center" }}
-              >
-                {lineDiscountAmount > 0 ? (
-                  <BodyText
-                    component="span"
-                    sx={{
-                      m: 0,
-                      fontSize: 12,
-                      fontWeight: 800,
-                      color: m.teal,
-                    }}
-                  >
-                    −{formatFinanceEuro(lineDiscountAmount)} Discount
-                  </BodyText>
-                ) : null}
-                {bookingDiscountAmount > 0 && bookingTotalDiscount ? (
-                  <BodyText
-                    component="span"
-                    sx={{
-                      m: 0,
-                      fontSize: 12,
-                      fontWeight: 800,
-                      color: m.teal,
-                    }}
-                  >
-                    {bookingTotalDiscount.type === "percentage"
-                      ? `${bookingTotalDiscount.amount}% Discount`
-                      : `${formatManualEntryDiscountLabel(bookingTotalDiscount)} Discount`}
-                  </BodyText>
-                ) : null}
-                {lateCancellationFeeAmount > 0 ? (
-                  <BodyText
-                    component="span"
-                    sx={{
-                      m: 0,
-                      fontSize: 12,
-                      fontWeight: 800,
-                      color: alpha(m.navy, 0.55),
-                    }}
-                  >
-                    +{formatFinanceEuro(lateCancellationFeeAmount)} Cancel fee
-                  </BodyText>
-                ) : null}
-                {lateRescheduleFeeAmount > 0 ? (
-                  <BodyText
-                    component="span"
-                    sx={{
-                      m: 0,
-                      fontSize: 12,
-                      fontWeight: 800,
-                      color: alpha(m.navy, 0.55),
-                    }}
-                  >
-                    +{formatFinanceEuro(lateRescheduleFeeAmount)} Late fee
-                  </BodyText>
-                ) : null}
-                {noShowFeeAmount > 0 ? (
-                  <BodyText
-                    component="span"
-                    sx={{
-                      m: 0,
-                      fontSize: 12,
-                      fontWeight: 800,
-                      color: alpha(m.navy, 0.55),
-                    }}
-                  >
-                    +{formatFinanceEuro(noShowFeeAmount)} No-show fee
-                  </BodyText>
-                ) : null}
-              </Stack>
-            </Stack>
-          ) : (
-            formatFinanceEuro(totalPrice)
-          )
-        }
-      />
+      {showPrepay ? (
+        <Stack spacing={1} sx={{ mb: 1.25 }}>
+          <FinanceRow
+            label={prepaidBreakdownLabel(prepaidPercent, prepaymentPaid)}
+            value={formatFinanceEuro(prepaidAmount)}
+            action={prepaidAction}
+          />
+          {renderRemaining ? (
+            <FinanceRow
+              label={remainingBreakdownLabel(
+                prepaidPercent,
+                remaining,
+                totalPrice,
+              )}
+              value={formatFinanceEuro(remaining)}
+            />
+          ) : null}
+        </Stack>
+      ) : null}
 
       {extraAfterDivider.length ? (
-        <Stack spacing={1} sx={{ mt: 1.25 }}>
+        <Stack spacing={1} sx={{ mb: 1.25 }}>
           {extraAfterDivider.map((row) => (
             <FinanceRow
               key={row.id}
@@ -274,21 +297,7 @@ export default function BookingPriceBreakdown({
         </Stack>
       ) : null}
 
-      {showPrepay ? (
-        <Stack spacing={1} sx={{ mt: 1.25 }}>
-          <FinanceRow
-            label={prepaidBreakdownLabel(prepaidPercent, prepaymentPaid)}
-            value={formatFinanceEuro(prepaidAmount)}
-            action={prepaidAction}
-          />
-          {renderRemaining ? (
-            <FinanceRow
-              label="Remaining"
-              value={formatFinanceEuro(remaining)}
-            />
-          ) : null}
-        </Stack>
-      ) : null}
+      {totalRow}
     </Box>
   );
 }

@@ -15,6 +15,8 @@ import {
   canAddPrepayment,
 } from "../bookingGroupAddOns";
 
+import { resolveCalendarPrepaymentStatus } from "../prepaymentStatus";
+
 import { isLateCancellation } from "../../client-booking/settleCancellationFee";
 
 import { useProfessionalFixedLocationCalendar } from "./useProfessionalFixedLocationCalendar";
@@ -162,7 +164,16 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerFooterAddO
         <Stack sx={{ py: 0.5 }}>
           {(
             [
-              canAddPrepayment({ alreadyShown: showPrepayment })
+              canAddPrepayment({
+                alreadyShown: showPrepayment,
+                alreadyPaid:
+                  resolveCalendarPrepaymentStatus(
+                    viewingBookingEvent ?? {
+                      status: "Requested",
+                      details: undefined,
+                    },
+                  ) === "confirmed",
+              })
                 ? {
                     label: "Add Prepayment",
                     onClick: () => {

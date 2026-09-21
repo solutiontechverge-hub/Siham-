@@ -1,6 +1,6 @@
 /**
  * Group / Add-ons (⋮) menu visibility and protective-fee clamping.
- * Prepayment is always proposable; protective fees need policy + trigger tags.
+ * Prepayment is proposable only when not already shown/paid; protective fees need policy + trigger tags.
  */
 
 export function isPolicyFeeConfigured(
@@ -18,7 +18,12 @@ export function parsePolicyPercentCeiling(
   return Math.min(100, n);
 }
 
-export function canAddPrepayment(input: { alreadyShown?: boolean }): boolean {
+export function canAddPrepayment(input: {
+  alreadyShown?: boolean;
+  /** Client/pro already collected prepayment — never offer Add again. */
+  alreadyPaid?: boolean;
+}): boolean {
+  if (input.alreadyPaid) return false;
   return !input.alreadyShown;
 }
 

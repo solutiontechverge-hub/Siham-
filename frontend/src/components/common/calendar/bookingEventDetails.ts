@@ -539,8 +539,16 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
       ...(typeof meta.exceededCancellationWindow === "boolean"
         ? { exceededCancellationWindow: meta.exceededCancellationWindow }
         : {}),
-      showPrepayment: Boolean(meta.showPrepayment),
-      prepaymentPercent: meta.prepaymentPercent ?? "",
+      showPrepayment:
+        Boolean(meta.showPrepayment) ||
+        meta.prepaymentStatus === "confirmed" ||
+        meta.prepaymentStatus === "pending" ||
+        (Number(meta.prepaymentPercent) || 0) > 0,
+      prepaymentPercent:
+        meta.prepaymentPercent != null &&
+        String(meta.prepaymentPercent).trim() !== ""
+          ? String(meta.prepaymentPercent).trim()
+          : "",
       ...(meta.prepaymentStatus
         ? { prepaymentStatus: meta.prepaymentStatus }
         : {}),

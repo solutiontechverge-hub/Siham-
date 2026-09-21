@@ -192,8 +192,8 @@ export default function ClientBookingDetailsHeader({
     isCancelled || isCompleted || isInvalid || isNoShow;
   const waitingForPayment =
     requiresPrepayment && !prepaymentPaid && !isCompleted && !isCancelled && !isInvalid;
-  /** Edit only on Confirmed (guideline). Prepay wait may still allow edits. */
-  const showEdit =
+  /** Edit enabled only on Confirmed (guideline). Prepay wait may still allow edits. */
+  const canEdit =
     !isCancelled &&
     !isCompleted &&
     !isInvalid &&
@@ -202,7 +202,14 @@ export default function ClientBookingDetailsHeader({
     bookingStatus !== "in_progress" &&
     !bookingRequestSent &&
     (isConfirmed || waitingForPayment);
-  const editActionsDisabled = !showEdit;
+  /** Show Edit (disabled when !canEdit) on non-terminal details, e.g. Requested/BR. */
+  const showEdit =
+    !isCancelled &&
+    !isCompleted &&
+    !isInvalid &&
+    !isNoShow &&
+    bookingStatus !== "in_progress";
+  const editActionsDisabled = !canEdit;
   /** Confirmed bookings can be edited directly (no ER grant). */
   const showConfirmedEditMenu =
     isConfirmed &&
@@ -365,7 +372,10 @@ export default function ClientBookingDetailsHeader({
                       sx={{ fontSize: 18, color: "#fff" }}
                     />
                   }
-                  onClick={(e) => setEditAnchor(e.currentTarget)}
+                  onClick={(e) => {
+                    if (editActionsDisabled) return;
+                    setEditAnchor(e.currentTarget);
+                  }}
                   sx={{
                     borderRadius: "8px",
                     fontSize: 12.5,

@@ -46,6 +46,10 @@ type Props = {
   draft: ClientBookingDraft | null;
   catalogProducts: CatalogItem[];
   catalogUniqueItems: CatalogItem[];
+  /** Primary client identity — rendered inside the first requester grey panel. */
+  requesterName?: string;
+  requesterEmail?: string;
+  requesterAvatarUrl?: string;
   editedServiceIds: readonly string[];
   addedServiceIds: readonly string[];
   cancelledServiceIds: readonly string[];
@@ -65,6 +69,9 @@ export default function ClientBookingPaymentChronology({
   draft,
   catalogProducts,
   catalogUniqueItems,
+  requesterName = "",
+  requesterEmail,
+  requesterAvatarUrl,
   editedServiceIds,
   addedServiceIds,
   cancelledServiceIds,
@@ -88,13 +95,15 @@ export default function ClientBookingPaymentChronology({
     ...mollureLabelSx(m.navy),
     mb: 1,
   } as const;
-  const nestedCardSx = {
+  /** Soft grey panel — same token as BookingStartEndTimeRow. */
+  const softPanelSx = {
     borderRadius: "10px",
     border: `1px solid ${alpha(m.navy, 0.08)}`,
-    bgcolor: m.white,
+    bgcolor: alpha(m.navy, 0.04),
     px: 1.5,
     py: 1.25,
   } as const;
+  const nestedCardSx = softPanelSx;
 
   const serviceChangeTags = React.useCallback(
     (serviceId: string) => {
@@ -372,11 +381,61 @@ export default function ClientBookingPaymentChronology({
     );
   };
 
+  const renderRequesterIdentity = () => {
+    if (!requesterName.trim()) return null;
+    return (
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={1.25}
+        sx={{ mb: 1.15 }}
+      >
+        <Avatar
+          src={requesterAvatarUrl}
+          sx={{
+            width: 34,
+            height: 34,
+            bgcolor: alpha(m.teal, 0.12),
+            color: m.teal,
+            fontWeight: 900,
+            fontSize: 14,
+          }}
+        >
+          {requesterName.charAt(0).toUpperCase()}
+        </Avatar>
+        <Stack spacing={0.25}>
+          <BodyText
+            sx={{
+              m: 0,
+              ...mollureLabelSx(m.navy),
+              lineHeight: 1.2,
+            }}
+          >
+            {requesterName}
+          </BodyText>
+          {requesterEmail ? (
+            <BodyText
+              sx={{
+                m: 0,
+                fontSize: 12,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.55),
+              }}
+            >
+              {requesterEmail}
+            </BodyText>
+          ) : null}
+        </Stack>
+      </Stack>
+    );
+  };
+
   const renderSectionBlock = (
     section: ClientBookingSummarySection,
     heading?: string,
     asPersonCard?: boolean,
     hideRoleHeading?: boolean,
+    showRequesterIdentity?: boolean,
   ) => {
     const services = section.items;
     const products = catalogItemsForSection(catalogProducts, section);
@@ -401,6 +460,7 @@ export default function ClientBookingPaymentChronology({
       isFirstPersonBlock &&
       isIdentityPerson &&
       updatedGuestIds.includes(String(participantId));
+    const useSoftPanel = asPersonCard || showRequesterIdentity;
     return (
       <Box key={section.key}>
         {asPersonCard && roleHeading && !hideRoleHeading ? (
@@ -428,7 +488,8 @@ export default function ClientBookingPaymentChronology({
             {roleHeading}
           </BodyText>
         ) : null}
-        <Box sx={asPersonCard ? nestedCardSx : undefined}>
+        <Box sx={useSoftPanel ? nestedCardSx : undefined}>
+          {showRequesterIdentity ? renderRequesterIdentity() : null}
           {showInnerName
             ? renderPersonHeader(personName || roleHeading, showGuestUpdated)
             : null}
@@ -527,17 +588,23 @@ export default function ClientBookingPaymentChronology({
           );
           const hideRoleHeading =
             isRequester && requesterAppearanceIndex === 0;
+          const showRequesterIdentity =
+            isRequester && requesterAppearanceIndex === 0;
           return renderSectionBlock(
             section,
             heading,
             asPersonCard,
             hideRoleHeading,
+            showRequesterIdentity,
           );
         });
       })()}
 
       {chronologicalSections.length === 0 ? (
         <>
+          {requesterName.trim() ? (
+            <Box sx={nestedCardSx}>{renderRequesterIdentity()}</Box>
+          ) : null}
           {renderCatalogGroup("Product", catalogProducts)}
           {renderCatalogGroup("Unique item", catalogUniqueItems)}
         </>
