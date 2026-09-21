@@ -252,14 +252,19 @@ export default function ClientBookingDetailsView({
             bookingRequestDirection={activeBooking?.bookingRequestDirection}
             locationMode={locationMode}
             isCancelled={isCancelled}
-            requiresPrepayment={Boolean(
-              activeBooking?.requiresPrepayment ??
-                (requiresPrepayment ||
-                  (Boolean(bookingNotesMeta?.showPrepayment) &&
-                    (Number(bookingNotesMeta?.prepaymentPercent) ||
-                      prepaymentPercent) > 0)),
-            )}
-            prepaymentPaid={isPrepaymentPaid}
+            requiresPrepayment={
+              paymentCardPrepaymentState !== "none" ||
+              Boolean(
+                activeBooking?.requiresPrepayment ??
+                  (requiresPrepayment ||
+                    (Boolean(bookingNotesMeta?.showPrepayment) &&
+                      (Number(bookingNotesMeta?.prepaymentPercent) ||
+                        prepaymentPercent) > 0)),
+              )
+            }
+            prepaymentPaid={
+              paymentCardPrepaymentState === "paid" || isPrepaymentPaid
+            }
             paymentDue={isPaymentDue}
             scheduleChangeTags={clientScheduleChangeTags}
             editTagSignpostTitle={ACTIVITY_COMPARISON_SIGNPOST}

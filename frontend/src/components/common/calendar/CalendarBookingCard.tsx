@@ -287,11 +287,13 @@ export default function CalendarBookingCard({
     }),
   );
   const prepaymentStatus = resolveCalendarPrepaymentStatus(event);
-  const prepaymentIconVariant = waitingForClientPrepay
-    ? undefined
-    : actionRequiredPrepaymentIconVariant(
-        prepaymentStatus ? toPrepaymentIconVariant(prepaymentStatus) : undefined,
-      );
+  const prepaymentIconVariant = actionRequiredPrepaymentIconVariant(
+    waitingForClientPrepay
+      ? "pending"
+      : prepaymentStatus
+        ? toPrepaymentIconVariant(prepaymentStatus)
+        : undefined,
+  );
   const paymentDueMeta = useBookingPaymentDueMeta(event);
   const isDesiredLocation = event.location === "DL";
   const isFixedLocation = event.location === "FL";
