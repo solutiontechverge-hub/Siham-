@@ -303,33 +303,35 @@ export function useProfessionalFixedLocationCalendarBookingPersistIncomingAccept
                   end: suggestedEnd || event.end,
                 }
               : {}),
-            details: {
-              ...(isClientEbr
-                ? {
-                    ...event.details,
-                    needsOk: true,
-                    ackRecipient: "client" as const,
-                    ackScenario: "EBR" as const,
-                  }
-                : ackDetails),
-              responseStatus: undefined,
-              lastEditedBy: professionalAddedLines
-                ? "professional"
-                : event.details?.lastEditedBy,
-              editedServiceIds: [
-                ...((event.details?.editedServiceIds ?? []).filter(Boolean)),
-                ...lineChanges.added,
-                ...lineChanges.edited,
-              ],
-              addedServiceIds: lineChanges.added,
-              cancelledServiceIds: lineChanges.cancelled,
-              ...(resolvedSuggestedServices?.length
-                ? { services: resolvedSuggestedServices }
-                : {}),
-              ...(suggestedProducts?.length
-                ? { products: suggestedProducts }
-                : {}),
-            },
+            details: isClientEbr
+              ? {
+                  ...event.details,
+                  needsOk: true,
+                  ackRecipient: "client" as const,
+                  ackScenario: "EBR" as const,
+                  responseStatus: undefined,
+                  lastEditedBy: professionalAddedLines
+                    ? "professional"
+                    : event.details?.lastEditedBy,
+                  editedServiceIds: [
+                    ...((event.details?.editedServiceIds ?? []).filter(Boolean)),
+                    ...lineChanges.added,
+                    ...lineChanges.edited,
+                  ],
+                  addedServiceIds: lineChanges.added,
+                  cancelledServiceIds: lineChanges.cancelled,
+                  ...(resolvedSuggestedServices?.length
+                    ? { services: resolvedSuggestedServices }
+                    : {}),
+                  ...(suggestedProducts?.length
+                    ? { products: suggestedProducts }
+                    : {}),
+                }
+              : {
+                  // Plain BR accept — do not invent edit line-change tags.
+                  ...ackDetails,
+                  responseStatus: undefined,
+                },
           };
         }),
       );

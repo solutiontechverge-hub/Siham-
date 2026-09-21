@@ -9,7 +9,6 @@ import {
   IconButton,
   Paper,
   Stack,
-  Switch,
   Tab,
   Tabs,
   Typography,
@@ -20,7 +19,6 @@ import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
 import {
-  mollureBodySx,
   mollureLabelSx,
   mollureSectionTitleSx,
 } from "../../../theme/mollureHierarchy";
@@ -41,9 +39,6 @@ export type ClientBookingServicesDetailsPanelProps = {
   selectedTeamMemberId: string;
   applySharedTeamMember: (id: string) => void;
   sharedTeamMemberOptions: TeamMemberSlotOption[];
-  services: Service[];
-  bookServicesAtSameTime: boolean;
-  setCombineServices: (value: boolean) => void;
   hasUnassigned: boolean;
   visible: Service[];
   allVisibleSelected: boolean;
@@ -72,9 +67,6 @@ export default function ClientBookingServicesDetailsPanel({
   selectedTeamMemberId,
   applySharedTeamMember,
   sharedTeamMemberOptions,
-  services,
-  bookServicesAtSameTime,
-  setCombineServices,
   hasUnassigned,
   visible,
   allVisibleSelected,
@@ -95,22 +87,23 @@ export default function ClientBookingServicesDetailsPanel({
   const m = theme.palette.mollure;
 
   return (
-    <Box sx={{ p: 1.5 }}>
+    <Box sx={{ p: 1.5, pt: 1.75 }}>
       <Stack
         direction="row"
         alignItems="center"
         justifyContent="space-between"
         sx={{
-          mb: 1,
+          mb: 1.25,
           pb: 1,
           borderBottom: `1px solid ${alpha(m.navy, 0.12)}`,
         }}
       >
         <Typography
           sx={{
-            fontSize: 12,
-            fontWeight: theme.typography.fontWeightBold,
+            fontSize: 13,
+            fontWeight: 800,
             color: m.headingText,
+            lineHeight: 1.2,
           }}
         >
           Services Details
@@ -221,75 +214,38 @@ export default function ClientBookingServicesDetailsPanel({
         </Box>
       ) : null}
 
-      {(!isDesiredLocation && services.length > 1) ||
-      (hasUnassigned && serviceTab === "unassigned" && visible.length > 1) ? (
+      {hasUnassigned &&
+      serviceTab === "unassigned" &&
+      visible.length > 1 ? (
         <Stack
           direction="row"
-          alignItems="flex-start"
-          justifyContent="space-between"
-          spacing={1}
-          sx={{ mb: 1.25 }}
+          alignItems="center"
+          justifyContent="flex-end"
+          sx={{ mb: 1 }}
         >
-          {!isDesiredLocation && services.length > 1 ? (
-            <FormControlLabel
-              sx={{ ml: 0, mr: 0, alignItems: "flex-start", flex: 1, minWidth: 0 }}
-              control={
-                <Switch
-                  size="small"
-                  checked={bookServicesAtSameTime}
-                  onChange={(e) => setCombineServices(e.target.checked)}
-                  sx={{
-                    mt: 0.15,
-                    "& .MuiSwitch-switchBase.Mui-checked": { color: m.teal },
-                    "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
-                      bgcolor: m.teal,
-                    },
-                  }}
-                />
-              }
-              label={
-                <Stack spacing={0.15}>
-                  <Typography sx={mollureBodySx(m.navy, { fontWeight: 800 })}>
-                    Book services at the same time
-                  </Typography>
-                  <Typography sx={{ fontSize: 11, color: alpha(m.navy, 0.48) }}>
-                    Duration uses the longest service instead of adding them
-                    sequentially.
-                  </Typography>
-                </Stack>
-              }
-            />
-          ) : (
-            <Box sx={{ flex: 1 }} />
-          )}
-
-          {hasUnassigned &&
-          serviceTab === "unassigned" &&
-          visible.length > 1 ? (
-            <FormControlLabel
-              control={
-                <Checkbox
-                  size="small"
-                  checked={allVisibleSelected}
-                  indeterminate={someVisibleSelected}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    const next: Record<string, boolean> = {};
-                    for (const s of visible) next[s.id] = checked;
-                    setSelectedServiceIds(next);
-                  }}
-                  sx={{
-                    "&.Mui-checked": { color: m.teal },
-                    color: alpha(m.navy, 0.35),
-                  }}
-                />
-              }
-              label={
-                <Typography sx={mollureLabelSx(m.navy)}>Select All</Typography>
-              }
-              sx={{ mr: 0, ml: 0, flexShrink: 0, alignItems: "center" }}
-            />
-          ) : null}
+          <FormControlLabel
+            control={
+              <Checkbox
+                size="small"
+                checked={allVisibleSelected}
+                indeterminate={someVisibleSelected}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  const next: Record<string, boolean> = {};
+                  for (const s of visible) next[s.id] = checked;
+                  setSelectedServiceIds(next);
+                }}
+                sx={{
+                  "&.Mui-checked": { color: m.teal },
+                  color: alpha(m.navy, 0.35),
+                }}
+              />
+            }
+            label={
+              <Typography sx={mollureLabelSx(m.navy)}>Select All</Typography>
+            }
+            sx={{ mr: 0, ml: 0, flexShrink: 0, alignItems: "center" }}
+          />
         </Stack>
       ) : null}
 
@@ -475,25 +431,18 @@ export default function ClientBookingServicesDetailsPanel({
               elevation={0}
               sx={{
                 borderRadius: "10px",
-                border: `1px solid ${alpha(m.navy, 0.1)}`,
-                px: 1.25,
-                py: 1.1,
+                border: `1px solid ${alpha(m.navy, 0.12)}`,
+                px: 1.5,
+                py: 1.25,
                 bgcolor: "#fff",
                 cursor: "default",
-                transition:
-                  "border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease",
-                "&:hover": {
-                  borderColor: alpha(m.teal, 0.35),
-                  boxShadow: "0 6px 18px rgba(16, 35, 63, 0.06)",
-                },
               }}
             >
               <Stack direction="row" alignItems="center" spacing={1.25}>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography
-                    sx={mollureLabelSx(m.navy, {
-                      fontWeight: 900,
-                      color: alpha(m.navy, 0.82),
+                    sx={mollureSectionTitleSx(m.navy, {
+                      fontSize: 13.5,
                       lineHeight: 1.2,
                     })}
                   >
@@ -501,10 +450,10 @@ export default function ClientBookingServicesDetailsPanel({
                   </Typography>
                   <Typography
                     sx={{
-                      fontSize: 10.5,
+                      fontSize: 11,
                       fontWeight: 700,
-                      color: alpha(m.navy, 0.45),
-                      mt: 0.25,
+                      color: alpha(m.navy, 0.48),
+                      mt: 0.35,
                       lineHeight: 1.2,
                     }}
                   >
@@ -546,17 +495,21 @@ export default function ClientBookingServicesDetailsPanel({
                 </Box>
 
                 <Typography
-                  sx={mollureLabelSx(m.navy, {
-                    fontWeight: 900,
-                    color: alpha(m.navy, 0.82),
-                    lineHeight: 1.2,
+                  sx={mollureSectionTitleSx(m.navy, {
+                    fontSize: 14,
+                    lineHeight: 1.15,
                     flexShrink: 0,
                   })}
                 >
                   {s.price} €
                 </Typography>
 
-                <Stack direction="row" alignItems="center" spacing={0.25} sx={{ flexShrink: 0 }}>
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  spacing={0.25}
+                  sx={{ flexShrink: 0 }}
+                >
                   {serviceTab === "unassigned" ? (
                     <Checkbox
                       size="small"
@@ -585,13 +538,16 @@ export default function ClientBookingServicesDetailsPanel({
                     sx={{
                       width: 26,
                       height: 26,
-                      borderRadius: "999px",
-                      bgcolor: alpha(m.navy, 0.03),
+                      p: 0,
                       color: alpha(m.navy, 0.45),
+                      "&:hover": {
+                        bgcolor: "transparent",
+                        color: alpha(m.navy, 0.7),
+                      },
                     }}
                     aria-label={`Remove ${s.name}`}
                   >
-                    <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
+                    <DeleteOutlineRoundedIcon sx={{ fontSize: 18 }} />
                   </IconButton>
                 </Stack>
               </Stack>
@@ -664,18 +620,21 @@ export default function ClientBookingServicesDetailsPanel({
             p: 0,
           }}
         >
-          service to assignment list
+          Service to assignment list
         </Typography>
       </ButtonBase>
 
       {serviceTab === "unassigned" && canDirectAssign ? (
-        <Box sx={{ mt: 1.25 }}>
+        <Box sx={{ mt: 1.5 }}>
           <AppButton
             tone="primary"
             fullWidth
             onClick={assignSelectedDirect}
             sx={{
-              height: 40,
+              height: 44,
+              fontWeight: 800,
+              letterSpacing: 0.6,
+              textTransform: "uppercase",
             }}
           >
             Assign

@@ -557,6 +557,24 @@ function hasBookingEnded(endIso: string | null): boolean {
   return end.getTime() <= Date.now();
 }
 
+/** Align with client `filterVisiblePaymentSummarySections`: prepaid hides after-treatment until due. */
+export function shouldShowAfterTreatmentCard(input: {
+  isPrepayPaid: boolean;
+  isInProgress: boolean;
+  isCompleted: boolean;
+  ended: boolean;
+  waitingForPayment?: boolean;
+  hasCollectedAfterTreatment?: boolean;
+}): boolean {
+  const remainingPaymentStage =
+    input.isInProgress ||
+    input.isCompleted ||
+    Boolean(input.waitingForPayment) ||
+    Boolean(input.hasCollectedAfterTreatment);
+  if (input.isPrepayPaid) return remainingPaymentStage;
+  return remainingPaymentStage || input.ended;
+}
+
 function isSplitPayerPaid(
   split: ReturnType<typeof parseSplitBillState>,
   payerKey: string,
@@ -758,8 +776,18 @@ export function buildCardsForEvent(input: {
     );
   }
 
-  // After treatment Summary only after the service end time (or completed).
-  const showAfterTreatment = ended || isCompleted;
+  const isInProgress = status === "in_progress" || status === "in progress";
+  const splitState = parseSplitBillState(event.details?.splitBill);
+  const hasCollectedAfterTreatment = Boolean(splitState?.payers.some((payer) => payer.paid));
+  // Prepaid-only: hide until In Progress / Completed / waiting / already collected (not clock end).
+  const showAfterTreatment = shouldShowAfterTreatmentCard({
+    isPrepayPaid,
+    isInProgress,
+    isCompleted,
+    ended,
+    waitingForPayment: event.details?.waitingForPayment,
+    hasCollectedAfterTreatment,
+  });
   if (showAfterTreatment && isAccepted) {
     const splitPayments = buildSplitPaymentAmounts({
       shares,
@@ -767,7 +795,6 @@ export function buildCardsForEvent(input: {
     });
     const guestModelShares = splitPayments.filter((s) => s.role !== "main_client");
     const mainShare = splitPayments.find((s) => s.role === "main_client") ?? splitPayments[0];
-    const splitState = parseSplitBillState(event.details?.splitBill);
     const afterId = resolveLiveCardId(bookingId, `${bookingId}-after-treatment`);
 
     if (mainShare) {
