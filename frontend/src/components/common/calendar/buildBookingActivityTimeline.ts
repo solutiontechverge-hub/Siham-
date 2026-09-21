@@ -7,6 +7,7 @@ import type {
 import {
   parseCalendarEntryNotes,
   parseStoredEbrFromNotes,
+  parseStoredErFromNotes,
 } from "./bookingEventDetails";
 import {
   detectServiceLineChanges,
@@ -439,17 +440,21 @@ function hasComparisonMode(
   );
 }
 
+/** True only with a concrete post-create edit payload — never scenario / lastEditedBy alone. */
 function hasRealEditActivitySignal(input: {
-  scenario?: string | null;
   editReqStatus?: string | null;
   storedEbrStatus?: string | null;
-  lastEditedBy?: string | null;
+  storedErStatus?: string | null;
   hasPersistedLineEdits: boolean;
+  scheduleEdited?: boolean;
+  silentUpdated?: boolean;
 }): boolean {
-  if (input.scenario === "EBR" || input.scenario === "ER") return true;
   if (input.editReqStatus && input.editReqStatus !== "none") return true;
   if (input.storedEbrStatus && input.storedEbrStatus !== "none") return true;
-  if (input.lastEditedBy) return true;
+  if (input.storedErStatus && input.storedErStatus !== "none") return true;
+  if (input.silentUpdated) return true;
+  if (input.scheduleEdited) return true;
+  // Line-change ids from a real edit/save (not scenario-only / lastEditedBy-only).
   return input.hasPersistedLineEdits;
 }
 
@@ -533,6 +538,7 @@ function enrichItemsWithComparison(
     "";
   const notesDetails = parseCalendarEntryNotes(booking?.notes ?? null);
   const storedEbr = parseStoredEbrFromNotes(booking?.notes ?? null);
+  const storedEr = parseStoredErFromNotes(booking?.notes ?? null);
   const editReq = getBookingEditRequest(String(code));
   const scenario = input.currentScenario;
   const effectiveStatus = input.currentStatus
@@ -540,6 +546,12 @@ function enrichItemsWithComparison(
     : normalizeStatus(booking?.status ?? "");
   const lastEditedBy =
     input.currentDetails?.lastEditedBy ?? notesDetails?.lastEditedBy ?? null;
+  const scheduleEdited = Boolean(
+    input.currentDetails?.scheduleEdited || notesDetails?.scheduleEdited,
+  );
+  const silentUpdated = Boolean(
+    input.currentDetails?.silentUpdated || notesDetails?.silentUpdated,
+  );
   const originalForHeal = flattenBookingServices({
     services: asServiceLines(
       input.currentDetails?.originalServices?.length
@@ -579,12 +591,15 @@ function enrichItemsWithComparison(
       notesDetails?.cancelledServiceIds?.length ||
       notesDetails?.scheduleEdited,
   );
-  // Heal only when an ER/EBR baseline exists and we already know an edit happened.
+  // Heal wiped IDs only when an edit payload already exists — never lastEditedBy /
+  // scenario alone (create originalServices vs guest lines looks like Adds).
   const allowHealLineDiffs =
     hasPersistedLineEdits ||
-    Boolean(lastEditedBy) ||
-    scenario === "EBR" ||
-    scenario === "ER";
+    Boolean(storedEbr && storedEbr.status !== "none") ||
+    Boolean(storedEr && storedEr.status !== "none") ||
+    Boolean(editReq.status && editReq.status !== "none") ||
+    scheduleEdited ||
+    silentUpdated;
   const hasHealedLineEdits =
     allowHealLineDiffs &&
     Boolean(
@@ -598,11 +613,12 @@ function enrichItemsWithComparison(
     lastEditedBy === "professional" && hasPersistedOrHealedLineEdits;
 
   const allowEditActivity = hasRealEditActivitySignal({
-    scenario,
     editReqStatus: editReq.status,
     storedEbrStatus: storedEbr?.status,
-    lastEditedBy,
+    storedErStatus: storedEr?.status,
     hasPersistedLineEdits: hasPersistedOrHealedLineEdits,
+    scheduleEdited,
+    silentUpdated,
   });
 
   const comparisonMode: ActivityComparisonMode =

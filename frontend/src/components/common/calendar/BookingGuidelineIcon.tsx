@@ -2,13 +2,13 @@
 
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { Box } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
+import { useTheme } from "@mui/material/styles";
 import type { ReactNode } from "react";
 
 /**
  * Booking status guideline icons — inline SVGs (was PNG set).
  * Main stroke uses slate `#607080` (sibling set). Badges keep status green/red.
- * Waiting-for-prepayment uses navy + thicker coin for card-row weight.
+ * Waiting-for-prepayment uses solid navy + bold € coin for clear card-row weight.
  * Overdue uses theme `statusRedFg`.
  */
 export type BookingGuidelineIconVariant =
@@ -91,19 +91,33 @@ function EuroMark({
   );
 }
 
-/** Bold coin + € — no gear teeth / pale badge (those read blurry at card size). */
+/**
+ * Bold €-in-circle (waiting for prepayment only).
+ * Geometric C + equal bars; butt caps read sharper than EuroMark at 16–18px.
+ */
 function WaitingForPrepaymentSvg({ size, color = SLATE }: SvgProps) {
   return (
     <SvgRoot size={size}>
       <circle
         cx="12"
         cy="12"
-        r="9"
+        r="9.25"
         stroke={color}
-        strokeWidth={2.25}
+        strokeWidth={2}
         fill="none"
       />
-      <EuroMark cx={12} cy={12} scale={0.88} color={color} strokeWidth={2.1} />
+      <g
+        stroke={color}
+        strokeWidth={2.15}
+        strokeLinecap="butt"
+        strokeLinejoin="round"
+        fill="none"
+      >
+        {/* Open C — generous inset so coin rim stays clear */}
+        <path d="M15.6 7.35c-1.15-1.15-2.7-1.75-4.35-1.7-2.85.1-5.1 2.4-5.1 5.35s2.25 5.25 5.1 5.35c1.65.05 3.2-.55 4.35-1.7" />
+        <path d="M6.85 10.55h7.1" />
+        <path d="M6.85 13.45h7.1" />
+      </g>
     </SvgRoot>
   );
 }
@@ -329,7 +343,8 @@ export default function BookingGuidelineIcon({ variant, size = 16 }: Props) {
   // Card call sites pass 16; seal needs ~18 optical weight (matches PaymentDue).
   const resolvedSize =
     variant === "waiting_for_prepayment" && size < 18 ? 18 : size;
-  const prepayColor = alpha(m.navy, 0.78);
+  // Full navy — alpha washed out the coin at card size vs reference.
+  const prepayColor = m.navy;
 
   if (variant === "overdue_response" || variant === "overdue_payment") {
     return (

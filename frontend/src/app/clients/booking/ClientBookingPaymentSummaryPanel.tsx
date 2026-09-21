@@ -32,12 +32,10 @@ import type { ClientBookingSummarySection } from "../../../components/common/cli
 import { ServiceSummaryMetaLine } from "../../../components/common/ServiceSummaryMetaLine";
 import {
   CLIENT_BOOKING_MIN_LEAD_ERROR,
-  fmtMinutesToIsoTime,
   fmtMinutesToTimeLabel,
   parseTimeLabelToMinutes,
   serviceTimeRangeLabel,
 } from "./booking-time";
-import BookingStartEndTimeRow from "../../../components/common/BookingStartEndTimeRow";
 import type { Service } from "./booking.page.types";
 
 export type ClientBookingPaymentSummaryPanelProps = {
@@ -97,12 +95,12 @@ export default function ClientBookingPaymentSummaryPanel({
       elevation={0}
       sx={{
         borderRadius: "10px",
-        border: `1px solid ${alpha(m.navy, 0.08)}`,
+        border: `1px solid ${alpha(m.navy, 0.16)}`,
         bgcolor: "#fff",
         overflow: "hidden",
       }}
     >
-      <Box sx={{ px: 1.8, pt: 1.2, pb: 1.05 }}>
+      <Box sx={{ px: 1.8, pt: 1.35, pb: 1.15 }}>
         <Typography
           sx={mollureSectionTitleSx(m.navy, {
             color: m.headingText,
@@ -114,7 +112,7 @@ export default function ClientBookingPaymentSummaryPanel({
         </Typography>
       </Box>
       <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
-      <Box sx={{ px: 1.8, pt: 1.15, pb: 1.05 }}>
+      <Box sx={{ px: 1.8, pt: 1.25, pb: 1.15 }}>
         <Typography
           sx={mollureSectionTitleSx(m.navy, {
             color: m.headingText,
@@ -128,47 +126,43 @@ export default function ClientBookingPaymentSummaryPanel({
           direction="row"
           alignItems="center"
           spacing={0.55}
-          sx={{ mt: 0.65, minWidth: 0 }}
+          sx={{ mt: 0.75, minWidth: 0 }}
         >
           <AccessTimeRoundedIcon
             sx={{ fontSize: 15, color: m.teal, flexShrink: 0 }}
           />
           <Typography
             sx={{
-              fontWeight: 800,
-              color: alpha(m.teal, 0.95),
-              fontSize: 10.25,
+              fontWeight: 700,
+              color: m.teal,
+              fontSize: 11,
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
+              lineHeight: 1.3,
             }}
           >
-            {selectedDate.toLocaleDateString("en-US", {
+            {selectedDate.toLocaleDateString("en-GB", {
               weekday: "short",
               day: "numeric",
               month: "short",
               year: "numeric",
             })}{" "}
-            ({fmtMinutesToTimeLabel(bookingStartMinutes)} –{" "}
-            {fmtMinutesToTimeLabel(bookingEndMinutes)})
+            | {fmtMinutesToTimeLabel(bookingStartMinutes)} –{" "}
+            {fmtMinutesToTimeLabel(bookingEndMinutes)}
           </Typography>
         </Stack>
 
         <Chip
           label={isDesiredLocation ? "Desired Location" : "Fixed Location"}
           size="small"
-          sx={{ ...locationModeChipSx, mt: 0.75 }}
-        />
-        <BookingStartEndTimeRow
-          start={fmtMinutesToIsoTime(bookingStartMinutes)}
-          end={fmtMinutesToIsoTime(bookingEndMinutes)}
-          sx={{ mt: 1 }}
+          sx={{ ...locationModeChipSx, mt: 0.85 }}
         />
       </Box>
-      <Divider />
+      <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
 
-      <Box sx={{ p: 1.6 }}>
-        <Stack spacing={1.25}>
+      <Box sx={{ px: 1.6, pt: 1.35, pb: 1.6 }}>
+        <Stack spacing={1.35}>
           {isDesiredLocation && desiredTeamMemberFullName ? (
             <Box
               component={
@@ -265,25 +259,17 @@ export default function ClientBookingPaymentSummaryPanel({
               participantType === "buffer" ||
               participantType === "planning";
             return (
-              <Box
-                key={key}
-                sx={{
-                  borderRadius: "10px",
-                  bgcolor: m.fxGrayF2F4F7,
-                  px: 1.2,
-                  py: 1,
-                }}
-              >
+              <Box key={key}>
                 <Stack
                   direction="row"
                   alignItems="center"
                   spacing={0.75}
-                  sx={{ mb: 0.75 }}
+                  sx={{ mb: 0.65 }}
                 >
                   <Typography
                     sx={{
-                      fontWeight: 900,
-                      fontSize: isRequester ? 14 : 15,
+                      fontWeight: 800,
+                      fontSize: 13.5,
                       color: m.headingText,
                       lineHeight: 1,
                       display: "flex",
@@ -295,9 +281,9 @@ export default function ClientBookingPaymentSummaryPanel({
                   {showGuestDisplayName ? (
                     <Typography
                       sx={{
-                        fontWeight: 800,
+                        fontWeight: 700,
                         fontSize: 11,
-                        color: alpha(m.navy, 0.62),
+                        color: alpha(m.navy, 0.55),
                         lineHeight: 1,
                       }}
                     >
@@ -321,48 +307,38 @@ export default function ClientBookingPaymentSummaryPanel({
                     </Typography>
                   ) : null}
                 </Stack>
-                <Stack spacing={0.75}>
+                <Stack spacing={0.85}>
                   {showSectionSchedule ? (
-                    <Box
-                      sx={{
-                        borderRadius: "10px",
-                        border: `1px solid ${alpha(m.navy, 0.08)}`,
-                        px: 1.2,
-                        py: 0.9,
-                        bgcolor: "#fff",
-                      }}
-                    >
-                      <Box sx={{ minWidth: 0 }}>
-                        {planningItem?.activity &&
-                        planningItem.activity.toLowerCase() !== "buffer" &&
-                        planningItem.activity !== heading ? (
-                          <Typography
-                            sx={mollureLabelSx(m.navy, {
-                              fontWeight: 900,
-                              lineHeight: 1.1,
-                            })}
-                          >
-                            {planningItem.activity}
-                          </Typography>
-                        ) : null}
-                        {planningMeta.timeRange || planningMeta.durationLabel ? (
-                          <ServiceSummaryMetaLine
-                            timeRange={planningMeta.timeRange}
-                            durationLabel={planningMeta.durationLabel}
-                          />
-                        ) : planningItem?.duration ? (
-                          <Typography
-                            sx={{
-                              mt: planningItem.activity ? 0.25 : 0,
-                              fontSize: 10.5,
-                              fontWeight: 700,
-                              color: alpha(m.navy, 0.48),
-                            }}
-                          >
-                            {planningItem.duration}
-                          </Typography>
-                        ) : null}
-                      </Box>
+                    <Box sx={{ minWidth: 0, py: 0.15 }}>
+                      {planningItem?.activity &&
+                      planningItem.activity.toLowerCase() !== "buffer" &&
+                      planningItem.activity !== heading ? (
+                        <Typography
+                          sx={mollureLabelSx(m.navy, {
+                            fontWeight: 900,
+                            lineHeight: 1.1,
+                          })}
+                        >
+                          {planningItem.activity}
+                        </Typography>
+                      ) : null}
+                      {planningMeta.timeRange || planningMeta.durationLabel ? (
+                        <ServiceSummaryMetaLine
+                          timeRange={planningMeta.timeRange}
+                          durationLabel={planningMeta.durationLabel}
+                        />
+                      ) : planningItem?.duration ? (
+                        <Typography
+                          sx={{
+                            mt: planningItem.activity ? 0.25 : 0,
+                            fontSize: 10.5,
+                            fontWeight: 700,
+                            color: alpha(m.navy, 0.48),
+                          }}
+                        >
+                          {planningItem.duration}
+                        </Typography>
+                      ) : null}
                     </Box>
                   ) : null}
                   {items.map((s, index) => {
@@ -390,105 +366,96 @@ export default function ClientBookingPaymentSummaryPanel({
                       staffName && staffId && onTeamMemberClick,
                     );
                     return (
-                      <Box
+                      <Stack
                         key={`${s.id}::${s.guestId ?? ""}::${index}`}
-                        sx={{
-                          borderRadius: "10px",
-                          border: `1px solid ${alpha(m.navy, 0.08)}`,
-                          px: 1.2,
-                          py: 0.9,
-                          bgcolor: "#fff",
-                        }}
+                        direction="row"
+                        alignItems="flex-start"
+                        justifyContent="space-between"
+                        spacing={1}
                       >
-                        <Stack
-                          direction="row"
-                          alignItems="center"
-                          justifyContent="space-between"
-                          spacing={1}
-                        >
-                          <Box sx={{ minWidth: 0, flex: 1 }}>
-                            <Typography
-                              sx={{
-                                fontSize: 12,
-                                fontWeight: 900,
-                                color: m.headingText,
-                                lineHeight: 1.2,
-                              }}
-                            >
-                              {s.name}
-                            </Typography>
-                            <ServiceSummaryMetaLine
-                              timeRange={serviceTimeRangeLabel(
-                                startMin,
-                                s.durationMins,
-                              )}
-                              durationLabel={`${s.durationMins} Mins`}
-                            />
-                            {staffName ? (
-                              <Stack
-                                component={staffClickable ? "button" : "div"}
-                                type={staffClickable ? "button" : undefined}
-                                direction="row"
-                                alignItems="center"
-                                spacing={0.5}
-                                onClick={
-                                  staffClickable
-                                    ? (event: React.MouseEvent) => {
-                                        event.stopPropagation();
-                                        onTeamMemberClick?.(staffId!);
-                                      }
-                                    : undefined
-                                }
-                                sx={{
-                                  mt: 0.5,
-                                  p: 0,
-                                  m: 0,
-                                  border: "none",
-                                  bgcolor: "transparent",
-                                  cursor: staffClickable
-                                    ? "pointer"
-                                    : "default",
-                                  textAlign: "left",
-                                  width: "fit-content",
-                                  maxWidth: "100%",
-                                  "&:hover": staffClickable
-                                    ? { color: m.teal }
-                                    : undefined,
-                                }}
-                              >
-                                <PersonOutlineRoundedIcon
-                                  sx={{
-                                    fontSize: 14,
-                                    color: alpha(m.navy, 0.4),
-                                  }}
-                                />
-                                <Typography
-                                  sx={mollureBodyMutedSx(m.navy, {
-                                    fontSize: 11,
-                                    fontWeight: 700,
-                                    lineHeight: 1,
-                                    ...(staffClickable
-                                      ? { "&:hover": { color: m.teal } }
-                                      : null),
-                                  })}
-                                >
-                                  {staffName}
-                                </Typography>
-                              </Stack>
-                            ) : null}
-                          </Box>
+                        <Box sx={{ minWidth: 0, flex: 1 }}>
                           <Typography
                             sx={{
-                              fontSize: 12,
-                              fontWeight: 900,
+                              fontSize: 12.5,
+                              fontWeight: 800,
                               color: m.headingText,
-                              flexShrink: 0,
+                              lineHeight: 1.25,
                             }}
                           >
-                            {s.price} €
+                            {s.name}
                           </Typography>
-                        </Stack>
-                      </Box>
+                          <ServiceSummaryMetaLine
+                            timeRange={serviceTimeRangeLabel(
+                              startMin,
+                              s.durationMins,
+                            )}
+                            durationLabel={`${s.durationMins} Mins`}
+                          />
+                          {staffName ? (
+                            <Stack
+                              component={staffClickable ? "button" : "div"}
+                              type={staffClickable ? "button" : undefined}
+                              direction="row"
+                              alignItems="center"
+                              spacing={0.5}
+                              onClick={
+                                staffClickable
+                                  ? (event: React.MouseEvent) => {
+                                      event.stopPropagation();
+                                      onTeamMemberClick?.(staffId!);
+                                    }
+                                  : undefined
+                              }
+                              sx={{
+                                mt: 0.45,
+                                p: 0,
+                                m: 0,
+                                border: "none",
+                                bgcolor: "transparent",
+                                cursor: staffClickable
+                                  ? "pointer"
+                                  : "default",
+                                textAlign: "left",
+                                width: "fit-content",
+                                maxWidth: "100%",
+                                "&:hover": staffClickable
+                                  ? { color: m.teal }
+                                  : undefined,
+                              }}
+                            >
+                              <PersonOutlineRoundedIcon
+                                sx={{
+                                  fontSize: 14,
+                                  color: alpha(m.navy, 0.4),
+                                }}
+                              />
+                              <Typography
+                                sx={mollureBodyMutedSx(m.navy, {
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  lineHeight: 1,
+                                  ...(staffClickable
+                                    ? { "&:hover": { color: m.teal } }
+                                    : null),
+                                })}
+                              >
+                                {staffName}
+                              </Typography>
+                            </Stack>
+                          ) : null}
+                        </Box>
+                        <Typography
+                          sx={{
+                            fontSize: 12.5,
+                            fontWeight: 800,
+                            color: m.headingText,
+                            flexShrink: 0,
+                            lineHeight: 1.25,
+                          }}
+                        >
+                          {s.price} €
+                        </Typography>
+                      </Stack>
                     );
                   })}
                 </Stack>
@@ -500,11 +467,9 @@ export default function ClientBookingPaymentSummaryPanel({
 
           <Box
             sx={{
-              borderRadius: "10px",
-              bgcolor: alpha(m.navy, 0.04),
-              border: `1px solid ${alpha(m.navy, 0.18)}`,
-              px: 1.5,
-              py: 1.2,
+              borderTop: `1px solid ${alpha(m.navy, 0.14)}`,
+              pt: 1.15,
+              mt: 0.25,
             }}
           >
             <Stack
@@ -513,21 +478,24 @@ export default function ClientBookingPaymentSummaryPanel({
               alignItems="center"
             >
               <Typography
-                sx={mollureSectionTitleSx(m.navy, {
+                sx={{
+                  fontSize: 14,
+                  fontWeight: 800,
                   color: m.headingText,
                   lineHeight: 1.2,
-                })}
+                }}
               >
                 Total
               </Typography>
               <Typography
-                sx={mollureSectionTitleSx(m.navy, {
-                  fontSize: 18,
+                sx={{
+                  fontSize: 16,
+                  fontWeight: 900,
                   color: m.headingText,
                   lineHeight: 1.2,
-                })}
+                }}
               >
-                €{total}
+                {total} €
               </Typography>
             </Stack>
           </Box>

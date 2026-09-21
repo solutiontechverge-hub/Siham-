@@ -86,18 +86,29 @@ function formatPhone(code?: string | null, number?: string | null): string {
   return [c, n].filter(Boolean).join(" ");
 }
 
+/** HH:mm only — strips seconds / ISO datetime so "09:00:00" === "09:00". */
+function clockHm(value?: string | null): string {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const match = raw.match(/(?:T|\s|^)(\d{1,2}):(\d{2})(?::\d{2})?/);
+  if (!match) return raw;
+  return `${match[1].padStart(2, "0")}:${match[2]}`;
+}
+
 function formatSchedule(dateISO?: string | null, time?: string | null): string {
   const datePart = (() => {
     if (!dateISO?.trim()) return "";
-    const dt = new Date(`${dateISO.trim()}T00:00:00`);
-    if (Number.isNaN(dt.getTime())) return dateISO.trim();
+    // Prefer YYYY-MM-DD prefix when value is a full ISO datetime.
+    const day = dateISO.trim().match(/^(\d{4}-\d{2}-\d{2})/)?.[1] ?? dateISO.trim();
+    const dt = new Date(`${day}T00:00:00`);
+    if (Number.isNaN(dt.getTime())) return day;
     return dt.toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",
     });
   })();
-  const timePart = (time ?? "").trim();
+  const timePart = clockHm(time);
   if (!datePart && !timePart) return "—";
   return [datePart, timePart].filter(Boolean).join(" · ");
 }
