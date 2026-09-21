@@ -329,9 +329,11 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
             const prepayment =
               resolveCalendarPrepaymentStatus(viewingBookingEvent);
             const hasBr = scenarioIndicators.includes("BR");
+            const waitingClientPrepay = professionalWaitingForClientPrepay(
+              viewingBookingEvent,
+            );
             const confirmedPrepaidStandalone =
-              prepayment === "confirmed" &&
-              !professionalWaitingForClientPrepay(viewingBookingEvent);
+              prepayment === "confirmed" && !waitingClientPrepay;
 
             if (scenarioIndicators.length && !hasBr) {
               // Still allow the prepaid icon through when prepayment is already paid.
@@ -356,13 +358,14 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
                 : [];
 
             // Confirmed prepaid always surfaces unless the EBR chip already renders it.
+            // Pending (incl. BR Accepted waiting for client pay) shows the € seal.
             const ebrOwnsPrepaymentIcon = scenarioIndicators.includes("EBR");
-            const standalonePrepayment =
-              prepayment &&
-              !professionalWaitingForClientPrepay(viewingBookingEvent) &&
-              (prepayment === "confirmed"
-                ? !ebrOwnsPrepaymentIcon
-                : scenarioIndicators.length === 0 || hasBr)
+            const standalonePrepayment = waitingClientPrepay
+              ? ("pending" as const)
+              : prepayment &&
+                  (prepayment === "confirmed"
+                    ? !ebrOwnsPrepaymentIcon
+                    : scenarioIndicators.length === 0 || hasBr)
                 ? prepayment
                 : undefined;
 

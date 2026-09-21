@@ -191,6 +191,12 @@ export function buildPersistDrawerDetails(input: {
     guestsForPersist,
   );
 
+  // Fresh create: freeze the same flattened lines the drawer will compare against.
+  if (isNewManualBooking) {
+    details.originalServices = details.services;
+    details.originalGuests = guestsForPersist;
+  }
+
   return details as typeof details & {
     services: NonNullable<(typeof details)["services"]>;
     products: NonNullable<(typeof details)["products"]>;

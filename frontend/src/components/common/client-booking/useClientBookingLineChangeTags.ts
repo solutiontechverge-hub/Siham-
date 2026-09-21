@@ -203,17 +203,16 @@ export function useClientBookingLineChangeTags(input: {
 
   const pendingServiceChangeSets = React.useMemo(() => {
     if (!clientChangesAwaitingApproval) return null;
+    // Only ER/EBR originalServices — services/draft fallback false-tags creates.
+    const baseline = bookingNotesMeta?.originalServices ?? [];
+    if (!baseline.length) return null;
     const original = toComparableLineServices(
       flattenBookingServices({
-        services:
-          bookingNotesMeta?.originalServices ??
-          bookingNotesMeta?.services ??
-          draft?.services ??
-          displayDraft?.services ??
-          [],
+        services: baseline,
         guests: bookingNotesMeta?.originalGuests ?? bookingNotesMeta?.guests,
       }),
     );
+    if (!original.length) return null;
     const current = toComparableLineServices(
       flattenBookingServices({
         services: displayDraft?.services ?? draft?.services ?? [],
@@ -225,7 +224,6 @@ export function useClientBookingLineChangeTags(input: {
     bookingNotesMeta?.guests,
     bookingNotesMeta?.originalGuests,
     bookingNotesMeta?.originalServices,
-    bookingNotesMeta?.services,
     clientChangesAwaitingApproval,
     displayDraft?.services,
     draft?.services,
@@ -308,12 +306,22 @@ export function useClientBookingLineChangeTags(input: {
   });
 
   const clientVisibleEditedServiceIds = React.useMemo(() => {
+    const editReqActive =
+      editRequest.isSuggested ||
+      editRequest.isPending ||
+      editRequest.isAccepted;
+    const incoming = activeBooking?.incomingEditRequest;
+    const incomingStatus = String(incoming?.status ?? "").toLowerCase();
+    const incomingActive =
+      incomingStatus === "suggested" ||
+      incomingStatus === "pending" ||
+      incomingStatus === "accepted";
     const merged = [
       ...(pendingServiceChangeSets?.edited ?? []),
       ...(bookingNotesMeta?.editedServiceIds ?? []),
-      ...(editRequest.editedServiceIds ?? []),
+      ...(editReqActive ? (editRequest.editedServiceIds ?? []) : []),
       ...(activeBooking?.editedServiceIds ?? []),
-      ...(activeBooking?.incomingEditRequest?.editedServiceIds ?? []),
+      ...(incomingActive ? (incoming?.editedServiceIds ?? []) : []),
     ];
     if (merged.length) return [...new Set(merged)];
     // Heal wiped IDs only from an explicit ER/EBR originalServices baseline.
@@ -326,59 +334,84 @@ export function useClientBookingLineChangeTags(input: {
     return undefined;
   }, [
     activeBooking?.editedServiceIds,
-    activeBooking?.incomingEditRequest?.editedServiceIds,
+    activeBooking?.incomingEditRequest,
     allowHealedComputedLineTags,
     bookingNotesMeta?.editedServiceIds,
     editRequest.editedServiceIds,
+    editRequest.isAccepted,
+    editRequest.isPending,
+    editRequest.isSuggested,
     healedServiceLineChanges.edited,
     pendingServiceChangeSets,
   ]);
 
-  const clientVisibleAddedServiceIds = React.useMemo(
-    () =>
-      [
-        ...new Set([
-          ...(pendingServiceChangeSets?.added ?? []),
-          ...(bookingNotesMeta?.addedServiceIds ?? []),
-          ...(editRequest.addedServiceIds ?? []),
-          ...(activeBooking?.incomingEditRequest?.addedServiceIds ?? []),
-          ...(allowHealedComputedLineTags
-            ? healedServiceLineChanges.added
-            : []),
-        ]),
-      ],
-    [
-      activeBooking?.incomingEditRequest?.addedServiceIds,
-      allowHealedComputedLineTags,
-      bookingNotesMeta?.addedServiceIds,
-      editRequest.addedServiceIds,
-      healedServiceLineChanges.added,
-      pendingServiceChangeSets,
-    ],
-  );
+  const clientVisibleAddedServiceIds = React.useMemo(() => {
+    const editReqActive =
+      editRequest.isSuggested ||
+      editRequest.isPending ||
+      editRequest.isAccepted;
+    const incoming = activeBooking?.incomingEditRequest;
+    const incomingStatus = String(incoming?.status ?? "").toLowerCase();
+    const incomingActive =
+      incomingStatus === "suggested" ||
+      incomingStatus === "pending" ||
+      incomingStatus === "accepted";
+    return [
+      ...new Set([
+        ...(pendingServiceChangeSets?.added ?? []),
+        ...(bookingNotesMeta?.addedServiceIds ?? []),
+        ...(editReqActive ? (editRequest.addedServiceIds ?? []) : []),
+        ...(incomingActive ? (incoming?.addedServiceIds ?? []) : []),
+        ...(allowHealedComputedLineTags
+          ? healedServiceLineChanges.added
+          : []),
+      ]),
+    ];
+  }, [
+    activeBooking?.incomingEditRequest,
+    allowHealedComputedLineTags,
+    bookingNotesMeta?.addedServiceIds,
+    editRequest.addedServiceIds,
+    editRequest.isAccepted,
+    editRequest.isPending,
+    editRequest.isSuggested,
+    healedServiceLineChanges.added,
+    pendingServiceChangeSets,
+  ]);
 
-  const clientVisibleCancelledServiceIds = React.useMemo(
-    () =>
-      [
-        ...new Set([
-          ...(pendingServiceChangeSets?.cancelled ?? []),
-          ...(bookingNotesMeta?.cancelledServiceIds ?? []),
-          ...(editRequest.cancelledServiceIds ?? []),
-          ...(activeBooking?.incomingEditRequest?.cancelledServiceIds ?? []),
-          ...(allowHealedComputedLineTags
-            ? healedServiceLineChanges.cancelled
-            : []),
-        ]),
-      ],
-    [
-      activeBooking?.incomingEditRequest?.cancelledServiceIds,
-      allowHealedComputedLineTags,
-      bookingNotesMeta?.cancelledServiceIds,
-      editRequest.cancelledServiceIds,
-      healedServiceLineChanges.cancelled,
-      pendingServiceChangeSets,
-    ],
-  );
+  const clientVisibleCancelledServiceIds = React.useMemo(() => {
+    const editReqActive =
+      editRequest.isSuggested ||
+      editRequest.isPending ||
+      editRequest.isAccepted;
+    const incoming = activeBooking?.incomingEditRequest;
+    const incomingStatus = String(incoming?.status ?? "").toLowerCase();
+    const incomingActive =
+      incomingStatus === "suggested" ||
+      incomingStatus === "pending" ||
+      incomingStatus === "accepted";
+    return [
+      ...new Set([
+        ...(pendingServiceChangeSets?.cancelled ?? []),
+        ...(bookingNotesMeta?.cancelledServiceIds ?? []),
+        ...(editReqActive ? (editRequest.cancelledServiceIds ?? []) : []),
+        ...(incomingActive ? (incoming?.cancelledServiceIds ?? []) : []),
+        ...(allowHealedComputedLineTags
+          ? healedServiceLineChanges.cancelled
+          : []),
+      ]),
+    ];
+  }, [
+    activeBooking?.incomingEditRequest,
+    allowHealedComputedLineTags,
+    bookingNotesMeta?.cancelledServiceIds,
+    editRequest.cancelledServiceIds,
+    editRequest.isAccepted,
+    editRequest.isPending,
+    editRequest.isSuggested,
+    healedServiceLineChanges.cancelled,
+    pendingServiceChangeSets,
+  ]);
 
   const cancelledServicesForDisplay = React.useMemo(() => {
     const ids = new Set(clientVisibleCancelledServiceIds);

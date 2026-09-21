@@ -41,16 +41,8 @@ export function resolveBookingResponseIndicators(
       prepayBlocksConfirmation({ prepayRequired, prepayPaid }));
 
   if (waitingPrepay) {
-    if (
-      event.status === "BR Accepted" &&
-      prepayBlocksConfirmation({ prepayRequired, prepayPaid })
-    ) {
-      // Professional waits for the client to pay after accept.
-      indicators.push("waiting_for_payment");
-    } else {
-      // BR sent with prepayment outstanding (client checkout), or pending API status.
-      indicators.push("waiting_for_prepayment");
-    }
+    // Shared €-in-circle pending seal — BR outstanding or post-accept client pay wait.
+    indicators.push("waiting_for_prepayment");
   } else if (prepayRequired && prepayPaid) {
     indicators.push("prepaid");
   }
