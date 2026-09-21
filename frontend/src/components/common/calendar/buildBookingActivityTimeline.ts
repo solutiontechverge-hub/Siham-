@@ -440,21 +440,17 @@ function hasComparisonMode(
   );
 }
 
-/** True only with a concrete post-create edit payload — never scenario / lastEditedBy alone. */
+/** True only with a concrete post-create edit payload — never scenario / lastEditedBy / silent alone. */
 function hasRealEditActivitySignal(input: {
   editReqStatus?: string | null;
   storedEbrStatus?: string | null;
   storedErStatus?: string | null;
   hasPersistedLineEdits: boolean;
-  scheduleEdited?: boolean;
-  silentUpdated?: boolean;
 }): boolean {
   if (input.editReqStatus && input.editReqStatus !== "none") return true;
   if (input.storedEbrStatus && input.storedEbrStatus !== "none") return true;
   if (input.storedErStatus && input.storedErStatus !== "none") return true;
-  if (input.silentUpdated) return true;
-  if (input.scheduleEdited) return true;
-  // Line-change ids from a real edit/save (not scenario-only / lastEditedBy-only).
+  // Line-change ids / scheduleEdited from a real edit/save — not silent Updated.
   return input.hasPersistedLineEdits;
 }
 
@@ -580,26 +576,23 @@ function enrichItemsWithComparison(
     originalForHeal.length > 0
       ? detectServiceLineChanges(originalForHeal, currentForHeal)
       : { added: [] as string[], edited: [] as string[], cancelled: [] as string[] };
-  const hasPersistedLineEdits = Boolean(
+  const hasPersistedLineIds = Boolean(
     input.currentDetails?.editedServiceIds?.length ||
       input.currentDetails?.addedServiceIds?.length ||
       input.currentDetails?.cancelledServiceIds?.length ||
       input.currentDetails?.editedProductIds?.length ||
-      input.currentDetails?.scheduleEdited ||
       notesDetails?.editedServiceIds?.length ||
       notesDetails?.addedServiceIds?.length ||
-      notesDetails?.cancelledServiceIds?.length ||
-      notesDetails?.scheduleEdited,
+      notesDetails?.cancelledServiceIds?.length,
   );
-  // Heal wiped IDs only when an edit payload already exists — never lastEditedBy /
-  // scenario alone (create originalServices vs guest lines looks like Adds).
+  const hasPersistedLineEdits = hasPersistedLineIds || scheduleEdited;
+  // Heal wiped IDs only from real ER/EBR / persisted line ids — never silent/
+  // schedule-alone (create originalServices vs guest lines looks like Adds).
   const allowHealLineDiffs =
-    hasPersistedLineEdits ||
+    hasPersistedLineIds ||
     Boolean(storedEbr && storedEbr.status !== "none") ||
     Boolean(storedEr && storedEr.status !== "none") ||
-    Boolean(editReq.status && editReq.status !== "none") ||
-    scheduleEdited ||
-    silentUpdated;
+    Boolean(editReq.status && editReq.status !== "none");
   const hasHealedLineEdits =
     allowHealLineDiffs &&
     Boolean(
@@ -617,8 +610,6 @@ function enrichItemsWithComparison(
     storedEbrStatus: storedEbr?.status,
     storedErStatus: storedEr?.status,
     hasPersistedLineEdits: hasPersistedOrHealedLineEdits,
-    scheduleEdited,
-    silentUpdated,
   });
 
   const comparisonMode: ActivityComparisonMode =

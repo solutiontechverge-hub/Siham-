@@ -6,6 +6,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../../ui/typography";
 import { formatManualEntryDiscountLabel } from "../../sections/finance/manualEntry.data";
 import type { ManualEntryDiscount } from "../../sections/finance/manualEntry.data";
+import PrepaymentStatusIcon from "../calendar/PrepaymentStatusIcon";
 import type { BookingPriceBreakdownRow } from "./bookingFinance.types";
 import {
   formatFinanceEuro,
@@ -36,11 +37,13 @@ type BookingPriceBreakdownProps = {
 
 function FinanceRow({
   label,
+  labelIcon,
   value,
   emphasize = false,
   action,
 }: {
   label: string;
+  labelIcon?: ReactNode;
   value: ReactNode;
   emphasize?: boolean;
   action?: ReactNode;
@@ -53,17 +56,20 @@ function FinanceRow({
       alignItems="center"
       spacing={1.5}
     >
-      <BodyText
-        component="span"
-        sx={{
-          m: 0,
-          fontSize: emphasize ? 16 : 13,
-          fontWeight: emphasize ? 950 : 700,
-          color: alpha(m.navy, emphasize ? 0.82 : 0.52),
-        }}
-      >
-        {label}
-      </BodyText>
+      <Stack direction="row" alignItems="center" spacing={0.75} sx={{ minWidth: 0 }}>
+        {labelIcon}
+        <BodyText
+          component="span"
+          sx={{
+            m: 0,
+            fontSize: emphasize ? 16 : 13,
+            fontWeight: emphasize ? 950 : 700,
+            color: alpha(m.navy, emphasize ? 0.82 : 0.52),
+          }}
+        >
+          {label}
+        </BodyText>
+      </Stack>
       <Stack
         direction="row"
         alignItems="center"
@@ -269,6 +275,12 @@ export default function BookingPriceBreakdown({
         <Stack spacing={1} sx={{ mb: 1.25 }}>
           <FinanceRow
             label={prepaidBreakdownLabel(prepaidPercent, prepaymentPaid)}
+            labelIcon={
+              <PrepaymentStatusIcon
+                variant={prepaymentPaid ? "confirmed" : "pending"}
+                size={18}
+              />
+            }
             value={formatFinanceEuro(prepaidAmount)}
             action={prepaidAction}
           />

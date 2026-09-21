@@ -14,6 +14,7 @@ import type { ReactNode } from "react";
 import BookingRequestBadge from "../calendar/BookingRequestBadge";
 import BookingRequestReceivedIcon from "../calendar/BookingRequestReceivedIcon";
 import BookingIndicatorIcon from "../calendar/BookingIndicatorIcon";
+import PrepaymentStatusIcon from "../calendar/PrepaymentStatusIcon";
 import EditRequestIndicatorIcon from "./EditRequestIndicatorIcon";
 
 export type BookingRequestRowMode =
@@ -268,7 +269,7 @@ export default function BookingRequestStatusRow({
               : undefined,
           }}
         >
-          <BookingIndicatorIcon variant="waiting_for_prepayment" size={16} />
+          <PrepaymentStatusIcon variant="pending" size={18} />
         </Box>
       ) : requiresPrepayment && prepaymentPaid && !isTerminal ? (
         <Box
@@ -276,7 +277,7 @@ export default function BookingRequestStatusRow({
           aria-label="Prepayment received"
           sx={{ display: "grid", placeItems: "center" }}
         >
-          <BookingIndicatorIcon variant="prepaid" size={16} />
+          <PrepaymentStatusIcon variant="confirmed" size={18} />
         </Box>
       ) : null}
 

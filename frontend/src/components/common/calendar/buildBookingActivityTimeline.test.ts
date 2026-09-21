@@ -347,4 +347,179 @@ assert.ok(
   "BR accept path still shows Booking Request Accepted",
 );
 
+// silentUpdated alone must not invent Edited BR (comparison inject hole).
+const silentOnly = buildBookingActivityTimeline({
+  bookings: [
+    {
+      id: "6",
+      unique_code: "BK6",
+      status: "requested",
+      notes: serializeCalendarEntryNotes("", {
+        requestDirection: "outgoing",
+        originalServices: [
+          {
+            id: "hair",
+            name: "hair dye",
+            price: 44,
+            durationMins: 60,
+            startTime: "09:00",
+            endTime: "10:00",
+          },
+        ],
+        services: [
+          {
+            id: "hair",
+            name: "hair dye",
+            price: 44,
+            durationMins: 60,
+            startTime: "09:00",
+            endTime: "10:00",
+          },
+          {
+            id: "buzz",
+            name: "buzz cutt",
+            price: 44,
+            durationMins: 15,
+            startTime: "10:00",
+            endTime: "10:15",
+            guestId: "g1",
+          },
+        ],
+        silentUpdated: true,
+        silentUpdateSnapshot: {
+          phoneCode: "+32",
+          phoneNumber: "470000000",
+        },
+      }),
+      created_at: "2026-09-21T15:52:00.000Z",
+      updated_at: "2026-09-21T15:52:00.000Z",
+      booking_date: "2026-09-21",
+      start_time: "09:00:00",
+    },
+  ],
+  clientName: "Client",
+  currentBookingId: "6",
+  currentBookingCode: "BK6",
+  currentScenario: "BR",
+  currentStatus: "Requested",
+  currentDetails: {
+    originalServices: [
+      {
+        id: "hair",
+        name: "hair dye",
+        price: 44,
+        durationMins: 60,
+        startTime: "09:00",
+        endTime: "10:00",
+      },
+    ],
+    services: [
+      {
+        id: "hair",
+        name: "hair dye",
+        price: 44,
+        durationMins: 60,
+        startTime: "09:00",
+        endTime: "10:00",
+      },
+      {
+        id: "buzz",
+        name: "buzz cutt",
+        price: 44,
+        durationMins: 15,
+        startTime: "10:00",
+        endTime: "10:15",
+        guestId: "g1",
+      },
+    ],
+    silentUpdated: true,
+  },
+  currentDateISO: "2026-09-21",
+  currentStart: "09:00",
+  apiEvents: [
+    {
+      id: "d1",
+      bookingId: "6",
+      kind: "booking_request_sent",
+      actor: "professional",
+      actorLabel: "Professional",
+      title: "Booking Request sent",
+      occurredAt: "2026-09-21T15:52:00.000Z",
+    },
+  ],
+  mode: "activity",
+});
+assert.equal(
+  silentOnly.some((item) => item.kind === "edit_request_sent"),
+  false,
+  "silentUpdated + guest-line noise must not invent Edited Booking Request sent",
+);
+assert.ok(
+  silentOnly.some((item) => item.kind === "booking_request_sent"),
+  "silent path still shows Booking Request sent",
+);
+
+// Brand-new Requested BR (client details case): only BR sent, never Edited.
+const newRequestedBr = buildBookingActivityTimeline({
+  bookings: [
+    {
+      id: "7",
+      unique_code: "ol1790006208534ad88",
+      status: "requested",
+      notes: serializeCalendarEntryNotes("", {
+        requestDirection: "incoming",
+        clientSnapshot: {
+          services: [
+            { id: "hair", name: "hair dye", price: 44, durationMins: 60 },
+            { id: "buzz", name: "buzz cutt", price: 44, durationMins: 15 },
+          ],
+        },
+      }),
+      created_at: "2026-09-21T15:52:00.000Z",
+      updated_at: "2026-09-21T15:52:00.000Z",
+      booking_date: "2026-09-21",
+      start_time: "09:00:00",
+    },
+  ],
+  clientName: "Client",
+  currentBookingId: "7",
+  currentBookingCode: "ol1790006208534ad88",
+  currentScenario: "BR",
+  currentStatus: "Requested",
+  currentDetails: {
+    services: [
+      { id: "hair", name: "hair dye", price: 44, durationMins: 60 },
+      { id: "buzz", name: "buzz cutt", price: 44, durationMins: 15 },
+    ],
+  },
+  apiEvents: [
+    {
+      id: "e1",
+      bookingId: "7",
+      kind: "booking_request_sent",
+      actor: "client",
+      actorLabel: "Client",
+      title: "Booking Request sent",
+      occurredAt: "2026-09-21T15:52:00.000Z",
+    },
+  ],
+  mode: "activity",
+});
+assert.equal(
+  newRequestedBr.some((item) => item.kind === "edit_request_sent"),
+  false,
+  "new Requested booking Activity must not show Edited Booking Request sent",
+);
+assert.equal(
+  newRequestedBr.some((item) =>
+    String(item.title).includes("Edited Booking Request"),
+  ),
+  false,
+  "new Requested booking must not use Edited Booking Request title",
+);
+assert.ok(
+  newRequestedBr.some((item) => item.title === "Booking Request sent"),
+  "new Requested booking shows Booking Request sent",
+);
+
 console.log("buildBookingActivityTimeline.test.ts passed");
