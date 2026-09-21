@@ -90,18 +90,16 @@ export default function ClientBookingDateCalendarPanel({
           sx={{
             width: 24,
             height: 24,
-            border: `1px solid ${alpha(m.teal, 0.45)}`,
-            color: m.teal,
+            color: alpha(m.navy, 0.45),
             ...(isPastDay(addMonths(selectedDate, -1))
               ? {
                   opacity: 0.45,
-                  borderColor: alpha(m.navy, 0.1),
-                  color: alpha(m.navy, 0.35),
+                  color: alpha(m.navy, 0.28),
                 }
               : null),
           }}
         >
-          <ChevronLeftRoundedIcon sx={{ fontSize: 16 }} />
+          <ChevronLeftRoundedIcon sx={{ fontSize: 18 }} />
         </IconButton>
         <ButtonBase
           onClick={(e) => setMonthPickerAnchor(e.currentTarget)}
@@ -133,11 +131,10 @@ export default function ClientBookingDateCalendarPanel({
           sx={{
             width: 24,
             height: 24,
-            border: `1px solid ${alpha(m.teal, 0.45)}`,
-            color: m.teal,
+            color: alpha(m.navy, 0.45),
           }}
         >
-          <ChevronRightRoundedIcon sx={{ fontSize: 16 }} />
+          <ChevronRightRoundedIcon sx={{ fontSize: 18 }} />
         </IconButton>
       </Stack>
 
@@ -292,14 +289,12 @@ export default function ClientBookingDateCalendarPanel({
           sx={{
             width: 24,
             height: 24,
-            border: `1px solid ${alpha(m.teal, 0.35)}`,
-            color: m.teal,
+            color: alpha(m.navy, 0.4),
             flexShrink: 0,
             ...(isPastDay(addDays(selectedDate, -7))
               ? {
                   opacity: 0.45,
-                  borderColor: alpha(m.navy, 0.1),
-                  color: alpha(m.navy, 0.35),
+                  color: alpha(m.navy, 0.28),
                 }
               : null),
           }}
@@ -433,8 +428,7 @@ export default function ClientBookingDateCalendarPanel({
           sx={{
             width: 24,
             height: 24,
-            border: `1px solid ${alpha(m.teal, 0.35)}`,
-            color: m.teal,
+            color: alpha(m.navy, 0.4),
             flexShrink: 0,
           }}
         >

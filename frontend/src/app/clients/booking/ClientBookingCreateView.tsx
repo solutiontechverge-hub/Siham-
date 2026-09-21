@@ -151,6 +151,7 @@ export default function ClientBookingCreateView() {
     handleProjectFilePick,
     deleteProjectUpload,
     deleteGuest,
+    combineServices,
     setCombineServices,
   } = page;
 
@@ -360,6 +361,10 @@ export default function ClientBookingCreateView() {
                     minimumTimeslotNotice={minimumTimeslotNotice}
                     requiresPersonAssignment={requiresPersonAssignment}
                     isNotesCardSelected={isNotesCardSelected}
+                    showCombineServices={!isDesiredLocation}
+                    combineServices={combineServices}
+                    setCombineServices={setCombineServices}
+                    servicesCount={page.services.length}
                   />
 
                   {isDesiredLocation && isPlanningCardSelected ? (
@@ -379,7 +384,7 @@ export default function ClientBookingCreateView() {
                     />
                   ) : (
                     <>
-                      <Divider />
+                      <Divider sx={{ my: 1.5 }} />
                       <ClientBookingServicesDetailsPanel
                         serviceTab={serviceTab}
                         setServiceTab={setServiceTab}
@@ -391,9 +396,6 @@ export default function ClientBookingCreateView() {
                         selectedTeamMemberId={selectedTeamMemberId}
                         applySharedTeamMember={applySharedTeamMember}
                         sharedTeamMemberOptions={sharedTeamMemberOptions}
-                        services={page.services}
-                        bookServicesAtSameTime={bookServicesAtSameTime}
-                        setCombineServices={setCombineServices}
                         hasUnassigned={hasUnassigned}
                         visible={visible}
                         allVisibleSelected={allVisibleSelected}

@@ -3,7 +3,9 @@
 import * as React from "react";
 import {
   Box,
+  Checkbox,
   Chip,
+  FormControlLabel,
   IconButton,
   Menu,
   MenuItem,
@@ -48,6 +50,11 @@ export type ClientBookingPeopleSectionProps = {
   minimumTimeslotNotice: string | null;
   requiresPersonAssignment: boolean;
   isNotesCardSelected: boolean;
+  /** Fixed-location only: combine / book-at-same-time toggle. */
+  showCombineServices?: boolean;
+  combineServices?: boolean;
+  setCombineServices?: (value: boolean) => void;
+  servicesCount?: number;
 };
 
 export default function ClientBookingPeopleSection({
@@ -76,6 +83,10 @@ export default function ClientBookingPeopleSection({
   minimumTimeslotNotice,
   requiresPersonAssignment,
   isNotesCardSelected,
+  showCombineServices = false,
+  combineServices = true,
+  setCombineServices,
+  servicesCount = 0,
 }: ClientBookingPeopleSectionProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -105,6 +116,7 @@ export default function ClientBookingPeopleSection({
         direction="row"
         alignItems="center"
         justifyContent="flex-end"
+        spacing={1.5}
         sx={{
           mb: 1,
           position: "sticky",
@@ -114,6 +126,35 @@ export default function ClientBookingPeopleSection({
           bgcolor: "#fff",
         }}
       >
+        {showCombineServices && servicesCount > 1 && setCombineServices ? (
+          <FormControlLabel
+            control={
+              <Checkbox
+                size="small"
+                checked={combineServices}
+                onChange={(e) => setCombineServices(e.target.checked)}
+                sx={{
+                  p: 0.5,
+                  "&.Mui-checked": { color: m.teal },
+                  color: alpha(m.navy, 0.35),
+                }}
+              />
+            }
+            label={
+              <Typography
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: m.headingText,
+                  lineHeight: 1.2,
+                }}
+              >
+                Combine Services
+              </Typography>
+            }
+            sx={{ mr: 0, ml: 0 }}
+          />
+        ) : null}
         {isDesiredLocation || canAddFixedLocationGuest ? (
           <Chip
             icon={
@@ -155,11 +196,11 @@ export default function ClientBookingPeopleSection({
             sx={{
               height: 32,
               borderRadius: "10px",
-              fontSize: 11.5,
-              fontWeight: theme.typography.fontWeightRegular,
+              fontSize: 12,
+              fontWeight: 700,
               bgcolor: m.white,
-              borderColor: m.cardBorder,
-              color: m.headingText,
+              borderColor: alpha(m.teal, 0.55),
+              color: m.teal,
               "& .MuiChip-icon": {
                 color: m.addSoftFg,
                 ml: 0.6,
@@ -170,8 +211,8 @@ export default function ClientBookingPeopleSection({
                 pr: 1,
               },
               "&:hover": {
-                bgcolor: m.white,
-                borderColor: m.cardBorder,
+                bgcolor: alpha(m.teal, 0.04),
+                borderColor: m.teal,
                 "& .MuiChip-icon": {
                   bgcolor: m.addSoftBgHover,
                   color: m.addSoftFg,
@@ -267,7 +308,7 @@ export default function ClientBookingPeopleSection({
               sx={{
                 flex: 1,
                 borderRadius: "10px",
-                border: `1px solid ${active ? alpha(m.navy, 0.28) : alpha(m.navy, 0.1)}`,
+                border: `1.5px solid ${active ? m.teal : alpha(m.navy, 0.12)}`,
                 bgcolor: "#fff",
                 px: 1,
                 pt: 1.05,
@@ -306,28 +347,27 @@ export default function ClientBookingPeopleSection({
                   sx={{
                     position: "absolute",
                     right: 4,
-                    bottom: 4,
+                    top: 4,
                     zIndex: 2,
                     width: 22,
                     height: 22,
-                    borderRadius: "999px",
-                    bgcolor: alpha(m.navy, 0.04),
-                    color: alpha(m.navy, 0.5),
+                    p: 0,
+                    color: alpha(m.navy, 0.45),
                     "&:hover": {
-                      bgcolor: alpha(m.navy, 0.08),
+                      bgcolor: "transparent",
                       color: alpha(m.navy, 0.72),
                     },
                   }}
                   aria-label={`Remove ${p.name}`}
                 >
-                  <DeleteOutlineRoundedIcon sx={{ fontSize: 14 }} />
+                  <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
                 </IconButton>
               ) : null}
 
               <Stack
                 spacing={0.55}
                 sx={{
-                  pb: p.isRequester ? 0 : 2.25,
+                  pt: p.isRequester ? 0 : 0.5,
                   alignItems: "center",
                 }}
               >
@@ -449,11 +489,10 @@ export default function ClientBookingPeopleSection({
         <Box
           sx={{
             mt: 1.25,
-            borderRadius: "10px",
-            bgcolor: alpha(m.teal, 0.08),
-            border: `1px solid ${alpha(m.teal, 0.18)}`,
-            px: 1.25,
-            py: 0.65,
+            borderRadius: "8px",
+            bgcolor: alpha(m.teal, 0.1),
+            px: 1.35,
+            py: 0.75,
             display: "flex",
             alignItems: "center",
             gap: 0.75,
@@ -463,10 +502,12 @@ export default function ClientBookingPeopleSection({
             sx={{ fontSize: 16, color: m.teal, flexShrink: 0 }}
           />
           <Typography
-            sx={mollureLabelSx(m.navy, {
-              color: alpha(m.navy, 0.6),
-              lineHeight: 1.2,
-            })}
+            sx={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: alpha(m.navy, 0.62),
+              lineHeight: 1.25,
+            }}
           >
             Assign Services By Selecting The Person
           </Typography>
