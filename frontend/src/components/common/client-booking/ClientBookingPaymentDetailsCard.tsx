@@ -3,7 +3,7 @@
 import { mollureLabelSx } from "../../../theme/mollureHierarchy";
 
 import * as React from "react";
-import { Avatar, Box, Paper, Stack } from "@mui/material";
+import { Box, Paper, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import BookingPriceBreakdown from "../booking-finance/BookingPriceBreakdown";
 import {
@@ -209,6 +209,14 @@ export default function ClientBookingPaymentDetailsCard({
     px: 1.5,
     py: 1.25,
   } as const;
+  /** Soft grey panel — same token as BookingStartEndTimeRow. */
+  const softPanelSx = {
+    borderRadius: "10px",
+    border: `1px solid ${alpha(m.navy, 0.08)}`,
+    bgcolor: alpha(m.navy, 0.04),
+    px: 1.5,
+    py: 1.25,
+  } as const;
 
   return (
     <Paper
@@ -232,56 +240,6 @@ export default function ClientBookingPaymentDetailsCard({
         >
           Booking & Payment Details
         </BodyText>
-        <Stack
-          direction="row"
-          alignItems="center"
-          spacing={1.25}
-          sx={{
-            mb: 2,
-            px: 1.25,
-            py: 1.1,
-            borderRadius: "10px",
-            border: `1px solid ${alpha(m.navy, 0.08)}`,
-            bgcolor: "#fff",
-          }}
-        >
-          <Avatar
-            src={requesterAvatarUrl}
-            sx={{
-              width: 34,
-              height: 34,
-              bgcolor: alpha(m.teal, 0.12),
-              color: m.teal,
-              fontWeight: 900,
-              fontSize: 14,
-            }}
-          >
-            {requesterName.charAt(0).toUpperCase()}
-          </Avatar>
-          <Stack spacing={0.25}>
-            <BodyText
-              sx={{
-                m: 0,
-                ...mollureLabelSx(m.navy),
-                lineHeight: 1.2,
-              }}
-            >
-              {requesterName}
-            </BodyText>
-            {requesterEmail ? (
-              <BodyText
-                sx={{
-                  m: 0,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: alpha(m.navy, 0.55),
-                }}
-              >
-                {requesterEmail}
-              </BodyText>
-            ) : null}
-          </Stack>
-        </Stack>
 
         {hasProject ? (
           <Box
@@ -358,6 +316,9 @@ export default function ClientBookingPaymentDetailsCard({
           draft={draft}
           catalogProducts={catalogProducts}
           catalogUniqueItems={catalogUniqueItems}
+          requesterName={requesterName}
+          requesterEmail={requesterEmail}
+          requesterAvatarUrl={requesterAvatarUrl}
           editedServiceIds={editedServiceIds}
           addedServiceIds={addedServiceIds}
           cancelledServiceIds={cancelledServiceIds}
@@ -372,7 +333,14 @@ export default function ClientBookingPaymentDetailsCard({
           onEditTagSignpostClick={onEditTagSignpostClick}
         />
 
-        <Box sx={{ mt: 2 }}>
+        <Box
+          sx={{
+            mt: 2,
+            ...softPanelSx,
+            // plain variant adds a separator for non-panel layouts — drop it inside the grey panel
+            "& > .MuiBox-root": { borderTop: "none", pt: 0, mt: 0 },
+          }}
+        >
           <BookingPriceBreakdown
             totalPrice={priceSummary.breakdown.bookingTotal}
             originalPrice={priceSummary.originalPrice}
@@ -393,6 +361,7 @@ export default function ClientBookingPaymentDetailsCard({
             remainingAmount={
               prepaymentState === "none" ? undefined : remaining
             }
+            prepaymentPaid={prepaymentPaid}
             extraRows={
               extrasAmount > 0
                 ? [

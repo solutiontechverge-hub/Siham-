@@ -201,8 +201,17 @@ export function hydrateBookingDrawerFromEvent(ev: CalendarEvent): BookingDrawerH
     phoneCode: splitPhone.countryCode,
     phoneNumber: splitPhone.phone,
     desiredLocation: details.desiredLocation ?? emptyDesiredLocation(),
-    showPrepayment: Boolean(details.showPrepayment),
-    prepaymentPercent: details.prepaymentPercent ?? "",
+    showPrepayment:
+      Boolean(details.showPrepayment) ||
+      details.prepaymentStatus === "confirmed" ||
+      details.prepaymentStatus === "pending" ||
+      (Number(details.prepaymentPercent) || 0) > 0,
+    // Client notes may store percent as a number — keep drawer state as string.
+    prepaymentPercent:
+      details.prepaymentPercent != null &&
+      String(details.prepaymentPercent).trim() !== ""
+        ? String(details.prepaymentPercent).trim()
+        : "",
     paymentMethod: details.paymentMethod ?? "online",
     showLateCancellation: Boolean(details.showLateCancellation),
     lateCancellationFeePercent: details.lateCancellationFeePercent ?? "",
