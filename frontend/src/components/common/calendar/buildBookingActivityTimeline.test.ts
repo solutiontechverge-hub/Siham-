@@ -3,6 +3,29 @@
  */
 import assert from "node:assert/strict";
 import { buildBookingActivityTimeline } from "./buildBookingActivityTimeline";
+import { serializeCalendarEntryNotes } from "./bookingEventDetails";
+import { buildAcceptAckDetails } from "./bookingAcknowledgment";
+import { parseCalendarEntryNotes } from "./bookingEventDetails";
+
+const erNotes = serializeCalendarEntryNotes(
+  "",
+  {
+    originalGuests: [
+      { id: "g1", name: "Ali", participantType: "guest", services: [] },
+      { id: "p1", name: "Planning", participantType: "planning", services: [] },
+    ],
+    guests: [
+      { id: "g1", name: "umerarshad", participantType: "guest", services: [] },
+      { id: "p1", name: "Planning", participantType: "planning", services: [] },
+    ],
+  },
+  null,
+  {
+    status: "pending",
+    initiatedBy: "professional",
+    note: "Please update guest name",
+  },
+);
 
 const items = buildBookingActivityTimeline({
   bookings: [
@@ -10,7 +33,7 @@ const items = buildBookingActivityTimeline({
       id: "1",
       unique_code: "BK1",
       status: "confirmed",
-      notes: null,
+      notes: erNotes,
     },
   ],
   clientName: "Client",
@@ -46,7 +69,18 @@ const snapshotFallback = buildBookingActivityTimeline({
       id: "2",
       unique_code: "BK2",
       status: "confirmed",
-      notes: null,
+      notes: serializeCalendarEntryNotes(
+        "",
+        {
+          guests: [
+            { id: "g1", name: "umerarshad", participantType: "guest", services: [] },
+          ],
+          silentUpdated: true,
+          silentUpdateSnapshot: {
+            guests: [{ id: "g1", name: "Ali", participantType: "guest", services: [] }],
+          },
+        },
+      ),
     },
   ],
   clientName: "Client",
@@ -58,6 +92,7 @@ const snapshotFallback = buildBookingActivityTimeline({
     guests: [
       { id: "g1", name: "umerarshad", participantType: "guest", services: [] },
     ],
+    silentUpdated: true,
     silentUpdateSnapshot: {
       guests: [{ id: "g1", name: "Ali", participantType: "guest", services: [] }],
     },
@@ -147,6 +182,169 @@ assert.equal(
 assert.ok(
   freshCreate.some((item) => item.kind === "booking_created"),
   "fresh create still shows Booking created",
+);
+
+// Scenario EBR alone (misclassified) must not invent Edited without a real EBR payload.
+const ebrScenarioOnly = buildBookingActivityTimeline({
+  bookings: [
+    {
+      id: "4",
+      unique_code: "BK4",
+      status: "requested",
+      notes: null,
+      created_at: "2026-09-21T13:34:00.000Z",
+      updated_at: "2026-09-21T13:34:00.000Z",
+      booking_date: "2026-09-21",
+      start_time: "18:34:00",
+    },
+  ],
+  clientName: "Client",
+  currentBookingId: "4",
+  currentBookingCode: "BK4",
+  currentScenario: "EBR",
+  currentStatus: "Requested",
+  currentDetails: {
+    services: [{ id: "s1", name: "cut", price: 10, durationMins: 15 }],
+  },
+  currentDateISO: "2026-09-21",
+  currentStart: "18:34",
+  apiEvents: [
+    {
+      id: "b1",
+      bookingId: "4",
+      kind: "booking_request_sent",
+      actor: "professional",
+      actorLabel: "Professional",
+      title: "Booking Request sent",
+      occurredAt: "2026-09-21T13:34:00.000Z",
+    },
+  ],
+  mode: "activity",
+});
+assert.equal(
+  ebrScenarioOnly.some((item) => item.kind === "edit_request_sent"),
+  false,
+  "EBR scenario alone must not invent Edited Booking Request sent",
+);
+
+// BR send → accept → confirm/prepaid must not invent Edited.
+const priorDetails = {
+  requestDirection: "outgoing" as const,
+  originalServices: [
+    {
+      id: "hair",
+      name: "test - hair dye",
+      price: 64,
+      durationMins: 135,
+      startTime: "09:00",
+      endTime: "11:15",
+    },
+  ],
+  services: [
+    {
+      id: "hair",
+      name: "test - hair dye",
+      price: 64,
+      durationMins: 135,
+      startTime: "09:00",
+      endTime: "11:15",
+    },
+  ],
+  showPrepayment: true,
+  prepaymentPercent: "100",
+};
+const priorNotes = serializeCalendarEntryNotes("", priorDetails);
+const ackDetails = buildAcceptAckDetails({
+  prepayRequired: true,
+  prepayPaid: true,
+  requestDirection: "outgoing",
+  ackScenario: "BR",
+  base: parseCalendarEntryNotes(priorNotes),
+});
+const afterAcceptNotes = serializeCalendarEntryNotes(
+  ackDetails.internalNote ?? "",
+  ackDetails,
+);
+const brAcceptPath = buildBookingActivityTimeline({
+  bookings: [
+    {
+      id: "5",
+      unique_code: "BK5",
+      status: "confirmed",
+      notes: afterAcceptNotes,
+      created_at: "2026-09-21T13:34:00.000Z",
+      updated_at: "2026-09-21T15:07:00.000Z",
+      booking_date: "2026-09-21",
+      start_time: "09:00:00",
+      prepayment_status: "paid",
+      total_price: 64,
+    },
+  ],
+  clientName: "Client",
+  currentBookingId: "5",
+  currentBookingCode: "BK5",
+  currentScenario: "BR",
+  currentStatus: "Confirmed",
+  currentDetails: {
+    ...ackDetails,
+    // lastEditedBy alone (no ER/EBR / line ids) must not invent Edited.
+    lastEditedBy: "professional",
+  },
+  currentDateISO: "2026-09-21",
+  currentStart: "09:00",
+  apiEvents: [
+    {
+      id: "c1",
+      bookingId: "5",
+      kind: "booking_prepaid",
+      actor: "client",
+      actorLabel: "Client",
+      title: "Booking prepaid",
+      subtitle: "Online Direct (64.00 EUR)",
+      occurredAt: "2026-09-21T15:07:00.000Z",
+    },
+    {
+      id: "c2",
+      bookingId: "5",
+      kind: "booking_confirmed",
+      actor: "professional",
+      actorLabel: "Professional",
+      title: "Confirmed",
+      occurredAt: "2026-09-21T15:07:00.000Z",
+    },
+    {
+      id: "c3",
+      bookingId: "5",
+      kind: "booking_accepted",
+      actor: "professional",
+      actorLabel: "Professional",
+      title: "Booking Request Accepted",
+      occurredAt: "2026-09-21T15:07:00.000Z",
+    },
+    {
+      id: "c4",
+      bookingId: "5",
+      kind: "booking_request_sent",
+      actor: "professional",
+      actorLabel: "Professional",
+      title: "Booking Request sent",
+      occurredAt: "2026-09-21T13:34:00.000Z",
+    },
+  ],
+  mode: "activity",
+});
+assert.equal(
+  brAcceptPath.some((item) => item.kind === "edit_request_sent"),
+  false,
+  "BR accept/prepaid must not show Edited Booking Request sent",
+);
+assert.ok(
+  brAcceptPath.some((item) => item.kind === "booking_request_sent"),
+  "BR accept path still shows Booking Request sent",
+);
+assert.ok(
+  brAcceptPath.some((item) => item.kind === "booking_accepted"),
+  "BR accept path still shows Booking Request Accepted",
 );
 
 console.log("buildBookingActivityTimeline.test.ts passed");
