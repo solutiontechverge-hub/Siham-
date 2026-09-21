@@ -4,6 +4,7 @@ import * as React from "react";
 import type { CalendarBookingDetails } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { ClientBookingStatus } from "../../../app/clients/booking/clientBookingRecords";
 import {
+  allowComputedServiceAddCancelTags,
   detectProductLineChanges,
   detectServiceLineChanges,
   flattenBookingServices,
@@ -256,27 +257,25 @@ export function useClientBookingLineChangeTags(input: {
     editRequest.suggestedProducts,
   ]);
 
+  // Only ER/EBR baselines (originalServices). Falling back to services/draft
+  // false-tags every fresh create (guest lines → Added, field drift → Edited).
   const healedServiceLineChanges = React.useMemo(() => {
+    const empty = {
+      added: [] as string[],
+      edited: [] as string[],
+      cancelled: [] as string[],
+    };
+    const baseline = bookingNotesMeta?.originalServices ?? [];
+    if (!baseline.length) return empty;
     const original = flattenBookingServices({
-      services:
-        bookingNotesMeta?.originalServices ??
-        bookingNotesMeta?.services ??
-        draft?.services ??
-        displayDraft?.services ??
-        [],
-      guests: bookingNotesMeta?.originalGuests ?? bookingNotesMeta?.guests,
+      services: baseline,
+      guests: bookingNotesMeta?.originalGuests,
     });
     const current = flattenBookingServices({
       services: displayDraft?.services ?? draft?.services ?? [],
       guests: bookingNotesMeta?.guests,
     });
-    if (!original.length) {
-      return {
-        added: [] as string[],
-        edited: [] as string[],
-        cancelled: [] as string[],
-      };
-    }
+    if (!original.length) return empty;
     const reorderOnly = hasServiceReorderOnly({
       previousServices: original.filter(
         (service) => !String(service.guestId ?? "").trim(),
@@ -284,8 +283,7 @@ export function useClientBookingLineChangeTags(input: {
       currentServices: current.filter(
         (service) => !String(service.guestId ?? "").trim(),
       ),
-      previousGuests:
-        bookingNotesMeta?.originalGuests ?? bookingNotesMeta?.guests,
+      previousGuests: bookingNotesMeta?.originalGuests,
       currentGuests: bookingNotesMeta?.guests,
     });
     const computed = detectServiceLineChanges(original, current);
@@ -298,10 +296,16 @@ export function useClientBookingLineChangeTags(input: {
     bookingNotesMeta?.guests,
     bookingNotesMeta?.originalGuests,
     bookingNotesMeta?.originalServices,
-    bookingNotesMeta?.services,
     displayDraft?.services,
     draft?.services,
   ]);
+
+  // Match pro drawer: computed Added/Cancelled only while awaiting approval.
+  const allowHealedComputedLineTags = allowComputedServiceAddCancelTags({
+    hasExistingBooking: Boolean(activeBooking) && bookingStatus !== "draft",
+    isEditingExisting: false,
+    awaitingLineApproval: clientChangesAwaitingApproval,
+  });
 
   const clientVisibleEditedServiceIds = React.useMemo(() => {
     const merged = [
@@ -312,14 +316,18 @@ export function useClientBookingLineChangeTags(input: {
       ...(activeBooking?.incomingEditRequest?.editedServiceIds ?? []),
     ];
     if (merged.length) return [...new Set(merged)];
-    // Heal wiped IDs after silent save: still show Edited from original vs current.
-    if (healedServiceLineChanges.edited.length) {
+    // Heal wiped IDs only from an explicit ER/EBR originalServices baseline.
+    if (
+      allowHealedComputedLineTags &&
+      healedServiceLineChanges.edited.length
+    ) {
       return [...healedServiceLineChanges.edited];
     }
     return undefined;
   }, [
     activeBooking?.editedServiceIds,
     activeBooking?.incomingEditRequest?.editedServiceIds,
+    allowHealedComputedLineTags,
     bookingNotesMeta?.editedServiceIds,
     editRequest.editedServiceIds,
     healedServiceLineChanges.edited,
@@ -334,11 +342,14 @@ export function useClientBookingLineChangeTags(input: {
           ...(bookingNotesMeta?.addedServiceIds ?? []),
           ...(editRequest.addedServiceIds ?? []),
           ...(activeBooking?.incomingEditRequest?.addedServiceIds ?? []),
-          ...healedServiceLineChanges.added,
+          ...(allowHealedComputedLineTags
+            ? healedServiceLineChanges.added
+            : []),
         ]),
       ],
     [
       activeBooking?.incomingEditRequest?.addedServiceIds,
+      allowHealedComputedLineTags,
       bookingNotesMeta?.addedServiceIds,
       editRequest.addedServiceIds,
       healedServiceLineChanges.added,
@@ -354,11 +365,14 @@ export function useClientBookingLineChangeTags(input: {
           ...(bookingNotesMeta?.cancelledServiceIds ?? []),
           ...(editRequest.cancelledServiceIds ?? []),
           ...(activeBooking?.incomingEditRequest?.cancelledServiceIds ?? []),
-          ...healedServiceLineChanges.cancelled,
+          ...(allowHealedComputedLineTags
+            ? healedServiceLineChanges.cancelled
+            : []),
         ]),
       ],
     [
       activeBooking?.incomingEditRequest?.cancelledServiceIds,
+      allowHealedComputedLineTags,
       bookingNotesMeta?.cancelledServiceIds,
       editRequest.cancelledServiceIds,
       healedServiceLineChanges.cancelled,

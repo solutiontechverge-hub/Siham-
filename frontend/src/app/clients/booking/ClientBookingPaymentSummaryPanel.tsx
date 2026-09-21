@@ -110,7 +110,7 @@ export default function ClientBookingPaymentSummaryPanel({
             lineHeight: 1.2,
           })}
         >
-          Booking and Payment Details
+          Service Summary
         </Typography>
       </Box>
       <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
@@ -235,7 +235,7 @@ export default function ClientBookingPaymentSummaryPanel({
               </Typography>
             </Box>
           ) : null}
-          {summarySections.map((section, sectionIndex) => {
+          {summarySections.map((section) => {
             const {
               key,
               isRequester,
@@ -250,7 +250,6 @@ export default function ClientBookingPaymentSummaryPanel({
               participantHeadingOrdinal(section, ordinals),
             );
             const planningMeta = planningScheduleMeta(section);
-            const useGuestCardStyle = !isRequester || isDesiredLocation;
             const isGuestOrModel =
               participantType === "guest" || participantType === "model";
             // Guest/Model: name lives in the header — never a fake person/schedule card.
@@ -266,7 +265,15 @@ export default function ClientBookingPaymentSummaryPanel({
               participantType === "buffer" ||
               participantType === "planning";
             return (
-              <Box key={key}>
+              <Box
+                key={key}
+                sx={{
+                  borderRadius: "10px",
+                  bgcolor: m.fxGrayF2F4F7,
+                  px: 1.2,
+                  py: 1,
+                }}
+              >
                 <Stack
                   direction="row"
                   alignItems="center"
@@ -276,7 +283,7 @@ export default function ClientBookingPaymentSummaryPanel({
                   <Typography
                     sx={{
                       fontWeight: 900,
-                      fontSize: isRequester ? 12 : 13,
+                      fontSize: isRequester ? 14 : 15,
                       color: m.headingText,
                       lineHeight: 1,
                       display: "flex",
@@ -319,12 +326,10 @@ export default function ClientBookingPaymentSummaryPanel({
                     <Box
                       sx={{
                         borderRadius: "10px",
-                        border: useGuestCardStyle
-                          ? "none"
-                          : `1px solid ${alpha(m.navy, 0.08)}`,
+                        border: `1px solid ${alpha(m.navy, 0.08)}`,
                         px: 1.2,
                         py: 0.9,
-                        bgcolor: useGuestCardStyle ? m.fxGrayF2F4F7 : "#fff",
+                        bgcolor: "#fff",
                       }}
                     >
                       <Box sx={{ minWidth: 0 }}>
@@ -389,14 +394,10 @@ export default function ClientBookingPaymentSummaryPanel({
                         key={`${s.id}::${s.guestId ?? ""}::${index}`}
                         sx={{
                           borderRadius: "10px",
-                          border: useGuestCardStyle
-                            ? "none"
-                            : `1px solid ${alpha(m.navy, 0.08)}`,
+                          border: `1px solid ${alpha(m.navy, 0.08)}`,
                           px: 1.2,
                           py: 0.9,
-                          bgcolor: useGuestCardStyle
-                            ? m.fxGrayF2F4F7
-                            : "#fff",
+                          bgcolor: "#fff",
                         }}
                       >
                         <Stack
@@ -491,9 +492,6 @@ export default function ClientBookingPaymentSummaryPanel({
                     );
                   })}
                 </Stack>
-                {sectionIndex < summarySections.length - 1 ? (
-                  <Divider sx={{ mt: 1.1 }} />
-                ) : null}
               </Box>
             );
           })}

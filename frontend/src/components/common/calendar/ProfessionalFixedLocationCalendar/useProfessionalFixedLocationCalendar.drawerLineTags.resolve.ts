@@ -237,14 +237,27 @@ export function useProfessionalFixedLocationCalendarDrawerLineTagsResolve(
         savedBookingDetails?.originalGuests,
       currentGuests: bookingGuests,
     });
+    const hasExplicitOriginalBaseline = Boolean(
+      negotiationDetails?.originalServices?.length ||
+        viewingBookingEvent?.details?.originalServices?.length,
+    );
     const editedSource = (() => {
       if (reorderOnly || suppressComputedErLineTags) return [] as string[];
       // Live ER: trust persisted negotiation tags until the client responds.
       if (awaitingLineApproval && storedEdited.length) return storedEdited;
+      // View-after-create: no originalServices → do not invent Edited from
+      // guests-only fallback baselines. Live edit still recomputes.
+      if (
+        !isEditingExisting &&
+        !awaitingLineApproval &&
+        !hasExplicitOriginalBaseline
+      ) {
+        return storedEdited;
+      }
       // Recompute when we have a baseline so stale notes.editedServiceIds
       // (e.g. false multi-guest id collisions) do not sticky-badge on view.
       if (original.length > 0) return computed.edited;
-      return [] as string[];
+      return storedEdited;
     })();
     return {
       added,

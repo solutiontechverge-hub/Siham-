@@ -100,12 +100,16 @@ export default function ClientBookingServicesDetailsPanel({
         direction="row"
         alignItems="center"
         justifyContent="space-between"
-        sx={{ mb: 1 }}
+        sx={{
+          mb: 1,
+          pb: 1,
+          borderBottom: `1px solid ${alpha(m.navy, 0.12)}`,
+        }}
       >
         <Typography
           sx={{
             fontSize: 12,
-            fontWeight: theme.typography.fontWeightRegular,
+            fontWeight: theme.typography.fontWeightBold,
             color: m.headingText,
           }}
         >
@@ -217,70 +221,75 @@ export default function ClientBookingServicesDetailsPanel({
         </Box>
       ) : null}
 
-      {!isDesiredLocation && services.length > 1 ? (
-        <FormControlLabel
-          sx={{ mb: 1.25, ml: 0, alignItems: "flex-start" }}
-          control={
-            <Switch
-              size="small"
-              checked={bookServicesAtSameTime}
-              onChange={(e) => setCombineServices(e.target.checked)}
-              sx={{
-                mt: 0.15,
-                "& .MuiSwitch-switchBase.Mui-checked": { color: m.teal },
-                "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
-                  bgcolor: m.teal,
-                },
-              }}
-            />
-          }
-          label={
-            <Stack spacing={0.15}>
-              <Typography sx={mollureBodySx(m.navy, { fontWeight: 800 })}>
-                Book services at the same time
-              </Typography>
-              <Typography sx={{ fontSize: 11, color: alpha(m.navy, 0.48) }}>
-                Duration uses the longest service instead of adding them sequentially.
-              </Typography>
-            </Stack>
-          }
-        />
-      ) : null}
-
-      {hasUnassigned && serviceTab === "unassigned" && visible.length > 1 ? (
+      {(!isDesiredLocation && services.length > 1) ||
+      (hasUnassigned && serviceTab === "unassigned" && visible.length > 1) ? (
         <Stack
           direction="row"
-          alignItems="center"
-          justifyContent="flex-end"
-          sx={{ mb: 1 }}
+          alignItems="flex-start"
+          justifyContent="space-between"
+          spacing={1}
+          sx={{ mb: 1.25 }}
         >
-          <FormControlLabel
-            control={
-              <Checkbox
-                size="small"
-                checked={allVisibleSelected}
-                indeterminate={someVisibleSelected}
-                onChange={(e) => {
-                  const checked = e.target.checked;
-                  const next: Record<string, boolean> = {};
-                  for (const s of visible) next[s.id] = checked;
-                  setSelectedServiceIds(next);
-                }}
-                sx={{
-                  "&.Mui-checked": { color: m.teal },
-                  color: alpha(m.navy, 0.35),
-                }}
-              />
-            }
-            label={
-              <Typography
-                sx={mollureLabelSx(m.navy)}
-              >
-                Select All
-              </Typography>
-            }
-            sx={{ mr: 0 }}
-          />
+          {!isDesiredLocation && services.length > 1 ? (
+            <FormControlLabel
+              sx={{ ml: 0, mr: 0, alignItems: "flex-start", flex: 1, minWidth: 0 }}
+              control={
+                <Switch
+                  size="small"
+                  checked={bookServicesAtSameTime}
+                  onChange={(e) => setCombineServices(e.target.checked)}
+                  sx={{
+                    mt: 0.15,
+                    "& .MuiSwitch-switchBase.Mui-checked": { color: m.teal },
+                    "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
+                      bgcolor: m.teal,
+                    },
+                  }}
+                />
+              }
+              label={
+                <Stack spacing={0.15}>
+                  <Typography sx={mollureBodySx(m.navy, { fontWeight: 800 })}>
+                    Book services at the same time
+                  </Typography>
+                  <Typography sx={{ fontSize: 11, color: alpha(m.navy, 0.48) }}>
+                    Duration uses the longest service instead of adding them
+                    sequentially.
+                  </Typography>
+                </Stack>
+              }
+            />
+          ) : (
+            <Box sx={{ flex: 1 }} />
+          )}
+
+          {hasUnassigned &&
+          serviceTab === "unassigned" &&
+          visible.length > 1 ? (
+            <FormControlLabel
+              control={
+                <Checkbox
+                  size="small"
+                  checked={allVisibleSelected}
+                  indeterminate={someVisibleSelected}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    const next: Record<string, boolean> = {};
+                    for (const s of visible) next[s.id] = checked;
+                    setSelectedServiceIds(next);
+                  }}
+                  sx={{
+                    "&.Mui-checked": { color: m.teal },
+                    color: alpha(m.navy, 0.35),
+                  }}
+                />
+              }
+              label={
+                <Typography sx={mollureLabelSx(m.navy)}>Select All</Typography>
+              }
+              sx={{ mr: 0, ml: 0, flexShrink: 0, alignItems: "center" }}
+            />
+          ) : null}
         </Stack>
       ) : null}
 
@@ -608,21 +617,6 @@ export default function ClientBookingServicesDetailsPanel({
         ) : null}
       </Stack>
 
-      {serviceTab === "unassigned" && canDirectAssign ? (
-        <Box sx={{ mt: 1.25 }}>
-          <AppButton
-            tone="primary"
-            fullWidth
-            onClick={assignSelectedDirect}
-            sx={{
-              height: 40,
-            }}
-          >
-            Assign
-          </AppButton>
-        </Box>
-      ) : null}
-
       <ButtonBase
         onClick={openAddServiceDialog}
         disabled={!canAddService}
@@ -673,6 +667,21 @@ export default function ClientBookingServicesDetailsPanel({
           service to assignment list
         </Typography>
       </ButtonBase>
+
+      {serviceTab === "unassigned" && canDirectAssign ? (
+        <Box sx={{ mt: 1.25 }}>
+          <AppButton
+            tone="primary"
+            fullWidth
+            onClick={assignSelectedDirect}
+            sx={{
+              height: 40,
+            }}
+          >
+            Assign
+          </AppButton>
+        </Box>
+      ) : null}
     </Box>
   );
 }

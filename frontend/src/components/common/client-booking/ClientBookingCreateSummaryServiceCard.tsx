@@ -187,13 +187,7 @@ export default function ClientBookingCreateSummaryServiceCard({
         <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
 
         <Box sx={{ px: { xs: 2, md: 2.5 }, py: 1.75 }}>
-          {summarySections.length > 0 ? (
-            <Typography sx={catalogHeadingSx}>Service</Typography>
-          ) : null}
-          <Stack
-            spacing={1.5}
-            divider={<Divider sx={{ borderColor: alpha(m.navy, 0.08) }} />}
-          >
+          <Stack spacing={1.5}>
             {summarySections.map((section) => {
               const roleLabel = roleLabelForSection(section);
               const ordinals = participantOrdinals(summarySections);
@@ -203,7 +197,15 @@ export default function ClientBookingCreateSummaryServiceCard({
               );
               const planningMeta = planningScheduleMeta(section);
               return (
-                <Box key={section.key}>
+                <Box
+                  key={section.key}
+                  sx={{
+                    borderRadius: "10px",
+                    bgcolor: m.fxGrayF2F4F7,
+                    px: 1.25,
+                    py: 1.1,
+                  }}
+                >
                   <Stack
                     direction="row"
                     alignItems="center"
@@ -213,7 +215,7 @@ export default function ClientBookingCreateSummaryServiceCard({
                     <Typography
                       sx={mollureLabelSx(m.navy, {
                         fontWeight: 900,
-                        fontSize: 13,
+                        fontSize: 15,
                         lineHeight: 1,
                         display: "flex",
                         alignItems: "center",
@@ -262,10 +264,10 @@ export default function ClientBookingCreateSummaryServiceCard({
                       <Box
                         sx={{
                           borderRadius: "10px",
-                          border: `1px solid ${alpha(m.navy, 0.06)}`,
+                          border: `1px solid ${alpha(m.navy, 0.08)}`,
                           px: 1.25,
                           py: 1,
-                          bgcolor: alpha(m.navy, 0.015),
+                          bgcolor: "#fff",
                         }}
                       >
                         <Stack
@@ -330,10 +332,10 @@ export default function ClientBookingCreateSummaryServiceCard({
                           key={item.id}
                           sx={{
                             borderRadius: "10px",
-                            border: `1px solid ${alpha(m.navy, 0.06)}`,
+                            border: `1px solid ${alpha(m.navy, 0.08)}`,
                             px: 1.25,
                             py: 1,
-                            bgcolor: alpha(m.navy, 0.015),
+                            bgcolor: "#fff",
                           }}
                         >
                           <Stack

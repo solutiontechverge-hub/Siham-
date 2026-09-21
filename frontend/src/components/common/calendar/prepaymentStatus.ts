@@ -56,7 +56,8 @@ export function resolveCalendarPrepaymentStatus(
   event: Pick<CalendarEvent, "status" | "details">,
 ): CalendarPrepaymentStatus | undefined {
   const details = event.details;
-  if (!details?.showPrepayment) return undefined;
+  // Paid/pending status alone implies prepayment applies (notes may lose showPrepayment).
+  if (!details?.showPrepayment && !details?.prepaymentStatus) return undefined;
 
   const finished =
     event.status === "Completed" ||

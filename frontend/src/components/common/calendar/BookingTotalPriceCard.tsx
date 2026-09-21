@@ -4,7 +4,11 @@ import * as React from "react";
 import { Box, Divider, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { mollureSectionTitleSx } from "../../../theme/mollureHierarchy";
-import { formatCompactEuro } from "../booking-finance/formatBookingFinance";
+import {
+  formatCompactEuro,
+  prepaidBreakdownLabel,
+  remainingBreakdownLabel,
+} from "../booking-finance/formatBookingFinance";
 
 export type BookingPriceSummaryLine = {
   label: string;
@@ -99,10 +103,7 @@ export default function BookingTotalPriceCard({
 }: BookingTotalPriceCardProps) {
   const m = useTheme().palette.mollure;
   const showPrepay = prepaidAmount > 0 || (prepaidPercent ?? 0) > 0;
-  const prepaidLabel =
-    prepaidPercent && prepaidPercent > 0
-      ? `Prepaid ${prepaidPercent}%`
-      : "Prepaid";
+  const prepaidLabel = prepaidBreakdownLabel(prepaidPercent ?? 0, true);
   const remaining =
     remainingAmount ??
     Math.round((totalPrice - prepaidAmount + Number.EPSILON) * 100) / 100;
@@ -110,6 +111,11 @@ export default function BookingTotalPriceCard({
     Math.round((remaining + Number.EPSILON) * 100) / 100 !==
     Math.round((totalPrice + Number.EPSILON) * 100) / 100;
   const renderRemaining = showRemaining && remainingDiffersFromTotal;
+  const remainingLabel = remainingBreakdownLabel(
+    prepaidPercent ?? 0,
+    remaining,
+    totalPrice,
+  );
   const showStrike = originalPrice != null && originalPrice > totalPrice;
   const visibleLines = lines.filter((line) => line.amount > 0);
   const hasBreakdown = visibleLines.length > 0 || showPrepay;
@@ -119,7 +125,7 @@ export default function BookingTotalPriceCard({
       sx={{
         borderRadius: embedded ? 0 : "10px",
         border: embedded ? "none" : `1px solid ${m.cardBorder}`,
-        bgcolor: embedded ? "transparent" : m.white,
+        bgcolor: embedded ? "transparent" : alpha(m.navy, 0.04),
         px: embedded ? 0 : 2,
         py: embedded ? 0 : 1.5,
       }}
@@ -151,7 +157,7 @@ export default function BookingTotalPriceCard({
           />
           {renderRemaining ? (
             <SummaryRow
-              label="Remaining"
+              label={remainingLabel}
               value={formatCompactEuro(remaining)}
               muted
             />

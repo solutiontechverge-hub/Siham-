@@ -35,6 +35,8 @@ import BookingRequestAcceptedPanel from "../BookingRequestAcceptedPanel";
 
 import BookingDrawerTotalPriceCard from "../BookingDrawerTotalPriceCard";
 
+import { isOfflinePaymentMethod } from "../../client-booking/checkoutPaymentOptions";
+
 import { useProfessionalFixedLocationCalendar } from "./useProfessionalFixedLocationCalendar";
 
 type Vm = ReturnType<typeof useProfessionalFixedLocationCalendar>;
@@ -123,6 +125,42 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsNot
     totalPrice,
     viewingBookingEvent,
   } = bag;
+
+  const effectivePrepayPercent =
+    Number(prepaymentPercent) ||
+    Number(viewingBookingEvent?.details?.prepaymentPercent) ||
+    0;
+  const showPrepayBreakdown =
+    (showPrepayment ||
+      isDrawerPrepaymentPaid ||
+      Boolean(viewingBookingEvent?.details?.showPrepayment)) &&
+    effectivePrepayPercent > 0;
+  // When drawer showPrepayment lagged, feeState amount is 0 — derive from % × afterDiscount.
+  const displayPrepaidAmount =
+    prepaymentAmount > 0
+      ? prepaymentAmount
+      : showPrepayBreakdown
+        ? Math.round(
+            ((bookingPrice.afterDiscount * effectivePrepayPercent) / 100 +
+              Number.EPSILON) *
+              100,
+          ) / 100
+        : 0;
+  // Prefer feeState remaining when it already applied prepay rules (incl. offline = full total).
+  const offlinePrepay = isOfflinePaymentMethod(
+    viewingBookingEvent?.details?.paymentMethod,
+  );
+  const displayRemaining = showPrepayBreakdown
+    ? prepaymentAmount > 0
+      ? remainingAfterPrepayment
+      : offlinePrepay
+        ? bookingTotalForSave
+        : Math.round(
+            (Math.max(0, bookingTotalForSave - displayPrepaidAmount) +
+              Number.EPSILON) *
+              100,
+          ) / 100
+    : undefined;
 
   return (
     <>
@@ -233,10 +271,12 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsNot
                 totalPrice={drawerPriceDisplay.displayTotal}
                 originalPrice={drawerPriceDisplay.originalPrice}
                 prepaymentPercent={
-                  Number(prepaymentPercent) || undefined
+                  showPrepayBreakdown ? effectivePrepayPercent : undefined
                 }
-                prepaymentAmount={prepaymentAmount}
-                remainingAmount={remainingAfterPrepayment}
+                prepaymentAmount={displayPrepaidAmount}
+                remainingAmount={
+                  displayRemaining ?? remainingAfterPrepayment
+                }
                 lines={priceSummaryLines}
                 discountAmount={bookingDiscountAmount}
                 onOk={() =>
@@ -246,7 +286,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsNot
             ) : (
               <BookingDrawerTotalPriceCard
                 payableTotal={
-                  showPrepayment
+                  showPrepayBreakdown
                     ? bookingTotalForSave
                     : drawerPriceDisplay.displayTotal
                 }
@@ -265,13 +305,13 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsNot
                 }
                 noShowFeeAmount={bookingPrice.noShowFeeAmount}
                 prepaidApplied={
-                  isDrawerPrepaymentPaid ? prepaymentAmount : 0
+                  isDrawerPrepaymentPaid ? displayPrepaidAmount : 0
                 }
-                showPrepayment={showPrepayment}
+                showPrepayment={showPrepayBreakdown}
                 prepaymentPaid={isDrawerPrepaymentPaid}
-                prepaymentPercent={Number(prepaymentPercent) || 0}
-                prepaymentAmount={prepaymentAmount}
-                remainingAmount={remainingAfterPrepayment}
+                prepaymentPercent={effectivePrepayPercent}
+                prepaymentAmount={displayPrepaidAmount}
+                remainingAmount={displayRemaining}
                 extraRows={
                   kilometerAllowanceAmount > 0
                     ? [

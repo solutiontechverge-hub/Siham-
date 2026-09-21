@@ -18,6 +18,11 @@ assert.equal(isPolicyFeeConfigured("50"), true);
 
 assert.equal(canAddPrepayment({}), true);
 assert.equal(canAddPrepayment({ alreadyShown: true }), false);
+assert.equal(canAddPrepayment({ alreadyPaid: true }), false);
+assert.equal(
+  canAddPrepayment({ alreadyShown: false, alreadyPaid: true }),
+  false,
+);
 
 assert.equal(
   canAddLateCancellation({

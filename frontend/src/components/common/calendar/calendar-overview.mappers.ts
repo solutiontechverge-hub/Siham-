@@ -456,8 +456,16 @@ export function mapCalendarBookingToEvent(
         : {}),
       phoneCode: splitPhone.countryCode,
       phoneNumber: splitPhone.phone,
-      showPrepayment: showPrepaymentFromApi || Boolean(parsedNotes?.showPrepayment),
+      showPrepayment:
+        showPrepaymentFromApi ||
+        Boolean(parsedNotes?.showPrepayment) ||
+        (Number(parsedNotes?.prepaymentPercent) || 0) > 0,
       ...(mappedPrepayStatus ? { prepaymentStatus: mappedPrepayStatus } : {}),
+      ...((Number(parsedNotes?.prepaymentPercent) || 0) > 0
+        ? {
+            prepaymentPercent: String(parsedNotes!.prepaymentPercent).trim(),
+          }
+        : {}),
       ...(displayClientNote ? { clientNote: displayClientNote } : {}),
       ...(professionalInternalNote
         ? {
@@ -516,7 +524,6 @@ export function mapCalendarBookingToEvent(
                     parsedNotes.exceededCancellationWindow,
                 }
               : {}),
-            prepaymentPercent: parsedNotes.prepaymentPercent,
             ...(mappedPrepayStatus
               ? { prepaymentStatus: mappedPrepayStatus }
               : parsedNotes.prepaymentStatus
