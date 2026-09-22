@@ -218,4 +218,20 @@ const withoutKm = mapApiBookingToClientRecord(
 const kmAmount = Number(eurPerKm) * Number(totalKilometer);
 assert.equal(kmRecord.draft?.total, withoutKm + kmAmount);
 
+// Notes prepaymentStatus confirmed ⇒ prepaid even when column still unpaid.
+const notesPaidOnly = mapApiBookingToClientRecord(
+  bookingWithNotes({
+    ...snapshotOnlyMeta,
+    showPrepayment: true,
+    prepaymentStatus: "confirmed",
+  }),
+);
+assert.equal(notesPaidOnly.prepaid, true);
+assert.equal(
+  mapApiBookingToClientRecord(
+    bookingWithNotes({ ...snapshotOnlyMeta, showPrepayment: true }),
+  ).prepaid,
+  false,
+);
+
 console.log("clientBookingApi.mapper.test.ts: all assertions passed");

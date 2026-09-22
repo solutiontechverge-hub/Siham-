@@ -7,6 +7,7 @@ import { submitClientBookingRequest } from "../../../app/clients/booking/submitC
 import { resolveCreateBookingStatus } from "../../../app/clients/booking/resolveCreateBookingStatus";
 import {
   getActiveBookingSession,
+  notifyActiveBookingChanged,
   setActiveBookingSession,
 } from "../../../app/clients/booking/clientBookingSession";
 import { getApiErrorMessage } from "../../../lib/api-error";
@@ -159,6 +160,7 @@ export function useClientBookingPrepaySubmit(input: {
           ...(confirmAfterPay ? { status: "confirmed" as const } : {}),
           ...(paidNotes ? { notes: paidNotes } : {}),
         });
+        notifyActiveBookingChanged();
       }
 
       await refreshActiveBooking();
