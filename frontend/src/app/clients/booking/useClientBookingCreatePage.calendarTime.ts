@@ -203,7 +203,8 @@ export function useClientBookingCreateCalendarTime() {
   const [selectedTime, setSelectedTime] = React.useState(() => {
     const mins = getNowMinutesFromMidnight() + CLIENT_BOOKING_MIN_LEAD_MINUTES;
     const future = allDayTimes.filter((t) => parseTimeLabelToMinutes(t) > mins);
-    return future[0] ?? allDayTimes[0] ?? "";
+    // Prefer empty over a disabled past slot; page effect picks first available.
+    return future[0] ?? "";
   });
   const [timeValidationError, setTimeValidationError] = React.useState<
     string | null

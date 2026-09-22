@@ -19,6 +19,7 @@ import { parseBookingListTab } from "../../../app/clients/booking/bookingPillTab
 import {
   getActiveBookingSession,
   getCreateReturnHref,
+  notifyActiveBookingChanged,
   setActiveBookingSession,
 } from "../../../app/clients/booking/clientBookingSession";
 import { submitClientBookingRequest } from "../../../app/clients/booking/submitClientBookingRequest";
@@ -558,6 +559,8 @@ export default function ClientBookingCreateSummaryView() {
         ...(paidNotes ? { notes: paidNotes } : {}),
       };
       setActiveBookingSession(paidSession);
+      // Session write alone does not re-render; bump so Book Now unlocks before list refetch.
+      notifyActiveBookingChanged();
       await refreshActiveBooking();
 
       void syncFinanceFromBooking({
@@ -602,15 +605,13 @@ export default function ClientBookingCreateSummaryView() {
 
     setIsPaying(true);
     try {
-      // Create server booking first, then collect card — do not mark paid until Stripe succeeds.
-      const record = await ensureBookingCreated();
-      if (!record) return;
-      setStripeDialogOpen(true);
+      // ponytail: testing shortcut — mark prepaid via completePrepayment (same as Stripe onSuccess); restore setStripeDialogOpen(true) when real card checkout is needed.
+      await completePrepayment();
     } finally {
       setIsPaying(false);
     }
   }, [
-    ensureBookingCreated,
+    completePrepayment,
     isPaying,
     isPrepaymentPaid,
     prepayAmount,

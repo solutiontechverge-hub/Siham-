@@ -16,6 +16,7 @@ import {
 } from "../../../app/clients/booking/clientBookingDraftCache";
 import { useGetMyBookingsQuery } from "../../../store/services/businessApi";
 import type { ClientBookingRecord } from "../../../app/clients/booking/clientBookingRecords";
+import { parseCalendarEntryNotes } from "../calendar/bookingEventDetails";
 
 function normalizeBookingLookup(value: string | null | undefined) {
   return String(value ?? "")
@@ -58,12 +59,37 @@ function bookingContentKey(record: ClientBookingRecord | null | undefined) {
   return [
     record.notes ?? "",
     record.status,
+    record.prepaid ? "1" : "0",
     record.draft?.total ?? "",
     record.draft?.services?.length ?? 0,
     record.draft?.products?.length ?? 0,
     (record.draft?.services ?? []).map((s) => `${s.id}:${s.price}`).join("|"),
     (record.draft?.products ?? []).map((p) => `${p.id}:${p.price}x${p.quantity}`).join("|"),
   ].join("::");
+}
+
+/** Column can lag after Pay Now; notes `prepaymentStatus: confirmed` is set in the same write. */
+function notesMarkPrepaymentPaid(notes: string | null | undefined) {
+  return parseCalendarEntryNotes(notes)?.prepaymentStatus === "confirmed";
+}
+
+function resolveActivePrepaid(
+  fromApi: ClientBookingRecord,
+  sessionRecord: ClientBookingRecord | null,
+): { prepaid: boolean; notes: string | null | undefined } {
+  const apiPaid =
+    Boolean(fromApi.prepaid) || notesMarkPrepaymentPaid(fromApi.notes);
+  const sessionPaid =
+    sessionRecord != null &&
+    sameBooking(fromApi, sessionRecord) &&
+    notesMarkPrepaymentPaid(sessionRecord.notes);
+  return {
+    prepaid: apiPaid || sessionPaid,
+    notes:
+      sessionPaid && !apiPaid
+        ? (sessionRecord.notes ?? fromApi.notes)
+        : fromApi.notes,
+  };
 }
 
 export function useActiveClientBooking() {
@@ -128,10 +154,12 @@ export function useActiveClientBooking() {
     // Editor just returned with new time/services — do not let stale API win.
     if (draftLocked && sessionRecord?.draft) {
       if (fromApi && sameBooking(fromApi, sessionRecord)) {
+        const paid = resolveActivePrepaid(fromApi, sessionRecord);
         return enrichClientBookingRecord({
           ...fromApi,
           draft: sessionRecord.draft,
-          notes: sessionRecord.notes ?? fromApi.notes,
+          prepaid: paid.prepaid,
+          notes: paid.notes ?? sessionRecord.notes ?? fromApi.notes,
         });
       }
       return enrichClientBookingRecord(sessionRecord);
@@ -140,18 +168,23 @@ export function useActiveClientBooking() {
     if (fromApi && sessionRecord && sameBooking(fromApi, sessionRecord) && sessionRecord.draft && fromApi.draft) {
       // API is source of truth for pro BR updates; session only fills missing guest/project richness.
       const draft = mergeClientBookingDraftRichness(fromApi.draft, sessionRecord.draft);
+      const paid = resolveActivePrepaid(fromApi, sessionRecord);
       return enrichClientBookingRecord({
         ...fromApi,
         draft,
-        // Do not keep a stale session "prepaid" when the API still says unpaid —
-        // that made clients think they paid while professional Accept stayed blocked.
-        prepaid: Boolean(fromApi.prepaid),
+        prepaid: paid.prepaid,
+        notes: paid.notes,
         incomingEditRequest: fromApi.incomingEditRequest ?? sessionRecord.incomingEditRequest,
       });
     }
 
     if (fromApi) {
-      return enrichClientBookingRecord(fromApi);
+      const paid = resolveActivePrepaid(fromApi, sessionRecord);
+      return enrichClientBookingRecord({
+        ...fromApi,
+        prepaid: paid.prepaid,
+        notes: paid.notes,
+      });
     }
 
     if (!sessionRecord) return null;

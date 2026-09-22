@@ -146,6 +146,7 @@ type ActiveBookingLineSlice = {
   editedServiceIds?: string[] | null;
   editedProductIds?: string[] | null;
   incomingEditRequest?: {
+    status?: string | null;
     editedServiceIds?: string[] | null;
     addedServiceIds?: string[] | null;
     cancelledServiceIds?: string[] | null;

@@ -65,6 +65,24 @@ export default function ClientBookingDateCalendarPanel({
 }: ClientBookingDateCalendarPanelProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
+  const tealCircleNavSx = {
+    width: 26,
+    height: 26,
+    borderRadius: "50%",
+    bgcolor: m.teal,
+    color: m.white,
+    "&:hover": { bgcolor: m.tealDark },
+    "&.Mui-disabled": {
+      bgcolor: alpha(m.teal, 0.35),
+      color: m.white,
+    },
+  } as const;
+  const tealCircleScrollSx = {
+    ...tealCircleNavSx,
+    width: 28,
+    height: 28,
+    flexShrink: 0,
+  } as const;
 
   return (
     <Box id="booking-calendar-section" sx={{ p: 1.5 }}>
@@ -87,19 +105,9 @@ export default function ClientBookingDateCalendarPanel({
             const prevMonth = addMonths(selectedDate, -1);
             return isPastDay(prevMonth);
           })()}
-          sx={{
-            width: 24,
-            height: 24,
-            color: alpha(m.navy, 0.45),
-            ...(isPastDay(addMonths(selectedDate, -1))
-              ? {
-                  opacity: 0.45,
-                  color: alpha(m.navy, 0.28),
-                }
-              : null),
-          }}
+          sx={tealCircleNavSx}
         >
-          <ChevronLeftRoundedIcon sx={{ fontSize: 18 }} />
+          <ChevronLeftRoundedIcon sx={{ fontSize: 16 }} />
         </IconButton>
         <ButtonBase
           onClick={(e) => setMonthPickerAnchor(e.currentTarget)}
@@ -115,8 +123,8 @@ export default function ClientBookingDateCalendarPanel({
         >
           <Typography
             sx={mollureLabelSx(m.navy, {
-              fontWeight: 900,
-              fontSize: 13,
+              fontWeight: 800,
+              fontSize: 14,
             })}
           >
             {monthLabel}
@@ -128,13 +136,9 @@ export default function ClientBookingDateCalendarPanel({
         <IconButton
           size="small"
           onClick={() => setSelectedDate((d) => addMonths(d, 1))}
-          sx={{
-            width: 24,
-            height: 24,
-            color: alpha(m.navy, 0.45),
-          }}
+          sx={tealCircleNavSx}
         >
-          <ChevronRightRoundedIcon sx={{ fontSize: 18 }} />
+          <ChevronRightRoundedIcon sx={{ fontSize: 16 }} />
         </IconButton>
       </Stack>
 
@@ -286,18 +290,7 @@ export default function ClientBookingDateCalendarPanel({
             })
           }
           disabled={isPastDay(addDays(selectedDate, -7))}
-          sx={{
-            width: 24,
-            height: 24,
-            color: alpha(m.navy, 0.4),
-            flexShrink: 0,
-            ...(isPastDay(addDays(selectedDate, -7))
-              ? {
-                  opacity: 0.45,
-                  color: alpha(m.navy, 0.28),
-                }
-              : null),
-          }}
+          sx={tealCircleScrollSx}
         >
           <ChevronLeftRoundedIcon sx={{ fontSize: 18 }} />
         </IconButton>
@@ -321,6 +314,7 @@ export default function ClientBookingDateCalendarPanel({
                 : null;
             const disabled = past || closed || noSlots;
             const blocked = closed || noSlots;
+            const faded = past || blocked;
             return (
               <Tooltip
                 key={d.key}
@@ -350,36 +344,20 @@ export default function ClientBookingDateCalendarPanel({
                       minWidth: 0,
                       borderRadius: "8px",
                       border: `1px solid ${
-                        past
-                          ? alpha(m.navy, 0.08)
-                          : blocked
-                            ? alpha(m.blockedTimeFg, 0.45)
-                            : active
-                              ? m.teal
-                              : m.cardBorder
-                      }`,
-                      bgcolor: past
-                        ? alpha(m.navy, 0.015)
-                        : blocked
-                          ? m.blockedTimeBg
+                        faded
+                          ? alpha(m.navy, 0.1)
                           : active
                             ? m.teal
-                            : m.white,
+                            : m.cardBorder
+                      }`,
+                      bgcolor: active && !faded ? m.teal : m.white,
                       py: 0.9,
                       display: "flex",
                       flexDirection: "column",
                       gap: 0.35,
                       pointerEvents: disabled ? "none" : "auto",
-                      "&.Mui-disabled": {
-                        opacity: past ? 0.45 : 1,
-                      },
-                      ...(past
-                        ? {
-                            opacity: 0.45,
-                            cursor: "not-allowed",
-                          }
-                        : null),
-                      ...(blocked
+                      "&.Mui-disabled": { opacity: 1 },
+                      ...(faded
                         ? {
                             cursor: "not-allowed",
                           }
@@ -388,30 +366,27 @@ export default function ClientBookingDateCalendarPanel({
                   >
                     <Typography
                       sx={{
-                        fontSize: 10,
-                        fontWeight: 800,
-                        color: past
-                          ? alpha(m.navy, 0.55)
-                          : blocked
-                            ? m.blockedTimeFg
-                            : active
-                              ? m.white
-                              : m.headingText,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: faded
+                          ? alpha(m.navy, 0.38)
+                          : active
+                            ? m.white
+                            : m.headingText,
                       }}
                     >
                       {d.dow}
                     </Typography>
                     <Typography
                       sx={{
-                        fontSize: 13.5,
-                        fontWeight: 900,
-                        color: past
-                          ? alpha(m.navy, 0.76)
-                          : blocked
-                            ? m.blockedTimeFg
-                            : active
-                              ? m.white
-                              : m.headingText,
+                        fontSize: 14,
+                        fontWeight: 800,
+                        color: faded
+                          ? alpha(m.navy, 0.38)
+                          : active
+                            ? m.white
+                            : m.headingText,
+                        textDecoration: faded ? "line-through" : "none",
                       }}
                     >
                       {d.day}
@@ -425,12 +400,7 @@ export default function ClientBookingDateCalendarPanel({
         <IconButton
           size="small"
           onClick={() => setSelectedDate((d) => addDays(d, 7))}
-          sx={{
-            width: 24,
-            height: 24,
-            color: alpha(m.navy, 0.4),
-            flexShrink: 0,
-          }}
+          sx={tealCircleScrollSx}
         >
           <ChevronRightRoundedIcon sx={{ fontSize: 18 }} />
         </IconButton>
