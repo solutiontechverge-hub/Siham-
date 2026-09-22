@@ -566,7 +566,10 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
     return Math.max(15, eh * 60 + em - (sh * 60 + sm));
   })();
   const priceEach = names.length > 1 ? Math.round((total / names.length) * 100) / 100 : total;
-  const prepaid = String(booking.prepayment_status ?? "").toLowerCase() === "paid";
+  // Notes confirmed covers column lag right after Pay Now (same write as markNotesPrepaymentPaid).
+  const prepaid =
+    String(booking.prepayment_status ?? "").toLowerCase() === "paid" ||
+    notesDetails?.prepaymentStatus === "confirmed";
   const isEbrIncoming = incomingEditRequest?.status === "suggested";
   const notesRequestDirection = notesDetails?.requestDirection;
   // Notes requestDirection is from the professional's perspective:

@@ -611,22 +611,30 @@ export function useClientBookingCreatePage() {
         }
         cursor = addDays(cursor, 1);
       }
-      return;
-    }
-    // Keep selection on a bookable future slot (nearest by default).
-    if (availableTimes.length > 0 && !availableTimes.includes(selectedTime)) {
-      setSelectedTime(availableTimes[0]);
-      setTimeValidationError(null);
     }
   }, [
-    availableTimes,
     isDayUnselectable,
     isPastDay,
     selectedDate,
-    selectedTime,
     today0,
     profileHydrated,
   ]);
+
+  // Default / repair selection: first available slot when empty or disabled.
+  // Does not override a user-chosen time that is still in availableTimes.
+  React.useEffect(() => {
+    if (availableTimes.length === 0) return;
+    if (selectedTime && availableTimes.includes(selectedTime)) return;
+    setSelectedTime(availableTimes[0]);
+    setTimeValidationError(null);
+  }, [availableTimes, selectedTime]);
+
+  const isSlotUnavailable = React.useCallback(
+    (t: string) =>
+      isTimeUnavailable(t) ||
+      (availableTimes.length > 0 && !availableTimes.includes(t)),
+    [availableTimes, isTimeUnavailable],
+  );
 
   const { applyProfileSelection } = useClientBookingCreateHydration({
     fromProfile,
@@ -878,7 +886,7 @@ export function useClientBookingCreatePage() {
     minBookableMinutes,
     times,
     availableTimes,
-    isTimeUnavailable,
+    isTimeUnavailable: isSlotUnavailable,
     timeScrollRef,
     scrollTimeSlots,
     people,

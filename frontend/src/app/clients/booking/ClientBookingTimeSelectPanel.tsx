@@ -40,6 +40,15 @@ export default function ClientBookingTimeSelectPanel({
 }: ClientBookingTimeSelectPanelProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
+  const tealCircleScrollSx = {
+    width: 28,
+    height: 28,
+    flexShrink: 0,
+    borderRadius: "50%",
+    bgcolor: m.teal,
+    color: m.white,
+    "&:hover": { bgcolor: m.tealDark },
+  } as const;
 
   return (
     <Box sx={{ p: 1.5 }}>
@@ -47,13 +56,18 @@ export default function ClientBookingTimeSelectPanel({
         elevation={0}
         sx={{
           borderRadius: "10px",
-          border: `1px solid ${alpha(m.navy, 0.2)}`,
-          bgcolor: m.fxGrayF2F4F7,
+          border: `1px solid ${m.cardBorder}`,
+          bgcolor: m.white,
           px: 1.25,
           py: 1.1,
         }}
       >
-        <Typography sx={mollureLabelSx(m.navy)}>
+        <Typography
+          sx={mollureLabelSx(m.navy, {
+            fontWeight: 800,
+            fontSize: 13,
+          })}
+        >
           Select Time
         </Typography>
         <Divider
@@ -68,15 +82,7 @@ export default function ClientBookingTimeSelectPanel({
           <IconButton
             size="small"
             onClick={() => scrollTimeSlots("left")}
-            sx={{
-              width: 32,
-              height: 32,
-              flexShrink: 0,
-              borderRadius: "10px",
-              border: `1px solid ${alpha(m.navy, 0.1)}`,
-              color: alpha(m.navy, 0.55),
-              bgcolor: "#fff",
-            }}
+            sx={tealCircleScrollSx}
           >
             <ChevronLeftRoundedIcon sx={{ fontSize: 18 }} />
           </IconButton>
@@ -118,10 +124,9 @@ export default function ClientBookingTimeSelectPanel({
                     minWidth: 76,
                     px: 1.25,
                     height: 32,
-                    fontSize: 11.5,
-                    fontWeight: active
-                      ? theme.typography.fontWeightBold
-                      : theme.typography.fontWeightRegular,
+                    borderRadius: "8px",
+                    fontSize: 12,
+                    fontWeight: 700,
                     whiteSpace: "nowrap",
                     bgcolor: active ? m.teal : m.white,
                     color: active ? m.white : m.headingText,
@@ -131,14 +136,19 @@ export default function ClientBookingTimeSelectPanel({
                       color: active ? m.white : m.headingText,
                       borderColor: active ? m.teal : m.cardBorder,
                     },
+                    "&.Mui-disabled": {
+                      bgcolor: m.white,
+                      borderColor: alpha(m.navy, 0.1),
+                      color: alpha(m.navy, 0.32),
+                    },
                     ...(unavailable
                       ? {
                           bgcolor: m.white,
-                          borderColor: alpha(m.navy, 0.08),
+                          borderColor: alpha(m.navy, 0.1),
                           color: alpha(m.navy, 0.32),
                           "&:hover": {
                             bgcolor: m.white,
-                            borderColor: alpha(m.navy, 0.08),
+                            borderColor: alpha(m.navy, 0.1),
                             color: alpha(m.navy, 0.32),
                           },
                         }
@@ -154,15 +164,7 @@ export default function ClientBookingTimeSelectPanel({
           <IconButton
             size="small"
             onClick={() => scrollTimeSlots("right")}
-            sx={{
-              width: 32,
-              height: 32,
-              flexShrink: 0,
-              borderRadius: "10px",
-              border: `1px solid ${alpha(m.navy, 0.1)}`,
-              color: alpha(m.navy, 0.55),
-              bgcolor: "#fff",
-            }}
+            sx={tealCircleScrollSx}
           >
             <ChevronRightRoundedIcon sx={{ fontSize: 18 }} />
           </IconButton>
