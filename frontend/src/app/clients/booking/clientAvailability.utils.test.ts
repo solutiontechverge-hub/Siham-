@@ -31,7 +31,6 @@ function makeSnapshot(
     slotStepMinutes: 15,
     scheduleAvailability: [],
     dateOverrides: teamMembers.map((m) => openOverride(m.id)),
-    publicBusinessHours: [],
     teamMembers,
     busyByMember,
   };

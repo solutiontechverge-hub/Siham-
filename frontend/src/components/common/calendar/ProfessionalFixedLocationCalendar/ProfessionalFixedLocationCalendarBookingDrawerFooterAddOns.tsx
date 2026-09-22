@@ -121,9 +121,11 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerFooterAddO
     viewingBookingEvent,
   } = bag;
 
+  // Existing bookings only — never on brand-new create draft (!editingEventId).
+  // Per-item status/policy gates live in bookingGroupAddOns canAdd*.
   const showMoreButton =
-    (slotBookingScreen === "new-booking" ||
-      (!isViewingExisting && Boolean(editingEventId))) &&
+    Boolean(editingEventId) &&
+    slotBookingScreen === "new-booking" &&
     slotClientAdded;
 
   return (

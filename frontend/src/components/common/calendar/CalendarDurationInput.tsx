@@ -18,12 +18,16 @@ export type CalendarDurationInputProps = {
   minutes: string;
   onHoursChange: (value: string) => void;
   onMinutesChange: (value: string) => void;
+  /** Atomic hours+minutes update (used when enforcing minTotalMinutes). */
+  onDurationChange?: (hours: string, minutes: string) => void;
   helperText?: string;
   disabled?: boolean;
   hoursUnit?: string;
   minutesUnit?: string;
   /** Pad to 2 digits on every keystroke (settings panel). */
   pad?: boolean;
+  /** Floor total duration on blur (e.g. DL interval min 5). */
+  minTotalMinutes?: number;
 };
 
 export function CalendarDurationInput({
@@ -32,26 +36,60 @@ export function CalendarDurationInput({
   minutes,
   onHoursChange,
   onMinutesChange,
+  onDurationChange,
   helperText,
   disabled,
   hoursUnit = "h",
   minutesUnit = "min",
   pad = false,
+  minTotalMinutes,
 }: CalendarDurationInputProps) {
   const m = useTheme().palette.mollure;
+  const hoursRef = React.useRef(hours);
+  const minutesRef = React.useRef(minutes);
+  hoursRef.current = hours;
+  minutesRef.current = minutes;
+
+  const rootRef = React.useRef<HTMLDivElement | null>(null);
 
   const sanitize = (raw: string) => {
     const digits = raw.replace(/\D/g, "").slice(0, 2);
     return pad ? digits.padStart(2, "0") : digits;
   };
 
+  const handleBlur = (event: React.FocusEvent) => {
+    const next = event.relatedTarget;
+    if (next instanceof Node && rootRef.current?.contains(next)) return;
+    if (minTotalMinutes == null || minTotalMinutes <= 0) return;
+    const h = Number.parseInt(String(hoursRef.current ?? ""), 10);
+    const min = Number.parseInt(String(minutesRef.current ?? ""), 10);
+    const total =
+      (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(min) ? min : 0);
+    if (total >= minTotalMinutes) return;
+    const nextHours = String(Math.floor(minTotalMinutes / 60));
+    const nextMinutes = String(minTotalMinutes % 60);
+    hoursRef.current = nextHours;
+    minutesRef.current = nextMinutes;
+    if (onDurationChange) {
+      onDurationChange(nextHours, nextMinutes);
+      return;
+    }
+    onHoursChange(nextHours);
+    onMinutesChange(nextMinutes);
+  };
+
   return (
-    <Box>
+    <Box ref={rootRef}>
       <BodyText sx={{ ...mollureBodySx(m.navy), mb: 0.85 }}>{label}</BodyText>
       <Stack direction="row" spacing={1.25} alignItems="center">
         <AppTextField
           value={hours}
-          onChange={(e) => onHoursChange(sanitize(e.target.value))}
+          onChange={(e) => {
+            const next = sanitize(e.target.value);
+            hoursRef.current = next;
+            onHoursChange(next);
+          }}
+          onBlur={handleBlur}
           disabled={disabled}
           inputProps={{
             inputMode: "numeric",
@@ -63,7 +101,12 @@ export function CalendarDurationInput({
         <BodyText sx={mollureBodyMutedSx(m.navy)}>{hoursUnit}</BodyText>
         <AppTextField
           value={minutes}
-          onChange={(e) => onMinutesChange(sanitize(e.target.value))}
+          onChange={(e) => {
+            const next = sanitize(e.target.value);
+            minutesRef.current = next;
+            onMinutesChange(next);
+          }}
+          onBlur={handleBlur}
           disabled={disabled}
           inputProps={{
             inputMode: "numeric",

@@ -9,7 +9,6 @@ import type {
   ScheduleAvailabilityRow,
   ScheduleDateOverride,
 } from "../../../components/common/calendar/calendar-settings.types";
-import type { PublicBusinessHoursLike } from "../../../components/common/calendar/calendar.utils";
 import {
   autoAssignServicesByAvailability,
   computeUnionBookableSlots,
@@ -90,7 +89,6 @@ export function useClientBookingCreateAvailability(
       slotStepMinutes: raw.slotStepMinutes,
       scheduleAvailability: raw.scheduleAvailability as ScheduleAvailabilityRow[],
       dateOverrides: raw.dateOverrides as ScheduleDateOverride[],
-      publicBusinessHours: raw.publicBusinessHours as PublicBusinessHoursLike[],
       teamMembers: raw.teamMembers,
       busyByMember: raw.busyByMember,
     };

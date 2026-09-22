@@ -15,7 +15,6 @@ import {
   intervalsOverlap,
   subtractIntervals,
   type Interval,
-  type PublicBusinessHoursLike,
 } from "../../../components/common/calendar/calendar.utils";
 
 export type SetupAvailabilityTeamMember = {
@@ -30,7 +29,6 @@ export type SetupAvailabilitySnapshot = {
   slotStepMinutes: number;
   scheduleAvailability: ScheduleAvailabilityRow[];
   dateOverrides: ScheduleDateOverride[];
-  publicBusinessHours: PublicBusinessHoursLike[];
   teamMembers: SetupAvailabilityTeamMember[];
   busyByMember: Record<string, Array<{ startMin: number; endMin: number }>>;
 };
@@ -41,14 +39,10 @@ export function getMemberWorkingIntervals(
   location: CalendarBookingLocation,
   snapshot: Pick<
     SetupAvailabilitySnapshot,
-    | "scheduleAvailability"
-    | "dateOverrides"
-    | "publicBusinessHours"
+    "scheduleAvailability" | "dateOverrides"
   >,
 ): Interval[] {
-  // Public Hours are display-only — real bookable windows come from Schedule.
-  void snapshot.publicBusinessHours;
-
+  // Public Hours are display-only — bookable windows come from Schedule only.
   const fromSchedule = getLocationAvailabilityIntervals(
     memberId,
     dateIso,

@@ -23,6 +23,7 @@ type Vm = ReturnType<typeof useProfessionalFixedLocationCalendar>;
 export type ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderBag = Pick<
   Vm,
   | "bookingActionAnchor"
+  | "bookingGuests"
   | "businessResponseWindowInput"
   | "handleBookingActionSelect"
   | "handleRestartResponseTime"
@@ -35,6 +36,7 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderBag
   | "openBookingMessages"
   | "postBookingPendingPayment"
   | "responseTimeConfigured"
+  | "selectedServices"
   | "selectedSlot"
   | "setBookingActionAnchor"
   | "setFocusSalesCardId"
@@ -52,14 +54,34 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderPro
   bag: ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderBag;
 };
 
+/** True when duration is known from services / planning / buffer — not grid +15. */
+function hasComputedBookingEnd(
+  selectedServices: Vm["selectedServices"],
+  bookingGuests: Vm["bookingGuests"],
+): boolean {
+  if (selectedServices.length > 0) return true;
+  return bookingGuests.some(
+    (g) =>
+      g.services.length > 0 ||
+      Boolean(g.planningStartTime?.trim() && g.planningEndTime?.trim()) ||
+      Boolean(g.bufferStartTime?.trim() && g.bufferEndTime?.trim()),
+  );
+}
+
 /** Actions / status header (viewing) or New Booking title */
 export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeader({ bag }: ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderProps) {
   const {
+    bookingGuests,
     isViewingBooking,
     m,
+    selectedServices,
     selectedSlot,
     viewingBookingEvent,
   } = bag;
+
+  const newBookingEnd = hasComputedBookingEnd(selectedServices, bookingGuests)
+    ? selectedSlot?.end
+    : undefined;
 
   return (
     <>
@@ -82,7 +104,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
           </BodyText>
           <BookingStartEndTimeRow
             start={selectedSlot?.start}
-            end={selectedSlot?.end}
+            end={newBookingEnd}
           />
         </Stack>
       )}

@@ -18,9 +18,11 @@ export const CALENDAR_HOURS_RULES_COPY = {
   desiredLocation: "Desired Location",
   intervalBetweenBookings: "Interval Between Bookings",
   minimumTimeslot: "Minimum Timeslot",
-  flIntervalHelper: "Set the minimum time between consecutive bookings",
+  flIntervalHelper:
+    "Default 0 (back-to-back). Increase if you need a gap between bookings.",
   dlIntervalHelper: "Minimum 5 minutes (travel buffer). You can increase it.",
-  dlMinTimeslotHelper: "Minimum required team member time at DL location",
+  dlMinTimeslotHelper:
+    "Optional. Leave empty, or set a minimum team-member time at DL.",
   categories: "Categories",
   services: "Services",
   categoriesEditingHint:
@@ -34,7 +36,6 @@ export const CALENDAR_HOURS_RULES_COPY = {
   customizeAppearanceEmpty:
     "Customize Your Calendar Based On Categories Or Services",
   noHoursSetYet: "No hours set yet",
-  variableScheduleFallback: "Variable schedule — add a note when editing.",
   edit: "Edit",
   set: "Set",
   save: "Save",

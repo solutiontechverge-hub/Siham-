@@ -5,6 +5,7 @@ import CalendarHoursRulesPanel from "../CalendarHoursRulesPanel";
 import {
   createEmptyPublicBusinessHoursDraft,
   draftFromPublicBusinessHoursEntries,
+  locationHasPublicHoursConfigured,
 } from "../CalendarPublicBusinessHoursModal";
 import { withClampedDesiredLocationInterval } from "../calendar-settings.types";
 import { useProfessionalFixedLocationCalendar } from "./useProfessionalFixedLocationCalendar";
@@ -83,7 +84,9 @@ export default function ProfessionalFixedLocationCalendarSettingsTab(
       : [];
     if (location === "FL" || location === "DL") {
       setPublicBusinessHoursDraft(
-        draftFromPublicBusinessHoursEntries(existing, location),
+        locationHasPublicHoursConfigured(existing, location)
+          ? draftFromPublicBusinessHoursEntries(existing, location)
+          : createEmptyPublicBusinessHoursDraft(location),
       );
     } else {
       setPublicBusinessHoursDraft(createEmptyPublicBusinessHoursDraft());

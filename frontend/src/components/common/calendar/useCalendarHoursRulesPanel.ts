@@ -399,9 +399,9 @@ export function useLocationHoursBlock({
     preferredScheduleForLocation(location);
   const scheduleLabel = scheduleLabelForType(scheduleType);
   const variableNote = variableNoteForLocation(entries, location);
-  const showInfo = scheduleType === "variable";
-  const infoTitle =
-    variableNote || CALENDAR_HOURS_RULES_COPY.variableScheduleFallback;
+  // Tooltip only for Variable + non-empty note; Fixed / empty → no affordance.
+  const showInfo = scheduleType === "variable" && Boolean(variableNote);
+  const infoTitle = variableNote;
 
   const options = buildHoursDropdownOptions(entries, colors);
   const entriesKey = hoursEntriesKey(entries);
@@ -459,7 +459,6 @@ export function useCalendarHoursRulesPanel({
   const showDl = availableLocations.includes("DL");
   const [appearanceExpanded, setAppearanceExpanded] = React.useState(false);
 
-  const [bookingRulesEditing, setBookingRulesEditing] = React.useState(false);
   const [serviceOrderEditing, setServiceOrderEditing] = React.useState(false);
   const [draggingCategory, setDraggingCategory] = React.useState<string | null>(
     null,
@@ -568,10 +567,6 @@ export function useCalendarHoursRulesPanel({
     inactiveScope,
   );
 
-  const handleBookingRulesEdit = () => {
-    setBookingRulesEditing(true);
-  };
-
   const handleServiceOrderEdit = () => {
     // Always edit on-page (template/platform defaults seed the list; never open a popup).
     setServiceOrderEditing(true);
@@ -584,7 +579,6 @@ export function useCalendarHoursRulesPanel({
         onBookingRulesChange(clamped);
       }
       await onSaveBookingRules(clamped);
-      setBookingRulesEditing(false);
     } catch {
       // Parent handlers already surface errors via snackbar.
     }
@@ -604,7 +598,6 @@ export function useCalendarHoursRulesPanel({
     showDl,
     appearanceExpanded,
     setAppearanceExpanded,
-    bookingRulesEditing,
     serviceOrderEditing,
     draggingCategory,
     setDraggingCategory,
@@ -622,7 +615,6 @@ export function useCalendarHoursRulesPanel({
     appearanceConfigured,
     inactiveScope,
     inactiveColorCount,
-    handleBookingRulesEdit,
     handleServiceOrderEdit,
     handleSaveBookingRules,
     handleSaveServiceOrder,

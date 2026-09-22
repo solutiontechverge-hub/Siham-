@@ -24,10 +24,12 @@ import type {
 import { buildSplitPaymentAmounts, parseSplitBillState, resolveSalesPayerShares } from "./salesSplitBill";
 import { formatFinanceDueDate } from "../booking-finance/formatBookingFinance";
 import { roundBookingMoney as roundMoney } from "../../../data/bookingLinePricing";
+import { computeBookingPrice } from "./bookingTotal";
 import {
   applyVisualState,
   discountLine,
   formatDateLabel,
+  formatDateTimeLabel,
   formatMethodDateTime,
   isInvoicePaymentMethod,
   isOnlineBookingType,
@@ -555,6 +557,100 @@ function hasBookingEnded(endIso: string | null): boolean {
   const end = new Date(endIso);
   if (Number.isNaN(end.getTime())) return false;
   return end.getTime() <= Date.now();
+}
+
+/** Stamp lines for cancellation-fee invoices (time + policy window breach). */
+export function buildCancellationFeeInvoiceMetaLines(input: {
+  cancellationFeeAt?: string | null;
+  exceededCancellationWindow?: boolean;
+}): string[] {
+  const lines: string[] = [];
+  const stamped = formatDateTimeLabel(input.cancellationFeeAt);
+  if (stamped) lines.push(`Cancellation time: ${stamped}`);
+  if (typeof input.exceededCancellationWindow === "boolean") {
+    lines.push(
+      input.exceededCancellationWindow
+        ? "Breached preset cancellation window"
+        : "Within preset cancellation window",
+    );
+  }
+  return lines;
+}
+
+function kilometerExtrasAmount(event: CalendarEvent): number {
+  if (!event.details?.showKilometerAllowance) return 0;
+  const ka = event.details.kilometerAllowance;
+  if (!ka) return 0;
+  const eur = Number(ka.eurPerKm) || 0;
+  const km = Number(ka.totalKilometer) || 0;
+  return roundMoney(Math.max(0, eur * km));
+}
+
+/**
+ * Cancelled / No Show fee-only sales card when protective fee section is active.
+ * Returns null when status/fee gate fails (caller keeps blank Sales for plain cancels).
+ */
+export function resolveProtectiveFeeSalesCardSpec(input: {
+  status?: string | null;
+  showLateCancellation?: boolean;
+  lateCancellationFeePercent?: string | number | null;
+  showNoShowFee?: boolean;
+  noShowFeePercent?: string | number | null;
+  lineSubtotal: number;
+  extrasAmount?: number;
+  discount?: { type: "fixed" | "percentage"; amount: number } | null;
+  cancellationFeeAt?: string | null;
+  exceededCancellationWindow?: boolean;
+}): {
+  title: string;
+  feeLabel: string;
+  feeAmount: number;
+  metaLines: string[];
+} | null {
+  const status = String(input.status ?? "").toLowerCase();
+  const price = computeBookingPrice({
+    lineSubtotal: input.lineSubtotal,
+    extrasAmount: input.extrasAmount ?? 0,
+    discount: input.discount ?? null,
+    showLateCancellation: Boolean(input.showLateCancellation),
+    lateCancellationFeePercent: input.lateCancellationFeePercent ?? undefined,
+    showNoShowFee: Boolean(input.showNoShowFee),
+    noShowFeePercent: input.noShowFeePercent ?? undefined,
+  });
+
+  if (
+    (status === "cancelled" || status === "canceled") &&
+    input.showLateCancellation &&
+    price.lateCancellationFeeAmount > 0
+  ) {
+    return {
+      title: "Cancellation Fee Invoice",
+      feeLabel: "Cancellation fee",
+      feeAmount: price.lateCancellationFeeAmount,
+      metaLines: buildCancellationFeeInvoiceMetaLines({
+        cancellationFeeAt: input.cancellationFeeAt,
+        exceededCancellationWindow: input.exceededCancellationWindow,
+      }),
+    };
+  }
+
+  if (
+    (status === "no_show" || status === "no show") &&
+    input.showNoShowFee &&
+    price.noShowFeeAmount > 0
+  ) {
+    return {
+      title: "No-Show Fee Invoice",
+      feeLabel: "No-show fee",
+      feeAmount: price.noShowFeeAmount,
+      metaLines: buildCancellationFeeInvoiceMetaLines({
+        cancellationFeeAt: input.cancellationFeeAt,
+        exceededCancellationWindow: input.exceededCancellationWindow,
+      }),
+    };
+  }
+
+  return null;
 }
 
 /** Align with client `filterVisiblePaymentSummarySections`: prepaid hides after-treatment until due. */
