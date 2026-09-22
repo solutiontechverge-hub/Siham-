@@ -744,6 +744,23 @@ export default function SalesOverviewCard({
         />
       ) : null}
 
+      {card.metaLines?.length ? (
+        <Stack spacing={0.25} sx={{ mt: 0.75 }}>
+          {card.metaLines.map((line) => (
+            <Typography
+              key={line}
+              sx={{
+                fontSize: 11.5,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.55),
+              }}
+            >
+              {line}
+            </Typography>
+          ))}
+        </Stack>
+      ) : null}
+
       {card.note ? (
         <Typography
           sx={{

@@ -81,9 +81,20 @@ export function buildSalesOverviewCards(input: BuildSalesOverviewInput): SalesOv
     seenBookingIds.add(id);
 
     const status = String(booking.status ?? "").toLowerCase();
+    if (status === "invalid") continue;
+
+    const event = mapCalendarBookingToEvent(booking, fallbackResourceId);
+    const isCancelledStatus = status === "cancelled" || status === "canceled";
+    const isNoShowStatus = status === "no_show" || status === "no show";
+    const protectiveFeeActive =
+      (isCancelledStatus && Boolean(event.details?.showLateCancellation)) ||
+      (isNoShowStatus && Boolean(event.details?.showNoShowFee));
+
+    if (isCancelledStatus && !protectiveFeeActive) continue;
+
     const prepay = String(booking.prepayment_status ?? "").toLowerCase();
-    if (status === "invalid" || status === "cancelled" || status === "canceled") continue;
     if (
+      !protectiveFeeActive &&
       status !== "completed" &&
       status !== "confirmed" &&
       status !== "in_progress" &&
@@ -96,7 +107,6 @@ export function buildSalesOverviewCards(input: BuildSalesOverviewInput): SalesOv
       continue;
     }
 
-    const event = mapCalendarBookingToEvent(booking, fallbackResourceId);
     cards.push(
       ...buildCardsForEvent({
         event,
