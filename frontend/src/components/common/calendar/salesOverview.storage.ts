@@ -97,3 +97,39 @@ export function resolveLiveCardId(bookingId: string, baseId: string): string {
   );
   return `${baseId}-v${maxSeq + 1}`;
 }
+
+const SUPERSEDE_BASE_SUFFIXES = [
+  "prepayment",
+  "summary",
+  "after-treatment",
+] as const;
+
+/**
+ * Pre-resolution booking edit: cancel live unpaid sales cards so rebuild uses a
+ * fresh id (same path as Cancel Sales → resolveLiveCardId), clearing frozen Edit
+ * Sales lines that would otherwise keep stale totals.
+ */
+export function supersedeOpenSalesCardsForBooking(bookingId: string) {
+  if (!bookingId) return;
+  for (const suffix of SUPERSEDE_BASE_SUFFIXES) {
+    const baseId = `${bookingId}-${suffix}`;
+    const liveId = resolveLiveCardId(bookingId, baseId);
+    const meta = getSalesCardMeta(liveId);
+    if (!meta || meta.canceled) continue;
+    // Skip settled cards — do not tear down prepaid/paid/refunded sales.
+    if (meta.paid || meta.paidAt || meta.refunded || meta.voided) continue;
+    const seqMatch = liveId.match(/-v(\d+)$/);
+    upsertSalesCardMeta({
+      bookingId,
+      cardKind:
+        meta.cardKind ??
+        (suffix === "after-treatment" ? "after_treatment" : "prepayment"),
+      cardId: liveId,
+      note: meta.note,
+      paymentMethod: meta.paymentMethod,
+      dueDate: meta.dueDate ?? null,
+      canceled: true,
+      invoiceSeq: seqMatch ? Number(seqMatch[1]) : 0,
+    });
+  }
+}

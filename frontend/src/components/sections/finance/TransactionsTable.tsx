@@ -33,11 +33,14 @@ import {
   type TransactionRow,
   type TransactionStatus,
 } from "../../../app/professionals/fixed-location/finance/data/transactions";
-import { clientPlatformTagToneColors } from "../../common/ClientPlatformTag";
+import {
+  MollureLogoMark,
+  clientPlatformTagToneColors,
+} from "../../common/ClientPlatformTag";
 import { BodyText } from "../../ui/typography";
 
 function clientTypeChipSx(theme: Theme, clientType?: TransactionClientType) {
-  // Guest stays navy; M / IC / BC use the shared teal hierarchy.
+  // Guest stays navy; IC / BC use the shared teal hierarchy.
   const tone = clientType === "guest" ? "navy" : "teal";
   const { color, bgcolor, border } = clientPlatformTagToneColors(
     theme.palette.mollure,
@@ -305,7 +308,9 @@ export default function TransactionsTable({
                             {row.clientName}
                           </BodyText>
                         )}
-                        {clientTypeLabel ? (
+                        {row.clientType === "mollure" ? (
+                          <MollureLogoMark size={14} />
+                        ) : clientTypeLabel ? (
                           <Chip
                             label={clientTypeLabel}
                             size="small"

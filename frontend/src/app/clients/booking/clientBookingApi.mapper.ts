@@ -15,13 +15,16 @@ import { buildResponseDeadline } from "../../../components/common/calendar/booki
 import { syncEditRequestFromBookingApi } from "../../../components/common/client-booking/syncEditRequestFromApi";
 import { mergeBookingTeamMembers } from "../../../components/common/client-booking/buildBookingSummarySections";
 import {
+  mergeBookingClientSnapshots,
+  slimClientSnapshotForLocationDetails,
+} from "../../../components/common/calendar/mergeBookingClientSnapshot";
+import {
   canonicalParticipantRank,
   dedupePlanningPeople,
   extraBookingParticipantIds,
   dedupeServicesByOwner,
 } from "../../../data/bookingChronologicalBlocks";
-import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
-import { inferProjectUploadKind, isProjectUploadImage } from "../../../lib/projectUploadMedia";
+import { isProjectUploadImage, resolveBookingProjectUploads } from "../../../lib/projectUploadMedia";
 import { isUuid } from "../../../lib/uuid";
 import type { BusinessSetupListing, CalendarBooking, CreateBookingRequest } from "../../../store/services/businessApi";
 import { mapApiBookingStatusToClient, mapClientStatusToApi } from "./clientBookingStatus";
@@ -306,22 +309,11 @@ export function buildClientBookingApiPayload(input: {
           }
         : {}),
     })),
+    // Notes keep description only — uploads live in location_details / images (body limit).
     projectDetails: input.draft.projectDetails
       ? {
           description: input.draft.projectDetails.description ?? "",
-          uploads: (input.draft.projectDetails.uploads ?? []).map((u) => ({
-            id: u.id,
-            name: u.name,
-            url: u.url,
-            mimeType: u.mimeType,
-            kind: u.kind,
-            // Omit blob:/data: preview payloads from API notes (keeps POST under body limit).
-            ...(u.url && /^https?:\/\//i.test(u.url)
-              ? { previewUrl: u.url }
-              : u.previewUrl && /^https?:\/\//i.test(u.previewUrl)
-                ? { previewUrl: u.previewUrl }
-                : {}),
-          })),
+          uploads: [],
         }
       : undefined,
     teamMembers: input.draft.teamMembers ?? [],
@@ -388,9 +380,13 @@ export function buildClientBookingApiPayload(input: {
           postal_code: desiredLocation.postalCode.trim() || null,
         }
       : {}),
-    ...(input.draft.projectDetails || hasDesiredVisitAddress
+    ...(input.draft.projectDetails ||
+    hasDesiredVisitAddress ||
+    (clientSnapshot.people?.length ?? 0) > 1
       ? {
           location_details: {
+            // Durable backup: notes meta can truncate; project + people survive here.
+            clientSnapshot: slimClientSnapshotForLocationDetails(clientSnapshot),
             ...(input.draft.projectDetails
               ? {
                   projectDescription,
@@ -480,7 +476,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
   const startLabel = hhmmToTimeLabel(startHhmm);
   const ebr = parseStoredEbrFromNotes(booking.notes);
   const notesDetails = parseCalendarEntryNotes(booking.notes);
-  const clientSnapshot = notesDetails?.clientSnapshot;
+  const notesClientSnapshot = notesDetails?.clientSnapshot;
   const bookingCancelled = String(booking.status ?? "").toLowerCase() === "cancelled";
   const bookingRef = booking.unique_code || String(booking.id);
   // Backend edit_request column is the only source of truth for Confirmed ER.
@@ -586,6 +582,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
     booking.location_details && typeof booking.location_details === "object"
       ? (booking.location_details as {
           projectDescription?: string;
+          clientSnapshot?: CalendarBookingClientSnapshot;
           desiredLocation?: {
             street?: string;
             number?: string;
@@ -602,41 +599,19 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
           }>;
         })
       : null;
-  const detailUploads = Array.isArray(locationDetails?.uploads) ? locationDetails.uploads : [];
-  const imageUploads = (booking.images ?? []).filter(Boolean).map((url, index) => ({
-    id: `img-${index}`,
-    name: `Image ${index + 1}`,
-    url,
-    kind: "image" as const,
-  }));
-  const documentUploads = (booking.documents ?? []).filter(Boolean).map((url, index) => ({
-    id: `doc-${index}`,
-    name: `Document ${index + 1}`,
-    url,
-    kind: "document" as const,
-  }));
-  const projectUploads =
-    detailUploads.length > 0
-      ? detailUploads.map((upload, index) => {
-          const resolved = resolveMediaUrl(upload.url);
-          return {
-            id: upload.id || `upload-${index}`,
-            name: upload.name || `File ${index + 1}`,
-            url: upload.url ?? undefined,
-            previewUrl: resolved,
-            mimeType: upload.mimeType ?? undefined,
-            kind: inferProjectUploadKind(
-              upload.name || `File ${index + 1}`,
-              upload.mimeType ?? undefined,
-            ),
-          };
-        })
-      : [...imageUploads, ...documentUploads].map((upload) => ({
-          ...upload,
-          previewUrl: resolveMediaUrl(upload.url),
-        }));
+  const clientSnapshot = mergeBookingClientSnapshots(
+    notesClientSnapshot,
+    locationDetails?.clientSnapshot,
+  );
+  const projectUploads = resolveBookingProjectUploads({
+    locationUploads: Array.isArray(locationDetails?.uploads) ? locationDetails.uploads : [],
+    images: booking.images,
+    documents: booking.documents,
+  });
   const projectDescription =
-    typeof locationDetails?.projectDescription === "string" ? locationDetails.projectDescription : "";
+    typeof locationDetails?.projectDescription === "string"
+      ? locationDetails.projectDescription
+      : clientSnapshot?.projectDetails?.description?.trim() || "";
 
   const desiredLocationFromColumns =
     booking.location_type === "desired" &&
@@ -991,14 +966,16 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
       return null;
     })(),
     silentUpdated: Boolean(notesDetails?.silentUpdated),
-    editedServiceIds:
-      notesDetails?.editedServiceIds?.length
+    editedServiceIds: notesDetails?.silentUpdated
+      ? undefined
+      : notesDetails?.editedServiceIds?.length
         ? notesDetails.editedServiceIds
         : ebr?.editedServiceIds?.length
           ? ebr.editedServiceIds
           : undefined,
-    editedProductIds:
-      notesDetails?.editedProductIds?.length
+    editedProductIds: notesDetails?.silentUpdated
+      ? undefined
+      : notesDetails?.editedProductIds?.length
         ? notesDetails.editedProductIds
         : ebr?.editedProductIds?.length
           ? ebr.editedProductIds

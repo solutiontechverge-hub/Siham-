@@ -73,6 +73,8 @@ type Props = {
   onUpdatedClick?: () => void;
   /** Confirmed booking was edited after ER/EBR accept. */
   showEditScenario?: boolean;
+  /** Keep ER pill after accept/reject until recipient OKs. */
+  editRequestAwaitingAck?: boolean;
   ebrSignpostTitle?: string;
   onEbrClick?: () => void;
   erSignpostTitle?: string;
@@ -110,6 +112,7 @@ export default function ClientBookingDetailsHeader({
   onOpenActivity,
   showUpdated = false,
   showEditScenario = false,
+  editRequestAwaitingAck = false,
   ebrSignpostTitle,
   onEbrClick,
   erSignpostTitle,
@@ -427,6 +430,7 @@ export default function ClientBookingDetailsHeader({
               bookingStatus={displayStatus}
               bookingRequestSent={bookingRequestSent}
               editRequestPending={editRequest.isPending}
+              editRequestAwaitingAck={editRequestAwaitingAck}
               requiresPrepayment={
                 requiresPrepayment && requestRowMode === "default"
               }
@@ -495,22 +499,7 @@ export default function ClientBookingDetailsHeader({
                 }}
                 sx={menuItemSx}
               >
-                Booking Details
-              </MenuItem>
-            ) : null,
-            locationMode === "desired" && onEditProject ? (
-              <Divider key="edit-project-divider" sx={{ my: 0 }} />
-            ) : null,
-            locationMode === "desired" && onEditProject ? (
-              <MenuItem
-                key="edit-project"
-                onClick={() => {
-                  setEditAnchor(null);
-                  onEditProject();
-                }}
-                sx={menuItemSx}
-              >
-                Project
+                Desired Location
               </MenuItem>
             ) : null,
           ]

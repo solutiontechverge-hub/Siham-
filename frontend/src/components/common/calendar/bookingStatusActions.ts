@@ -84,6 +84,7 @@ export function resolveProfessionalBookingActions(
   if (!event) return flags;
 
   const status = event.status;
+  const isOffline = event.bookingType === "Offline";
   const feeCheckoutOk = Boolean(opts?.protectiveFeeCheckoutApplicable);
   const expiredBanner = shouldShowExpiredResponseBanner(
     event,
@@ -98,7 +99,11 @@ export function resolveProfessionalBookingActions(
   }
 
   if (status === "Confirmed") {
-    const erPending = event.bookingScenario === "ER";
+    // Pending ER only — accepted/rejected ER keeps the tag via needsOk until OK.
+    const erPending =
+      event.bookingScenario === "ER" &&
+      event.details?.editRequestStatus !== "approved" &&
+      event.details?.editRequestStatus !== "rejected";
     flags.edit = true;
     if (professionalShouldAck(event.details)) {
       flags.ok = true;
@@ -107,7 +112,7 @@ export function resolveProfessionalBookingActions(
     if (!erPending) {
       flags.cancel = true;
       flags.in_progress = true;
-      flags.no_show = true;
+      flags.no_show = !isOffline;
     } else {
       flags.discard = true;
     }
@@ -128,7 +133,7 @@ export function resolveProfessionalBookingActions(
 
   if (status === "In Progress") {
     // Checkout lives as a persistent footer button, not in the Action menu.
-    flags.no_show = true;
+    flags.no_show = !isOffline;
     return flags;
   }
 
@@ -139,12 +144,17 @@ export function resolveProfessionalBookingActions(
     return flags;
   }
 
-  if (status === "Cancelled" || status === "Invalid" || status === "No Show") {
+  // No Show is reversible if the client arrives late → back to In Progress.
+  if (status === "No Show") {
     flags.delete = true;
-    if (
-      feeCheckoutOk &&
-      (status === "Cancelled" || status === "No Show")
-    ) {
+    flags.in_progress = true;
+    if (feeCheckoutOk) flags.checkout = true;
+    return flags;
+  }
+
+  if (status === "Cancelled" || status === "Invalid") {
+    flags.delete = true;
+    if (feeCheckoutOk && status === "Cancelled") {
       flags.checkout = true;
     }
     return flags;

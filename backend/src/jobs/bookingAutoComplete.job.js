@@ -3,6 +3,12 @@ import { syncBookingToFinanceTransaction } from "../services/finance-sync.servic
 import { safeEnsureProfessionalClientFromBooking } from "../services/professional-clients.service.js";
 import { emitBookingChanged } from "../messaging/messagingSocket.js";
 import { dispatchBookingUpdatedNotifications } from "../services/bookingNotification.service.js";
+import {
+  BOOKING_WALKOUT_GRACE_MINUTES,
+  isCheckoutCloseOutComplete,
+  isWalkOutBlockingAutoComplete,
+  parseBookingNotesMeta,
+} from "./bookingAutoCompleteCloseOut.js";
 
 const DEFAULT_INTERVAL_MS = Number(process.env.BOOKING_AUTOCOMPLETE_POLL_MS || 60 * 1000);
 
@@ -10,28 +16,50 @@ let intervalHandle = null;
 let running = false;
 
 /**
- * Transition in-progress bookings to completed once their service window has
- * passed. Uses end_time when available, otherwise falls back to the booking
- * date (completed once the booking date is before today).
+ * Catch-up: in_progress past end → completed ONLY when close-out rules are
+ * already met (invoice due date / all payers paid). Clock alone must not force
+ * Completed — incomplete checkout stays In Progress (timing out of sync is OK).
  *
- * Confirmed bookings are intentionally left alone after the window ends so the
- * professional can still mark No Show (client booked but never arrived). Only
- * bookings that were started (in_progress) auto-complete.
+ * Walk-out: after scheduled end + BOOKING_WALKOUT_GRACE_MINUTES without
+ * checkout/payment, never auto-complete — stay in_progress for manual unpaid.
+ *
+ * Confirmed bookings are left alone so No Show remains available.
+ * Paid/invoice transitions normally happen on checkout persist; this job only
+ * heals lag.
  */
 const runAutoCompleteCycle = async () => {
   if (running) return;
   running = true;
   try {
+    const pastEnd = await query(
+      `SELECT id, notes, end_time, booking_date
+         FROM bookings
+        WHERE status = 'in_progress'
+          AND (
+            (end_time IS NOT NULL AND end_time <= NOW())
+            OR (end_time IS NULL AND booking_date < CURRENT_DATE)
+          )`,
+    );
+
+    const eligibleIds = pastEnd.rows
+      .filter((row) => {
+        const meta = parseBookingNotesMeta(row.notes);
+        if (isWalkOutBlockingAutoComplete(meta, row.end_time, row.booking_date)) {
+          return false;
+        }
+        return isCheckoutCloseOutComplete(meta);
+      })
+      .map((row) => row.id);
+
+    if (eligibleIds.length === 0) return;
+
     const result = await query(
       `WITH targets AS (
          SELECT id, status AS prev_status
-         FROM bookings
-         WHERE status = 'in_progress'
-           AND (
-             (end_time IS NOT NULL AND end_time <= NOW())
-             OR (end_time IS NULL AND booking_date < CURRENT_DATE)
-           )
-         FOR UPDATE
+           FROM bookings
+          WHERE id = ANY($1::uuid[])
+            AND status = 'in_progress'
+          FOR UPDATE
        ),
        updated AS (
          UPDATE bookings b
@@ -42,6 +70,7 @@ const runAutoCompleteCycle = async () => {
          RETURNING b.*, t.prev_status
        )
        SELECT * FROM updated`,
+      [eligibleIds],
     );
 
     for (const booking of result.rows) {
@@ -53,8 +82,11 @@ const runAutoCompleteCycle = async () => {
         // best-effort finance sync
       }
       await safeEnsureProfessionalClientFromBooking(booking.id);
-      // In-app + companion emails (client post-treatment / review; pro completed).
-      void dispatchBookingUpdatedNotifications(booking, booking.prev_status, booking.prepayment_status);
+      void dispatchBookingUpdatedNotifications(
+        booking,
+        booking.prev_status,
+        booking.prepayment_status,
+      );
       emitBookingChanged(booking, "updated");
     }
 
@@ -79,7 +111,7 @@ export const startBookingAutoCompleteJob = () => {
   void runAutoCompleteCycle();
   intervalHandle = setInterval(runAutoCompleteCycle, DEFAULT_INTERVAL_MS);
   console.log(
-    `[booking-autocomplete] Started (every ${Math.round(DEFAULT_INTERVAL_MS / 1000)}s).`,
+    `[booking-autocomplete] Started (every ${Math.round(DEFAULT_INTERVAL_MS / 1000)}s; walk-out grace ${BOOKING_WALKOUT_GRACE_MINUTES}m).`,
   );
 };
 

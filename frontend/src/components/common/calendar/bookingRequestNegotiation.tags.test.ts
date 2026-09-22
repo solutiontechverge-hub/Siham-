@@ -4,6 +4,7 @@
 import assert from "node:assert/strict";
 import {
   allowComputedServiceAddCancelTags,
+  bookingNotesIndicateSilentOnlyVisit,
   detectProductLineChanges,
   detectServiceLineChanges,
   detectSilentUpdatedFields,
@@ -293,6 +294,40 @@ assert.equal(
     { lastEditedBy: "client", status: "suggested" },
   ),
   false,
+);
+assert.equal(
+  isAwaitingClientChangeApproval(
+    {
+      silentUpdated: true,
+      lastEditedBy: "professional",
+      responseStatus: "suggestion_for_change",
+    },
+    { lastEditedBy: "professional", status: "suggested" },
+  ),
+  false,
+  "silentUpdated must ignore leftover suggestion_for_change / suggested ebr",
+);
+
+assert.equal(
+  bookingNotesIndicateSilentOnlyVisit({
+    silentUpdated: false,
+    phoneCode: "+31",
+    phoneNumber: "611111111",
+    guests: [{ id: "g1", name: "ali khan", services: [] }],
+    services: [
+      { id: "eyelash", name: "eyelash", price: 111, durationMins: 11 },
+    ],
+    silentUpdateSnapshot: {
+      phoneCode: "+31",
+      phoneNumber: "600000000",
+      guests: [{ id: "g1", name: "ali", services: [] }],
+      services: [
+        { id: "eyelash", name: "eyelash", price: 111, durationMins: 11 },
+      ],
+    },
+  }),
+  true,
+  "snapshot-only silent phone/guest change counts as silent visit",
 );
 
 assert.equal(

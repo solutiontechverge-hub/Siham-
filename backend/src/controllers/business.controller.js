@@ -324,7 +324,13 @@ const normalizeBookingStatus = (value, fallback = "requested") => {
 
 /** Online / request / project channels mint ol codes; only true offline uses of. */
 const ONLINE_CHANNEL_BOOKING_TYPES = new Set(["online", "request", "project"]);
-const OFFLINE_DISALLOWED_STATUSES = new Set(["requested", "invalid"]);
+/** Strict allowlist for offline (OF) bookings — no Requested / Invalid / No Show. */
+const OFFLINE_ALLOWED_STATUSES = new Set([
+  "confirmed",
+  "in_progress",
+  "completed",
+  "cancelled",
+]);
 
 const normalizeCalendarBookingType = (value, status) => {
   const raw = String(value ?? "").trim().toLowerCase();
@@ -359,9 +365,10 @@ const isOfflineBookingType = (bookingType) =>
 
 const assertOfflineAllowsStatus = (bookingType, status) => {
   if (!isOfflineBookingType(bookingType)) return null;
-  const next = String(status ?? "").trim().toLowerCase();
-  if (OFFLINE_DISALLOWED_STATUSES.has(next)) {
-    return "Offline bookings cannot use Requested or Invalid status.";
+  let next = String(status ?? "").trim().toLowerCase();
+  if (next === "canceled") next = "cancelled";
+  if (!OFFLINE_ALLOWED_STATUSES.has(next)) {
+    return "Offline bookings only allow Confirmed, In Progress, Completed, or Cancelled status.";
   }
   return null;
 };
@@ -1871,6 +1878,86 @@ const resolveMollureCustomerIdForCalendarEntry = async ({
   return byClient.rows[0]?.mollure_user_id ?? null;
 };
 
+/** Lift project media out of notes into durable booking columns (same shape as client create). */
+const extractMirroredProjectMedia = (meta) => {
+  const project = meta?.clientSnapshot?.projectDetails;
+  const uploads = Array.isArray(project?.uploads)
+    ? project.uploads
+        .filter((upload) => {
+          const url = String(upload?.url ?? "").trim();
+          return url && !url.startsWith("blob:") && !url.startsWith("data:");
+        })
+        .map((upload) => ({
+          id: upload.id,
+          name: upload.name,
+          url: upload.url,
+          mimeType: upload.mimeType ?? null,
+          kind: upload.kind ?? null,
+        }))
+    : [];
+  const description = String(project?.description ?? "").trim();
+  const images = uploads
+    .filter((upload) => {
+      const kind = String(upload.kind ?? "").toLowerCase();
+      const name = String(upload.name ?? "").toLowerCase();
+      return kind === "image" || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name);
+    })
+    .map((upload) => upload.url);
+  const documents = uploads
+    .filter((upload) => !images.includes(upload.url))
+    .map((upload) => upload.url);
+
+  const slimPeople = Array.isArray(meta?.clientSnapshot?.people)
+    ? meta.clientSnapshot.people
+    : undefined;
+  const slimServices = Array.isArray(meta?.clientSnapshot?.services)
+    ? meta.clientSnapshot.services
+    : undefined;
+  const slimTeam = Array.isArray(meta?.clientSnapshot?.teamMembers)
+    ? meta.clientSnapshot.teamMembers
+    : undefined;
+
+  const locationDetails = {
+    ...(slimPeople?.length || slimServices?.length
+      ? {
+          clientSnapshot: {
+            ...(slimPeople?.length ? { people: slimPeople } : {}),
+            ...(slimServices?.length ? { services: slimServices } : {}),
+            ...(slimTeam?.length ? { teamMembers: slimTeam } : {}),
+            ...(description
+              ? { projectDetails: { description, uploads: [] } }
+              : {}),
+          },
+        }
+      : {}),
+    ...(description || uploads.length
+      ? {
+          projectDescription: description,
+          uploads,
+        }
+      : {}),
+    ...(meta?.desiredLocation ? { desiredLocation: meta.desiredLocation } : {}),
+  };
+
+  // Notes keep description only — media lives in location_details / images.
+  if (meta?.clientSnapshot?.projectDetails) {
+    meta.clientSnapshot = {
+      ...meta.clientSnapshot,
+      projectDetails: {
+        description: description || meta.clientSnapshot.projectDetails.description || "",
+        uploads: [],
+      },
+    };
+  }
+
+  return {
+    locationDetails:
+      Object.keys(locationDetails).length > 0 ? locationDetails : null,
+    images,
+    documents,
+  };
+};
+
 /**
  * Mirror a professional-sent calendar BR into `bookings` so it appears on the
  * client's Past / Ongoing / Upcoming list (incoming BR).
@@ -1906,6 +1993,9 @@ const mirrorCalendarRequestToBooking = async ({
   // Mark as professional-outgoing so the client list can show an incoming BR badge.
   let notes = entry.notes ?? null;
   let mirroredTotal = null;
+  let mirroredLocationDetails = null;
+  let mirroredImages = [];
+  let mirroredDocuments = [];
   if (notes && String(notes).includes("---mollure-meta---")) {
     try {
       const [human, metaRaw] = String(notes).split("---mollure-meta---");
@@ -1925,6 +2015,10 @@ const mirrorCalendarRequestToBooking = async ({
         : 0;
       const computed = servicesTotal + productsTotal || snapshotServices;
       if (computed > 0) mirroredTotal = computed;
+      const media = extractMirroredProjectMedia(meta);
+      mirroredLocationDetails = media.locationDetails;
+      mirroredImages = media.images;
+      mirroredDocuments = media.documents;
       notes = `${human}---mollure-meta---\n${JSON.stringify(meta)}`;
     } catch {
       // keep original notes
@@ -1950,14 +2044,17 @@ const mirrorCalendarRequestToBooking = async ({
            end_time = COALESCE($5, end_time),
            location_type = COALESCE($6, location_type),
            notes = $7,
+           location_details = COALESCE($8::jsonb, location_details),
+           images = CASE WHEN cardinality($9::text[]) > 0 THEN $9::text[] ELSE images END,
+           documents = CASE WHEN cardinality($10::text[]) > 0 THEN $10::text[] ELSE documents END,
            status = CASE
              WHEN LOWER(COALESCE(status, '')) IN ('cancelled', 'completed', 'no_show') THEN status
              ELSE 'requested'
            END,
            booking_type = 'online',
-           total_price = COALESCE($8, total_price),
+           total_price = COALESCE($11, total_price),
            updated_at = NOW()
-       WHERE id = $9
+       WHERE id = $12
        RETURNING *`,
       [
         bookingDate,
@@ -1967,6 +2064,9 @@ const mirrorCalendarRequestToBooking = async ({
         entry.end_time ?? null,
         entry.location_type ?? "fixed",
         notes,
+        mirroredLocationDetails ? JSON.stringify(mirroredLocationDetails) : null,
+        mirroredImages,
+        mirroredDocuments,
         mirroredTotal,
         existing.rows[0].id,
       ],
@@ -2005,13 +2105,16 @@ const mirrorCalendarRequestToBooking = async ({
        start_time,
        end_time,
        location_type,
+       location_details,
        notes,
        status,
        booking_type,
        unique_code,
-       total_price
+       total_price,
+       images,
+       documents
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'requested', 'online', $10, $11)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, 'requested', 'online', $11, $12, $13, $14)
      RETURNING *`,
     [
       bookingDate,
@@ -2022,9 +2125,12 @@ const mirrorCalendarRequestToBooking = async ({
       entry.start_time ?? null,
       entry.end_time ?? null,
       entry.location_type ?? "fixed",
+      mirroredLocationDetails ? JSON.stringify(mirroredLocationDetails) : null,
       notes,
       uniqueCode,
       mirroredTotal,
+      mirroredImages,
+      mirroredDocuments,
     ],
   );
   const booking = inserted.rows[0] ?? null;
@@ -2368,6 +2474,14 @@ export const createBooking = async (req, res) => {
     let bookingType = req.body.booking_type ?? "online";
     if (bookingType === "project" && req.user.user_type === "individual") {
       bookingType = req.body.location_type === "desired" ? "request" : "online";
+    }
+    const offlineStatusError = assertOfflineAllowsStatus(bookingType, normalizedStatus);
+    if (offlineStatusError) {
+      return res.status(400).json({
+        success: false,
+        message: offlineStatusError,
+        data: null,
+      });
     }
     const generatedCodePrefix =
       bookingType === "offline" ? BOOKING_CODE_PREFIX.offline : BOOKING_CODE_PREFIX.online;
@@ -2718,6 +2832,24 @@ export const updateCalendarEntry = async (req, res) => {
       });
     }
 
+    // Offline / calendar-only status changes often go through PUT, not /status.
+    if (entry && String(existing.status) !== String(entry.status)) {
+      void logBookingStatusActivity(
+        {
+          id: null,
+          unique_code: entry.unique_code,
+          status: entry.status,
+          booking_type: entry.booking_type,
+          prepayment_status: null,
+          total_price: null,
+        },
+        {
+          previousStatus: existing.status,
+          actorLabel: "Professional",
+        },
+      );
+    }
+
     emitBusinessChangedForProfile(professionalProfile.id, {
       action: "updated",
       scope: "calendar",
@@ -2853,6 +2985,14 @@ export const updateMyBooking = async (req, res) => {
     let nextStatus = existing.status;
     if (hasStatus) {
       nextStatus = normalizeBookingStatus(req.body.status, existing.status);
+      const offlineStatusError = assertOfflineAllowsStatus(existing.booking_type, nextStatus);
+      if (offlineStatusError) {
+        return res.status(400).json({
+          success: false,
+          message: offlineStatusError,
+          data: null,
+        });
+      }
       const allowedCustomerStatuses = ["cancelled", "confirmed", "requested", "br_accepted", "invalid"];
       if (!allowedCustomerStatuses.includes(nextStatus)) {
         return res.status(400).json({
@@ -3077,6 +3217,16 @@ export const updateBookingStatus = async (req, res) => {
     const previousStatus = existingResult.rows[0].status;
     const businessSetupId = existingResult.rows[0].business_setup_id;
     const customerId = existingResult.rows[0].customer_id;
+    const existingBooking = existingResult.rows[0];
+
+    const offlineStatusError = assertOfflineAllowsStatus(existingBooking.booking_type, status);
+    if (offlineStatusError) {
+      return res.status(400).json({
+        success: false,
+        message: offlineStatusError,
+        data: null,
+      });
+    }
 
     // No Show = client booked but did not arrive. Only from active attendance states.
     if (status === "no_show" && !["confirmed", "in_progress"].includes(previousStatus)) {
@@ -3087,7 +3237,6 @@ export const updateBookingStatus = async (req, res) => {
       });
     }
 
-    const existingBooking = existingResult.rows[0];
     if (
       isEditRequestPending(existingBooking.edit_request) &&
       ["cancelled", "in_progress", "no_show"].includes(status)
@@ -3343,13 +3492,7 @@ export const manageBookingEditRequest = async (req, res) => {
     let notificationEvent = null;
 
     if (action === "send") {
-      if (existingEr?.status === "pending") {
-        return res.status(409).json({
-          success: false,
-          message: "An edit request is already pending.",
-          data: null,
-        });
-      }
+      // Supersede any existing pending ER — latest send is the sole active pending.
       const built = buildPendingEditRequest({
         note: req.body.note,
         initiatedBy: actor,
@@ -3434,7 +3577,7 @@ export const manageBookingEditRequest = async (req, res) => {
     if (notificationEvent) {
       void dispatchBookingEventNotification(updated.id, notificationEvent, {
         initiatedBy: actor,
-        message: existingEr?.note || req.body.note || undefined,
+        message: req.body.note || existingEr?.note || undefined,
       });
     }
     emitBookingChanged(updated, "updated");
@@ -3468,6 +3611,21 @@ export const getBookingActivity = async (req, res) => {
     let authorizedBookingId = null;
     let authorizedCode = bookingCode;
 
+    const authorizeCalendarEntryByCode = async (code) => {
+      const byEntry = await query(
+        `SELECT ce.unique_code, pp.user_id AS professional_user_id
+         FROM calendar_entries ce
+         INNER JOIN professional_profiles pp ON pp.id = ce.professional_profile_id
+         WHERE ce.unique_code = $1
+         LIMIT 1`,
+        [code],
+      );
+      if (!byEntry.rows[0] || byEntry.rows[0].professional_user_id !== req.user.id) {
+        return null;
+      }
+      return byEntry.rows[0].unique_code;
+    };
+
     if (bookingIdParam) {
       const access = await query(
         `SELECT
@@ -3483,24 +3641,55 @@ export const getBookingActivity = async (req, res) => {
         [bookingIdParam],
       );
       const row = access.rows[0];
-      if (!row) {
-        return res.status(404).json({
-          success: false,
-          message: "Booking not found.",
-          data: null,
-        });
+      if (row) {
+        const allowed =
+          row.customer_id === req.user.id || row.professional_user_id === req.user.id;
+        if (!allowed) {
+          return res.status(403).json({
+            success: false,
+            message: "Not authorized to view this booking activity.",
+            data: null,
+          });
+        }
+        authorizedBookingId = row.id;
+        authorizedCode = row.unique_code || bookingCode;
+      } else {
+        // Path uuid may be a calendar_entries.id (offline ce-* events), or code query.
+        const byEntryId = await query(
+          `SELECT ce.unique_code, pp.user_id AS professional_user_id
+           FROM calendar_entries ce
+           INNER JOIN professional_profiles pp ON pp.id = ce.professional_profile_id
+           WHERE ce.id = $1
+           LIMIT 1`,
+          [bookingIdParam],
+        );
+        if (byEntryId.rows[0]) {
+          if (byEntryId.rows[0].professional_user_id !== req.user.id) {
+            return res.status(403).json({
+              success: false,
+              message: "Not authorized to view this booking activity.",
+              data: null,
+            });
+          }
+          authorizedCode = byEntryId.rows[0].unique_code || bookingCode;
+        } else if (bookingCode) {
+          const codeOk = await authorizeCalendarEntryByCode(bookingCode);
+          if (!codeOk) {
+            return res.status(403).json({
+              success: false,
+              message: "Not authorized to view this booking activity.",
+              data: null,
+            });
+          }
+          authorizedCode = codeOk;
+        } else {
+          return res.status(404).json({
+            success: false,
+            message: "Booking not found.",
+            data: null,
+          });
+        }
       }
-      const allowed =
-        row.customer_id === req.user.id || row.professional_user_id === req.user.id;
-      if (!allowed) {
-        return res.status(403).json({
-          success: false,
-          message: "Not authorized to view this booking activity.",
-          data: null,
-        });
-      }
-      authorizedBookingId = row.id;
-      authorizedCode = row.unique_code || bookingCode;
     } else if (bookingCode) {
       // Calendar-only offline bookings: authorize via calendar_entries ownership or bookings.
       const byBooking = await query(
@@ -3530,22 +3719,15 @@ export const getBookingActivity = async (req, res) => {
         authorizedBookingId = row.id;
         authorizedCode = row.unique_code;
       } else {
-        const byEntry = await query(
-          `SELECT ce.unique_code, pp.user_id AS professional_user_id
-           FROM calendar_entries ce
-           INNER JOIN professional_profiles pp ON pp.id = ce.professional_profile_id
-           WHERE ce.unique_code = $1
-           LIMIT 1`,
-          [bookingCode],
-        );
-        if (!byEntry.rows[0] || byEntry.rows[0].professional_user_id !== req.user.id) {
+        const codeOk = await authorizeCalendarEntryByCode(bookingCode);
+        if (!codeOk) {
           return res.status(403).json({
             success: false,
             message: "Not authorized to view this booking activity.",
             data: null,
           });
         }
-        authorizedCode = byEntry.rows[0].unique_code;
+        authorizedCode = codeOk;
       }
     }
 

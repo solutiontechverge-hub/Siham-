@@ -48,6 +48,67 @@ export function projectUploadHref(upload: ProjectUploadLike): string | undefined
   );
 }
 
+type LocationUploadRow = {
+  id?: string;
+  name?: string;
+  url?: string | null;
+  mimeType?: string | null;
+  kind?: "image" | "document" | null;
+};
+
+/** Prefer location_details.uploads with live urls; else booking images/documents columns. */
+export function resolveBookingProjectUploads(input: {
+  locationUploads?: LocationUploadRow[] | null;
+  images?: Array<string | null | undefined> | null;
+  documents?: Array<string | null | undefined> | null;
+}): Array<{
+  id: string;
+  name: string;
+  url?: string;
+  previewUrl?: string;
+  mimeType?: string;
+  kind: "image" | "document";
+}> {
+  const fromLocation = (input.locationUploads ?? [])
+    .map((upload, index) => {
+      const url = liveMediaUrl(upload.url);
+      if (!url) return null;
+      const name = upload.name || `File ${index + 1}`;
+      return {
+        id: upload.id || `ld-upload-${index}`,
+        name,
+        url,
+        previewUrl: resolveMediaUrl(url) ?? url,
+        mimeType: upload.mimeType ?? undefined,
+        kind: inferProjectUploadKind(name, upload.mimeType ?? undefined),
+      };
+    })
+    .filter((row): row is NonNullable<typeof row> => Boolean(row));
+  if (fromLocation.length) return fromLocation;
+
+  const imageUploads = (input.images ?? []).filter(Boolean).map((url, index) => {
+    const href = String(url);
+    return {
+      id: `img-${index}`,
+      name: `Image ${index + 1}`,
+      url: href,
+      previewUrl: resolveMediaUrl(href) ?? href,
+      kind: "image" as const,
+    };
+  });
+  const documentUploads = (input.documents ?? []).filter(Boolean).map((url, index) => {
+    const href = String(url);
+    return {
+      id: `doc-${index}`,
+      name: `Document ${index + 1}`,
+      url: href,
+      previewUrl: resolveMediaUrl(href) ?? href,
+      kind: "document" as const,
+    };
+  });
+  return [...imageUploads, ...documentUploads];
+}
+
 export async function fileFromProjectUpload(upload: {
   name: string;
   file?: File;

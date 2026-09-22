@@ -1,6 +1,7 @@
 import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { BookingIndicatorVariant } from "./BookingIndicatorIcon";
 import { prepayBlocksConfirmation } from "./bookingAcknowledgment";
+import { resolvePostBookingPendingPayment } from "./bookingCheckout";
 import {
   isResponseWindowOverdue,
   type ResponseWindowInput,
@@ -10,7 +11,7 @@ import { resolveCalendarPrepaymentStatus } from "./prepaymentStatus";
 export type CalendarResponseStatus = "suggestion_for_change" | "overdue_response";
 
 export function resolveBookingResponseIndicators(
-  event: Pick<CalendarEvent, "bookingScenario" | "details" | "status">,
+  event: Pick<CalendarEvent, "id" | "bookingScenario" | "details" | "status">,
   opts?: {
     responseTimeConfigured?: boolean;
     responseTime?: ResponseWindowInput | null;
@@ -47,7 +48,16 @@ export function resolveBookingResponseIndicators(
     indicators.push("prepaid");
   }
 
-  if (event.status === "Completed" && details?.waitingForPayment && !details?.refunded) {
+  // In Progress past end may stay out of sync — still signal close-out when unpaid.
+  if (event.status === "In Progress" && !details?.refunded) {
+    if (resolvePostBookingPendingPayment(event as CalendarEvent)) {
+      indicators.push("waiting_for_payment");
+    }
+  } else if (
+    event.status === "Completed" &&
+    details?.waitingForPayment &&
+    !details?.refunded
+  ) {
     const due = details.invoiceDueDate?.trim();
     const overdue =
       Boolean(due) &&

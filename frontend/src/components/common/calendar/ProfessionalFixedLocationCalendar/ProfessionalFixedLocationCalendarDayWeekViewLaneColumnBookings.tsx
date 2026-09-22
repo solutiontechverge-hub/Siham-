@@ -7,9 +7,16 @@ import CalendarBookingTicketStack from "../CalendarBookingTicketStack";
 import { getWeekOverviewMainServiceSpans } from "../calendarBookingCardServices";
 
 import {
+  hideConnectedChainStatusBadge,
+  resolveConnectedChainBlockStatus,
+} from "../connectedChainBadge";
+
+import {
   clusterSameStartTimeEvents,
   getClusterTimeBounds,
 } from "../calendar-overlap.utils";
+
+import { flashBookingChainThen } from "../calendarChainSelectionFlash";
 
 import {
   extractBookingId,
@@ -92,6 +99,10 @@ export default function ProfessionalFixedLocationCalendarDayWeekViewLaneColumnBo
     viewMode,
   } = bag;
 
+  const openBooking = (ev: LaneEvent) => {
+    flashBookingChainThen(ev, () => openExistingBooking(ev));
+  };
+
   if (viewMode === "week") {
     return (
       <>
@@ -99,7 +110,7 @@ export default function ProfessionalFixedLocationCalendarDayWeekViewLaneColumnBo
           const spans = getWeekOverviewMainServiceSpans(ev);
           const useDenseCard = weekDayCrowded;
           const cardInset = useDenseCard ? 2 : 3;
-          return spans.map((span) => {
+          return spans.map((span, spanIndex) => {
             const spanStart = minutesSinceMidnight(span.start);
             const spanEnd = minutesSinceMidnight(span.end);
             const top =
@@ -108,11 +119,16 @@ export default function ProfessionalFixedLocationCalendarDayWeekViewLaneColumnBo
               4,
               ((spanEnd - spanStart) / grid.stepMinutes) * rowPx - 0.3,
             );
+            const blockStatus = resolveConnectedChainBlockStatus(ev, {
+              serviceId: span.serviceId,
+              guestId: span.guestId,
+            });
             const weekEvent = {
               ...ev,
               start: span.start,
               end: span.end,
               title: span.name,
+              status: blockStatus,
             };
             return (
               <CalendarBookingCard
@@ -124,20 +140,25 @@ export default function ProfessionalFixedLocationCalendarDayWeekViewLaneColumnBo
                 right={cardInset}
                 dense={useDenseCard}
                 weekSimple
+                hideStatusBadge={hideConnectedChainStatusBadge({
+                  isAnchor: spanIndex === 0,
+                  blockStatus,
+                  chainStatus: ev.status,
+                })}
                 teamMemberNameById={resourceNameById}
                 teamResources={data.resources}
                 serviceColor={resolveEventColors(ev).serviceColor}
                 statusColor={resolveEventColors(ev).statusColor}
                 responseTimeConfigured={responseTimeConfigured}
                 responseTime={businessResponseWindowInput}
-                onOpen={() => openExistingBooking(ev)}
+                onOpen={() => openBooking(ev)}
                 onOpenCalendar={() =>
                   showSnackbar({
                     severity: "info",
                     message: `Calendar for booking ${extractBookingId(ev.id)}`,
                   })
                 }
-                onOpenNotes={() => openExistingBooking(ev)}
+                onOpenNotes={() => openBooking(ev)}
                 onOpenClient={(anchorEl) =>
                   handleClientNameClick(ev, anchorEl, "overview")
                 }
@@ -168,14 +189,13 @@ export default function ProfessionalFixedLocationCalendarDayWeekViewLaneColumnBo
         const resolveStatusColor = (ev: (typeof cluster)[number]) =>
           resolveEventColors(ev).statusColor;
         const eventHandlers = {
-          onOpen: openExistingBooking,
+          onOpen: openBooking,
           onOpenCalendar: (ev: (typeof cluster)[number]) =>
             showSnackbar({
               severity: "info",
               message: `Calendar for booking ${extractBookingId(ev.id)}`,
             }),
-          onOpenNotes: (ev: (typeof cluster)[number]) =>
-            openExistingBooking(ev),
+          onOpenNotes: openBooking,
           onOpenClient: (
             ev: (typeof cluster)[number],
             anchorEl: HTMLElement,

@@ -51,6 +51,7 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsNotesTotalsBag 
   | "bookingTotalDiscount"
   | "bookingTotalForSave"
   | "canMutateDrawerContents"
+  | "confirmDrawerPrepayment"
   | "drawerPriceDisplay"
   | "handleBookingActionSelect"
   | "incomingClientNote"
@@ -96,6 +97,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsNot
     bookingTotalDiscount,
     bookingTotalForSave,
     canMutateDrawerContents,
+    confirmDrawerPrepayment,
     drawerPriceDisplay,
     handleBookingActionSelect,
     incomingClientNote,
@@ -312,6 +314,47 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsNot
                 prepaymentPercent={effectivePrepayPercent}
                 prepaymentAmount={displayPrepaidAmount}
                 remainingAmount={displayRemaining}
+                prepaidAction={
+                  showPrepayBreakdown && !isDrawerPrepaymentPaid ? (
+                    <BodyText
+                      component="button"
+                      type="button"
+                      // ponytail: testing Pay Now — ceiling: local paid override only; restore real checkout when Stripe is wired.
+                      onClick={confirmDrawerPrepayment}
+                      sx={mollureLabelSx(m.navy, {
+                        border: "none",
+                        outline: "none",
+                        boxShadow: "none",
+                        bgcolor: "transparent",
+                        p: 0,
+                        m: 0,
+                        cursor: "pointer",
+                        color: m.teal,
+                        fontFamily: "inherit",
+                        appearance: "none",
+                        WebkitAppearance: "none",
+                        "&:hover": { color: m.tealDark },
+                        "&:focus": { outline: "none" },
+                        "&:focus-visible": {
+                          outline: `2px solid ${alpha(m.teal, 0.45)}`,
+                          outlineOffset: 2,
+                        },
+                      })}
+                    >
+                      Pay Now
+                    </BodyText>
+                  ) : isDrawerPrepaymentPaid ? (
+                    <BodyText
+                      sx={{
+                        fontWeight: 800,
+                        fontSize: 12,
+                        color: m.teal,
+                      }}
+                    >
+                      Paid
+                    </BodyText>
+                  ) : undefined
+                }
                 extraRows={
                   kilometerAllowanceAmount > 0
                     ? [

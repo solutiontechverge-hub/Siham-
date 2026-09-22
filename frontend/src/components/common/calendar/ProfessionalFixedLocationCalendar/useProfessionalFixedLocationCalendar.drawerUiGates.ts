@@ -155,10 +155,9 @@ export function useProfessionalFixedLocationCalendarDrawerUiGates({
     slotBookingScreen === "edit-service" ||
     slotBookingScreen === "add-unique-item" ||
     slotBookingScreen === "add-buffer";
-  const drawerPrimaryActionLabel = isBookingSubScreen
-    ? "Save"
-    : incomingRequestEditMode
-      ? "Send EBR"
+  const drawerPrimaryActionLabel =
+    isBookingSubScreen || incomingRequestEditMode
+      ? "Save"
       : editingEventId
         ? "Update"
         : resolveOfflineBookingPrepayAction({

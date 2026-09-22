@@ -22,7 +22,7 @@ export const ACTIVITY_DRAWER_TITLES = {
 } as const;
 
 export const CLIENT_BOOKING_DETAILS_COPY = {
-  sendBookingRequest: "Send booking request",
+  sendBookingRequest: "Save",
   ok: "Ok",
   acceptSuggestedChanges: "ACCEPT",
   suggestChanges: "Suggest changes",

@@ -4,7 +4,10 @@ import {
   hydrateBookingDrawerFromEvent,
   markClientEbrRejectedInNotes,
   parseApiCalendarEventId,
+  parseCalendarEntryNotes,
   parseStoredEbrFromNotes,
+  parseStoredErFromNotes,
+  serializeCalendarEntryNotes,
 } from "../bookingEventDetails";
 import { resolveOriginalServices } from "../bookingRequestNegotiation";
 import type { UseProfessionalFixedLocationCalendarBookingPersistArgs } from "./useProfessionalFixedLocationCalendar.bookingPersist";
@@ -49,8 +52,22 @@ export function useProfessionalFixedLocationCalendarBookingPersistIncomingReject
         throw new Error("Unable to reject booking request.");
       }
       try {
-        const rejectedNotes = markClientEbrRejectedInNotes(
+        // Keep EBR + Edited tags until the client OKs the rejection outcome.
+        const rejectedBase = markClientEbrRejectedInNotes(
           viewingBookingEvent.notes,
+        );
+        const prior = parseCalendarEntryNotes(rejectedBase) ?? {};
+        const ackDetails = {
+          ...prior,
+          needsOk: true as const,
+          ackRecipient: "client" as const,
+          ackScenario: "EBR" as const,
+        };
+        const rejectedNotes = serializeCalendarEntryNotes(
+          ackDetails.internalNote ?? "",
+          ackDetails,
+          parseStoredEbrFromNotes(rejectedBase),
+          parseStoredErFromNotes(rejectedBase),
         );
         await onUpdateBookingStatus(parsed.id, "confirmed", {
           notes: rejectedNotes,
@@ -61,14 +78,12 @@ export function useProfessionalFixedLocationCalendarBookingPersistIncomingReject
               ? {
                   ...event,
                   status: "Confirmed" as const,
-                  bookingScenario: undefined,
+                  bookingScenario: "EBR",
                   notes: rejectedNotes,
                   details: {
                     ...event.details,
+                    ...ackDetails,
                     responseStatus: undefined,
-                    lastEditedBy: undefined,
-                    editedServiceIds: undefined,
-                    clientEditedServiceIds: undefined,
                   },
                 }
               : event,

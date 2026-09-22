@@ -55,6 +55,13 @@ export function canRespondToConfirmedEr(
   event: Pick<CalendarEvent, "status" | "bookingScenario" | "details"> | null | undefined,
 ) {
   if (!event || event.status !== "Confirmed" || event.bookingScenario !== "ER") return false;
+  if (
+    event.details?.editRequestStatus === "approved" ||
+    event.details?.editRequestStatus === "rejected" ||
+    event.details?.needsOk
+  ) {
+    return false;
+  }
   return event.details?.requestDirection !== "outgoing";
 }
 
@@ -105,6 +112,9 @@ export function isAwaitingClientChangeApproval(
   details?: CalendarBookingDetails | null,
   ebr?: EditTagEbrSource,
 ) {
+  // Silent phone / guest name / reorder never awaits approval — leftover
+  // responseStatus or EBR status must not revive Edited+Pending.
+  if (bookingNotesIndicateSilentOnlyVisit(details)) return false;
   if (ebr?.lastEditedBy === "professional") {
     const status = String(ebr.status ?? "").toLowerCase();
     if (status === "suggested" || status === "pending") return true;
@@ -791,6 +801,50 @@ export function isSilentSafeBookingChange(input: {
     guestSetChanged ||
     guestServiceApprovalRequired
   );
+}
+
+/**
+ * True when notes say silent Updated, or when a leftover silentUpdateSnapshot
+ * proves the live booking only differs by phone / guest name / reorder
+ * (stale editedServiceIds / responseStatus must not force Edited).
+ */
+export function bookingNotesIndicateSilentOnlyVisit(
+  meta?: CalendarBookingDetails | null,
+): boolean {
+  if (!meta) return false;
+  if (meta.silentUpdated) return true;
+  const snap = meta.silentUpdateSnapshot;
+  if (!snap) return false;
+  const fields = detectSilentUpdatedFields({
+    snapshot: snap,
+    currentPhoneCode: meta.phoneCode,
+    currentPhoneNumber: meta.phoneNumber,
+    currentGuests: meta.guests,
+    currentPeople: meta.clientSnapshot?.people,
+    currentServices: meta.services,
+  });
+  if (
+    !fields.phoneUpdated &&
+    fields.guestIds.length === 0 &&
+    fields.serviceIds.length === 0
+  ) {
+    return false;
+  }
+  return isSilentSafeBookingChange({
+    previousServices: snap.services ?? [],
+    currentServices: meta.services ?? [],
+    previousGuests: snap.guests,
+    currentGuests: meta.guests,
+    previousPeople: snap.people,
+    currentPeople: meta.clientSnapshot?.people,
+    previousPhoneCode: snap.phoneCode ?? undefined,
+    currentPhoneCode: meta.phoneCode,
+    previousPhoneNumber: snap.phoneNumber ?? undefined,
+    currentPhoneNumber: meta.phoneNumber,
+    previousProducts: snap.products ?? [],
+    currentProducts: meta.products ?? [],
+    scheduleChanged: Boolean(meta.scheduleEdited),
+  });
 }
 
 export function detectServiceLineChanges(

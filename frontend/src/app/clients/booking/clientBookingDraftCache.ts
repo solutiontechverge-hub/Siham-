@@ -4,6 +4,7 @@ import { liveMediaUrl } from "../../../lib/projectUploadMedia";
 import {
   extraBookingParticipantIds,
   dedupeServicesByOwner,
+  isExtraBookingParticipant,
 } from "../../../data/bookingChronologicalBlocks";
 
 const DRAFT_SNAPSHOT_KEY = "mollure:booking_draft_snapshots_v1";
@@ -57,6 +58,13 @@ function sanitizeDraft(draft: ClientBookingDraft): ClientBookingDraft {
 
 function hasPeople(draft?: ClientBookingDraft | DraftSnapshot | null) {
   return (draft?.people?.length ?? 0) > 0;
+}
+
+function extraPeopleCount(
+  people: ClientBookingDraft["people"] | DraftSnapshot["people"] | undefined,
+) {
+  return (people ?? []).filter((person) => isExtraBookingParticipant(person))
+    .length;
 }
 
 function hasProject(draft?: ClientBookingDraft | DraftSnapshot | null) {
@@ -128,7 +136,9 @@ export function mergeClientBookingDraftRichness(
   const liveFallback = sanitizeDraft(fallback as ClientBookingDraft);
 
   const people = hasPeople(livePrimary)
-    ? livePrimary.people
+    ? extraPeopleCount(livePrimary.people) >= extraPeopleCount(liveFallback.people)
+      ? livePrimary.people
+      : liveFallback.people ?? livePrimary.people
     : liveFallback.people ?? livePrimary.people;
   const projectDetails =
     hasProject(livePrimary) || hasProject(liveFallback)

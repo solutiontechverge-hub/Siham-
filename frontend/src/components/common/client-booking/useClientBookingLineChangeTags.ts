@@ -5,10 +5,12 @@ import type { CalendarBookingDetails } from "../../../app/professionals/fixed-lo
 import type { ClientBookingStatus } from "../../../app/clients/booking/clientBookingRecords";
 import {
   allowComputedServiceAddCancelTags,
+  bookingNotesIndicateSilentOnlyVisit,
   detectProductLineChanges,
   detectServiceLineChanges,
   flattenBookingServices,
   hasServiceReorderOnly,
+  isAwaitingClientChangeApproval,
 } from "../calendar/bookingRequestNegotiation";
 import type { ClientBookingDraft } from "./types";
 import type { BookingEditRequestRecord } from "./bookingEditRequest";
@@ -56,6 +58,9 @@ export function resolveHasProfessionalSuggestedEdits(input: {
 }) {
   if (input.isCancelled) return false;
   if (input.editRequest.isAccepted || input.editRequest.isRejected) return false;
+  // Silent phone / guest / reorder — never treat as a professional suggestion,
+  // even when a stale editRequest still says suggested/pending.
+  if (bookingNotesIndicateSilentOnlyVisit(input.bookingNotesMeta)) return false;
   if (
     input.isEbrIncoming ||
     input.isIncomingConfirmedEr ||
@@ -63,15 +68,43 @@ export function resolveHasProfessionalSuggestedEdits(input: {
   ) {
     return true;
   }
-  // Silent Updated must not hide pending professional Edited/Added/Cancelled.
-  if (input.bookingNotesMeta?.lastEditedBy !== "professional") return false;
-  return Boolean(
-    input.bookingNotesMeta?.editedServiceIds?.length ||
-      input.bookingNotesMeta?.addedServiceIds?.length ||
-      input.bookingNotesMeta?.cancelledServiceIds?.length ||
-      input.bookingNotesMeta?.editedProductIds?.length ||
-      input.bookingNotesMeta?.scheduleEdited,
+  return isAwaitingClientChangeApproval(input.bookingNotesMeta, {
+    lastEditedBy: input.bookingNotesMeta?.lastEditedBy,
+    status: input.editRequest.status,
+  });
+}
+
+/**
+ * Silent Updated never awaits approval. Stale editRequest.isSuggested/isPending
+ * must not keep Edited+Pending on every service line (screenshot regression).
+ */
+export function resolveClientChangesAwaitingApproval(input: {
+  hasProfessionalSuggestedEdits: boolean;
+  isEbrIncoming: boolean;
+  editRequestIsSuggested: boolean;
+  silentOnlyVisit: boolean;
+}): boolean {
+  if (input.silentOnlyVisit) return false;
+  return (
+    input.hasProfessionalSuggestedEdits ||
+    input.editRequestIsSuggested ||
+    input.isEbrIncoming
   );
+}
+
+/** Silent-only visit: never surface leftover Edited/Added/Cancelled line ids. */
+export function resolveClientVisibleEditedServiceIds(input: {
+  silentOnlyVisit: boolean;
+  mergedIds: readonly string[];
+  healedEdited?: readonly string[];
+  allowHealed?: boolean;
+}): string[] | undefined {
+  if (input.silentOnlyVisit) return undefined;
+  if (input.mergedIds.length) return [...new Set(input.mergedIds)];
+  if (input.allowHealed && input.healedEdited?.length) {
+    return [...input.healedEdited];
+  }
+  return undefined;
 }
 
 export function resolveClientScheduleChangeTags(input: {
@@ -126,11 +159,18 @@ export function resolveLineTagComparisonMode(input: {
   if (input.clientChangesAwaitingApproval) {
     return input.isEbrIncoming ? "ebr" : "er";
   }
+  // Silent-only visit → Updated chips / Activity, never leftover Edited ids.
+  if (
+    input.bookingNotesMeta?.silentUpdated ||
+    (input.bookingNotesMeta &&
+      bookingNotesIndicateSilentOnlyVisit(input.bookingNotesMeta))
+  ) {
+    return "silent_updated";
+  }
   // Edited/Added/Cancelled → Activity ER/EBR comparison (not silent Updated).
   if (hasPersistedLineEdits) {
     return input.bookingStatus === "requested" ? "ebr" : "er";
   }
-  if (input.bookingNotesMeta?.silentUpdated) return "silent_updated";
   if (input.bookingStatus === "requested") return "ebr";
   return "er";
 }
@@ -181,6 +221,8 @@ export function useClientBookingLineChangeTags(input: {
     activeBooking,
   } = input;
 
+  const silentOnlyVisit = bookingNotesIndicateSilentOnlyVisit(bookingNotesMeta);
+
   const hasProfessionalSuggestedEdits = React.useMemo(
     () =>
       resolveHasProfessionalSuggestedEdits({
@@ -199,8 +241,12 @@ export function useClientBookingLineChangeTags(input: {
     ],
   );
 
-  const clientChangesAwaitingApproval =
-    hasProfessionalSuggestedEdits || editRequest.isSuggested || isEbrIncoming;
+  const clientChangesAwaitingApproval = resolveClientChangesAwaitingApproval({
+    hasProfessionalSuggestedEdits,
+    isEbrIncoming,
+    editRequestIsSuggested: editRequest.isSuggested,
+    silentOnlyVisit,
+  });
 
   const pendingServiceChangeSets = React.useMemo(() => {
     if (!clientChangesAwaitingApproval) return null;
@@ -317,22 +363,18 @@ export function useClientBookingLineChangeTags(input: {
       incomingStatus === "suggested" ||
       incomingStatus === "pending" ||
       incomingStatus === "accepted";
-    const merged = [
-      ...(pendingServiceChangeSets?.edited ?? []),
-      ...(bookingNotesMeta?.editedServiceIds ?? []),
-      ...(editReqActive ? (editRequest.editedServiceIds ?? []) : []),
-      ...(activeBooking?.editedServiceIds ?? []),
-      ...(incomingActive ? (incoming?.editedServiceIds ?? []) : []),
-    ];
-    if (merged.length) return [...new Set(merged)];
-    // Heal wiped IDs only from an explicit ER/EBR originalServices baseline.
-    if (
-      allowHealedComputedLineTags &&
-      healedServiceLineChanges.edited.length
-    ) {
-      return [...healedServiceLineChanges.edited];
-    }
-    return undefined;
+    return resolveClientVisibleEditedServiceIds({
+      silentOnlyVisit,
+      mergedIds: [
+        ...(pendingServiceChangeSets?.edited ?? []),
+        ...(bookingNotesMeta?.editedServiceIds ?? []),
+        ...(editReqActive ? (editRequest.editedServiceIds ?? []) : []),
+        ...(activeBooking?.editedServiceIds ?? []),
+        ...(incomingActive ? (incoming?.editedServiceIds ?? []) : []),
+      ],
+      healedEdited: healedServiceLineChanges.edited,
+      allowHealed: allowHealedComputedLineTags,
+    });
   }, [
     activeBooking?.editedServiceIds,
     activeBooking?.incomingEditRequest,
@@ -344,9 +386,13 @@ export function useClientBookingLineChangeTags(input: {
     editRequest.isSuggested,
     healedServiceLineChanges.edited,
     pendingServiceChangeSets,
+    silentOnlyVisit,
   ]);
 
   const clientVisibleAddedServiceIds = React.useMemo(() => {
+    if (silentOnlyVisit) {
+      return [];
+    }
     const editReqActive =
       editRequest.isSuggested ||
       editRequest.isPending ||
@@ -378,9 +424,13 @@ export function useClientBookingLineChangeTags(input: {
     editRequest.isSuggested,
     healedServiceLineChanges.added,
     pendingServiceChangeSets,
+    silentOnlyVisit,
   ]);
 
   const clientVisibleCancelledServiceIds = React.useMemo(() => {
+    if (silentOnlyVisit) {
+      return [];
+    }
     const editReqActive =
       editRequest.isSuggested ||
       editRequest.isPending ||
@@ -412,6 +462,7 @@ export function useClientBookingLineChangeTags(input: {
     editRequest.isSuggested,
     healedServiceLineChanges.cancelled,
     pendingServiceChangeSets,
+    silentOnlyVisit,
   ]);
 
   const cancelledServicesForDisplay = React.useMemo(() => {
@@ -450,6 +501,9 @@ export function useClientBookingLineChangeTags(input: {
   ]);
 
   const clientVisibleEditedProductIds = React.useMemo(() => {
+    if (silentOnlyVisit) {
+      return undefined;
+    }
     if (pendingProductChangeSets) return pendingProductChangeSets.edited;
     if (bookingNotesMeta?.lastEditedBy === "client") return undefined;
     if (editRequest.isPending) return undefined;
@@ -481,29 +535,36 @@ export function useClientBookingLineChangeTags(input: {
     editRequest.isSuggested,
     isEbrIncoming,
     pendingProductChangeSets,
+    silentOnlyVisit,
   ]);
 
   const clientVisibleAddedProductIds = React.useMemo(
     () =>
-      pendingProductChangeSets?.added ??
-      editRequest.addedProductIds ??
-      bookingNotesMeta?.addedProductIds,
+      silentOnlyVisit
+        ? undefined
+        : pendingProductChangeSets?.added ??
+          editRequest.addedProductIds ??
+          bookingNotesMeta?.addedProductIds,
     [
       bookingNotesMeta?.addedProductIds,
       editRequest.addedProductIds,
       pendingProductChangeSets,
+      silentOnlyVisit,
     ],
   );
 
   const clientVisibleCancelledProductIds = React.useMemo(
     () =>
-      pendingProductChangeSets?.cancelled ??
-      editRequest.cancelledProductIds ??
-      bookingNotesMeta?.cancelledProductIds,
+      silentOnlyVisit
+        ? undefined
+        : pendingProductChangeSets?.cancelled ??
+          editRequest.cancelledProductIds ??
+          bookingNotesMeta?.cancelledProductIds,
     [
       bookingNotesMeta?.cancelledProductIds,
       editRequest.cancelledProductIds,
       pendingProductChangeSets,
+      silentOnlyVisit,
     ],
   );
 

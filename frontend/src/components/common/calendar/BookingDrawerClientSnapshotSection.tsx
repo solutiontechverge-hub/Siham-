@@ -193,9 +193,6 @@ export default function BookingDrawerClientSnapshotSection({
               person.bufferStartTime?.trim() ||
               person.bufferEndTime?.trim(),
           );
-        if (!personServices.length && !hasPlanning && !isPlanning && !isBuffer) {
-          return null;
-        }
 
         return (
           <Box

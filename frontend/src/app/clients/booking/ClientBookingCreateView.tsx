@@ -25,7 +25,10 @@ import ClientBookingPaymentSummaryPanel from "./ClientBookingPaymentSummaryPanel
 import ClientTeamMemberPublicProfileDrawer, {
   type ClientTeamMemberPublicProfile,
 } from "../../../components/common/client-booking/ClientTeamMemberPublicProfileDrawer";
-import { getTeamForLocationMode } from "../../../data/businessPublicProfile.data";
+import { getTeamForLocationMode, resolveDesiredVisitMunicipalityOptions } from "../../../data/businessPublicProfile.data";
+import AppDropdown from "../../../components/common/AppDropdown";
+import AppTextField from "../../../components/common/AppTextField";
+import { mollureLabelSx } from "../../../theme/mollureHierarchy";
 
 export default function ClientBookingCreateView() {
   const page = useClientBookingCreatePage();
@@ -153,6 +156,9 @@ export default function ClientBookingCreateView() {
     deleteGuest,
     combineServices,
     setCombineServices,
+    isConfirmedEbrEdit,
+    desiredVisitAddress,
+    setDesiredVisitAddress,
   } = page;
 
   const summaryShopName = shop?.shopName?.trim() || "Salon";
@@ -320,101 +326,210 @@ export default function ClientBookingCreateView() {
                   />
                 </Paper>
 
-                <ClientBookingProjectDetailsPanel
-                  isDesiredLocation={isDesiredLocation}
-                  isCompanyClient={isCompanyClient}
-                  bookingProjectEnabled={bookingProjectEnabled}
-                  setBookingProjectEnabled={setBookingProjectEnabled}
-                  showProjectDetails={showProjectDetails}
-                  projectDescription={projectDescription}
-                  setProjectDescription={setProjectDescription}
-                  projectFileInputRef={projectFileInputRef}
-                  handleProjectFilePick={handleProjectFilePick}
-                  projectUploads={projectUploads}
-                  deleteProjectUpload={deleteProjectUpload}
-                />
+                {isConfirmedEbrEdit && isDesiredLocation ? (
+                  <Box
+                    id="booking-location-section"
+                    sx={{
+                      mt: 1.25,
+                      borderRadius: "10px",
+                      border: `1px solid ${alpha(m.navy, 0.16)}`,
+                      bgcolor: "#fff",
+                      px: { xs: 1.5, md: 2 },
+                      py: 1.75,
+                    }}
+                  >
+                    <Typography
+                      sx={mollureLabelSx(m.navy, {
+                        fontWeight: 900,
+                        fontSize: 14,
+                        mb: 1.5,
+                      })}
+                    >
+                      Desired Location
+                    </Typography>
+                    <Box
+                      sx={{
+                        display: "grid",
+                        gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                        columnGap: 1.25,
+                        rowGap: 1.35,
+                      }}
+                    >
+                      {(
+                        [
+                          ["street", "Street Address", "Churchill-laan"],
+                          ["number", "Street Number", "34234"],
+                          ["postalCode", "Postal Code", "1234 AB"],
+                        ] as const
+                      ).map(([key, label, placeholder]) => (
+                        <Box key={key}>
+                          <Typography
+                            sx={{
+                              fontSize: 12,
+                              fontWeight: 900,
+                              color: alpha(m.navy, 0.65),
+                              mb: 0.75,
+                            }}
+                          >
+                            {label}
+                          </Typography>
+                          <AppTextField
+                            value={desiredVisitAddress[key]}
+                            onChange={(e) =>
+                              setDesiredVisitAddress((prev) => ({
+                                ...prev,
+                                [key]: e.target.value,
+                              }))
+                            }
+                            placeholder={placeholder}
+                            fullWidth
+                            size="small"
+                            sx={{
+                              "& .MuiOutlinedInput-root": {
+                                height: 40,
+                                minHeight: 40,
+                              },
+                            }}
+                          />
+                        </Box>
+                      ))}
+                      <Box>
+                        <Typography
+                          sx={{
+                            fontSize: 12,
+                            fontWeight: 900,
+                            color: alpha(m.navy, 0.65),
+                            mb: 0.75,
+                          }}
+                        >
+                          Municipality
+                        </Typography>
+                        <AppDropdown
+                          value={desiredVisitAddress.municipality}
+                          onChange={(val) =>
+                            setDesiredVisitAddress((prev) => ({
+                              ...prev,
+                              municipality: String(val ?? ""),
+                              province: "",
+                            }))
+                          }
+                          options={resolveDesiredVisitMunicipalityOptions(
+                            businessProfile?.desiredLocation,
+                          ).map((muni) => ({ value: muni, label: muni }))}
+                          placeholder="Municipality"
+                          fullWidth
+                          size="small"
+                          sx={{
+                            "& .MuiOutlinedInput-root": {
+                              height: 40,
+                              minHeight: 40,
+                            },
+                          }}
+                        />
+                      </Box>
+                    </Box>
+                  </Box>
+                ) : null}
 
-                <Box id="booking-services-section" sx={{ mt: 1.25, p: 0.25 }}>
-                  <ClientBookingPeopleSection
-                    isDesiredLocation={isDesiredLocation}
-                    canAddFixedLocationGuest={canAddFixedLocationGuest}
-                    isCompanyClient={isCompanyClient}
-                    bookingProjectEnabled={bookingProjectEnabled}
-                    participantMenuAnchor={participantMenuAnchor}
-                    setParticipantMenuAnchor={setParticipantMenuAnchor}
-                    addParticipant={addParticipant}
-                    hasNotesPerson={hasNotesPerson}
-                    canAddPlanningParticipant={canAddPlanningParticipant}
-                    people={people}
-                    selectedPersonId={selectedPersonId}
-                    draggingPersonId={draggingPersonId}
-                    setDraggingPersonId={setDraggingPersonId}
-                    reorderPeople={reorderPeople}
-                    isPlanningPerson={isPlanningPerson}
-                    selectPlanningCard={selectPlanningCard}
-                    setSelectedPersonId={setSelectedPersonId}
-                    selectNonPlanningPerson={selectNonPlanningPerson}
-                    deleteGuest={deleteGuest}
-                    updateGuestName={updateGuestName}
-                    getParticipantLabel={getParticipantLabel}
-                    personCardSubtitle={personCardSubtitle}
-                    minimumTimeslotNotice={minimumTimeslotNotice}
-                    requiresPersonAssignment={requiresPersonAssignment}
-                    isNotesCardSelected={isNotesCardSelected}
-                    showCombineServices={!isDesiredLocation}
-                    combineServices={combineServices}
-                    setCombineServices={setCombineServices}
-                    servicesCount={page.services.length}
-                  />
+                {!isConfirmedEbrEdit ? (
+                  <>
+                    <ClientBookingProjectDetailsPanel
+                      isDesiredLocation={isDesiredLocation}
+                      isCompanyClient={isCompanyClient}
+                      bookingProjectEnabled={bookingProjectEnabled}
+                      setBookingProjectEnabled={setBookingProjectEnabled}
+                      showProjectDetails={showProjectDetails}
+                      projectDescription={projectDescription}
+                      setProjectDescription={setProjectDescription}
+                      projectFileInputRef={projectFileInputRef}
+                      handleProjectFilePick={handleProjectFilePick}
+                      projectUploads={projectUploads}
+                      deleteProjectUpload={deleteProjectUpload}
+                    />
 
-                  {isDesiredLocation && isPlanningCardSelected ? (
-                    <ClientBookingPlanningForm
-                      planningActivity={planningActivity}
-                      setPlanningActivity={setPlanningActivity}
-                      planningDuration={planningDuration}
-                      setPlanningDuration={setPlanningDuration}
-                      planningFormIsLocked={planningFormIsLocked}
-                      startPlanningEdit={startPlanningEdit}
-                      savePlanning={savePlanning}
-                    />
-                  ) : isNotesCardSelected ? (
-                    <ClientBookingNotesForm
-                      clientNote={clientNote}
-                      setClientNote={setClientNote}
-                    />
-                  ) : (
-                    <>
-                      <Divider sx={{ my: 1.5 }} />
-                      <ClientBookingServicesDetailsPanel
-                        serviceTab={serviceTab}
-                        setServiceTab={setServiceTab}
-                        setSelectedServiceIds={setSelectedServiceIds}
-                        assigned={assigned}
-                        unassigned={unassigned}
-                        filteredTeamMembers={filteredTeamMembers}
+                    <Box id="booking-services-section" sx={{ mt: 1.25, p: 0.25 }}>
+                      <ClientBookingPeopleSection
                         isDesiredLocation={isDesiredLocation}
-                        selectedTeamMemberId={selectedTeamMemberId}
-                        applySharedTeamMember={applySharedTeamMember}
-                        sharedTeamMemberOptions={sharedTeamMemberOptions}
-                        hasUnassigned={hasUnassigned}
-                        visible={visible}
-                        allVisibleSelected={allVisibleSelected}
-                        someVisibleSelected={someVisibleSelected}
-                        unassignService={unassignService}
-                        updateServiceTeamMember={updateServiceTeamMember}
-                        getServiceTeamMemberOptions={getServiceTeamMemberOptions}
-                        selectedServiceIds={selectedServiceIds}
-                        toggleServiceSelection={toggleServiceSelection}
-                        removeService={removeService}
-                        isModelOrGuestSelected={isModelOrGuestSelected}
-                        canDirectAssign={canDirectAssign}
-                        assignSelectedDirect={assignSelectedDirect}
-                        openAddServiceDialog={openAddServiceDialog}
-                        canAddService={canAddService}
+                        canAddFixedLocationGuest={canAddFixedLocationGuest}
+                        isCompanyClient={isCompanyClient}
+                        bookingProjectEnabled={bookingProjectEnabled}
+                        participantMenuAnchor={participantMenuAnchor}
+                        setParticipantMenuAnchor={setParticipantMenuAnchor}
+                        addParticipant={addParticipant}
+                        hasNotesPerson={hasNotesPerson}
+                        canAddPlanningParticipant={canAddPlanningParticipant}
+                        people={people}
+                        selectedPersonId={selectedPersonId}
+                        draggingPersonId={draggingPersonId}
+                        setDraggingPersonId={setDraggingPersonId}
+                        reorderPeople={reorderPeople}
+                        isPlanningPerson={isPlanningPerson}
+                        selectPlanningCard={selectPlanningCard}
+                        setSelectedPersonId={setSelectedPersonId}
+                        selectNonPlanningPerson={selectNonPlanningPerson}
+                        deleteGuest={deleteGuest}
+                        updateGuestName={updateGuestName}
+                        getParticipantLabel={getParticipantLabel}
+                        personCardSubtitle={personCardSubtitle}
+                        minimumTimeslotNotice={minimumTimeslotNotice}
+                        requiresPersonAssignment={requiresPersonAssignment}
+                        isNotesCardSelected={isNotesCardSelected}
+                        showCombineServices={!isDesiredLocation}
+                        combineServices={combineServices}
+                        setCombineServices={setCombineServices}
+                        servicesCount={page.services.length}
                       />
-                    </>
-                  )}
-                </Box>
+
+                      {isDesiredLocation && isPlanningCardSelected ? (
+                        <ClientBookingPlanningForm
+                          planningActivity={planningActivity}
+                          setPlanningActivity={setPlanningActivity}
+                          planningDuration={planningDuration}
+                          setPlanningDuration={setPlanningDuration}
+                          planningFormIsLocked={planningFormIsLocked}
+                          startPlanningEdit={startPlanningEdit}
+                          savePlanning={savePlanning}
+                        />
+                      ) : isNotesCardSelected ? (
+                        <ClientBookingNotesForm
+                          clientNote={clientNote}
+                          setClientNote={setClientNote}
+                        />
+                      ) : (
+                        <>
+                          <Divider sx={{ my: 1.5 }} />
+                          <ClientBookingServicesDetailsPanel
+                            serviceTab={serviceTab}
+                            setServiceTab={setServiceTab}
+                            setSelectedServiceIds={setSelectedServiceIds}
+                            assigned={assigned}
+                            unassigned={unassigned}
+                            filteredTeamMembers={filteredTeamMembers}
+                            isDesiredLocation={isDesiredLocation}
+                            selectedTeamMemberId={selectedTeamMemberId}
+                            applySharedTeamMember={applySharedTeamMember}
+                            sharedTeamMemberOptions={sharedTeamMemberOptions}
+                            hasUnassigned={hasUnassigned}
+                            visible={visible}
+                            allVisibleSelected={allVisibleSelected}
+                            someVisibleSelected={someVisibleSelected}
+                            unassignService={unassignService}
+                            updateServiceTeamMember={updateServiceTeamMember}
+                            getServiceTeamMemberOptions={getServiceTeamMemberOptions}
+                            selectedServiceIds={selectedServiceIds}
+                            toggleServiceSelection={toggleServiceSelection}
+                            removeService={removeService}
+                            isModelOrGuestSelected={isModelOrGuestSelected}
+                            canDirectAssign={canDirectAssign}
+                            assignSelectedDirect={assignSelectedDirect}
+                            openAddServiceDialog={openAddServiceDialog}
+                            canAddService={canAddService}
+                          />
+                        </>
+                      )}
+                    </Box>
+                  </>
+                ) : null}
               </Grid>
 
               <Grid item xs={12} md={3.8}>

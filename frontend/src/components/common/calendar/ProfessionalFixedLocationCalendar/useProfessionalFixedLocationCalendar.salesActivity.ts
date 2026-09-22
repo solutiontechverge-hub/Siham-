@@ -79,9 +79,13 @@ export function useProfessionalFixedLocationCalendarSalesActivity({
     [drawerSalesActivityContext, myBookingsResponse?.data],
   );
 
-  const activityBookingId = drawerSalesActivityContext
-    ? (parseApiCalendarEventId(drawerSalesActivityContext.id)?.id ?? null)
+  // Offline calendar entries are `ce-<uuid>` — that uuid is not a bookings.id.
+  // Activity rows are keyed by unique_code; only pass a real booking uuid as bookingId.
+  const parsedActivityEventId = drawerSalesActivityContext
+    ? parseApiCalendarEventId(drawerSalesActivityContext.id)
     : null;
+  const activityBookingId =
+    parsedActivityEventId?.kind === "booking" ? parsedActivityEventId.id : null;
   const activityBookingCode = drawerSalesActivityContext?.bookingCode ?? null;
 
   const { data: bookingActivityResponse } = useGetBookingActivityQuery(

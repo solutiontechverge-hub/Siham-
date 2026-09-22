@@ -225,6 +225,11 @@ export type CalendarBookingDetails = {
   cancelledServiceIds?: string[];
   addedProductIds?: string[];
   cancelledProductIds?: string[];
+  /**
+   * Participants marked No Show while the booking shell may stay Confirmed
+   * (partial selection). Used so divergent chain blocks can show their own badge.
+   */
+  noShowParticipantIds?: string[];
   /** Guest name / contact / service-order change — tag Updated, do not start ER. */
   silentUpdated?: boolean;
   /**

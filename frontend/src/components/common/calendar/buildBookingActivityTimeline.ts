@@ -749,6 +749,19 @@ function mapApiEventsToItems(
   return items;
 }
 
+/** Collapse identical persisted rows (same kind/title/time/subtitle). */
+function dedupeActivityItems(items: BookingActivityItem[]): BookingActivityItem[] {
+  const seen = new Set<string>();
+  const out: BookingActivityItem[] = [];
+  for (const item of items) {
+    const key = `${item.kind}|${item.title}|${item.occurredAt}|${item.subtitle ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+}
+
 /**
  * Legacy fallback when no persisted activity events exist.
  * Booking-scoped only; channel-aware; never fabricates unpaid payment rows.
@@ -825,6 +838,7 @@ function synthesizeBookingActivity(
       });
     }
 
+    // Prepaid only when prepayment_status is actually paid — never pending/required.
     if (prepay === "paid") {
       pushItem(items, {
         id: `${bookingId}-prepaid`,
@@ -841,6 +855,7 @@ function synthesizeBookingActivity(
     }
 
     if (effectiveStatus === "confirmed" || effectiveStatus === "completed") {
+      // Accepted only for online request flows (BR / requested) — never invent for offline.
       if (requestFlow && !offline) {
         pushItem(items, {
           id: `${bookingId}-accepted`,
@@ -1015,7 +1030,7 @@ export function buildBookingActivityTimeline(input: BookingActivityBuildInput): 
   const apiEvents = input.apiEvents;
   if (apiEvents && apiEvents.length > 0) {
     const fallbackId = input.currentBookingId || input.currentBookingCode || "booking";
-    const mapped = mapApiEventsToItems(apiEvents, fallbackId);
+    const mapped = dedupeActivityItems(mapApiEventsToItems(apiEvents, fallbackId));
     const filtered =
       input.mode === "sales" ? mapped.filter((item) => isSalesKind(item.kind)) : mapped;
     const sorted = filtered.sort((a, b) => {
@@ -1026,5 +1041,8 @@ export function buildBookingActivityTimeline(input: BookingActivityBuildInput): 
     return enrichItemsWithComparison(sorted, input);
   }
 
-  return enrichItemsWithComparison(synthesizeBookingActivity(input), input);
+  return enrichItemsWithComparison(
+    dedupeActivityItems(synthesizeBookingActivity(input)),
+    input,
+  );
 }

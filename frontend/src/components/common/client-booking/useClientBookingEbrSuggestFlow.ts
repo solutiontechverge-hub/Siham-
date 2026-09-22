@@ -183,7 +183,8 @@ export function useClientBookingEbrSuggestFlow(input: {
   ]);
 
   const openConfirmedEbrEditor = React.useCallback(
-    (focus: "datetime" | "services" | "project") => {
+    // Client confirmed edit: schedule + Desired Location only (not services/project).
+    (focus: "datetime" | "location") => {
       if (activeBooking) {
         // Enrich from local draft snapshot so Desired Model/Planning/Project data survives reopen.
         setActiveBookingSession(enrichClientBookingRecord(activeBooking));

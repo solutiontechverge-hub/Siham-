@@ -85,6 +85,8 @@ export type UseProfessionalFixedLocationCalendarDrawerEditDirtyArgs = {
   bookingProjectUploads: readonly { id: string; name: string }[];
   showIncomingRequestActions: boolean;
   showIncomingErActions: boolean;
+  setIncomingRequestEditMode: React.Dispatch<React.SetStateAction<boolean>>;
+  setAllowDrawerTimeSelection: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
 export function useProfessionalFixedLocationCalendarDrawerEditDirty(
@@ -137,6 +139,8 @@ export function useProfessionalFixedLocationCalendarDrawerEditDirty(
     bookingProjectUploads,
     showIncomingRequestActions,
     showIncomingErActions,
+    setIncomingRequestEditMode,
+    setAllowDrawerTimeSelection,
   } = args;
 
   const isViewingExisting =
@@ -285,8 +289,12 @@ export function useProfessionalFixedLocationCalendarDrawerEditDirty(
   const beginExistingBookingEdit = React.useCallback(() => {
     if (!editingEventId) return;
     if (isCompletedBooking || isCancelledOrInvalidBooking) return;
-    if (showIncomingRequestActions || showIncomingErActions) return;
     if (isEditingExisting) return;
+    // Pending BR/ER must not hard-lock Edit — enter EBR mode so Save works.
+    if (showIncomingRequestActions || showIncomingErActions) {
+      setIncomingRequestEditMode(true);
+      setAllowDrawerTimeSelection(true);
+    }
     if (!silentEditBaselineRef.current) {
       silentEditBaselineRef.current = {
         services: selectedServices,
@@ -311,6 +319,8 @@ export function useProfessionalFixedLocationCalendarDrawerEditDirty(
     isEditingExisting,
     selectedProducts,
     selectedServices,
+    setAllowDrawerTimeSelection,
+    setIncomingRequestEditMode,
     setIsEditingExisting,
     showIncomingErActions,
     showIncomingRequestActions,
