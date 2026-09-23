@@ -314,10 +314,10 @@ export default function CalendarPublicBusinessHoursModal({
     );
     const options: { label: string; value: PublicBusinessHoursLocation }[] = [];
     if (allowed.has("FL") || allowed.size === 0) {
-      options.push({ label: "FL", value: "FL" });
+      options.push({ label: "Fixed Location", value: "FL" });
     }
     if (allowed.has("DL") || allowed.size === 0) {
-      options.push({ label: "DL", value: "DL" });
+      options.push({ label: "Desired Location", value: "DL" });
     }
     return options;
   }, [availableLocations]);
@@ -365,17 +365,20 @@ export default function CalendarPublicBusinessHoursModal({
     [setDraft],
   );
 
-  const updateActiveDay = React.useCallback(
-    (patch: Partial<PublicHoursDayConfig>) => {
+  const updateDay = React.useCallback(
+    (day: PublicBusinessHoursDay, patch: Partial<PublicHoursDayConfig>) => {
       setDraft((prev) => {
-        const activeKey = prev.day || WEEKDAY_ORDER[0];
-        const days = (prev.days?.length
+        const days = (prev.days?.length === 7
           ? prev.days
           : createDefaultPublicHoursDayConfigs()
-        ).map((row) => (row.day === activeKey ? { ...row, ...patch } : row));
-        const nextActive = days.find((row) => row.day === activeKey) ?? days[0];
+        ).map((row) => (row.day === day ? { ...row, ...patch } : row));
+        const nextActive =
+          days.find((row) => row.day === day) ??
+          days.find((row) => row.day === (prev.day || WEEKDAY_ORDER[0])) ??
+          days[0];
         return {
           ...prev,
+          day,
           days,
           startTime: nextActive.startTime,
           endTime: nextActive.endTime,
@@ -500,17 +503,101 @@ export default function CalendarPublicBusinessHoursModal({
             fullWidth
           />
 
-          <AppDropdown
-            label="Day"
-            value={selectedDay}
-            onChange={(val) => selectDay(String(val) as PublicBusinessHoursDay)}
-            options={WEEKDAY_ORDER.map((day) => ({
-              label: day,
-              value: day,
-            }))}
-            placeholder="Select Day"
-            fullWidth
-          />
+          <Stack spacing={0.75}>
+            <BodyText
+              sx={{
+                fontSize: "0.75rem",
+                fontWeight: 500,
+                color: alpha(m.navy, 0.9),
+              }}
+            >
+              Hours by day
+            </BodyText>
+            {dayConfigs.map((row) => {
+              const isSelected = row.day === selectedDay;
+              const timeLabel = row.off
+                ? offLabel
+                : `${formatTimeDisplay(row.startTime) || row.startTime} – ${formatTimeDisplay(row.endTime) || row.endTime}`;
+              return (
+                <Box
+                  key={row.day}
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                    minHeight: 44,
+                    px: 1.25,
+                    py: 0.5,
+                    borderRadius: "6px",
+                    border: `1px solid ${
+                      isSelected ? m.teal : alpha(m.navy, 0.12)
+                    }`,
+                    bgcolor: isSelected ? alpha(m.teal, 0.06) : "#fff",
+                  }}
+                >
+                  <ButtonBase
+                    onClick={() => selectDay(row.day)}
+                    sx={{
+                      flex: 1,
+                      minWidth: 0,
+                      justifyContent: "space-between",
+                      gap: 1,
+                      py: 0.5,
+                      textAlign: "left",
+                    }}
+                  >
+                    <BodyText
+                      sx={{
+                        fontSize: 13,
+                        fontWeight: isSelected ? 800 : 700,
+                        color: alpha(m.navy, 0.82),
+                      }}
+                    >
+                      {row.day}
+                    </BodyText>
+                    <BodyText
+                      sx={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: alpha(m.navy, row.off ? 0.45 : 0.62),
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {timeLabel}
+                    </BodyText>
+                  </ButtonBase>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={Boolean(row.off)}
+                        onChange={(e) => {
+                          selectDay(row.day);
+                          updateDay(row.day, { off: e.target.checked });
+                        }}
+                        size="small"
+                        sx={{
+                          color: alpha(m.navy, 0.35),
+                          "&.Mui-checked": { color: m.teal },
+                          py: 0,
+                        }}
+                      />
+                    }
+                    label={offLabel}
+                    sx={{
+                      m: 0,
+                      mr: 0.25,
+                      flexShrink: 0,
+                      "& .MuiFormControlLabel-label": {
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: alpha(m.navy, 0.72),
+                      },
+                    }}
+                  />
+                </Box>
+              );
+            })}
+          </Stack>
 
           <Stack spacing={1.25}>
             <Stack direction="row" spacing={1.25}>
@@ -612,7 +699,8 @@ export default function CalendarPublicBusinessHoursModal({
                       : activeDay?.endTime || "17:00"
                   }
                   onChange={(val) =>
-                    updateActiveDay(
+                    updateDay(
+                      selectedDay,
                       editingTimeField === "start"
                         ? { startTime: val, off: false }
                         : { endTime: val, off: false },
@@ -624,29 +712,6 @@ export default function CalendarPublicBusinessHoursModal({
               </Box>
             ) : null}
           </Stack>
-
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={Boolean(activeDay?.off)}
-                onChange={(e) => updateActiveDay({ off: e.target.checked })}
-                size="small"
-                sx={{
-                  color: alpha(m.navy, 0.35),
-                  "&.Mui-checked": { color: m.teal },
-                }}
-              />
-            }
-            label={offLabel}
-            sx={{
-              "& .MuiFormControlLabel-label": {
-                fontSize: 13,
-                fontWeight: 600,
-                color: alpha(m.navy, 0.72),
-              },
-              m: 0,
-            }}
-          />
 
           {isVariable ? (
             <AppTextField

@@ -27,6 +27,47 @@ const roundMoney = (value) => Math.round((Number(value) + Number.EPSILON) * 100)
 
 const toIsoDate = (value) => toIsoDateOnly(value);
 
+/** Stale payment link / Cancel Sales race: money landed after sale was voided. */
+export const PAYMENT_AFTER_CANCEL_DETAIL =
+  "Payment received after cancel — review required";
+export const PAYMENT_AFTER_CANCEL_FLAG = "payment_after_cancel";
+
+export function isSettledFinanceStatus(status) {
+  return status === "Paid" || status === "Prepaid";
+}
+
+export function shouldFlagPaymentAfterCancel(intendedStatus, hasPriorVoidedSibling) {
+  return isSettledFinanceStatus(intendedStatus) && Boolean(hasPriorVoidedSibling);
+}
+
+export function buildPaymentAfterCancelDocumentPatch({ intendedStatus, amount }) {
+  return {
+    safetyFlag: PAYMENT_AFTER_CANCEL_FLAG,
+    needsReview: true,
+    paymentReceivedStatus: intendedStatus,
+    paymentReceivedAt: new Date().toISOString(),
+    paymentReceivedAmount: roundMoney(amount),
+  };
+}
+
+/** Keep Voided; stamp review flag + status_detail (visible in finance table). */
+export async function flagFinancePaymentAfterCancel(txId, { intendedStatus, amount }) {
+  const patch = buildPaymentAfterCancelDocumentPatch({ intendedStatus, amount });
+  const result = await query(
+    `UPDATE finance_transactions
+     SET status_detail = $2,
+         document = COALESCE(document, '{}'::jsonb) || $3::jsonb,
+         updated_at = NOW()
+     WHERE id = $1
+     RETURNING *`,
+    [txId, PAYMENT_AFTER_CANCEL_DETAIL, JSON.stringify(patch)],
+  );
+  console.warn(
+    `[finance-safety] ${PAYMENT_AFTER_CANCEL_FLAG} on finance_transactions.id=${txId}`,
+  );
+  return result.rows[0] ?? null;
+}
+
 async function loadInvoiceSettingsForProfessional(professionalProfileId) {
   const result = await query(
     `SELECT invoice_settings
@@ -327,19 +368,91 @@ async function insertFinanceTransaction({
   docSuffix,
   entryLabel,
 }) {
-  const existing = await query(
-    `SELECT id FROM finance_transactions
+  const gross = roundMoney(amount);
+  // Open (unresolved) invoice for this booking/phase — replace when amount changes
+  // so pre-resolution edits do not leave a stale payment link / prepayment row.
+  const openExisting = await query(
+    `SELECT id, gross_amount, status FROM finance_transactions
      WHERE professional_profile_id = $1
        AND booking_id = $2
-       AND status = $3
-       AND COALESCE(document->>'payerKey', '') = $4
-       AND COALESCE(document->>'paymentPhase', '') = $5
+       AND COALESCE(document->>'payerKey', '') = $3
+       AND COALESCE(document->>'paymentPhase', '') = $4
+       AND status NOT IN ('Paid', 'Prepaid', 'Refunded', 'Voided')
+     ORDER BY updated_at DESC NULLS LAST
      LIMIT 1`,
-    [booking.professional_profile_id, booking.unique_code, status, payerKey || "", paymentPhase || ""],
+    [
+      booking.professional_profile_id,
+      booking.unique_code,
+      payerKey || "",
+      paymentPhase || "",
+    ],
   );
-  if (existing.rows[0]) return existing.rows[0].id;
+  const openRow = openExisting.rows[0];
+  /** Exclude rows we just voided for amount/status supersede — those are not Cancel Sales. */
+  let supersededOpenId = null;
+  if (openRow) {
+    const prevGross = roundMoney(openRow.gross_amount);
+    if (prevGross === gross && String(openRow.status) === String(status)) {
+      return openRow.id;
+    }
+    // Amount or open-status drift → void old (Cancel Sales / deactivate link) then insert fresh.
+    supersededOpenId = openRow.id;
+    await query(
+      `UPDATE finance_transactions
+       SET status = 'Voided', updated_at = NOW()
+       WHERE id = $1`,
+      [openRow.id],
+    );
+  } else {
+    const exact = await query(
+      `SELECT id FROM finance_transactions
+       WHERE professional_profile_id = $1
+         AND booking_id = $2
+         AND status = $3
+         AND COALESCE(document->>'payerKey', '') = $4
+         AND COALESCE(document->>'paymentPhase', '') = $5
+       LIMIT 1`,
+      [
+        booking.professional_profile_id,
+        booking.unique_code,
+        status,
+        payerKey || "",
+        paymentPhase || "",
+      ],
+    );
+    if (exact.rows[0]) return exact.rows[0].id;
+  }
 
-  const gross = roundMoney(amount);
+  // Stale Stripe / payment-link race: Cancel Sales already Voided this phase, but payment still landed.
+  if (isSettledFinanceStatus(status)) {
+    const voidedSibling = await query(
+      `SELECT id FROM finance_transactions
+       WHERE professional_profile_id = $1
+         AND booking_id = $2
+         AND status = 'Voided'
+         AND COALESCE(document->>'payerKey', '') = $3
+         AND COALESCE(document->>'paymentPhase', '') = $4
+         AND ($5::uuid IS NULL OR id <> $5)
+       ORDER BY updated_at DESC NULLS LAST
+       LIMIT 1`,
+      [
+        booking.professional_profile_id,
+        booking.unique_code,
+        payerKey || "",
+        paymentPhase || "",
+        supersededOpenId,
+      ],
+    );
+    const priorVoidedId = voidedSibling.rows[0]?.id ?? null;
+    if (shouldFlagPaymentAfterCancel(status, Boolean(priorVoidedId))) {
+      await flagFinancePaymentAfterCancel(priorVoidedId, {
+        intendedStatus: status,
+        amount: gross,
+      });
+      return priorVoidedId;
+    }
+  }
+
   if (gross <= 0 && paymentPhase !== "prepay") return null;
 
   const isOnline = paymentMethod.startsWith("online") && booking.booking_type !== "offline";

@@ -453,7 +453,10 @@ export default function ClientPageView() {
                                   </Typography>
                                   <ClientPlatformTag
                                     isMollure={isMollureClient(c)}
-                                    clientKind={c.kind}
+                                    clientKind={
+                                      c.kind === "company" ? "company" : null
+                                    }
+                                    companyLabel="B.C. client"
                                   />
                                   {blocked ? (
                                     <Chip

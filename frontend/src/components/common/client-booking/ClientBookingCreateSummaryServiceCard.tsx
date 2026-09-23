@@ -314,7 +314,7 @@ export default function ClientBookingCreateSummaryServiceCard({
                         </Stack>
                       </Box>
                     ) : null}
-                    {section.items.map((item) => {
+                    {section.items.map((item, itemIndex) => {
                       const start = serviceCursor;
                       serviceCursor += item.durationMins;
                       const tmId = String(item.teamMemberId ?? "").trim();
@@ -329,7 +329,7 @@ export default function ClientBookingCreateSummaryServiceCard({
                       );
                       return (
                         <Box
-                          key={item.id}
+                          key={`${item.id}::${section.key}::${itemIndex}`}
                           sx={{
                             borderRadius: "10px",
                             border: `1px solid ${alpha(m.navy, 0.08)}`,
@@ -445,9 +445,9 @@ export default function ClientBookingCreateSummaryServiceCard({
             <Box sx={{ mt: 2 }}>
               <Typography sx={catalogHeadingSx}>Product</Typography>
               <Stack spacing={1}>
-                {catalogProducts.map((product) => (
+                {catalogProducts.map((product, productIndex) => (
                   <Box
-                    key={product.id}
+                    key={`${product.id}::${product.guestId ?? ""}::${productIndex}`}
                     sx={{
                       borderRadius: "10px",
                       border: `1px solid ${alpha(m.navy, 0.06)}`,
@@ -489,9 +489,9 @@ export default function ClientBookingCreateSummaryServiceCard({
             <Box sx={{ mt: 2 }}>
               <Typography sx={catalogHeadingSx}>Unique item</Typography>
               <Stack spacing={1}>
-                {catalogUniqueItems.map((item) => (
+                {catalogUniqueItems.map((item, itemIndex) => (
                   <Box
-                    key={item.id}
+                    key={`${item.id}::${item.guestId ?? ""}::${itemIndex}`}
                     sx={{
                       borderRadius: "10px",
                       border: `1px solid ${alpha(m.navy, 0.06)}`,

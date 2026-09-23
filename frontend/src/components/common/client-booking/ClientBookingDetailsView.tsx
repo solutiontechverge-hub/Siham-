@@ -277,17 +277,11 @@ export default function ClientBookingDetailsView({
                 : undefined
             }
             onEditBookingDetails={
-              bookingStatus === "confirmed"
-                ? () => openConfirmedEbrEditor("services")
+              bookingStatus === "confirmed" && locationMode === "desired"
+                ? () => openConfirmedEbrEditor("location")
                 : undefined
             }
-            onEditProject={
-              bookingStatus === "confirmed" &&
-              locationMode === "desired" &&
-              user?.user_type === "company"
-                ? () => openConfirmedEbrEditor("project")
-                : undefined
-            }
+            onEditProject={undefined}
             onSendBookingRequest={
               isDraft && !isBookingRequestSent
                 ? handleSendBookingRequest
@@ -306,6 +300,10 @@ export default function ClientBookingDetailsView({
                 Boolean(activeBooking?.editedServiceIds?.length) ||
                 Boolean(activeBooking?.editedProductIds?.length) ||
                 isClientChangeAccepted)
+            }
+            editRequestAwaitingAck={
+              Boolean(activeBooking?.needsOk) &&
+              activeBooking?.ackScenario === "ER"
             }
             ebrSignpostTitle={ACTIVITY_COMPARISON_SIGNPOST}
             onEbrClick={() => openActivityComparison("ebr")}

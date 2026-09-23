@@ -55,6 +55,13 @@ export function canRespondToConfirmedEr(
   event: Pick<CalendarEvent, "status" | "bookingScenario" | "details"> | null | undefined,
 ) {
   if (!event || event.status !== "Confirmed" || event.bookingScenario !== "ER") return false;
+  if (
+    event.details?.editRequestStatus === "approved" ||
+    event.details?.editRequestStatus === "rejected" ||
+    event.details?.needsOk
+  ) {
+    return false;
+  }
   return event.details?.requestDirection !== "outgoing";
 }
 
@@ -105,6 +112,9 @@ export function isAwaitingClientChangeApproval(
   details?: CalendarBookingDetails | null,
   ebr?: EditTagEbrSource,
 ) {
+  // Silent phone / guest name / reorder never awaits approval — leftover
+  // responseStatus or EBR status must not revive Edited+Pending.
+  if (bookingNotesIndicateSilentOnlyVisit(details)) return false;
   if (ebr?.lastEditedBy === "professional") {
     const status = String(ebr.status ?? "").toLowerCase();
     if (status === "suggested" || status === "pending") return true;
@@ -281,6 +291,8 @@ function phonePart(value?: string | null) {
 /**
  * Notes store client+guest lines in `services`; the drawer keeps guests separate.
  * Flatten so silent/ER diffs do not mix those shapes.
+ * Merge both sources and key by guestId:id — same catalog id on client + guest must both survive
+ * (do not drop flat guestId-tagged client lines when nested guest services exist).
  */
 export function flattenBookingServices(input: {
   services?: readonly CalendarBookingServiceItem[];
@@ -292,16 +304,16 @@ export function flattenBookingServices(input: {
       guestId: service.guestId ?? guest.id,
     })),
   );
-  const clientLines = (input.services ?? []).filter(
-    (service) => !String(service.guestId ?? "").trim(),
-  );
-  const guestLinesFromServices = (input.services ?? []).filter((service) =>
-    Boolean(String(service.guestId ?? "").trim()),
-  );
-  const guestLines = guestLinesFromGuests.length
-    ? guestLinesFromGuests
-    : guestLinesFromServices;
-  return [...clientLines, ...guestLines];
+  const seen = new Set<string>();
+  const next: CalendarBookingServiceItem[] = [];
+  for (const service of [...(input.services ?? []), ...guestLinesFromGuests]) {
+    const keyed = { ...service, guestId: service.guestId ?? null };
+    const key = serviceLineKey(keyed);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    next.push(keyed);
+  }
+  return next;
 }
 
 type IdentityPerson = {
@@ -791,6 +803,50 @@ export function isSilentSafeBookingChange(input: {
     guestSetChanged ||
     guestServiceApprovalRequired
   );
+}
+
+/**
+ * True when notes say silent Updated, or when a leftover silentUpdateSnapshot
+ * proves the live booking only differs by phone / guest name / reorder
+ * (stale editedServiceIds / responseStatus must not force Edited).
+ */
+export function bookingNotesIndicateSilentOnlyVisit(
+  meta?: CalendarBookingDetails | null,
+): boolean {
+  if (!meta) return false;
+  if (meta.silentUpdated) return true;
+  const snap = meta.silentUpdateSnapshot;
+  if (!snap) return false;
+  const fields = detectSilentUpdatedFields({
+    snapshot: snap,
+    currentPhoneCode: meta.phoneCode,
+    currentPhoneNumber: meta.phoneNumber,
+    currentGuests: meta.guests,
+    currentPeople: meta.clientSnapshot?.people,
+    currentServices: meta.services,
+  });
+  if (
+    !fields.phoneUpdated &&
+    fields.guestIds.length === 0 &&
+    fields.serviceIds.length === 0
+  ) {
+    return false;
+  }
+  return isSilentSafeBookingChange({
+    previousServices: snap.services ?? [],
+    currentServices: meta.services ?? [],
+    previousGuests: snap.guests,
+    currentGuests: meta.guests,
+    previousPeople: snap.people,
+    currentPeople: meta.clientSnapshot?.people,
+    previousPhoneCode: snap.phoneCode ?? undefined,
+    currentPhoneCode: meta.phoneCode,
+    previousPhoneNumber: snap.phoneNumber ?? undefined,
+    currentPhoneNumber: meta.phoneNumber,
+    previousProducts: snap.products ?? [],
+    currentProducts: meta.products ?? [],
+    scheduleChanged: Boolean(meta.scheduleEdited),
+  });
 }
 
 export function detectServiceLineChanges(

@@ -60,6 +60,7 @@ export function clearBookingAckDetails<T extends CalendarBookingDetails>(
   delete next.needsOk;
   delete next.ackRecipient;
   delete next.ackScenario;
+  delete next.editRequestStatus;
   return next;
 }
 
@@ -82,4 +83,19 @@ export function buildAcceptAckDetails(input: {
     delete next.ackScenario;
   }
   return next;
+}
+
+/** After ER accept/reject — keep ER tag until the initiator OKs the outcome. */
+export function buildEditRequestAckDetails(input: {
+  initiatedBy: AckRecipient;
+  editRequestStatus: "approved" | "rejected";
+  base?: CalendarBookingDetails | null;
+}): CalendarBookingDetails {
+  return {
+    ...(input.base ?? {}),
+    needsOk: true,
+    ackRecipient: input.initiatedBy,
+    ackScenario: "ER",
+    editRequestStatus: input.editRequestStatus,
+  };
 }

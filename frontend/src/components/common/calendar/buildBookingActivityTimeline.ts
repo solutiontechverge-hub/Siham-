@@ -163,7 +163,8 @@ function asGuestItems(
   return (guests ?? []).map((guest) => ({
     id: String(guest.id ?? "").trim() || (guest.name ?? "").trim(),
     name: (guest.name ?? "").trim(),
-    participantType: guest.participantType,
+    // Guest-list rows are extras even when type is omitted.
+    participantType: guest.participantType ?? "guest",
     services: (guest.services ?? []).map((service) => ({
       id: service.id,
       name: service.name,
@@ -174,6 +175,21 @@ function asGuestItems(
       guestId: service.guestId ?? guest.id ?? null,
     })),
     products: [],
+  }));
+}
+
+/** Guest-list people → comparison sections (default type guest). */
+function asGuestParticipants(
+  guests?: readonly ActivityGuestLike[] | null,
+): Array<{
+  id?: string;
+  name?: string | null;
+  participantType: NonNullable<CalendarBookingGuestItem["participantType"]>;
+}> {
+  return (guests ?? []).map((guest) => ({
+    id: String(guest.id ?? "").trim() || (guest.name ?? "").trim(),
+    name: guest.name,
+    participantType: guest.participantType ?? "guest",
   }));
 }
 
@@ -272,6 +288,7 @@ function resolveComparisonForBooking(input: {
   currentStart?: string | null;
   bookingDate?: string | null;
   bookingStart?: string | null;
+  clientName?: string | null;
 }): ActivityComparison | null {
   const {
     mode,
@@ -283,6 +300,7 @@ function resolveComparisonForBooking(input: {
     currentStart,
     bookingDate,
     bookingStart,
+    clientName,
   } = input;
 
   const details = currentDetails ?? null;
@@ -416,6 +434,23 @@ function resolveComparisonForBooking(input: {
     originalDesiredLocation: snapshot?.desiredLocation,
     newDesiredLocation:
       details?.desiredLocation ?? notesDetails?.desiredLocation,
+    clientName:
+      clientName ??
+      livePeople?.find((p) => p.isRequester)?.name ??
+      snapshot?.people?.find((p) => p.isRequester)?.name ??
+      details?.clientSnapshot?.people?.find((p) => p.isRequester)?.name ??
+      notesDetails?.clientSnapshot?.people?.find((p) => p.isRequester)?.name ??
+      null,
+    participants: [
+      ...asGuestParticipants(originalGuests),
+      ...asGuestParticipants(liveGuests),
+      ...asGuestParticipants(snapshot?.guests),
+      ...(livePeople ?? []),
+      ...(snapshot?.people ?? []),
+      ...(details?.clientSnapshot?.people ??
+        notesDetails?.clientSnapshot?.people ??
+        []),
+    ],
   });
 }
 
@@ -636,6 +671,7 @@ function enrichItemsWithComparison(
         currentStart: input.currentStart,
         bookingDate: booking?.booking_date,
         bookingStart: booking?.start_time,
+        clientName: input.clientName,
       })
     : null;
 
@@ -651,6 +687,7 @@ function enrichItemsWithComparison(
           currentStart: input.currentStart,
           bookingDate: booking?.booking_date,
           bookingStart: booking?.start_time,
+          clientName: input.clientName,
         })
       : null;
 
@@ -749,6 +786,19 @@ function mapApiEventsToItems(
   return items;
 }
 
+/** Collapse identical persisted rows (same kind/title/time/subtitle). */
+function dedupeActivityItems(items: BookingActivityItem[]): BookingActivityItem[] {
+  const seen = new Set<string>();
+  const out: BookingActivityItem[] = [];
+  for (const item of items) {
+    const key = `${item.kind}|${item.title}|${item.occurredAt}|${item.subtitle ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+}
+
 /**
  * Legacy fallback when no persisted activity events exist.
  * Booking-scoped only; channel-aware; never fabricates unpaid payment rows.
@@ -825,6 +875,7 @@ function synthesizeBookingActivity(
       });
     }
 
+    // Prepaid only when prepayment_status is actually paid — never pending/required.
     if (prepay === "paid") {
       pushItem(items, {
         id: `${bookingId}-prepaid`,
@@ -841,6 +892,7 @@ function synthesizeBookingActivity(
     }
 
     if (effectiveStatus === "confirmed" || effectiveStatus === "completed") {
+      // Accepted only for online request flows (BR / requested) — never invent for offline.
       if (requestFlow && !offline) {
         pushItem(items, {
           id: `${bookingId}-accepted`,
@@ -1015,7 +1067,7 @@ export function buildBookingActivityTimeline(input: BookingActivityBuildInput): 
   const apiEvents = input.apiEvents;
   if (apiEvents && apiEvents.length > 0) {
     const fallbackId = input.currentBookingId || input.currentBookingCode || "booking";
-    const mapped = mapApiEventsToItems(apiEvents, fallbackId);
+    const mapped = dedupeActivityItems(mapApiEventsToItems(apiEvents, fallbackId));
     const filtered =
       input.mode === "sales" ? mapped.filter((item) => isSalesKind(item.kind)) : mapped;
     const sorted = filtered.sort((a, b) => {
@@ -1026,5 +1078,8 @@ export function buildBookingActivityTimeline(input: BookingActivityBuildInput): 
     return enrichItemsWithComparison(sorted, input);
   }
 
-  return enrichItemsWithComparison(synthesizeBookingActivity(input), input);
+  return enrichItemsWithComparison(
+    dedupeActivityItems(synthesizeBookingActivity(input)),
+    input,
+  );
 }

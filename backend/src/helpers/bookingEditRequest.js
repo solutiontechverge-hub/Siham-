@@ -78,7 +78,7 @@ export function buildApprovedEditRequest(existing) {
 
 /**
  * Reject keeps booking Confirmed and marks ER rejected (UI: ER + cross).
- * A new ER can still be sent — only `pending` blocks send.
+ * A new ER send supersedes any existing pending (no queue).
  */
 export function buildRejectedEditRequest(existing) {
   const er = parseEditRequest(existing);

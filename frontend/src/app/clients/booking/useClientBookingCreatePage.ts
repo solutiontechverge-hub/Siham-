@@ -803,6 +803,7 @@ export function useClientBookingCreatePage() {
     desiredVisitAddressLabel,
     businessProfile,
     isEbrSuggest,
+    isConfirmedEbrEdit,
     ebrSuggestBaselineRef,
     locationMode,
     fromProfile,
@@ -818,11 +819,13 @@ export function useClientBookingCreatePage() {
   React.useEffect(() => {
     if (!isEbrSuggest || !ebrFocus || !profileHydrated) return;
     const id =
-      ebrFocus === "project"
-        ? "booking-project-section"
-        : ebrFocus === "services"
-          ? "booking-services-section"
-          : "booking-calendar-section";
+      ebrFocus === "location"
+        ? "booking-location-section"
+        : ebrFocus === "project"
+          ? "booking-project-section"
+          : ebrFocus === "services"
+            ? "booking-services-section"
+            : "booking-calendar-section";
     const timer = window.setTimeout(() => {
       document
         .getElementById(id)
@@ -929,6 +932,8 @@ export function useClientBookingCreatePage() {
     setProjectDescription,
     projectUploads,
     setProjectUploads,
+    desiredVisitAddress,
+    setDesiredVisitAddress,
     desiredVisitAddressLabel,
     participantMenuAnchor,
     setParticipantMenuAnchor,

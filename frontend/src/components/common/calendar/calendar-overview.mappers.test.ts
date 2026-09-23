@@ -199,4 +199,40 @@ assert.equal(segmentsDeduped.length, 2, "display dedupe keeps one card per staff
 const aliLane = segmentsDeduped.filter((row) => row.resourceId === ALI);
 assert.equal(resolveSameTimeStackChip(aliLane), null);
 
+// Project media: fall back to booking.images when location_details.uploads has no live urls.
+const mediaBooking: CalendarBooking = {
+  id: "booking-media",
+  booking_date: "2026-09-23",
+  business_setup_id: "biz-1",
+  customer_id: "cust-1",
+  service_id: "svc-1",
+  team_member_id: "tm-1",
+  start_time: "2026-09-23T10:00:00",
+  end_time: "2026-09-23T10:24:00",
+  location_type: "desired",
+  notes: `---mollure-meta---\n${JSON.stringify({
+    clientSnapshot: {
+      projectDetails: { description: "sadfas", uploads: [] },
+    },
+  })}`,
+  status: "confirmed",
+  total_price: 10,
+  unique_code: "ol1790115795995KQMH9A",
+  location_details: {
+    projectDescription: "sadfas",
+    uploads: [{ id: "u1", name: "dead.jpg", url: null }],
+  },
+  images: ["/uploads/bookings/x/a.jpg"],
+};
+const mediaEvent = mapCalendarBookingToEvent(mediaBooking, "tm-1");
+assert.equal(mediaEvent.details?.clientSnapshot?.projectDetails?.description, "sadfas");
+assert.equal(
+  (mediaEvent.details?.clientSnapshot?.projectDetails?.uploads ?? []).length,
+  1,
+);
+assert.equal(
+  mediaEvent.details?.clientSnapshot?.projectDetails?.uploads?.[0]?.url,
+  "/uploads/bookings/x/a.jpg",
+);
+
 console.log("calendar-overview.mappers.test.ts: all assertions passed");

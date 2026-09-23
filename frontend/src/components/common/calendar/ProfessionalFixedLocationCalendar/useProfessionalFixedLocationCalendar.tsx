@@ -736,6 +736,8 @@ export function useProfessionalFixedLocationCalendar({
     bookingProjectUploads,
     showIncomingRequestActions,
     showIncomingErActions,
+    setIncomingRequestEditMode,
+    setAllowDrawerTimeSelection,
   });
 
   const {

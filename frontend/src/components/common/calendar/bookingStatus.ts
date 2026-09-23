@@ -32,12 +32,10 @@ export const ONLINE_BOOKING_STATUSES: readonly CalendarBookingStatus[] = [
 ];
 
 export const OFFLINE_BOOKING_STATUSES: readonly CalendarBookingStatus[] = [
-  "Requested",
   "Confirmed",
   "In Progress",
   "Completed",
   "Cancelled",
-  "No Show",
 ];
 
 export const BOOKING_SCENARIO_LABELS: Record<BookingScenarioIndicator, string> = {
@@ -282,8 +280,8 @@ export function getActionRequiredScenarioIndicators(
 }
 
 export function isAllowedStatusForBookingType(status: CalendarBookingStatus, bookingType?: CalendarBookingType) {
-  const allowed = isOnlineBookingType(bookingType) ? ONLINE_BOOKING_STATUSES : OFFLINE_BOOKING_STATUSES;
-  return allowed.includes(status);
+  if (bookingType === "Offline") return OFFLINE_BOOKING_STATUSES.includes(status);
+  return ONLINE_BOOKING_STATUSES.includes(status);
 }
 
 export function isActiveBookingRequest(

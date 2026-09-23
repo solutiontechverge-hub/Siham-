@@ -66,7 +66,10 @@ export function useProfessionalFixedLocationCalendarDrawerLineTagsFlags(
     isViewingBooking &&
     viewingBookingEvent?.status === "Confirmed" &&
     viewingBookingEvent?.bookingScenario === "ER" &&
-    viewingBookingEvent?.details?.requestDirection === "outgoing";
+    viewingBookingEvent?.details?.requestDirection === "outgoing" &&
+    viewingBookingEvent?.details?.editRequestStatus !== "approved" &&
+    viewingBookingEvent?.details?.editRequestStatus !== "rejected" &&
+    !viewingBookingEvent?.details?.needsOk;
   const showExpiredResponseBanner = shouldShowExpiredResponseBanner(
     viewingBookingEvent,
     businessResponseWindowInput,

@@ -106,6 +106,48 @@ function buildFallbackCreateBookingPayload(
     ...(draft.projectDetails || (locationMode === "desired" && draft.desiredLocation)
       ? {
           location_details: {
+            ...(draft.people?.length
+              ? {
+                  clientSnapshot: {
+                    people: draft.people
+                      .filter(
+                        (p) =>
+                          p.participantType !== "notes" && p.id !== "p-notes",
+                      )
+                      .map((p) => ({
+                        id: p.id,
+                        name: p.name,
+                        isRequester: Boolean(p.isRequester),
+                        participantType: p.participantType,
+                        planningActivity: p.planningActivity,
+                        planningDuration: p.planningDuration,
+                        planningStartTime: p.planningStartTime,
+                        planningEndTime: p.planningEndTime,
+                        bufferStartTime: p.bufferStartTime,
+                        bufferEndTime: p.bufferEndTime,
+                      })),
+                    services: (draft.services ?? []).map((s) => ({
+                      id: s.id,
+                      name: s.name,
+                      price: s.price,
+                      durationMins: s.durationMins,
+                      startTime: s.startTime,
+                      endTime: s.endTime,
+                      guestId: s.guestId ?? null,
+                      teamMemberId: s.teamMemberId ?? null,
+                    })),
+                    teamMembers: draft.teamMembers ?? [],
+                    ...(draft.projectDetails?.description?.trim()
+                      ? {
+                          projectDetails: {
+                            description: draft.projectDetails.description,
+                            uploads: [],
+                          },
+                        }
+                      : {}),
+                  },
+                }
+              : {}),
             ...(draft.projectDetails
               ? {
                   projectDescription: draft.projectDetails.description ?? "",
@@ -116,11 +158,52 @@ function buildFallbackCreateBookingPayload(
               ? { desiredLocation: draft.desiredLocation }
               : {}),
           },
-          notes: draft.clientNote?.trim()
-            ? draft.clientNote.trim()
-            : draft.projectDetails?.description
-            ? `Project: ${draft.projectDetails.description}`
-            : null,
+          notes: (() => {
+            const human = draft.clientNote?.trim()
+              ? draft.clientNote.trim()
+              : draft.projectDetails?.description
+                ? `Project: ${draft.projectDetails.description}`
+                : "";
+            if (!draft.people?.length) return human || null;
+            return `${human}${human ? "\n" : ""}---mollure-meta---\n${JSON.stringify({
+              requestDirection: asBookingRequest ? "incoming" : undefined,
+              ...(human ? { clientNote: human } : {}),
+              clientSnapshot: {
+                people: draft.people
+                  .filter(
+                    (p) =>
+                      p.participantType !== "notes" && p.id !== "p-notes",
+                  )
+                  .map((p) => ({
+                    id: p.id,
+                    name: p.name,
+                    isRequester: Boolean(p.isRequester),
+                    participantType: p.participantType,
+                    planningActivity: p.planningActivity,
+                    planningDuration: p.planningDuration,
+                    planningStartTime: p.planningStartTime,
+                    planningEndTime: p.planningEndTime,
+                  })),
+                services: (draft.services ?? []).map((s) => ({
+                  id: s.id,
+                  name: s.name,
+                  price: s.price,
+                  durationMins: s.durationMins,
+                  guestId: s.guestId ?? null,
+                  teamMemberId: s.teamMemberId ?? null,
+                })),
+                teamMembers: draft.teamMembers ?? [],
+                ...(draft.projectDetails?.description?.trim()
+                  ? {
+                      projectDetails: {
+                        description: draft.projectDetails.description,
+                        uploads: [],
+                      },
+                    }
+                  : {}),
+              },
+            })}`;
+          })(),
           images: (draft.projectDetails?.uploads ?? [])
             .filter((u) => u.url && (u.kind === "image" || !u.kind))
             .map((u) => u.url as string),

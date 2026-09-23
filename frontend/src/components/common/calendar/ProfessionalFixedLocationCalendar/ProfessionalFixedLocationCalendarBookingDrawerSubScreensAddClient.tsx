@@ -203,7 +203,9 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerSubScreens
                   endAdornment: (
                     <BookingClientTags
                       isMollure={Boolean(c.isMollure)}
-                      clientKind={c.clientKind}
+                      clientKind={
+                        c.clientKind === "company" ? "company" : null
+                      }
                     />
                   ),
                 }))}
@@ -327,7 +329,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerSubScreens
                                     platformEmailMatch.id),
                             )?.clientKind === "company"
                               ? "company"
-                              : "individual"
+                              : null
                           }
                         />
                       </Stack>

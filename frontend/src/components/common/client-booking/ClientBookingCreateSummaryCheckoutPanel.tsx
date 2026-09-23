@@ -68,15 +68,25 @@ export default function ClientBookingCreateSummaryCheckoutPanel({
                 onClick={() => void onPayNow()}
                 disabled={isPaying}
                 sx={mollureLabelSx(m.navy, {
-                  border: 0,
+                  border: "none",
+                  outline: "none",
+                  boxShadow: "none",
                   bgcolor: "transparent",
                   p: 0,
+                  m: 0,
                   cursor: isPaying ? "wait" : "pointer",
                   color: m.teal,
                   fontWeight: 900,
                   fontFamily: "inherit",
                   opacity: isPaying ? 0.7 : 1,
+                  appearance: "none",
+                  WebkitAppearance: "none",
                   "&:hover": { color: m.tealDark },
+                  "&:focus": { outline: "none" },
+                  "&:focus-visible": {
+                    outline: `2px solid ${alpha(m.teal, 0.45)}`,
+                    outlineOffset: 2,
+                  },
                 })}
               >
                 {isPaying ? "Preparing…" : "Pay Now"}
@@ -119,10 +129,10 @@ export default function ClientBookingCreateSummaryCheckoutPanel({
         {isSubmitting ? (
           <>
             <CircularProgress size={18} sx={{ mr: 1, color: "inherit" }} />
-            {isDesired ? "Sending…" : "Booking…"}
+            {isDesired ? "Saving…" : "Booking…"}
           </>
         ) : isDesired ? (
-          "Send Booking Request"
+          "Save"
         ) : (
           "Book Now"
         )}

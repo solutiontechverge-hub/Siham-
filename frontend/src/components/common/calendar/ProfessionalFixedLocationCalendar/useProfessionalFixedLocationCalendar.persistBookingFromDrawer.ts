@@ -17,6 +17,7 @@ import {
 } from "../bookingEventDetails";
 import { resolveOfflineBookingPrepayAction } from "../bookingCheckout";
 import { consumeConfirmedEditGrant } from "../../client-booking/bookingEditRequest";
+import { supersedeOpenSalesCardsForBooking } from "../salesOverview.storage";
 import { extractBookingId, type SelectedSlot } from "../calendar.utils";
 import {
   applyPendingInlineGuestEdit,
@@ -582,6 +583,12 @@ export function useProfessionalFixedLocationCalendarPersistBookingFromDrawer({
           }
 
           silentEditBaselineRef.current = null;
+
+          // Payable-affecting edit before prior sales/payment resolves → supersede
+          // open sales cards (Cancel Sales semantics) so rebuild shows latest totals.
+          if (!details.silentUpdated && parsedEditingId.kind === "booking") {
+            supersedeOpenSalesCardsForBooking(parsedEditingId.id);
+          }
 
           const nextEvent = buildLocalEvent(
             editingEventId,

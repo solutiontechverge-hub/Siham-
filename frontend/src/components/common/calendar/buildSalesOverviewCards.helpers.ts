@@ -22,12 +22,16 @@ import type {
   SalesSubCardData,
 } from "./salesOverview.types";
 import { buildSplitPaymentAmounts, parseSplitBillState, resolveSalesPayerShares } from "./salesSplitBill";
-import { formatFinanceDueDate } from "../booking-finance/formatBookingFinance";
+import {
+  formatFinanceDueDate,
+  prepaidBreakdownLabel,
+} from "../booking-finance/formatBookingFinance";
 import { roundBookingMoney as roundMoney } from "../../../data/bookingLinePricing";
+import { computeBookingPrice } from "./bookingTotal";
 import {
   applyVisualState,
   discountLine,
-  formatDateLabel,
+  formatDateTimeLabel,
   formatMethodDateTime,
   isInvoicePaymentMethod,
   isOnlineBookingType,
@@ -54,10 +58,16 @@ function buildLinesFromEvent(event: CalendarEvent): { lines: SalesLineItem[]; su
 
   const snapshotServices = details?.clientSnapshot?.services;
   if (snapshotServices?.length) {
-    for (const service of snapshotServices) {
-      lines.push({ id: service.id, label: service.name, amount: roundMoney(service.price) });
+    snapshotServices.forEach((service, index) => {
+      // Same catalog service can appear for main + guest — keep line keys unique.
+      const lineId = `${service.id}::${String(service.guestId ?? "")}::${index}`;
+      lines.push({
+        id: lineId,
+        label: service.name,
+        amount: roundMoney(service.price),
+      });
       subtotal += service.price;
-    }
+    });
   } else {
     for (const service of details?.services ?? []) {
       lines.push({ id: service.id, label: service.name, amount: roundMoney(service.price) });
@@ -557,6 +567,100 @@ function hasBookingEnded(endIso: string | null): boolean {
   return end.getTime() <= Date.now();
 }
 
+/** Stamp lines for cancellation-fee invoices (time + policy window breach). */
+export function buildCancellationFeeInvoiceMetaLines(input: {
+  cancellationFeeAt?: string | null;
+  exceededCancellationWindow?: boolean;
+}): string[] {
+  const lines: string[] = [];
+  const stamped = formatDateTimeLabel(input.cancellationFeeAt);
+  if (stamped) lines.push(`Cancellation time: ${stamped}`);
+  if (typeof input.exceededCancellationWindow === "boolean") {
+    lines.push(
+      input.exceededCancellationWindow
+        ? "Breached preset cancellation window"
+        : "Within preset cancellation window",
+    );
+  }
+  return lines;
+}
+
+function kilometerExtrasAmount(event: CalendarEvent): number {
+  if (!event.details?.showKilometerAllowance) return 0;
+  const ka = event.details.kilometerAllowance;
+  if (!ka) return 0;
+  const eur = Number(ka.eurPerKm) || 0;
+  const km = Number(ka.totalKilometer) || 0;
+  return roundMoney(Math.max(0, eur * km));
+}
+
+/**
+ * Cancelled / No Show fee-only sales card when protective fee section is active.
+ * Returns null when status/fee gate fails (caller keeps blank Sales for plain cancels).
+ */
+export function resolveProtectiveFeeSalesCardSpec(input: {
+  status?: string | null;
+  showLateCancellation?: boolean;
+  lateCancellationFeePercent?: string | number | null;
+  showNoShowFee?: boolean;
+  noShowFeePercent?: string | number | null;
+  lineSubtotal: number;
+  extrasAmount?: number;
+  discount?: { type: "fixed" | "percentage"; amount: number } | null;
+  cancellationFeeAt?: string | null;
+  exceededCancellationWindow?: boolean;
+}): {
+  title: string;
+  feeLabel: string;
+  feeAmount: number;
+  metaLines: string[];
+} | null {
+  const status = String(input.status ?? "").toLowerCase();
+  const price = computeBookingPrice({
+    lineSubtotal: input.lineSubtotal,
+    extrasAmount: input.extrasAmount ?? 0,
+    discount: input.discount ?? null,
+    showLateCancellation: Boolean(input.showLateCancellation),
+    lateCancellationFeePercent: input.lateCancellationFeePercent ?? undefined,
+    showNoShowFee: Boolean(input.showNoShowFee),
+    noShowFeePercent: input.noShowFeePercent ?? undefined,
+  });
+
+  if (
+    (status === "cancelled" || status === "canceled") &&
+    input.showLateCancellation &&
+    price.lateCancellationFeeAmount > 0
+  ) {
+    return {
+      title: "Cancellation Fee Invoice",
+      feeLabel: "Cancellation fee",
+      feeAmount: price.lateCancellationFeeAmount,
+      metaLines: buildCancellationFeeInvoiceMetaLines({
+        cancellationFeeAt: input.cancellationFeeAt,
+        exceededCancellationWindow: input.exceededCancellationWindow,
+      }),
+    };
+  }
+
+  if (
+    (status === "no_show" || status === "no show") &&
+    input.showNoShowFee &&
+    price.noShowFeeAmount > 0
+  ) {
+    return {
+      title: "No-Show Fee Invoice",
+      feeLabel: "No-show fee",
+      feeAmount: price.noShowFeeAmount,
+      metaLines: buildCancellationFeeInvoiceMetaLines({
+        cancellationFeeAt: input.cancellationFeeAt,
+        exceededCancellationWindow: input.exceededCancellationWindow,
+      }),
+    };
+  }
+
+  return null;
+}
+
 /** Align with client `filterVisiblePaymentSummarySections`: prepaid hides after-treatment until due. */
 export function shouldShowAfterTreatmentCard(input: {
   isPrepayPaid: boolean;
@@ -598,10 +702,98 @@ export function buildCardsForEvent(input: {
 }): SalesOverviewCardData[] {
   const { event, booking, clientName, clientEmail, clientPhone, clientKind, ctx } = input;
   const { lines, subtotal } = buildLinesFromEvent(event);
-  if (!lines.length && !booking) return [];
+  const status = String(booking?.status ?? event.status ?? "").toLowerCase();
+  const isCancelled = status === "cancelled" || status === "canceled";
+  const isInvalid = status === "invalid" || isBookingRequestRejected(event);
+
+  if (isInvalid) return [];
 
   const bookingId = parseApiCalendarEventId(event.id)?.id ?? event.id;
   const bookingCode = event.bookingCode || bookingId;
+  const name = clientName || event.showClientName || booking?.customer_name || booking?.client_name || "Client";
+  const email = clientEmail || event.details?.clientEmail || booking?.customer_email || undefined;
+  const phone =
+    clientPhone ||
+    [event.details?.phoneCode, event.details?.phoneNumber].filter(Boolean).join(" ").trim() ||
+    booking?.contact_number ||
+    undefined;
+  const eventPaymentMethod = event.details?.paymentMethod as SalesCheckoutPaymentMethod | undefined;
+  const method = paymentMethodLabel(eventPaymentMethod);
+  const invoiceDueFromNotes = event.details?.invoiceDueDate ?? null;
+  const occurredAt =
+    event.details?.cancellationFeeAt ||
+    booking?.created_at ||
+    booking?.start_time ||
+    `${event.date}T${event.start}:00`;
+  const endAt = bookingEndIso(event, booking);
+
+  const lineSubtotalBeforeDiscount = roundMoney(
+    lines.filter((line) => line.amount >= 0).reduce((sum, line) => sum + line.amount, 0),
+  );
+  const feeSpec = resolveProtectiveFeeSalesCardSpec({
+    status,
+    showLateCancellation: event.details?.showLateCancellation,
+    lateCancellationFeePercent: event.details?.lateCancellationFeePercent,
+    showNoShowFee: event.details?.showNoShowFee,
+    noShowFeePercent: event.details?.noShowFeePercent,
+    lineSubtotal: lineSubtotalBeforeDiscount,
+    extrasAmount: kilometerExtrasAmount(event),
+    discount: event.details?.totalDiscount ?? null,
+    cancellationFeeAt: event.details?.cancellationFeeAt,
+    exceededCancellationWindow: event.details?.exceededCancellationWindow,
+  });
+  if (feeSpec) {
+    const onlineBooking = isOnlineBookingType(booking, event);
+    const feeId = resolveLiveCardId(bookingId, `${bookingId}-protective-fee`);
+    return [
+      applyMeta(
+        {
+          id: feeId,
+          bookingId,
+          bookingCode,
+          kind: "after_treatment",
+          title: feeSpec.title,
+          clientName: name,
+          payerRole: "main_client",
+          payerKey: "main-client",
+          clientEmail: email,
+          clientPhone: phone,
+          clientKind,
+          lines: [
+            {
+              id: `${feeId}-fee`,
+              label: feeSpec.feeLabel,
+              amount: feeSpec.feeAmount,
+            },
+          ],
+          total: feeSpec.feeAmount,
+          totalLabel: "Total",
+          highlightLabel: "Fee due",
+          highlightAmount: feeSpec.feeAmount,
+          metaLines: feeSpec.metaLines,
+          methodDateLine: method,
+          dueDate: invoiceDueFromNotes || deriveDueDate(occurredAt, ctx.paymentTerms),
+          showAddOns: false,
+          paymentMethod: eventPaymentMethod,
+          paymentMethodLabel: method,
+          documentAmount: feeSpec.feeAmount,
+          occurredAt,
+          bookingEndAt: endAt,
+        },
+        ctx,
+        {
+          isOnlineBooking: onlineBooking,
+          isAfterTreatment: true,
+          isPrepayPaid: false,
+          isFailed: false,
+        },
+      ),
+    ];
+  }
+
+  if (isCancelled) return [];
+  if (!lines.length && !booking) return [];
+
   const totalFromBooking = Number(booking?.total_price);
   const total = lines.length
     ? subtotal
@@ -638,31 +830,13 @@ export function buildCardsForEvent(input: {
 
   const isPrepayPaid = prepayStatus === "paid" || prepayStatus === "confirmed";
   const isFailed = prepayStatus === "failed";
-  const status = String(booking?.status ?? event.status ?? "").toLowerCase();
   const isCompleted = status === "completed";
-  const isCancelled = status === "cancelled" || status === "canceled";
-  const isInvalid = status === "invalid" || isBookingRequestRejected(event);
   const isPendingRequest = status === "requested";
   const isAccepted =
     status === "confirmed" || status === "completed" || status === "in_progress" || status === "in progress";
   const onlineBooking = isOnlineBookingType(booking, event);
-  const invoiceDueFromNotes = event.details?.invoiceDueDate ?? null;
-  const eventPaymentMethod = event.details?.paymentMethod as SalesCheckoutPaymentMethod | undefined;
 
-  if (isInvalid || isCancelled) return [];
-
-  const method = paymentMethodLabel(eventPaymentMethod);
-  const occurredAt =
-    booking?.created_at || booking?.start_time || `${event.date}T${event.start}:00`;
-  const endAt = bookingEndIso(event, booking);
   const ended = hasBookingEnded(endAt);
-  const name = clientName || event.showClientName || booking?.customer_name || booking?.client_name || "Client";
-  const email = clientEmail || event.details?.clientEmail || booking?.customer_email || undefined;
-  const phone =
-    clientPhone ||
-    [event.details?.phoneCode, event.details?.phoneNumber].filter(Boolean).join(" ").trim() ||
-    booking?.contact_number ||
-    undefined;
 
   const shares = resolveSalesPayerShares({
     event,
@@ -741,7 +915,6 @@ export function buildCardsForEvent(input: {
   }
 
   if (isAccepted && showPrepayment && prepaidAmount > 0) {
-    const percentLabel = prepaymentPercent > 0 ? `(${prepaymentPercent}%)` : "";
     const prepayId = resolveLiveCardId(bookingId, `${bookingId}-prepayment`);
     cards.push(
       applyMeta(
@@ -760,7 +933,7 @@ export function buildCardsForEvent(input: {
           lines: effectiveLines.filter((line) => line.amount >= 0),
           total,
           totalLabel: "Total Amount",
-          highlightLabel: `Prepayment${percentLabel ? ` ${percentLabel}` : ""}`,
+          highlightLabel: prepaidBreakdownLabel(prepaymentPercent, isPrepayPaid),
           highlightAmount: prepaidAmount,
           methodDateLine: isPrepayPaid ? formatMethodDateTime(method, occurredAt) : method,
           dueDate: isPrepayPaid ? null : invoiceDueFromNotes || deriveDueDate(occurredAt, ctx.paymentTerms),

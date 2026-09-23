@@ -7,6 +7,11 @@ import type {
 import type { CalendarBooking, CalendarEntry } from "../../../store/services/businessApi";
 import { wallClockDateFromDateTime, wallClockTimeFromDateTime } from "./calendar.utils";
 import { mainDrawerServicesFromClientSnapshot, parseCalendarEntryNotes, parseStoredEbrFromNotes, parseStoredErFromNotes, sanitizeInternalNoteText } from "./bookingEventDetails";
+import { mergeBookingClientSnapshots } from "./mergeBookingClientSnapshot";
+import {
+  liveMediaUrl,
+  resolveBookingProjectUploads,
+} from "../../../lib/projectUploadMedia";
 import { syncEditRequestFromBookingApi } from "../client-booking/syncEditRequestFromApi";
 import { mapApiPrepaymentStatus } from "./prepaymentStatus";
 import { splitContactPhone } from "../../../lib/phone-validation";
@@ -143,12 +148,71 @@ export function mapCalendarBookingToEvent(
   const status = statusFromApi[booking.status] ?? "Requested";
   const isRequested = status === "Requested";
   const parsedNotes = parseCalendarEntryNotes(booking.notes);
+  const locationDetailsEarly =
+    booking.location_details && typeof booking.location_details === "object"
+      ? (booking.location_details as {
+          clientKind?: "individual" | "company";
+          projectDescription?: string;
+          uploads?: Array<{
+            id?: string;
+            name?: string;
+            url?: string | null;
+            mimeType?: string | null;
+            kind?: "image" | "document" | null;
+          }>;
+          clientSnapshot?: NonNullable<
+            NonNullable<CalendarEvent["details"]>["clientSnapshot"]
+          >;
+          desiredLocation?: {
+            street?: string;
+            number?: string;
+            postalCode?: string;
+            province?: string;
+            municipality?: string;
+          };
+        })
+      : null;
+  const locationProjectUploads = resolveBookingProjectUploads({
+    locationUploads: Array.isArray(locationDetailsEarly?.uploads)
+      ? locationDetailsEarly.uploads
+      : [],
+    images: booking.images,
+    documents: booking.documents,
+  });
+  const locationProjectDescription =
+    typeof locationDetailsEarly?.projectDescription === "string"
+      ? locationDetailsEarly.projectDescription
+      : "";
+  const mergedClientSnapshot = (() => {
+    const base = mergeBookingClientSnapshots(
+      parsedNotes?.clientSnapshot,
+      locationDetailsEarly?.clientSnapshot,
+    );
+    if (!locationProjectDescription.trim() && !locationProjectUploads.length) {
+      return base;
+    }
+    return {
+      ...(base ?? {}),
+      projectDetails: {
+        description:
+          base?.projectDetails?.description?.trim() ||
+          locationProjectDescription ||
+          "",
+        uploads: (() => {
+          const fromNotes = (base?.projectDetails?.uploads ?? []).filter((upload) =>
+            Boolean(liveMediaUrl(upload.url || upload.previewUrl)),
+          );
+          return fromNotes.length ? fromNotes : locationProjectUploads;
+        })(),
+      },
+    };
+  })();
   const ebrMeta = status === "Cancelled" ? null : parseStoredEbrFromNotes(booking.notes);
   const pendingEbr =
     ebrMeta && (ebrMeta.status === "pending" || ebrMeta.status === "suggested")
       ? ebrMeta
       : null;
-  const snapshotMainServices = mainDrawerServicesFromClientSnapshot(parsedNotes?.clientSnapshot);
+  const snapshotMainServices = mainDrawerServicesFromClientSnapshot(mergedClientSnapshot);
   const ebrServices = pendingEbr?.suggestedServices?.length
     ? pendingEbr.suggestedServices
     : parsedNotes?.services?.length
@@ -159,7 +223,7 @@ export function mapCalendarBookingToEvent(
   const guestOnlyNames = (parsedNotes?.guests ?? []).flatMap((guest) =>
     (guest.services ?? []).map((service) => service.name),
   );
-  const snapshotGuestNames = (parsedNotes?.clientSnapshot?.services ?? [])
+  const snapshotGuestNames = (mergedClientSnapshot?.services ?? [])
     .filter((service) => Boolean(service.guestId))
     .map((service) => service.name);
   // Flat notes.services already includes guest lines; otherwise merge main + guest names.
@@ -266,19 +330,7 @@ export function mapCalendarBookingToEvent(
           ? "outgoing"
           : "incoming");
 
-  const locationDetails =
-    booking.location_details && typeof booking.location_details === "object"
-      ? (booking.location_details as {
-          clientKind?: "individual" | "company";
-          desiredLocation?: {
-            street?: string;
-            number?: string;
-            postalCode?: string;
-            province?: string;
-            municipality?: string;
-          };
-        })
-      : null;
+  const locationDetails = locationDetailsEarly;
   const desiredFromColumns =
     booking.location_type === "desired" &&
     (booking.street_address ||
@@ -382,6 +434,7 @@ export function mapCalendarBookingToEvent(
           price: Number(booking.total_price) || 0,
         },
       ],
+      ...(mergedClientSnapshot ? { clientSnapshot: mergedClientSnapshot } : {}),
       ...(pendingEbr?.suggestedProducts?.length
         ? { products: pendingEbr.suggestedProducts }
         : parsedNotes?.products?.length
@@ -434,6 +487,9 @@ export function mapCalendarBookingToEvent(
         : pendingEbr?.cancelledServiceIds?.length
           ? { cancelledServiceIds: pendingEbr.cancelledServiceIds }
           : {}),
+      ...(parsedNotes?.noShowParticipantIds?.length
+        ? { noShowParticipantIds: parsedNotes.noShowParticipantIds }
+        : {}),
       ...(parsedNotes?.addedProductIds?.length
         ? { addedProductIds: parsedNotes.addedProductIds }
         : pendingEbr?.addedProductIds?.length
@@ -541,7 +597,6 @@ export function mapCalendarBookingToEvent(
                 }
               : {}),
             ...(parsedNotes.cancellationReason ? { cancellationReason: parsedNotes.cancellationReason } : {}),
-            ...(parsedNotes.clientSnapshot ? { clientSnapshot: parsedNotes.clientSnapshot } : {}),
             ...(parsedNotes.originalServices?.length
               ? { originalServices: parsedNotes.originalServices }
               : {}),
@@ -551,7 +606,7 @@ export function mapCalendarBookingToEvent(
             ...(parsedNotes.guests?.length
               ? { guests: parsedNotes.guests }
               : (() => {
-                  const snapshot = parsedNotes.clientSnapshot;
+                  const snapshot = mergedClientSnapshot;
                   if (!snapshot?.people?.length) return {};
                   const guests = snapshot.people
                     .filter(
@@ -618,6 +673,8 @@ export function mapCalendarBookingToEvent(
                         guest.products.length > 0 ||
                         guest.participantType === "planning" ||
                         guest.participantType === "buffer" ||
+                        guest.participantType === "model" ||
+                        guest.participantType === "guest" ||
                         Boolean(guest.planningActivity?.trim()),
                     );
                   return guests.length ? { guests } : {};

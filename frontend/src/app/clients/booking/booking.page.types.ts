@@ -39,4 +39,4 @@ export type Service = ClientBookingDraftService & {
 };
 
 export type ShopState = ClientBookingSelectedShop;
-export type EbrFocus = "datetime" | "services" | "project" | null;
+export type EbrFocus = "datetime" | "location" | "services" | "project" | null;

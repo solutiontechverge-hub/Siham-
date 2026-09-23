@@ -46,6 +46,7 @@ export type StoredEbrNotePayload = {
   cancelledServiceIds?: string[];
   addedProductIds?: string[];
   cancelledProductIds?: string[];
+  noShowParticipantIds?: string[];
   /** Preferred for clientâ†’pro rounds so the drawer can show â€œEditedâ€. */
   clientEditedServiceIds?: string[];
   suggestedServices?: NonNullable<CalendarBookingDetails["services"]>;
@@ -131,6 +132,7 @@ type StoredBookingNoteMeta = Partial<
     | "cancelledServiceIds"
     | "addedProductIds"
     | "cancelledProductIds"
+    | "noShowParticipantIds"
     | "silentUpdated"
     | "silentUpdateSnapshot"
     | "scheduleEdited"
@@ -274,6 +276,9 @@ export function serializeCalendarEntryNotes(
     ...(details?.addedProductIds?.length ? { addedProductIds: details.addedProductIds } : {}),
     ...(details?.cancelledProductIds?.length
       ? { cancelledProductIds: details.cancelledProductIds }
+      : {}),
+    ...(details?.noShowParticipantIds?.length
+      ? { noShowParticipantIds: details.noShowParticipantIds }
       : {}),
     ...(details?.silentUpdated ? { silentUpdated: true } : {}),
     ...(details?.silentUpdateSnapshot
@@ -614,10 +619,14 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
       ...(meta.cancelledServiceIds?.length
         ? { cancelledServiceIds: meta.cancelledServiceIds }
         : {}),
-      ...(ebr?.status !== "rejected" && ebr?.addedServiceIds?.length && !meta.addedServiceIds?.length
+      ...(!meta.silentUpdated &&
+      ebr?.status !== "rejected" &&
+      ebr?.addedServiceIds?.length &&
+      !meta.addedServiceIds?.length
         ? { addedServiceIds: ebr.addedServiceIds }
         : {}),
-      ...(ebr?.status !== "rejected" &&
+      ...(!meta.silentUpdated &&
+      ebr?.status !== "rejected" &&
       ebr?.cancelledServiceIds?.length &&
       !meta.cancelledServiceIds?.length
         ? { cancelledServiceIds: ebr.cancelledServiceIds }
@@ -626,10 +635,17 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
       ...(meta.cancelledProductIds?.length
         ? { cancelledProductIds: meta.cancelledProductIds }
         : {}),
-      ...(ebr?.status !== "rejected" && ebr?.addedProductIds?.length && !meta.addedProductIds?.length
+      ...(meta.noShowParticipantIds?.length
+        ? { noShowParticipantIds: meta.noShowParticipantIds }
+        : {}),
+      ...(!meta.silentUpdated &&
+      ebr?.status !== "rejected" &&
+      ebr?.addedProductIds?.length &&
+      !meta.addedProductIds?.length
         ? { addedProductIds: ebr.addedProductIds }
         : {}),
-      ...(ebr?.status !== "rejected" &&
+      ...(!meta.silentUpdated &&
+      ebr?.status !== "rejected" &&
       ebr?.cancelledProductIds?.length &&
       !meta.cancelledProductIds?.length
         ? { cancelledProductIds: ebr.cancelledProductIds }
@@ -645,7 +661,12 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
       ...(meta.splitBill ? { splitBill: meta.splitBill } : {}),
       ...(meta.clientKind ? { clientKind: meta.clientKind } : {}),
       ...(meta.isGuest ? { isGuest: true } : {}),
-      ...(ebr?.status !== "rejected" && ebr?.editedServiceIds?.length && !meta.editedServiceIds?.length
+      // Silent Updated cleared meta.editedServiceIds — do not revive them from a
+      // leftover nested ebr blob (would force every line to show Edited).
+      ...(!meta.silentUpdated &&
+      ebr?.status !== "rejected" &&
+      ebr?.editedServiceIds?.length &&
+      !meta.editedServiceIds?.length
         ? { editedServiceIds: ebr.editedServiceIds }
         : {}),
       ...(ebr?.status !== "rejected" && ebr?.suggestedProjectDetails

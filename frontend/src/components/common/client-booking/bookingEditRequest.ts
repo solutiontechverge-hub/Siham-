@@ -87,7 +87,10 @@ export const BOOKING_EDIT_REQUEST_UPDATED_EVENT = "mollure:booking-edit-request-
 
 export function notifyBookingEditRequestUpdated() {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(new Event(BOOKING_EDIT_REQUEST_UPDATED_EVENT));
+  // Defer so sync-from-mapper during render doesn't setState other subscribers mid-render.
+  queueMicrotask(() => {
+    window.dispatchEvent(new Event(BOOKING_EDIT_REQUEST_UPDATED_EVENT));
+  });
 }
 
 function loadAll(): Record<string, BookingEditRequestRecord> {

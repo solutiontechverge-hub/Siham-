@@ -193,6 +193,8 @@ export type UseClientBookingCreateContinueArgs = {
   desiredVisitAddressLabel: string;
   businessProfile: BusinessPublicProfileData | null | undefined;
   isEbrSuggest: boolean;
+  /** Confirmed booking client edit — schedule/location only; lock service lines. */
+  isConfirmedEbrEdit: boolean;
   ebrSuggestBaselineRef: React.MutableRefObject<Service[] | null>;
   locationMode: "fixed" | "desired";
   fromProfile: boolean;
@@ -248,6 +250,7 @@ export function useClientBookingCreateContinue(
     desiredVisitAddressLabel,
     businessProfile,
     isEbrSuggest,
+    isConfirmedEbrEdit,
     ebrSuggestBaselineRef,
     locationMode,
     fromProfile,
@@ -358,33 +361,51 @@ export function useClientBookingCreateContinue(
           return;
         }
 
+        // Client confirmed edit: keep prior services/prices/people/project; allow schedule + DL address.
+        const draftForSave = isConfirmedEbrEdit
+          ? {
+              ...payload,
+              services:
+                ebrSuggestBaselineRef.current ??
+                existing.draft?.services ??
+                payload.services,
+              products: existing.draft?.products,
+              people: existing.draft?.people ?? payload.people,
+              projectDetails: existing.draft?.projectDetails,
+              total: existing.draft?.total ?? payload.total,
+              teamMembers: existing.draft?.teamMembers ?? payload.teamMembers,
+            }
+          : payload;
+
         const baseline =
           ebrSuggestBaselineRef.current ?? existing.draft?.services ?? [];
         const baselineById = new Map(baseline.map((s) => [s.id, s]));
         const editedServiceIds: string[] = [];
-        for (const service of servicesForDraft) {
-          const original = baselineById.get(service.id);
-          if (
-            !original ||
-            original.name !== service.name ||
-            original.price !== service.price ||
-            original.durationMins !== service.durationMins ||
-            (original.teamMemberId ?? null) !==
-              (service.teamMemberId ?? null) ||
-            (original.guestId ?? null) !== (service.guestId ?? null)
-          ) {
-            editedServiceIds.push(service.id);
+        if (!isConfirmedEbrEdit) {
+          for (const service of draftForSave.services) {
+            const original = baselineById.get(service.id);
+            if (
+              !original ||
+              original.name !== service.name ||
+              original.price !== service.price ||
+              original.durationMins !== service.durationMins ||
+              (original.teamMemberId ?? null) !==
+                (service.teamMemberId ?? null) ||
+              (original.guestId ?? null) !== (service.guestId ?? null)
+            ) {
+              editedServiceIds.push(service.id);
+            }
           }
-        }
-        for (const original of baseline) {
-          if (!servicesForDraft.some((s) => s.id === original.id)) {
-            editedServiceIds.push(original.id);
+          for (const original of baseline) {
+            if (!draftForSave.services.some((s) => s.id === original.id)) {
+              editedServiceIds.push(original.id);
+            }
           }
         }
 
         setActiveBookingSession({
           ...existing,
-          draft: payload,
+          draft: draftForSave,
           requiresPrepayment: existing.requiresPrepayment ?? requiresPrepayment,
           prepaymentPercent:
             existing.prepaymentPercent ??
@@ -556,6 +577,7 @@ export function useClientBookingCreateContinue(
     isContinuing,
     isDesiredLocation,
     isEbrSuggest,
+    isConfirmedEbrEdit,
     isSelectedToday,
     locationMode,
     people,

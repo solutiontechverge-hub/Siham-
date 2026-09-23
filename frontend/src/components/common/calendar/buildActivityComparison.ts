@@ -1,4 +1,4 @@
-import { detectServiceLineChanges, isServiceReorderOnly } from "./bookingRequestNegotiation";
+import { isServiceReorderOnly } from "./bookingRequestNegotiation";
 import type { CalendarBookingServiceItem } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 
 export type ActivityComparisonMode = "ebr" | "er" | "silent_updated";
@@ -9,12 +9,46 @@ export type ActivityComparisonChangeKind =
   | "removed"
   | "updated";
 
+/** Who a comparison row belongs to — used to group Activity Comparison. */
+export type ActivityComparisonSection =
+  | "main_client"
+  | "guest"
+  | "model"
+  | "planning";
+
+export const ACTIVITY_COMPARISON_SECTION_ORDER: readonly ActivityComparisonSection[] =
+  ["main_client", "guest", "model", "planning"];
+
+/** Fallback role labels when booking data has no person name. */
+export const ACTIVITY_COMPARISON_SECTION_LABELS: Record<
+  ActivityComparisonSection,
+  string
+> = {
+  main_client: "Client",
+  guest: "Guest",
+  model: "Model",
+  planning: "Planning",
+};
+
 export type ActivityComparisonRow = {
   id: string;
   label: string;
   originalValue: string;
   newValue: string;
   changeKind: ActivityComparisonChangeKind;
+  /** Role bucket for ordering (Client → Guest → Model → Planning). */
+  section?: ActivityComparisonSection;
+  /** Group key — person id for extras, or `main_client`. */
+  sectionKey?: string;
+  /** Dynamic heading from booking participant / client name. */
+  sectionLabel?: string;
+};
+
+export type ActivityComparisonSectionGroup = {
+  key: string;
+  section: ActivityComparisonSection;
+  label: string;
+  rows: ActivityComparisonRow[];
 };
 
 export type ActivityComparison = {
@@ -45,6 +79,14 @@ type ProductLike = {
   name: string;
   price: number;
   quantity?: number;
+  guestId?: string | null;
+};
+
+type ParticipantLike = {
+  id?: string | null;
+  name?: string | null;
+  isRequester?: boolean;
+  participantType?: "model" | "planning" | "guest" | "buffer" | "notes" | null;
 };
 
 function formatMoney(amount: number): string {
@@ -127,6 +169,155 @@ function itemRowLabel(
   return name || generic;
 }
 
+function sectionForParticipant(
+  person: ParticipantLike | null | undefined,
+): ActivityComparisonSection | null {
+  if (!person) return null;
+  // Requester / company contact = Client — never Guest (participantType is often unset).
+  if (person.isRequester) return "main_client";
+  const kind = person.participantType;
+  if (kind === "buffer" || kind === "notes") return null;
+  if (kind === "planning" || (person.name ?? "").trim() === "Planning") {
+    return "planning";
+  }
+  if (kind === "model") return "model";
+  if (kind === "guest") return "guest";
+  // No type + not requester: company/main-client contact in people[] — leave unmapped
+  // so resolve treats their guestId as Client (same as isMainClientAssignedLine).
+  return null;
+}
+
+/** Dynamic heading from participant name + role (e.g. "Guest umer", "alizaCompany"). */
+export function activityComparisonSectionHeading(
+  section: ActivityComparisonSection,
+  name?: string | null,
+): string {
+  const n = (name ?? "").trim();
+  if (section === "main_client") return n || ACTIVITY_COMPARISON_SECTION_LABELS.main_client;
+  if (section === "planning") {
+    if (!n || /^planning$/i.test(n)) return ACTIVITY_COMPARISON_SECTION_LABELS.planning;
+    return n;
+  }
+  if (section === "model") {
+    if (!n || /^model$/i.test(n)) return ACTIVITY_COMPARISON_SECTION_LABELS.model;
+    return n;
+  }
+  // guest — "Guest umer" pattern when name doesn't already start with Guest
+  if (!n || /^guest$/i.test(n)) return ACTIVITY_COMPARISON_SECTION_LABELS.guest;
+  return /^guest\b/i.test(n) ? n : `Guest ${n}`;
+}
+
+type ParticipantRegistry = {
+  byId: Map<string, { section: ActivityComparisonSection; name: string }>;
+  clientName: string;
+};
+
+/** Map person id → role + name; resolve main client display name from booking data. */
+export function buildParticipantSectionMap(
+  participants?: readonly ParticipantLike[] | null,
+): Map<string, ActivityComparisonSection> {
+  const map = new Map<string, ActivityComparisonSection>();
+  for (const [id, meta] of buildParticipantRegistry(participants).byId) {
+    map.set(id, meta.section);
+  }
+  return map;
+}
+
+function buildParticipantRegistry(
+  participants?: readonly ParticipantLike[] | null,
+  clientNameHint?: string | null,
+): ParticipantRegistry {
+  const byId = new Map<string, { section: ActivityComparisonSection; name: string }>();
+  let clientName = (clientNameHint ?? "").trim();
+
+  for (const person of participants ?? []) {
+    const id = String(person.id ?? "").trim();
+    const name = (person.name ?? "").trim();
+    if (person.isRequester && name && !clientName) clientName = name;
+
+    const section = sectionForParticipant(person);
+    if (!id || !section) continue;
+
+    const existing = byId.get(id);
+    // Prefer Guest/Model/Planning over a later requester duplicate of the same id.
+    if (existing && existing.section !== "main_client" && section === "main_client") {
+      continue;
+    }
+    if (!existing || existing.section === "main_client") {
+      byId.set(id, { section, name });
+    }
+    if (section === "main_client" && name && !clientName) clientName = name;
+  }
+
+  return {
+    byId,
+    clientName: clientName || ACTIVITY_COMPARISON_SECTION_LABELS.main_client,
+  };
+}
+
+type SectionMeta = {
+  section: ActivityComparisonSection;
+  sectionKey: string;
+  sectionLabel: string;
+};
+
+function resolveSectionMeta(
+  guestId: string | null | undefined,
+  registry: ParticipantRegistry,
+): SectionMeta {
+  const id = String(guestId ?? "").trim();
+  const clientMeta = (): SectionMeta => ({
+    section: "main_client",
+    sectionKey: "main_client",
+    sectionLabel: registry.clientName,
+  });
+  if (!id) return clientMeta();
+  const hit = registry.byId.get(id);
+  // Unknown / requester / company contact ids → Client (not Guest).
+  if (!hit || hit.section === "main_client") {
+    return {
+      section: "main_client",
+      sectionKey: "main_client",
+      sectionLabel: hit?.name || registry.clientName,
+    };
+  }
+  return {
+    section: hit.section,
+    sectionKey: id,
+    sectionLabel: activityComparisonSectionHeading(hit.section, hit.name),
+  };
+}
+
+/** Group rows by dynamic sectionKey; only non-empty groups; ordered by role then first seen. */
+export function groupActivityComparisonSections(
+  rows: readonly ActivityComparisonRow[],
+): ActivityComparisonSectionGroup[] {
+  const groups: ActivityComparisonSectionGroup[] = [];
+  const indexByKey = new Map<string, number>();
+
+  for (const row of rows) {
+    const section = row.section ?? "main_client";
+    const key = row.sectionKey ?? section;
+    const label =
+      row.sectionLabel?.trim() ||
+      ACTIVITY_COMPARISON_SECTION_LABELS[section];
+    let idx = indexByKey.get(key);
+    if (idx == null) {
+      idx = groups.length;
+      indexByKey.set(key, idx);
+      groups.push({ key, section, label, rows: [] });
+    }
+    groups[idx].rows.push(row);
+  }
+
+  return groups.sort((a, b) => {
+    const ao = ACTIVITY_COMPARISON_SECTION_ORDER.indexOf(a.section);
+    const bo = ACTIVITY_COMPARISON_SECTION_ORDER.indexOf(b.section);
+    if (ao !== bo) return ao - bo;
+    return 0;
+  });
+}
+
 function formatLocationValue(
   value?: string | Record<string, string | undefined> | null,
 ): string {
@@ -157,6 +348,28 @@ function toComparableServices(
     staffResourceId: service.staffResourceId ?? undefined,
     guestId: service.guestId ?? null,
   }));
+}
+
+/** Client + guest often share a catalog id — never key comparison maps by id alone. */
+function comparisonLineKey(item: {
+  id: string;
+  guestId?: string | null;
+}): string {
+  return `${item.guestId ?? ""}:${item.id}`;
+}
+
+/** Expand bare catalog ids from persisted edit payloads to every matching line key. */
+function lineKeysForBareIds(
+  bareIds: Iterable<string>,
+  byKey: Map<string, { id: string }>,
+): string[] {
+  const ids = new Set([...bareIds].map(String));
+  if (!ids.size) return [];
+  const keys: string[] = [];
+  for (const [key, item] of byKey) {
+    if (ids.has(String(item.id))) keys.push(key);
+  }
+  return keys;
 }
 
 function modeCopy(mode: ActivityComparisonMode): Pick<
@@ -206,6 +419,10 @@ export type BuildActivityComparisonInput = {
   newGuestNames?: readonly string[] | null;
   originalDesiredLocation?: string | Record<string, string | undefined> | null;
   newDesiredLocation?: string | Record<string, string | undefined> | null;
+  /** Guests / people used to map service.guestId → Client / Guest / Model / Planning. */
+  participants?: readonly ParticipantLike[] | null;
+  /** Main booker / company display name for the Client heading. */
+  clientName?: string | null;
 };
 
 /**
@@ -217,6 +434,10 @@ export function buildActivityComparison(
 ): ActivityComparison | null {
   const rows: ActivityComparisonRow[] = [];
   const mode = input.mode;
+  const registry = buildParticipantRegistry(input.participants, input.clientName);
+  const rowMeta = (guestId?: string | null): SectionMeta =>
+    resolveSectionMeta(guestId, registry);
+  const clientMeta = rowMeta(null);
 
   const originalSchedule = formatSchedule(input.originalDateISO, input.originalTime);
   const newSchedule = formatSchedule(input.newDateISO, input.newTime);
@@ -230,6 +451,7 @@ export function buildActivityComparison(
       originalValue: originalSchedule,
       newValue: newSchedule,
       changeKind: mode === "silent_updated" ? "updated" : "changed",
+      ...clientMeta,
     });
   }
 
@@ -242,6 +464,7 @@ export function buildActivityComparison(
       originalValue: originalLoc || "—",
       newValue: newLoc || "—",
       changeKind: mode === "silent_updated" ? "updated" : "changed",
+      ...clientMeta,
     });
   }
 
@@ -259,90 +482,104 @@ export function buildActivityComparison(
             originalValue: originalOrder,
             newValue: newOrder,
             changeKind: "updated",
+            ...clientMeta,
           });
         }
       }
     } else {
-      const lineChanges = detectServiceLineChanges(originalServices, currentServices);
+      const originalByKey = new Map(
+        originalServices.map((s) => [comparisonLineKey(s), s]),
+      );
+      const currentByKey = new Map(
+        currentServices.map((s) => [comparisonLineKey(s), s]),
+      );
       // Empty baseline (fresh create) must not treat every catalog line as Added.
       const allowComputedLineDiffs = originalServices.length > 0;
-      const added = new Set(
-        [
-          ...(input.addedServiceIds ?? []),
-          ...(allowComputedLineDiffs ? lineChanges.added : []),
-        ].map(String),
+      const cancelledKeys = new Set<string>(
+        lineKeysForBareIds(input.cancelledServiceIds ?? [], originalByKey),
       );
-      const cancelled = new Set(
-        [
-          ...(input.cancelledServiceIds ?? []),
-          ...(allowComputedLineDiffs ? lineChanges.cancelled : []),
-        ].map(String),
+      const addedKeys = new Set<string>(
+        lineKeysForBareIds(input.addedServiceIds ?? [], currentByKey),
       );
-      const edited = new Set(
-        [
-          ...(input.editedServiceIds ?? []),
-          ...(allowComputedLineDiffs ? lineChanges.edited : []),
-        ].map(String),
-      );
-      const originalById = new Map(originalServices.map((s) => [s.id, s]));
-      const currentById = new Map(currentServices.map((s) => [s.id, s]));
+      const editedKeys = new Set<string>([
+        ...lineKeysForBareIds(input.editedServiceIds ?? [], currentByKey),
+        ...lineKeysForBareIds(input.editedServiceIds ?? [], originalByKey),
+      ]);
 
-      for (const id of cancelled) {
-        const original = originalById.get(id);
+      if (allowComputedLineDiffs) {
+        for (const [key] of originalByKey) {
+          if (!currentByKey.has(key)) cancelledKeys.add(key);
+        }
+        for (const [key, current] of currentByKey) {
+          const original = originalByKey.get(key);
+          if (!original) addedKeys.add(key);
+          else if (formatServiceLine(original) !== formatServiceLine(current)) {
+            editedKeys.add(key);
+          }
+        }
+      }
+
+      // Bare-id lists can name a catalog id shared by client + guest — keep only
+      // keys that are actually gone / new / changed for that person.
+      for (const key of [...cancelledKeys]) {
+        if (currentByKey.has(key) || !originalByKey.has(key)) cancelledKeys.delete(key);
+      }
+      for (const key of [...addedKeys]) {
+        if (originalByKey.has(key) || !currentByKey.has(key)) addedKeys.delete(key);
+      }
+      for (const key of [...editedKeys]) {
+        if (addedKeys.has(key) || cancelledKeys.has(key)) {
+          editedKeys.delete(key);
+          continue;
+        }
+        const original = originalByKey.get(key);
+        const current = currentByKey.get(key);
+        if (!original || !current) {
+          editedKeys.delete(key);
+          continue;
+        }
+        if (formatServiceLine(original) === formatServiceLine(current)) {
+          editedKeys.delete(key);
+        }
+      }
+
+      for (const key of cancelledKeys) {
+        const original = originalByKey.get(key);
         if (!original) continue;
         rows.push({
-          id: `service-removed-${id}`,
+          id: `service-removed-${key}`,
           label: itemRowLabel(original.name, undefined, "Service"),
           originalValue: formatServiceLine(original),
           newValue: "—",
           changeKind: "removed",
+          ...rowMeta(original.guestId),
         });
       }
 
-      for (const id of added) {
-        const current = currentById.get(id);
+      for (const key of addedKeys) {
+        const current = currentByKey.get(key);
         if (!current) continue;
         rows.push({
-          id: `service-added-${id}`,
+          id: `service-added-${key}`,
           label: itemRowLabel(current.name, undefined, "Service"),
           originalValue: "—",
           newValue: formatServiceLine(current),
           changeKind: "added",
+          ...rowMeta(current.guestId),
         });
       }
 
-      for (const id of edited) {
-        if (added.has(id) || cancelled.has(id)) continue;
-        const original = originalById.get(id);
-        const current = currentById.get(id);
-        if (!original && current) {
-          rows.push({
-            id: `service-added-${id}`,
-            label: itemRowLabel(current.name, undefined, "Service"),
-            originalValue: "—",
-            newValue: formatServiceLine(current),
-            changeKind: "added",
-          });
-          continue;
-        }
-        if (original && !current) {
-          rows.push({
-            id: `service-removed-${id}`,
-            label: itemRowLabel(original.name, undefined, "Service"),
-            originalValue: formatServiceLine(original),
-            newValue: "—",
-            changeKind: "removed",
-          });
-          continue;
-        }
+      for (const key of editedKeys) {
+        const original = originalByKey.get(key);
+        const current = currentByKey.get(key);
         if (!original || !current) continue;
-        if (formatServiceLine(original) === formatServiceLine(current)) continue;
         rows.push({
-          id: `service-edited-${id}`,
+          id: `service-edited-${key}`,
           label: itemRowLabel(current.name, original.name, "Service"),
           originalValue: formatServiceLine(original),
           newValue: formatServiceLine(current),
           changeKind: "changed",
+          ...rowMeta(current.guestId ?? original.guestId),
         });
       }
     }
@@ -352,39 +589,50 @@ export function buildActivityComparison(
   const currentProducts = [...(input.currentProducts ?? [])];
   const editedProductIds = new Set((input.editedProductIds ?? []).map(String));
   if (editedProductIds.size && (originalProducts.length || currentProducts.length)) {
-    const originalById = new Map(originalProducts.map((p) => [p.id, p]));
-    const currentById = new Map(currentProducts.map((p) => [p.id, p]));
-    for (const id of editedProductIds) {
-      const original = originalById.get(id);
-      const current = currentById.get(id);
+    const originalByKey = new Map(
+      originalProducts.map((p) => [comparisonLineKey(p), p]),
+    );
+    const currentByKey = new Map(
+      currentProducts.map((p) => [comparisonLineKey(p), p]),
+    );
+    const productKeys = new Set([
+      ...lineKeysForBareIds(editedProductIds, originalByKey),
+      ...lineKeysForBareIds(editedProductIds, currentByKey),
+    ]);
+    for (const key of productKeys) {
+      const original = originalByKey.get(key);
+      const current = currentByKey.get(key);
       if (!original && current) {
         rows.push({
-          id: `product-added-${id}`,
+          id: `product-added-${key}`,
           label: itemRowLabel(current.name, undefined, "Product"),
           originalValue: "—",
           newValue: formatProductLine(current),
           changeKind: "added",
+          ...rowMeta(current.guestId),
         });
         continue;
       }
       if (original && !current) {
         rows.push({
-          id: `product-removed-${id}`,
+          id: `product-removed-${key}`,
           label: itemRowLabel(original.name, undefined, "Product"),
           originalValue: formatProductLine(original),
           newValue: "—",
           changeKind: "removed",
+          ...rowMeta(original.guestId),
         });
         continue;
       }
       if (original && current) {
         if (formatProductLine(original) === formatProductLine(current)) continue;
         rows.push({
-          id: `product-edited-${id}`,
+          id: `product-edited-${key}`,
           label: itemRowLabel(current.name, original.name, "Product"),
           originalValue: formatProductLine(original),
           newValue: formatProductLine(current),
           changeKind: "changed",
+          ...rowMeta(current.guestId ?? original.guestId),
         });
       }
     }
@@ -405,6 +653,7 @@ export function buildActivityComparison(
       originalValue: originalPhone,
       newValue: newPhone,
       changeKind: mode === "silent_updated" ? "updated" : "changed",
+      ...clientMeta,
     });
   }
 
@@ -423,12 +672,19 @@ export function buildActivityComparison(
           : (input.newGuestNames?.length ?? 0) === 0
             ? "removed"
             : "changed";
+    const renameName =
+      newGuests !== "—" ? newGuests : originalGuests !== "—" ? originalGuests : "";
+    // Aggregate identity rename (guest + model names). Prefer Guest heading;
+    // model-only renames still land here (ponytail: split per-person when needed).
     rows.push({
       id: "guests",
       label: "Guest names",
       originalValue: originalGuests,
       newValue: newGuests,
       changeKind: guestKind,
+      section: "guest",
+      sectionKey: "guest-names",
+      sectionLabel: activityComparisonSectionHeading("guest", renameName),
     });
   }
 

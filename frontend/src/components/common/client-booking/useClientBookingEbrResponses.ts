@@ -13,6 +13,7 @@ import { getApiErrorMessage } from "../../../lib/api-error";
 import { useSnackbar } from "../AppSnackbar";
 import {
   buildAcceptAckDetails,
+  buildEditRequestAckDetails,
   clearBookingAckDetails,
 } from "../calendar/bookingAcknowledgment";
 import {
@@ -286,9 +287,18 @@ export function useClientBookingEbrResponses(input: {
                 : {}),
             });
           } else {
+            const prior = parseCalendarEntryNotes(activeBooking?.notes) ?? {};
+            const cleared = clearBookingAckDetails(prior);
+            const nextNotes = serializeCalendarEntryNotes(
+              cleared.internalNote ?? "",
+              cleared,
+              parseStoredEbrFromNotes(activeBooking?.notes),
+              null,
+            );
             await persistBookingPatch({
               id: apiBookingId,
               status: "confirmed",
+              notes: nextNotes,
             });
           }
           await refreshActiveBooking();
@@ -373,12 +383,29 @@ export function useClientBookingEbrResponses(input: {
           id: apiBookingId,
           action: "accept",
         }).unwrap();
-        syncEditRequestFromBookingApi(
-          bookingRef,
-          result.data?.edit_request as Parameters<
-            typeof syncEditRequestFromBookingApi
-          >[1],
+        const er = result.data?.edit_request as Parameters<
+          typeof syncEditRequestFromBookingApi
+        >[1];
+        syncEditRequestFromBookingApi(bookingRef, er);
+        const initiatedBy =
+          er?.initiated_by === "professional" ? "professional" : "client";
+        const prior = parseCalendarEntryNotes(activeBooking?.notes) ?? {};
+        const ackDetails = buildEditRequestAckDetails({
+          initiatedBy,
+          editRequestStatus: "approved",
+          base: prior,
+        });
+        const nextNotes = serializeCalendarEntryNotes(
+          ackDetails.internalNote ?? "",
+          ackDetails,
+          parseStoredEbrFromNotes(activeBooking?.notes),
+          parseStoredErFromNotes(activeBooking?.notes),
         );
+        await persistBookingPatch({
+          id: apiBookingId,
+          status: "confirmed",
+          notes: nextNotes,
+        });
         await refreshActiveBooking();
         editRequest.refresh();
       } catch (error) {
@@ -395,6 +422,7 @@ export function useClientBookingEbrResponses(input: {
       isIncomingBr ? "accept_br" : "accept_suggested",
     );
   }, [
+    activeBooking?.notes,
     activeBooking?.prepaymentPercent,
     apiBookingId,
     bookingRef,
@@ -406,6 +434,7 @@ export function useClientBookingEbrResponses(input: {
     isPrepaymentPaid,
     manageBookingEditRequest,
     pendingAcceptBrAfterPrepay,
+    persistBookingPatch,
     prepaymentPercent,
     refreshActiveBooking,
     returnToBookingDetailsStart,
@@ -418,7 +447,7 @@ export function useClientBookingEbrResponses(input: {
   const handleConfirmEbrReject = React.useCallback(async () => {
     if (!bookingRef) return;
 
-    // Confirmed ER: keep Confirmed + rejected ER indicator (never Invalid).
+    // Confirmed ER: keep Confirmed + ER tag until initiator OKs (never Invalid).
     if (isIncomingConfirmedEr) {
       if (!apiBookingId) return;
       try {
@@ -426,12 +455,34 @@ export function useClientBookingEbrResponses(input: {
           id: apiBookingId,
           action: "reject",
         }).unwrap();
-        syncEditRequestFromBookingApi(
-          bookingRef,
-          result.data?.edit_request as Parameters<
-            typeof syncEditRequestFromBookingApi
-          >[1],
+        const er = result.data?.edit_request as Parameters<
+          typeof syncEditRequestFromBookingApi
+        >[1];
+        syncEditRequestFromBookingApi(bookingRef, er);
+        const initiatedBy =
+          er?.initiated_by === "professional" ? "professional" : "client";
+        const prior = parseCalendarEntryNotes(activeBooking?.notes) ?? {};
+        const ackDetails = buildEditRequestAckDetails({
+          initiatedBy,
+          editRequestStatus: "rejected",
+          base: {
+            ...prior,
+            editRequestNote: er?.note ?? prior.editRequestNote,
+            editRequestInitiatedBy:
+              er?.initiated_by ?? prior.editRequestInitiatedBy,
+          },
+        });
+        const nextNotes = serializeCalendarEntryNotes(
+          ackDetails.internalNote ?? "",
+          ackDetails,
+          parseStoredEbrFromNotes(activeBooking?.notes),
+          parseStoredErFromNotes(activeBooking?.notes),
         );
+        await persistBookingPatch({
+          id: apiBookingId,
+          status: "confirmed",
+          notes: nextNotes,
+        });
         await refreshActiveBooking();
         editRequest.refresh();
       } catch (error) {
@@ -491,6 +542,7 @@ export function useClientBookingEbrResponses(input: {
     isIncomingBr,
     isIncomingConfirmedEr,
     manageBookingEditRequest,
+    persistBookingPatch,
     refreshActiveBooking,
     setActionFeedback,
     setResponseActionsDismissed,

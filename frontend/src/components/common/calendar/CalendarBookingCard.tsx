@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Avatar, Box, Stack, Tooltip } from "@mui/material";
+import { Avatar, Box, Chip, Stack, Tooltip } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import type { SxProps, Theme } from "@mui/material/styles";
 import Image from "next/image";
@@ -30,6 +30,10 @@ import {
   statusChipSxWithOverride,
   type BookingScenarioIndicator,
 } from "./bookingStatus";
+import {
+  hideConnectedChainStatusBadge,
+  resolveConnectedChainBlockStatus,
+} from "./connectedChainBadge";
 import {
   actionRequiredBookingIndicators,
   resolveBookingResponseIndicators,
@@ -64,6 +68,7 @@ import {
   resolveBookingIdAccentColor,
   resolveCalendarBookingIdentity,
 } from "./calendar-overlap.utils";
+import { bookingChainSelectionKey } from "./calendarChainSelectionFlash";
 
 /** Single-service cards stay compact on the 24h grid. */
 const SINGLE_CARD_MIN_HEIGHT = 64;
@@ -147,6 +152,8 @@ export type CalendarBookingCardProps = {
   dense?: boolean;
   /** Week grid: exact start–end height, no nested service sub-cards. */
   weekSimple?: boolean;
+  /** Connected chain: hide status/scenario chips (non-anchor spans). */
+  hideStatusBadge?: boolean;
   /** Day multi-column lane owner — staff chip follows this, not a stale service assignee. */
   laneResourceId?: string;
   teamMemberNameById?: ReadonlyMap<string, string>;
@@ -199,6 +206,7 @@ export default function CalendarBookingCard({
   positioned = true,
   dense = false,
   weekSimple = false,
+  hideStatusBadge = false,
   laneResourceId,
   teamMemberNameById,
   teamResources,
@@ -275,6 +283,7 @@ export default function CalendarBookingCard({
         );
   const isCompactTicket = dense || (isTicket && cardHeight < 48);
   const bookingRef = event.bookingCode ?? extractBookingId(event.id);
+  const bookingChainKey = bookingChainSelectionKey(event);
   const unreadCount = useProfessionalMessagingUnread(bookingRef);
   const displayStatus = professionalCalendarDisplayStatus(event);
   const waitingForClientPrepay = professionalWaitingForClientPrepay(event);
@@ -356,66 +365,70 @@ export default function CalendarBookingCard({
     notePreview: incomingErNote
       ? (`Note from client: ${incomingErNote}` as string)
       : (null as string | null),
-    showUpdated,
-    status: {
-      label: professionalCalendarStatusLabel(event),
-      sx: {
-        ...statusChipSxWithOverride(displayStatus, statusColor),
-        ...(emphasizeRequest ? { fontWeight: 900 } : null),
-      },
-    },
+    showUpdated: hideStatusBadge ? false : showUpdated,
+    status: hideStatusBadge
+      ? undefined
+      : {
+          label: professionalCalendarStatusLabel(event),
+          sx: {
+            ...statusChipSxWithOverride(displayStatus, statusColor),
+            ...(emphasizeRequest ? { fontWeight: 900 } : null),
+          },
+        },
     accentColor,
     borderColor,
     backgroundColor: isIncomingEr ? alpha(m.teal, 0.14) : backgroundColor,
     pattern: cardPattern as "lines" | "dots" | "none",
-    scenarioBadges: [
-      ...(calendarEventIsGuest(event)
-        ? [
-            {
-              label: "Guest",
-              tooltip: "Guest booking — no profile",
-              bold: true,
-              sx: {
-                border: `1px solid ${alpha(m.navy, 0.18)}`,
-                bgcolor: alpha(m.navy, 0.06),
-                color: alpha(m.navy, 0.72),
-              },
-            },
-          ]
-        : []),
-      ...scenarioIndicators.map((indicator) => ({
-        label: scenarioIndicatorDisplayLabel(indicator),
-        showRequestSentIcon: indicator === "BR",
-        requestAccepted:
-          indicator === "BR" && event.status === "BR Accepted",
-        requestDirection:
-          indicator === "BR" || indicator === "ER"
-            ? resolveProfessionalBookingRequestDirection(event)
-            : undefined,
-        responseIndicators:
-          indicator === "EBR" || indicator === "ER"
-            ? scenarioBadgeResponseIndicators(indicator, responseIndicators)
-            : [],
-        prepaymentStatus:
-          indicator === "EBR" &&
-          prepaymentIconVariant === "canceled_or_invalid"
-            ? prepaymentIconVariant
-            : undefined,
-        showExternalLink: false,
-        bold:
-          indicator === "EBR" ||
-          indicator === "BR" ||
-          indicator === "ER",
-        sx:
-          indicator === "ER" && isIncomingEr
-            ? {
-                border: `1px solid ${alpha(m.teal, 0.45)}`,
-                bgcolor: alpha(m.teal, 0.12),
-                color: m.teal,
-              }
-            : undefined,
-      })),
-    ],
+    scenarioBadges: hideStatusBadge
+      ? []
+      : [
+          ...(calendarEventIsGuest(event)
+            ? [
+                {
+                  label: "Guest",
+                  tooltip: "Guest booking — no profile",
+                  bold: true,
+                  sx: {
+                    border: `1px solid ${alpha(m.navy, 0.18)}`,
+                    bgcolor: alpha(m.navy, 0.06),
+                    color: alpha(m.navy, 0.72),
+                  },
+                },
+              ]
+            : []),
+          ...scenarioIndicators.map((indicator) => ({
+            label: scenarioIndicatorDisplayLabel(indicator),
+            showRequestSentIcon: indicator === "BR",
+            requestAccepted:
+              indicator === "BR" && event.status === "BR Accepted",
+            requestDirection:
+              indicator === "BR" || indicator === "ER"
+                ? resolveProfessionalBookingRequestDirection(event)
+                : undefined,
+            responseIndicators:
+              indicator === "EBR" || indicator === "ER"
+                ? scenarioBadgeResponseIndicators(indicator, responseIndicators)
+                : [],
+            prepaymentStatus:
+              indicator === "EBR" &&
+              prepaymentIconVariant === "canceled_or_invalid"
+                ? prepaymentIconVariant
+                : undefined,
+            showExternalLink: false,
+            bold:
+              indicator === "EBR" ||
+              indicator === "BR" ||
+              indicator === "ER",
+            sx:
+              indicator === "ER" && isIncomingEr
+                ? {
+                    border: `1px solid ${alpha(m.teal, 0.45)}`,
+                    bgcolor: alpha(m.teal, 0.12),
+                    color: m.teal,
+                  }
+                : undefined,
+          })),
+        ],
     prepaymentStatus: prepaymentIconVariant,
     paymentDue: paymentDueMeta
       ? {
@@ -715,6 +728,39 @@ export default function CalendarBookingCard({
                 })()}
               </BodyText>
               {(() => {
+                const blockStatus = resolveConnectedChainBlockStatus(event, {
+                  serviceId: block.serviceId,
+                  guestId: block.guestId,
+                });
+                // Divergent sub-block breaks away with its own status chip.
+                if (
+                  hideConnectedChainStatusBadge({
+                    isAnchor: false,
+                    blockStatus,
+                    chainStatus: event.status,
+                  })
+                ) {
+                  return null;
+                }
+                return (
+                  <Chip
+                    size="small"
+                    label={professionalCalendarStatusLabel({
+                      ...event,
+                      status: blockStatus,
+                    })}
+                    sx={{
+                      height: 18,
+                      maxWidth: "100%",
+                      fontSize: 10,
+                      fontWeight: 800,
+                      ...statusChipSxWithOverride(blockStatus, statusColor),
+                      "& .MuiChip-label": { px: 0.6 },
+                    }}
+                  />
+                );
+              })()}
+              {(() => {
                 const columnId = String(laneResourceId ?? "").trim();
                 const memberId =
                   columnId || String(block.teamMemberId ?? "").trim();
@@ -798,6 +844,7 @@ export default function CalendarBookingCard({
 
     return (
       <Box
+        data-booking-chain={bookingChainKey || undefined}
         sx={[
           positionSx,
           isTicket
@@ -854,6 +901,7 @@ export default function CalendarBookingCard({
 
   return (
     <Box
+      data-booking-chain={bookingChainKey || undefined}
       sx={[
         positionSx,
         isTicket

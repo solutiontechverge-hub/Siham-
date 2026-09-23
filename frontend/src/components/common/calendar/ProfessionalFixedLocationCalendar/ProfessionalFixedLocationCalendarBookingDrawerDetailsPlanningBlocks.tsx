@@ -216,9 +216,8 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsPla
               ) {
                 if (guest.id !== firstDrawerPlanningId) return null;
                 return (
-                  <Box data-booking-section={guest.id}>
+                  <Box key={block.key} data-booking-section={guest.id}>
                   <BookingDrawerPlanningGroup
-                    key="planning-group"
                     items={drawerPlanningGuests}
                     disabled={isViewingExisting}
                     showRemove={showLineItemRemoveButton}

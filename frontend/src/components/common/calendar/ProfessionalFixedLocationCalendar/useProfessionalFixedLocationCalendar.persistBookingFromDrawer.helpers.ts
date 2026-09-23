@@ -402,13 +402,15 @@ export function applyExistingBookingEditLabels(input: {
   if (silentSafeOnly) {
     details.silentUpdated = true;
     details.lastEditedBy = "professional";
-    details.editedServiceIds = existingEvent.details?.editedServiceIds;
-    details.addedServiceIds = existingEvent.details?.addedServiceIds;
-    details.cancelledServiceIds = existingEvent.details?.cancelledServiceIds;
-    details.editedProductIds = existingEvent.details?.editedProductIds;
-    details.addedProductIds = existingEvent.details?.addedProductIds;
-    details.cancelledProductIds = existingEvent.details?.cancelledProductIds;
-    details.scheduleEdited = existingEvent.details?.scheduleEdited;
+    // Clear ER line tags — silent Updated must not revive Edited/Pending.
+    details.editedServiceIds = undefined;
+    details.addedServiceIds = undefined;
+    details.cancelledServiceIds = undefined;
+    details.editedProductIds = undefined;
+    details.addedProductIds = undefined;
+    details.cancelledProductIds = undefined;
+    details.scheduleEdited = undefined;
+    details.responseStatus = undefined;
     const rawSnapshot = {
       phoneCode: silentBaseline?.phoneCode ?? existingEvent.details?.phoneCode,
       phoneNumber:
@@ -453,7 +455,7 @@ export function applyExistingBookingEditLabels(input: {
     } catch {
       details.silentUpdateSnapshot = snapshotForNotes;
     }
-    if (lineChanges.edited.length) {
+    if (lineChanges.edited.length && !servicesReordered) {
       details.editedServiceIds = lineChanges.edited;
     }
     if (lineChanges.added.length) details.addedServiceIds = lineChanges.added;

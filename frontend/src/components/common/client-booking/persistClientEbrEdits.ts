@@ -383,8 +383,25 @@ export async function persistConfirmedGrantEdit(params: {
     return;
   }
 
-  const services = sessionDraft.services ?? [];
-  const products = sessionDraft.products ?? [];
+  const priorNotes = parseCalendarEntryNotes(
+    sessionRecord?.notes ?? activeBooking?.notes,
+  );
+  // Client confirmed edit: never rewrite service/price lines from the editor.
+  const services = (
+    priorNotes?.services?.length
+      ? priorNotes.services
+      : (activeBooking?.draft?.services ?? sessionDraft.services ?? [])
+  ).map((s) => ({
+    id: s.id,
+    name: s.name,
+    price: s.price,
+    durationMins: s.durationMins,
+    guestId: s.guestId ?? null,
+    teamMemberId: s.teamMemberId ?? null,
+  }));
+  const products = priorNotes?.products?.length
+    ? priorNotes.products
+    : (sessionDraft.products ?? []);
   const durationMins = services.reduce(
     (sum, service) => sum + (service.durationMins || 0),
     0,
@@ -393,9 +410,8 @@ export async function persistConfirmedGrantEdit(params: {
     sessionDraft.selectedTime ?? "12:00 AM",
   );
   const endMinutes = startMinutes + Math.max(durationMins, 15);
-  const priorNotes = parseCalendarEntryNotes(
-    sessionRecord?.notes ?? activeBooking?.notes,
-  );
+  const nextDesiredLocation =
+    sessionDraft.desiredLocation ?? priorNotes?.desiredLocation;
   let cursor = startMinutes;
   const serviceLines = services.map((s) => {
     const duration = Math.max(15, s.durationMins || 15);
@@ -425,7 +441,12 @@ export async function persistConfirmedGrantEdit(params: {
     : (priorNotes?.services ?? []);
   const lineChanges = detectServiceLineChanges(originalServices, serviceLines);
   const clientSnapshot = {
-    people: (sessionDraft.people ?? []).map((p) => ({
+    people: (
+      priorNotes?.clientSnapshot?.people ??
+      activeBooking?.draft?.people ??
+      sessionDraft.people ??
+      []
+    ).map((p) => ({
       id: p.id,
       name: p.name,
       isRequester: Boolean(p.isRequester),
@@ -435,28 +456,43 @@ export async function persistConfirmedGrantEdit(params: {
       planningIsLocked: p.planningIsLocked,
     })),
     services: serviceLines,
-    projectDetails: sessionDraft.projectDetails
-      ? {
-          description: sessionDraft.projectDetails.description ?? "",
-          uploads: (sessionDraft.projectDetails.uploads ?? []).map((u) => ({
-            id: u.id,
-            name: u.name,
-            previewUrl: u.previewUrl,
-          })),
-        }
-      : priorNotes?.clientSnapshot?.projectDetails,
-    teamMembers: sessionDraft.teamMembers ?? [],
+    projectDetails: priorNotes?.clientSnapshot?.projectDetails
+      ? priorNotes.clientSnapshot.projectDetails
+      : sessionDraft.projectDetails
+        ? {
+            description: sessionDraft.projectDetails.description ?? "",
+            uploads: (sessionDraft.projectDetails.uploads ?? []).map((u) => ({
+              id: u.id,
+              name: u.name,
+              previewUrl: u.previewUrl,
+            })),
+          }
+        : undefined,
+    teamMembers:
+      sessionDraft.teamMembers ?? activeBooking?.draft?.teamMembers ?? [],
   };
   const scheduleEdited =
     (sessionDraft.selectedDateISO ?? "") !==
       (activeBooking?.draft?.selectedDateISO ?? "") ||
     (sessionDraft.selectedTime ?? "") !==
       (activeBooking?.draft?.selectedTime ?? "");
+  const priorDesired = priorNotes?.desiredLocation;
+  const locationEdited = Boolean(
+    nextDesiredLocation &&
+      (String(priorDesired?.street ?? "") !==
+        String(nextDesiredLocation.street ?? "") ||
+        String(priorDesired?.number ?? "") !==
+          String(nextDesiredLocation.number ?? "") ||
+        String(priorDesired?.postalCode ?? "") !==
+          String(nextDesiredLocation.postalCode ?? "") ||
+        String(priorDesired?.municipality ?? "") !==
+          String(nextDesiredLocation.municipality ?? "")),
+  );
   const currentPhone = splitContactPhone(
     sessionRecord?.contactPhone ?? activeBooking?.contactPhone ?? "",
     priorNotes?.phoneCode,
   );
-  const comparableServiceLines = services.map((s) => ({
+  const comparableServiceLines = serviceLines.map((s) => ({
     id: s.id,
     name: s.name,
     price: s.price,
@@ -466,13 +502,17 @@ export async function persistConfirmedGrantEdit(params: {
     startTime: s.startTime,
     endTime: s.endTime,
   }));
+  const lockedPeople =
+    priorNotes?.clientSnapshot?.people ??
+    activeBooking?.draft?.people ??
+    sessionDraft.people;
   const previousGuests = guestsFromPeopleAndServices(
     priorNotes?.clientSnapshot?.people,
     priorNotes?.services ?? originalServices,
     priorNotes?.guests,
   );
   const currentGuests = guestsFromPeopleAndServices(
-    sessionDraft.people,
+    lockedPeople,
     comparableServiceLines,
     priorNotes?.guests,
   );
@@ -490,14 +530,14 @@ export async function persistConfirmedGrantEdit(params: {
     previousGuests,
     currentGuests,
     previousPeople: priorNotes?.clientSnapshot?.people,
-    currentPeople: sessionDraft.people,
+    currentPeople: lockedPeople,
     previousPhoneCode: priorNotes?.phoneCode,
     currentPhoneCode: currentPhone.countryCode,
     previousPhoneNumber: priorNotes?.phoneNumber,
     currentPhoneNumber: currentPhone.phone,
     previousProducts: priorNotes?.products ?? [],
     currentProducts: productLines,
-    scheduleChanged: scheduleEdited,
+    scheduleChanged: scheduleEdited || locationEdited,
   });
   const nextNotes = serializeCalendarEntryNotes(
     priorNotes?.internalNote ?? "",
@@ -508,18 +548,21 @@ export async function persistConfirmedGrantEdit(params: {
           services: serviceLines,
           products: productLines,
           guests: currentGuests,
+          ...(nextDesiredLocation
+            ? { desiredLocation: nextDesiredLocation }
+            : {}),
           phoneCode: currentPhone.countryCode || priorNotes?.phoneCode,
           phoneNumber: currentPhone.phone || priorNotes?.phoneNumber,
           lastEditedBy: "client",
           silentUpdated: true,
-          // Keep prior Edited/Added/Cancelled — only Updated is ephemeral.
-          editedServiceIds: priorNotes?.editedServiceIds,
-          addedServiceIds: priorNotes?.addedServiceIds,
-          cancelledServiceIds: priorNotes?.cancelledServiceIds,
-          editedProductIds: priorNotes?.editedProductIds,
-          addedProductIds: priorNotes?.addedProductIds,
-          cancelledProductIds: priorNotes?.cancelledProductIds,
-          scheduleEdited: priorNotes?.scheduleEdited,
+          // Clear ER line tags — silent Updated must not revive Edited/Pending.
+          editedServiceIds: undefined,
+          addedServiceIds: undefined,
+          cancelledServiceIds: undefined,
+          editedProductIds: undefined,
+          addedProductIds: undefined,
+          cancelledProductIds: undefined,
+          scheduleEdited: undefined,
           silentUpdateSnapshot: {
             phoneCode: priorNotes?.phoneCode,
             phoneNumber: priorNotes?.phoneNumber,
@@ -540,6 +583,9 @@ export async function persistConfirmedGrantEdit(params: {
           services: serviceLines,
           products: productLines,
           guests: currentGuests,
+          ...(nextDesiredLocation
+            ? { desiredLocation: nextDesiredLocation }
+            : {}),
           lastEditedBy: "client",
           silentUpdated: undefined,
           silentUpdateSnapshot: {
@@ -551,7 +597,9 @@ export async function persistConfirmedGrantEdit(params: {
             people: priorNotes?.clientSnapshot?.people,
             desiredLocation: priorNotes?.desiredLocation,
           },
-          ...(scheduleEdited ? { scheduleEdited: true } : {}),
+          ...(scheduleEdited || locationEdited
+            ? { scheduleEdited: true }
+            : {}),
           originalServices: originalServices.length
             ? originalServices
             : serviceLines,
@@ -571,7 +619,10 @@ export async function persistConfirmedGrantEdit(params: {
     id: apiBookingId,
     status: "confirmed",
     notes: nextNotes,
-    total_price: sessionDraft.total,
+    total_price:
+      activeBooking?.draft?.total ??
+      priorNotes?.services?.reduce((sum, s) => sum + (s.price || 0), 0) ??
+      sessionDraft.total,
     booking_date: sessionDraft.selectedDateISO,
     start_time: buildWallClockDateTimeIso(
       sessionDraft.selectedDateISO,

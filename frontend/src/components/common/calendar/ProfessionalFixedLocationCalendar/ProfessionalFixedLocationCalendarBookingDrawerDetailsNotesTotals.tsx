@@ -312,6 +312,20 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsNot
                 prepaymentPercent={effectivePrepayPercent}
                 prepaymentAmount={displayPrepaidAmount}
                 remainingAmount={displayRemaining}
+                prepaidAction={
+                  // Professionals never pay here — only clients see "Pay Now".
+                  isDrawerPrepaymentPaid ? (
+                    <BodyText
+                      sx={{
+                        fontWeight: 800,
+                        fontSize: 12,
+                        color: m.teal,
+                      }}
+                    >
+                      Paid
+                    </BodyText>
+                  ) : undefined
+                }
                 extraRows={
                   kilometerAllowanceAmount > 0
                     ? [

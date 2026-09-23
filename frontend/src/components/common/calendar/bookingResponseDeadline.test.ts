@@ -152,6 +152,16 @@ assert.equal(erFlags.cancel, false);
 assert.equal(erFlags.discard, true);
 assert.equal(erFlags.in_progress, false);
 
+const noShow = {
+  status: "No Show" as const,
+  bookingScenario: undefined,
+  details: {},
+};
+const noShowFlags = resolveProfessionalBookingActions(noShow);
+assert.equal(noShowFlags.in_progress, true);
+assert.equal(noShowFlags.no_show, false);
+assert.equal(noShowFlags.delete, true);
+
 const staleOverdueIncoming = {
   status: "Requested" as const,
   bookingScenario: "BR" as const,

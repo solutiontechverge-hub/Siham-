@@ -29,9 +29,8 @@ export function getTransactionStatusTone(status: TransactionStatus): Transaction
     case "Payment due":
     case "Overdue":
     case "Overdue response":
-      return "warning";
     case "Failed":
-      return "danger";
+      return "warning";
     case "Refunded":
     case "Voided":
       return "muted";
