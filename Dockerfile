@@ -1,9 +1,10 @@
 # Northflank: Dockerfile path `/Dockerfile`, build context `/` (repository root).
+# Frontend deps are locked via root package-lock.json (workspaces); no frontend/package-lock.json.
 FROM node:20-bookworm-slim AS frontend-builder
 
 WORKDIR /app/frontend
 
-COPY frontend/package.json frontend/package-lock.json ./
+COPY frontend/package.json ./
 RUN npm install --no-audit --no-fund
 
 COPY frontend/ .
@@ -32,7 +33,7 @@ RUN npm install --omit=dev --no-audit --no-fund
 COPY backend/ .
 
 WORKDIR /app/frontend
-COPY frontend/package.json frontend/package-lock.json ./
+COPY frontend/package.json ./
 RUN npm install --omit=dev --no-audit --no-fund
 COPY --from=frontend-builder /app/frontend/.next ./.next
 COPY --from=frontend-builder /app/frontend/public ./public
