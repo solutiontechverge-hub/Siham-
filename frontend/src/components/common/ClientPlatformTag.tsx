@@ -16,6 +16,8 @@ export type ClientPlatformTagInput = {
   isMollure?: boolean;
   isGuest?: boolean;
   clientKind?: ClientKind | null;
+  /** Override company pill text (default "BC"). e.g. client list uses "B.C. client". */
+  companyLabel?: string;
 };
 
 type MollurePalette = Theme["palette"]["mollure"];
@@ -23,7 +25,7 @@ type MollurePalette = Theme["palette"]["mollure"];
 /**
  * Shared pill colors for client platform/type tags.
  * - navy: Guest
- * - teal: M / IC / BC
+ * - teal: IC / BC (and legacy M pill if any remain)
  */
 export function clientPlatformTagToneColors(
   m: MollurePalette,
@@ -41,10 +43,10 @@ export function clientPlatformTagToneColors(
 /**
  * Client tags:
  * - Guest overlay → "Guest"
- * - Mollure platform → "M" (when isMollure)
+ * - Mollure platform → compact logo mark (when isMollure)
  * - Individual → "IC"
  * - Company → "BC"
- * M can sit beside IC/BC; non-Mollure clients get type tag only.
+ * Logo can sit beside IC/BC; non-Mollure clients get type tag only.
  */
 export function resolveClientPlatformTag(
   input: ClientPlatformTagInput,
@@ -145,6 +147,7 @@ export default function ClientPlatformTag({
   isMollure,
   isGuest,
   clientKind,
+  companyLabel = "BC",
 }: ClientPlatformTagInput) {
   if (isGuest) {
     return (
@@ -164,7 +167,7 @@ export default function ClientPlatformTag({
 
   const typeLabel =
     clientKind === "company"
-      ? "BC"
+      ? companyLabel
       : clientKind === "individual"
         ? "IC"
         : null;
@@ -182,16 +185,12 @@ export default function ClientPlatformTag({
         lineHeight: 0,
       }}
     >
-      {isMollure ? (
-        <Box component="span" aria-label="Mollure platform client">
-          <TagPill label="M" tone="teal" />
-        </Box>
-      ) : null}
+      {isMollure ? <MollureLogoMark size={16} /> : null}
       {typeLabel ? (
         <Box
           component="span"
           aria-label={
-            typeLabel === "BC" ? "Company Client" : "Individual Client"
+            clientKind === "company" ? "Company Client" : "Individual Client"
           }
         >
           <TagPill label={typeLabel} tone="teal" />

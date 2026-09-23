@@ -522,4 +522,82 @@ assert.ok(
   "new Requested booking shows Booking Request sent",
 );
 
+// Offline confirmed: never invent Booking Request Accepted; unpaid never invents prepaid.
+const offlineConfirmed = buildBookingActivityTimeline({
+  bookings: [
+    {
+      id: "8",
+      unique_code: "of123",
+      status: "confirmed",
+      booking_type: "offline",
+      prepayment_status: "pending",
+      created_at: "2026-09-21T10:00:00.000Z",
+      updated_at: "2026-09-21T10:00:00.000Z",
+    },
+  ],
+  clientName: "Walk-in",
+  currentBookingId: "8",
+  currentBookingCode: "of123",
+  currentScenario: null,
+  currentStatus: "Confirmed",
+  currentBookingType: "Offline",
+  mode: "activity",
+});
+assert.equal(
+  offlineConfirmed.some((item) => item.kind === "booking_accepted"),
+  false,
+  "offline confirmed must not invent Booking Request Accepted",
+);
+assert.equal(
+  offlineConfirmed.some((item) => item.kind === "booking_prepaid"),
+  false,
+  "pending prepayment must not invent Booking prepaid",
+);
+assert.ok(
+  offlineConfirmed.some((item) => item.kind === "booking_confirmed"),
+  "offline confirmed still shows Confirmed",
+);
+
+// Identical API rows collapse to one.
+const dedupedApi = buildBookingActivityTimeline({
+  bookings: [
+    {
+      id: "9",
+      unique_code: "BK9",
+      status: "confirmed",
+      created_at: "2026-09-21T10:00:00.000Z",
+    },
+  ],
+  clientName: "Client",
+  currentBookingId: "9",
+  currentBookingCode: "BK9",
+  currentStatus: "confirmed",
+  apiEvents: [
+    {
+      id: "dup1",
+      bookingId: "9",
+      kind: "booking_confirmed",
+      actor: "professional",
+      actorLabel: "Professional",
+      title: "Confirmed",
+      occurredAt: "2026-09-21T10:00:00.000Z",
+    },
+    {
+      id: "dup2",
+      bookingId: "9",
+      kind: "booking_confirmed",
+      actor: "professional",
+      actorLabel: "Professional",
+      title: "Confirmed",
+      occurredAt: "2026-09-21T10:00:00.000Z",
+    },
+  ],
+  mode: "activity",
+});
+assert.equal(
+  dedupedApi.filter((item) => item.kind === "booking_confirmed").length,
+  1,
+  "identical Confirmed API events must dedupe",
+);
+
 console.log("buildBookingActivityTimeline.test.ts passed");

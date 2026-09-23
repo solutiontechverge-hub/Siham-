@@ -209,7 +209,7 @@ export default function ClientBookingPaymentChronology({
 
     return (
       <Box
-        key={service.id}
+        key={`${service.id}::${section.key}::${service.guestId ?? ""}`}
         sx={{
           borderRadius: "10px",
           border: `1px solid ${alpha(m.navy, 0.08)}`,
@@ -280,9 +280,9 @@ export default function ClientBookingPaymentChronology({
     );
   };
 
-  const renderCatalogItem = (item: CatalogItem) => (
+  const renderCatalogItem = (item: CatalogItem, index: number) => (
     <Box
-      key={item.id}
+      key={`${item.id}::${item.guestId ?? ""}::${index}`}
       sx={{
         borderRadius: "10px",
         border: `1px solid ${alpha(m.navy, 0.08)}`,
@@ -375,7 +375,7 @@ export default function ClientBookingPaymentChronology({
       <Box>
         <BodyText sx={catalogHeadingSx}>{heading}</BodyText>
         <Stack spacing={1}>
-          {items.map((item) => renderCatalogItem(item))}
+          {items.map((item, index) => renderCatalogItem(item, index))}
         </Stack>
       </Box>
     );

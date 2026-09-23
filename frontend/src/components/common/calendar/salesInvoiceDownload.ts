@@ -26,6 +26,10 @@ export async function downloadSalesInvoicePdf(card: SalesOverviewCardData) {
     doc.text(card.methodDateLine, left, y);
     y += 20;
   }
+  for (const meta of card.metaLines ?? []) {
+    doc.text(meta, left, y);
+    y += 14;
+  }
 
   y += 8;
   doc.setFont("helvetica", "bold");
@@ -61,6 +65,7 @@ export async function downloadSalesInvoiceExcel(card: SalesOverviewCardData) {
     ["Booking", card.bookingCode],
     ["Status", card.statusBadge || ""],
     ["Method", card.methodDateLine || card.paymentMethodLabel || ""],
+    ...(card.metaLines ?? []).map((line) => ["Meta", line]),
     [],
     ["Item", "Amount"],
     ...card.lines.map((line) => [line.label, roundMoney(line.amount)]),

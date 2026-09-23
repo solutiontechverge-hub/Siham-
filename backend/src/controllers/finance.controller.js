@@ -16,6 +16,8 @@ import {
   withPaginationParams,
 } from "../utils/pagination.js";
 import {
+  flagFinancePaymentAfterCancel,
+  isSettledFinanceStatus,
   processOverdueInvoiceReissues,
   syncBookingToFinanceTransaction,
 } from "../services/finance-sync.service.js";
@@ -565,6 +567,33 @@ export const updateFinanceTransaction = async (req, res) => {
     }
 
     const { status, note } = req.body ?? {};
+
+    const existing = await query(
+      `SELECT id, status, gross_amount FROM finance_transactions
+       WHERE professional_profile_id = $1 AND id = $2
+       LIMIT 1`,
+      [profile.id, id],
+    );
+    if (!existing.rows[0]) {
+      return res.status(404).json({ success: false, message: "Transaction not found.", data: null });
+    }
+
+    // Cancel Sales voided this row — refuse silent Paid/Prepaid; stamp review flag instead.
+    if (
+      isSettledFinanceStatus(status) &&
+      String(existing.rows[0].status) === "Voided"
+    ) {
+      const flagged = await flagFinancePaymentAfterCancel(id, {
+        intendedStatus: status,
+        amount: existing.rows[0].gross_amount,
+      });
+      return res.status(200).json({
+        success: true,
+        message: "Payment on canceled sale flagged for review.",
+        data: mapTransactionRow(flagged),
+      });
+    }
+
     const fields = [];
     const values = [profile.id, id];
     let idx = 3;

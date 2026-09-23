@@ -136,11 +136,11 @@ export default function BookingSelectServicesScreen({
               </Box>
 
               <Stack spacing={0.75}>
-                {group.services.map((service) => {
+                {group.services.map((service, serviceIndex) => {
                   const checked = selectedSet.has(service.id);
                   return (
                     <Box
-                      key={service.id}
+                      key={`${service.id}::${group.category}::${serviceIndex}`}
                       component="button"
                       type="button"
                       disabled={disabled}

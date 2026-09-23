@@ -4,6 +4,7 @@ import { liveMediaUrl } from "../../../lib/projectUploadMedia";
 import {
   extraBookingParticipantIds,
   dedupeServicesByOwner,
+  isExtraBookingParticipant,
 } from "../../../data/bookingChronologicalBlocks";
 
 const DRAFT_SNAPSHOT_KEY = "mollure:booking_draft_snapshots_v1";
@@ -57,6 +58,13 @@ function sanitizeDraft(draft: ClientBookingDraft): ClientBookingDraft {
 
 function hasPeople(draft?: ClientBookingDraft | DraftSnapshot | null) {
   return (draft?.people?.length ?? 0) > 0;
+}
+
+function extraPeopleCount(
+  people: ClientBookingDraft["people"] | DraftSnapshot["people"] | undefined,
+) {
+  return (people ?? []).filter((person) => isExtraBookingParticipant(person))
+    .length;
 }
 
 function hasProject(draft?: ClientBookingDraft | DraftSnapshot | null) {
@@ -128,7 +136,9 @@ export function mergeClientBookingDraftRichness(
   const liveFallback = sanitizeDraft(fallback as ClientBookingDraft);
 
   const people = hasPeople(livePrimary)
-    ? livePrimary.people
+    ? extraPeopleCount(livePrimary.people) >= extraPeopleCount(liveFallback.people)
+      ? livePrimary.people
+      : liveFallback.people ?? livePrimary.people
     : liveFallback.people ?? livePrimary.people;
   const projectDetails =
     hasProject(livePrimary) || hasProject(liveFallback)
@@ -151,7 +161,9 @@ export function mergeClientBookingDraftRichness(
   const fallbackServices = liveFallback.services ?? [];
   let services = primaryServices;
 
-  if (fallbackServices.length > 0) {
+  // API/primary is source of truth for which lines exist. Session only enriches
+  // metadata — never re-append removed/cancelled services from a stale draft.
+  if (fallbackServices.length > 0 && primaryServices.length > 0) {
     const byId = new Map(fallbackServices.map((s) => [s.id, s]));
     const byName = new Map(fallbackServices.map((s) => [s.name, s]));
     services = primaryServices.map((service) => {
@@ -163,27 +175,6 @@ export function mergeClientBookingDraftRichness(
         teamMemberId: service.teamMemberId ?? match?.teamMemberId ?? null,
       };
     });
-
-    const lineKey = (row: { id: string; guestId?: string | null }) =>
-      `${row.id}::${row.guestId ?? ""}`;
-    const primaryKeys = new Set(services.map(lineKey));
-    for (const fb of fallbackServices) {
-      const key = lineKey(fb);
-      if (primaryKeys.has(key)) continue;
-      services = [
-        ...services,
-        {
-          id: fb.id,
-          name: fb.name,
-          durationMins: fb.durationMins,
-          price: fb.price,
-          guestId: fb.guestId ?? null,
-          teamMemberId: fb.teamMemberId ?? null,
-          isAddOn: fb.isAddOn,
-        },
-      ];
-      primaryKeys.add(key);
-    }
   }
 
   services = dedupeServicesByOwner(

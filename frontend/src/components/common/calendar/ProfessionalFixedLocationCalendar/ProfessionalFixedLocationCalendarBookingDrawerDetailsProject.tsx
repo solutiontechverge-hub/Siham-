@@ -215,9 +215,9 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsPro
                       spacing={1}
                       sx={{ overflowX: "auto", pb: 0.5 }}
                     >
-                      {bookingProjectUploads.map((img) => (
+                      {bookingProjectUploads.map((img, imgIndex) => (
                         <Box
-                          key={img.id}
+                          key={`${img.id}::${imgIndex}`}
                           sx={{
                             flex: "0 0 88px",
                             minWidth: 88,

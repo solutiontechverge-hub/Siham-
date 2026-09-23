@@ -63,9 +63,9 @@ export default function BookingDrawerPlanningGroup({
         }}
       >
         <Stack spacing={1.5}>
-          {items.map((item) => (
+          {items.map((item, index) => (
             <Box
-              key={item.id}
+              key={`${item.id}::${index}`}
               onDragOver={(event) => {
                 if (!canReorder) return;
                 event.preventDefault();

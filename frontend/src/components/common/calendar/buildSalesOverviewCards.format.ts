@@ -24,15 +24,21 @@ export function formatDateLabel(iso?: string | null): string {
   return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 }
 
-export function formatMethodDateTime(method: string, iso?: string | null): string {
+export function formatDateTimeLabel(iso?: string | null): string {
   const d = iso ? new Date(iso) : new Date();
-  if (Number.isNaN(d.getTime())) return method;
+  if (Number.isNaN(d.getTime())) return "";
   const date = formatDateLabel(d.toISOString());
   const time = d
     .toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
     .replace(/\s/g, "")
     .toLowerCase();
-  return `${method}, ${date} ${time}`;
+  return `${date} ${time}`;
+}
+
+export function formatMethodDateTime(method: string, iso?: string | null): string {
+  const stamped = formatDateTimeLabel(iso);
+  if (!stamped) return method;
+  return `${method}, ${stamped}`;
 }
 
 export function paymentMethodLabel(

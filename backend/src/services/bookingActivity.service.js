@@ -198,31 +198,43 @@ export async function logBookingStatusActivity(
   const prev = String(previousStatus ?? "").toLowerCase();
   const prepay = String(booking.prepayment_status ?? "").toLowerCase();
   const prevPrepay = String(previousPrepayment ?? "").toLowerCase();
+  const bookingType = String(booking.booking_type ?? "").toLowerCase();
+  const isOffline =
+    bookingType === "offline" ||
+    String(bookingCode || "")
+      .toLowerCase()
+      .startsWith("of");
+  // "Booking Request Accepted" only for online request flows — never offline calendar.
+  const canLogRequestAccepted = !isOffline;
   const clientLabel = actorLabel || "Client";
   const priceSub = moneySubtitle(booking.total_price);
   const now = new Date().toISOString();
 
   if (status !== prev) {
     if (status === "br_accepted" && prev === "requested") {
-      await appendBookingActivityEvent({
-        bookingId,
-        bookingCode,
-        kind: KIND.BOOKING_ACCEPTED,
-        title: "Booking Request Accepted",
-        actor: "professional",
-        actorLabel: "Professional",
-        occurredAt: now,
-      });
+      if (canLogRequestAccepted) {
+        await appendBookingActivityEvent({
+          bookingId,
+          bookingCode,
+          kind: KIND.BOOKING_ACCEPTED,
+          title: "Booking Request Accepted",
+          actor: "professional",
+          actorLabel: "Professional",
+          occurredAt: now,
+        });
+      }
     } else if (status === "confirmed" && prev === "requested") {
-      await appendBookingActivityEvent({
-        bookingId,
-        bookingCode,
-        kind: KIND.BOOKING_ACCEPTED,
-        title: "Booking Request Accepted",
-        actor: "professional",
-        actorLabel: "Professional",
-        occurredAt: now,
-      });
+      if (canLogRequestAccepted) {
+        await appendBookingActivityEvent({
+          bookingId,
+          bookingCode,
+          kind: KIND.BOOKING_ACCEPTED,
+          title: "Booking Request Accepted",
+          actor: "professional",
+          actorLabel: "Professional",
+          occurredAt: now,
+        });
+      }
       await appendBookingActivityEvent({
         bookingId,
         bookingCode,
@@ -267,18 +279,8 @@ export async function logBookingStatusActivity(
       });
     }
 
-    if (status === "completed" && prev !== "completed" && prepay === "paid") {
-      await appendBookingActivityEvent({
-        bookingId,
-        bookingCode,
-        kind: KIND.POST_BOOKING_PAID,
-        title: "Post Booking Paid",
-        actor: "client",
-        actorLabel: clientLabel,
-        subtitle: priceSub,
-        occurredAt: now,
-      });
-    }
+    // ponytail: do not invent "Post Booking Paid" on complete+prepaid —
+    // that is not a payment transition. Wire when a real post-pay completes.
   }
 
   if (prepay === "paid" && prevPrepay !== "paid") {

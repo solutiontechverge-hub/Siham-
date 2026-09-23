@@ -4,6 +4,7 @@ import {
   isPlanningPerson,
   isBufferPerson,
   isNotesPerson,
+  isExtraBookingParticipant,
   extraBookingParticipantIds,
   resolveBookingLineOwnerId,
   dedupeServicesByOwner,
@@ -151,7 +152,24 @@ export function buildClientDraftChronologicalBlocks(
         resolveBookingLineOwnerId(guestId, requesterPerson.id, extraIds) ===
         person.id,
     );
-    if (!items.length && !hasProducts) continue;
+    if (!items.length && !hasProducts) {
+      // Show empty Model/Guest cards only for real extras (not company contacts).
+      if (
+        isExtraBookingParticipant(person) &&
+        (participantType === "model" || participantType === "guest")
+      ) {
+        const startTime = cursor;
+        entries.push({
+          id: `${person.id}::identity`,
+          participantId: person.id,
+          participantType,
+          startTime,
+          endTime: startTime,
+          kind: "service",
+        });
+      }
+      continue;
+    }
 
     if (!items.length && hasProducts) {
       const startTime = cursor;

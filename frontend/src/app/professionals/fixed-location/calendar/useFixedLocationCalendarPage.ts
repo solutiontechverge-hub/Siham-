@@ -72,18 +72,27 @@ const parseServiceDurationMins = (label?: string | null) => {
 
 const mapSetupServicesToCatalog = (
   services: readonly BusinessServiceDetail[] | undefined,
-): BookingCatalogService[] =>
-  (services ?? []).map((service) => {
+): BookingCatalogService[] => {
+  // service_id is the catalog identity and can repeat across detail rows —
+  // keep one entry so Select Services keys stay unique.
+  const seen = new Set<string>();
+  const out: BookingCatalogService[] = [];
+  for (const service of services ?? []) {
+    const id = String(service.service_id || service.id).trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
     const base = Number(service.price) || 0;
     const priced = applyBusinessServiceDiscount(base, service);
-    return {
-      id: String(service.service_id || service.id),
+    out.push({
+      id,
       name: service.service_title,
       durationMins: parseServiceDurationMins(service.duration_label),
       price: priced.amount,
       category: service.category_title || undefined,
-    };
-  });
+    });
+  }
+  return out;
+};
 
 function buildUpsertPayloadFromSetup(
   setup: BusinessSetup,
@@ -203,13 +212,24 @@ export function useFixedLocationCalendarPage() {
   const calendarData = React.useMemo(() => {
     const businessSetup = setupData?.data ?? null;
     const overview = calendarOverviewData?.data ?? null;
-    const resources: CalendarResource[] =
-      businessSetup?.team_members?.map((member, index) => ({
-        id: String(member.id ?? `team-${index + 1}`),
-        name: member.full_name?.trim() || `Team Member ${index + 1}`,
-        avatarText: member.full_name?.trim()?.[0]?.toUpperCase() || "T",
-        photoSrc: resolveMediaUrl(member.profile_photo),
-      })) ?? [];
+    const resources: CalendarResource[] = (() => {
+      const seen = new Set<string>();
+      const rows: CalendarResource[] = [];
+      for (const [index, member] of (
+        businessSetup?.team_members ?? []
+      ).entries()) {
+        const id = String(member.id ?? `team-${index + 1}`);
+        if (seen.has(id)) continue;
+        seen.add(id);
+        rows.push({
+          id,
+          name: member.full_name?.trim() || `Team Member ${index + 1}`,
+          avatarText: member.full_name?.trim()?.[0]?.toUpperCase() || "T",
+          photoSrc: resolveMediaUrl(member.profile_photo),
+        });
+      }
+      return rows;
+    })();
 
     const supportedLocations: CalendarBookingLocation[] =
       businessSetup?.location_mode === "fixed"

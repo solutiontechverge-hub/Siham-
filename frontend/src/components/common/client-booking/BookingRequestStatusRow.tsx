@@ -26,6 +26,8 @@ type Props = {
   bookingStatus: ClientBookingStatus;
   bookingRequestSent?: boolean;
   editRequestPending?: boolean;
+  /** Keep ER pill after accept/reject until the recipient OKs. */
+  editRequestAwaitingAck?: boolean;
   requiresPrepayment?: boolean;
   /** True when required prepayment has already been paid. */
   prepaymentPaid?: boolean;
@@ -98,6 +100,7 @@ export default function BookingRequestStatusRow({
   bookingStatus,
   bookingRequestSent = false,
   editRequestPending = false,
+  editRequestAwaitingAck = false,
   requiresPrepayment = false,
   prepaymentPaid = false,
   paymentDue = false,
@@ -126,7 +129,10 @@ export default function BookingRequestStatusRow({
     bookingStatus === "no_show";
   const showErPill =
     (rowMode === "professional_rejected" && !isEbrRejected) ||
-    (editRequestPending && !isEbrIncoming && !isTerminal && !isCompleted);
+    ((editRequestPending || editRequestAwaitingAck) &&
+      !isEbrIncoming &&
+      !isTerminal &&
+      !isCompleted);
 
   const waitingForPrepayment =
     requiresPrepayment &&

@@ -166,9 +166,10 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsCli
                   addClientSource === "mollure-platform"
                 }
                 clientKind={
-                  resolvedSelectedClientKind ??
-                  selectedClient?.clientKind ??
-                  "individual"
+                  (resolvedSelectedClientKind ??
+                    selectedClient?.clientKind) === "company"
+                    ? "company"
+                    : null
                 }
               />
             )}

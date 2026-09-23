@@ -9,6 +9,7 @@ import {
   scheduleMarkBookingUpdateSeen,
 } from "../calendar/bookingUpdateSeen";
 import { parseCalendarEntryNotes } from "../calendar/bookingEventDetails";
+import { bookingNotesIndicateSilentOnlyVisit } from "../calendar/bookingRequestNegotiation";
 import type { ClientBookingStatus } from "../../../app/clients/booking/clientBookingRecords";
 
 type SilentUpdatedBookingSlice = {
@@ -33,7 +34,6 @@ export function useClientBookingSilentUpdatedStatus(input: {
     bookingRef,
     bookingStatus,
     isEbrIncoming,
-    editRequestIsPending,
     activeBooking,
   } = input;
 
@@ -49,13 +49,9 @@ export function useClientBookingSilentUpdatedStatus(input: {
     const notesMeta = parseCalendarEntryNotes(activeBooking?.notes);
     const silentUpdated =
       Boolean(activeBooking?.silentUpdated) ||
-      Boolean(notesMeta?.silentUpdated);
-    if (
-      isEbrIncoming ||
-      editRequestIsPending ||
-      bookingStatus !== "confirmed" ||
-      !silentUpdated
-    ) {
+      bookingNotesIndicateSilentOnlyVisit(notesMeta);
+    // Silent-only: show Updated even if a stale editRequest is still "pending".
+    if (isEbrIncoming || bookingStatus !== "confirmed" || !silentUpdated) {
       return;
     }
     const lastEditedBy =
@@ -81,7 +77,6 @@ export function useClientBookingSilentUpdatedStatus(input: {
     bookingRef,
     bookingStatus,
     isEbrIncoming,
-    editRequestIsPending,
     activeBooking?.silentUpdated,
     activeBooking?.updatedAt,
     activeBooking?.lastEditedBy,

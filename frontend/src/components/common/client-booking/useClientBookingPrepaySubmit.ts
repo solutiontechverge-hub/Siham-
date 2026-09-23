@@ -253,20 +253,12 @@ export function useClientBookingPrepaySubmit(input: {
       showSnackbar({ severity: "error", message: "No prepayment amount due." });
       return;
     }
-    if (checkoutPaymentMethodSupportsPayNow(selectedPaymentMethod)) {
-      const submitted = await submitDraftBookingRequest();
-      if (!submitted) return;
-      setStripeDialogOpen(true);
-      return;
-    }
+    // ponytail: testing shortcut — mark prepaid via completePrepayment; restore Stripe dialog when real card checkout is needed.
     await completePrepayment();
   }, [
     completePrepayment,
     prepaidAmount,
-    selectedPaymentMethod,
-    setStripeDialogOpen,
     showSnackbar,
-    submitDraftBookingRequest,
   ]);
 
   const handleSendBookingRequest = React.useCallback(async () => {

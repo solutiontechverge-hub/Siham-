@@ -132,7 +132,16 @@ export function buildOrderedBookingServiceCategories(
           ),
       );
 
-      return { category, services: orderedServices };
+      // Same catalog id twice in one category → React duplicate-key warning.
+      const seenIds = new Set<string>();
+      const uniqueServices = orderedServices.filter((service) => {
+        const id = String(service.id);
+        if (seenIds.has(id)) return false;
+        seenIds.add(id);
+        return true;
+      });
+
+      return { category, services: uniqueServices };
     })
     .filter((group) => group.services.length > 0);
 }

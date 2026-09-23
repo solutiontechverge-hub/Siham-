@@ -19,12 +19,18 @@ import type {
   UpdateProfilePayload,
 } from "../../../store/services/profileApi";
 import AppButton from "../AppButton";
+import AppCountryPhoneFields from "../AppCountryPhoneFields";
 import {
   MollureLabeledField,
   MollureLabeledPasswordField,
   MollureTextField,
 } from "../MollureLabeledFields";
 import { PROFILE_IMAGE_FILE_ACCEPT } from "../../../lib/profileImageUpload";
+import {
+  formatContactPhone,
+  getPhoneValidationErrors,
+  splitContactPhone,
+} from "../../../lib/phone-validation";
 import { Typography } from "../../ui/typography";
 import {
   mollurePageTitleSx,
@@ -117,6 +123,15 @@ export function ProfessionalAccountSection({
   applyProfessionalDraft,
   setIsProfessionalEditing,
 }: ProfessionalAccountSectionProps) {
+  const contactPhoneParts = splitContactPhone(values.contactPhone);
+  const clearContactPhoneErrors = React.useCallback(() => {
+    setProfileErrors((prev) =>
+      prev.contactPhone || prev.contactPhoneCode
+        ? { ...prev, contactPhone: undefined, contactPhoneCode: undefined }
+        : prev,
+    );
+  }, [setProfileErrors]);
+
   const professionalForm = (
   <Stack spacing={2.1}>
     <Stack direction="row" spacing={2} alignItems="center">
@@ -500,6 +515,33 @@ export function ProfessionalAccountSection({
             required
           />
         </Grid>
+        <Grid item xs={12}>
+          <AppCountryPhoneFields
+            label="Phone Number"
+            countryCode={contactPhoneParts.countryCode}
+            phone={contactPhoneParts.phone}
+            onCountryCodeChange={(dialCode) => {
+              setField(
+                "contactPhone",
+                formatContactPhone(dialCode, contactPhoneParts.phone),
+              );
+              clearContactPhoneErrors();
+            }}
+            onPhoneChange={(phone) => {
+              setField(
+                "contactPhone",
+                formatContactPhone(contactPhoneParts.countryCode, phone),
+              );
+              clearContactPhoneErrors();
+            }}
+            onClearErrors={clearContactPhoneErrors}
+            countryCodeError={profileErrors.contactPhoneCode}
+            phoneError={profileErrors.contactPhone}
+            disabled={professionalFieldsDisabled}
+            required
+            phonePlaceholder="Enter phone number"
+          />
+        </Grid>
         <Grid item xs={12} md={6}>
           <MollureLabeledPasswordField
             fieldLabel="Password"
@@ -618,6 +660,17 @@ export function ProfessionalAccountSection({
               if (!isValidName(values.contactLastName))
                 nextErrors.contactLastName = "Enter a valid last name.";
 
+              const phoneParts = splitContactPhone(values.contactPhone);
+              const phoneErrors = getPhoneValidationErrors(
+                phoneParts.countryCode,
+                phoneParts.phone,
+                { required: true },
+              );
+              if (phoneErrors.countryCode)
+                nextErrors.contactPhoneCode = phoneErrors.countryCode;
+              if (phoneErrors.phone)
+                nextErrors.contactPhone = phoneErrors.phone;
+
               const password = values.contactPassword.trim();
               const repeatPassword = values.contactRepeatPassword.trim();
               if (password || repeatPassword) {
@@ -641,6 +694,11 @@ export function ProfessionalAccountSection({
                 return;
               }
 
+              const contactPhoneValue = formatContactPhone(
+                phoneParts.countryCode,
+                phoneParts.phone,
+              );
+
               const jsonPayload = {
                 email: values.contactEmail,
                 password: values.contactPassword || undefined,
@@ -659,7 +717,7 @@ export function ProfessionalAccountSection({
                 other_link: values.socialOther,
                 contact_first_name: values.contactFirstName,
                 contact_last_name: values.contactLastName,
-                phone: values.contactPhone,
+                phone: contactPhoneValue,
               };
 
               let updated: ProfileResponse | void;
@@ -682,6 +740,7 @@ export function ProfessionalAccountSection({
 
               const nextSavedProfessionalDraft = {
                 ...professionalDraft,
+                contactPhone: contactPhoneValue,
                 contactPassword: "",
                 contactRepeatPassword: "",
               };

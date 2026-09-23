@@ -380,7 +380,25 @@ export default function ClientBookingPaymentDetailsCard({
                   component="button"
                   type="button"
                   onClick={onPayNow}
-                  sx={mollureLabelSx(m.navy, { border: 0, bgcolor: "transparent", p: 0, cursor: "pointer", color: m.teal, fontFamily: "inherit", "&:hover": { color: m.tealDark } })}
+                  sx={mollureLabelSx(m.navy, {
+                    border: "none",
+                    outline: "none",
+                    boxShadow: "none",
+                    bgcolor: "transparent",
+                    p: 0,
+                    m: 0,
+                    cursor: "pointer",
+                    color: m.teal,
+                    fontFamily: "inherit",
+                    appearance: "none",
+                    WebkitAppearance: "none",
+                    "&:hover": { color: m.tealDark },
+                    "&:focus": { outline: "none" },
+                    "&:focus-visible": {
+                      outline: `2px solid ${alpha(m.teal, 0.45)}`,
+                      outlineOffset: 2,
+                    },
+                  })}
                 >
                   {payNowLabel}
                 </BodyText>

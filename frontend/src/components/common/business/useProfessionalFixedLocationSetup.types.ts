@@ -50,6 +50,7 @@ export type ProfileValidationField =
   | "contactLastName"
   | "contactEmail"
   | "contactPhone"
+  | "contactPhoneCode"
   | "contactPassword"
   | "contactRepeatPassword";
 

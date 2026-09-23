@@ -14,6 +14,7 @@ import {
   flattenBookingServices,
 } from "../bookingRequestNegotiation";
 import { professionalSuggestBookingChanges } from "../../client-booking/bookingEditRequest";
+import { supersedeOpenSalesCardsForBooking } from "../salesOverview.storage";
 import type { SelectedSlot } from "../calendar.utils";
 import type { ProfessionalFixedLocationCalendarProps } from "./useProfessionalFixedLocationCalendar.types";
 import {
@@ -292,6 +293,17 @@ export async function persistIncomingEbrFromDrawer(input: {
         start_time: `${selectedSlot.date}T${selectedSlot.start}:00`,
         end_time: `${selectedSlot.date}T${selectedSlot.end}:00`,
       });
+      const payableChanged =
+        lineChanges.added.length +
+          lineChanges.edited.length +
+          lineChanges.cancelled.length +
+          productChanges.added.length +
+          productChanges.edited.length +
+          productChanges.cancelled.length >
+        0;
+      if (payableChanged) {
+        supersedeOpenSalesCardsForBooking(parsedBooking.id);
+      }
     } catch {
       showSnackbar({
         severity: "error",

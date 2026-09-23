@@ -15,6 +15,7 @@ export type CalendarCardServiceLine = {
   end: string;
   teamMemberId: string;
   teamMemberName?: string;
+  guestId?: string | null;
 };
 
 export type CalendarCardGapLine = {
@@ -40,6 +41,8 @@ export type CalendarCardTimelineLayout = {
   name: string;
   start: string;
   end: string;
+  serviceId?: string;
+  guestId?: string | null;
   teamMemberId?: string;
   teamMemberName?: string;
   /** Offset from parent body top (0–1). */
@@ -91,6 +94,7 @@ function pushServiceLine(
     end: service.endTime?.trim() || fallback.end,
     teamMemberId,
     teamMemberName: service.teamMemberName?.trim() || undefined,
+    guestId: service.guestId ?? null,
   };
   const dedupe = serviceLineDedupeKey(line);
   if (seen.has(dedupe)) return;
@@ -134,7 +138,16 @@ export function collectBookingServiceLines(
   for (const guest of event.details?.guests ?? []) {
     if (isBufferGuest(guest) || isPlanningGuest(guest)) continue;
     for (const service of guest.services ?? []) {
-      pushServiceLine(lines, seen, service, fallback, index++);
+      pushServiceLine(
+        lines,
+        seen,
+        {
+          ...service,
+          guestId: service.guestId ?? guest.id,
+        },
+        fallback,
+        index++,
+      );
     }
   }
 
@@ -283,13 +296,23 @@ export function getCalendarCardServiceLines(
   return [];
 }
 
+export type WeekOverviewServiceSpan = {
+  key: string;
+  start: string;
+  end: string;
+  name: string;
+  serviceId?: string;
+  guestId?: string | null;
+};
+
 /**
  * Week overview: one main card per client service (no guest / buffer / planning).
  * Each span uses that service's own start–end so cards are not stretched.
+ * Divergent guest blocks surface on the day multi-service card instead.
  */
 export function getWeekOverviewMainServiceSpans(
   event: CalendarEvent,
-): Array<{ key: string; start: string; end: string; name: string }> {
+): WeekOverviewServiceSpan[] {
   const resourceId = String(event.resourceId ?? "");
   let services = (event.details?.services ?? []).filter(
     (service) => !String(service.guestId ?? "").trim(),
@@ -303,6 +326,7 @@ export function getWeekOverviewMainServiceSpans(
 
   const spans = services
     .map((service, index) => {
+      // Always include index — same catalog id can appear twice on one booking.
       const start = service.startTime?.trim() || event.start;
       const end = service.endTime?.trim() || event.end;
       if (
@@ -314,15 +338,22 @@ export function getWeekOverviewMainServiceSpans(
       }
       const name = String(service.name ?? "").trim() || event.title;
       return {
-        key: `${event.id}::week-svc-${service.id || index}`,
+        key: `${event.id}::week-svc-${index}-${service.id || "svc"}`,
         start,
         end,
         name,
+        serviceId: String(service.id || "").trim() || undefined,
+        guestId: service.guestId ?? null,
       };
     })
     .filter((span): span is NonNullable<typeof span> => Boolean(span));
 
-  if (spans.length) return spans;
+  if (spans.length) {
+    // Chronological order so callers can treat index 0 as the chain anchor.
+    return spans.sort(
+      (a, b) => minutesSinceMidnight(a.start) - minutesSinceMidnight(b.start),
+    );
+  }
 
   return [
     {
@@ -416,6 +447,8 @@ export function layoutCalendarCardTimeline(
         name: line.name,
         start: line.start,
         end: line.end,
+        serviceId: line.id,
+        guestId: line.guestId ?? null,
         teamMemberId: line.teamMemberId || undefined,
         teamMemberName: line.teamMemberName,
         topRatio: Math.max(0, Math.min(1, topRatio)),

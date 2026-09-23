@@ -143,6 +143,7 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsBag = Pick<
   | "scheduleChangeTags"
   | "selectedClient"
   | "selectedProducts"
+  | "selectedServices"
   | "selectedSlot"
   | "setActionFeedback"
   | "setActiveDateIso"

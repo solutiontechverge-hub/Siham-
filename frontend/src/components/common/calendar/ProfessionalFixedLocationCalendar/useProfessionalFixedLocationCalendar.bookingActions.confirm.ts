@@ -3,6 +3,8 @@ import { getApiErrorMessage } from "../../../../lib/api-error";
 import type { CalendarEvent } from "../../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { BookingNotificationEvent } from "../../../../store/services/businessApi";
 import type { UseProfessionalFixedLocationCalendarBookingActionsArgs } from "./useProfessionalFixedLocationCalendar.bookingActions";
+import { listNoShowParticipantOptions } from "./useProfessionalFixedLocationCalendar.noShowParticipants";
+import { serializeCalendarEntryNotes } from "../bookingEventDetails";
 
 type PersistEventStatus = (
   eventId: string,
@@ -26,6 +28,7 @@ export function useProfessionalFixedLocationCalendarBookingActionsConfirm(
   },
 ) {
   const {
+    events,
     editingEventId,
     pendingBookingAction,
     persistEventStatus,
@@ -92,21 +95,48 @@ export function useProfessionalFixedLocationCalendarBookingActionsConfirm(
     async (selectedIds: string[]) => {
       setNoShowModalOpen(false);
       if (!editingEventId) return;
-      // Booking-level status only: require at least one person selected.
-      // Partial selection still marks the booking no-show (client booked, did not attend).
       if (!selectedIds.length) return;
+      const current = events.find((event) => event.id === editingEventId);
+      const selectable = listNoShowParticipantOptions(current);
+      const selected = new Set(selectedIds.map((id) => String(id)));
+      // All selectable participants → booking-level No Show. Partial → keep
+      // shell status; store ids so divergent blocks can show their own badge.
+      const markBookingNoShow =
+        selectable.length > 0 &&
+        selectable.every((person) => selected.has(person.id));
+      const nextStatus: CalendarEvent["status"] = markBookingNoShow
+        ? "No Show"
+        : (current?.status ?? "Confirmed");
+      const nextDetails = {
+        ...current?.details,
+        noShowParticipantIds: selectedIds,
+      };
+      // ponytail: notes meta carries ids across reload when status API accepts notes.
+      const nextNotes = serializeCalendarEntryNotes(
+        current?.details?.internalNote ?? "",
+        nextDetails,
+      );
       try {
-        await persistEventStatus(editingEventId, "No Show");
+        await persistEventStatus(editingEventId, nextStatus, {
+          ...(nextNotes ? { notes: nextNotes } : {}),
+        });
         setEvents((prev) =>
           prev.map((event) =>
             event.id === editingEventId
-              ? { ...event, status: "No Show" }
+              ? {
+                  ...event,
+                  status: nextStatus,
+                  details: nextDetails,
+                  ...(nextNotes ? { notes: nextNotes } : {}),
+                }
               : event,
           ),
         );
         showSnackbar({
           severity: "success",
-          message: "Booking marked as no show.",
+          message: markBookingNoShow
+            ? "Booking marked as no show."
+            : "Selected participants marked as no show.",
         });
       } catch (error) {
         showSnackbar({
@@ -118,7 +148,14 @@ export function useProfessionalFixedLocationCalendarBookingActionsConfirm(
         });
       }
     },
-    [editingEventId, persistEventStatus, showSnackbar, setNoShowModalOpen, setEvents],
+    [
+      editingEventId,
+      events,
+      persistEventStatus,
+      showSnackbar,
+      setNoShowModalOpen,
+      setEvents,
+    ],
   );
 
   return {

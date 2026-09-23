@@ -1,6 +1,12 @@
 import * as React from "react";
 import { getApiErrorMessage } from "../../../../lib/api-error";
-import { parseApiCalendarEventId } from "../bookingEventDetails";
+import {
+  parseApiCalendarEventId,
+  parseStoredEbrFromNotes,
+  parseStoredErFromNotes,
+  serializeCalendarEntryNotes,
+} from "../bookingEventDetails";
+import { buildEditRequestAckDetails } from "../bookingAcknowledgment";
 import { syncEditRequestFromBookingApi } from "../../client-booking/syncEditRequestFromApi";
 import { extractBookingId } from "../calendar.utils";
 import type { UseProfessionalFixedLocationCalendarBookingPersistArgs } from "./useProfessionalFixedLocationCalendar.bookingPersist";
@@ -12,10 +18,31 @@ export function useProfessionalFixedLocationCalendarBookingPersistEr(
     editingEventId,
     viewingBookingEvent,
     manageBookingEditRequest,
+    onUpdateBookingStatus,
     restoreIncomingActions,
     showSnackbar,
     setEvents,
   } = args;
+
+  const persistErAckNotes = React.useCallback(
+    async (
+      bookingId: string,
+      ackDetails: ReturnType<typeof buildEditRequestAckDetails>,
+    ) => {
+      if (!viewingBookingEvent || !onUpdateBookingStatus) return null;
+      const nextNotes = serializeCalendarEntryNotes(
+        ackDetails.internalNote ?? "",
+        ackDetails,
+        parseStoredEbrFromNotes(viewingBookingEvent.notes),
+        parseStoredErFromNotes(viewingBookingEvent.notes),
+      );
+      await onUpdateBookingStatus(bookingId, "confirmed", {
+        notes: nextNotes,
+      });
+      return nextNotes;
+    },
+    [onUpdateBookingStatus, viewingBookingEvent],
+  );
 
   const handleAcceptConfirmedEr = React.useCallback(async () => {
     if (!editingEventId || !viewingBookingEvent) return;
@@ -28,13 +55,25 @@ export function useProfessionalFixedLocationCalendarBookingPersistEr(
         id: parsed.id,
         action: "accept",
       }).unwrap();
-      syncEditRequestFromBookingApi(bookingRef, result.data?.edit_request);
+      const er = result.data?.edit_request;
+      syncEditRequestFromBookingApi(bookingRef, er);
+      const initiatedBy =
+        er?.initiated_by === "professional" ? "professional" : "client";
+      const ackDetails = buildEditRequestAckDetails({
+        initiatedBy,
+        editRequestStatus: "approved",
+        base: viewingBookingEvent.details,
+      });
+      const nextNotes = await persistErAckNotes(parsed.id, ackDetails);
       setEvents((prev) =>
         prev.map((event) =>
           event.id === editingEventId
             ? {
                 ...event,
-                bookingScenario: undefined,
+                status: "Confirmed" as const,
+                bookingScenario: "ER",
+                ...(nextNotes != null ? { notes: nextNotes } : {}),
+                details: ackDetails,
               }
             : event,
         ),
@@ -50,6 +89,7 @@ export function useProfessionalFixedLocationCalendarBookingPersistEr(
   }, [
     editingEventId,
     manageBookingEditRequest,
+    persistErAckNotes,
     restoreIncomingActions,
     showSnackbar,
     viewingBookingEvent,
@@ -68,21 +108,28 @@ export function useProfessionalFixedLocationCalendarBookingPersistEr(
       }).unwrap();
       const er = result.data?.edit_request;
       syncEditRequestFromBookingApi(bookingRef, er);
+      const initiatedBy =
+        er?.initiated_by === "professional" ? "professional" : "client";
+      const ackDetails = buildEditRequestAckDetails({
+        initiatedBy,
+        editRequestStatus: "rejected",
+        base: {
+          ...(viewingBookingEvent.details ?? {}),
+          editRequestNote: er?.note ?? viewingBookingEvent.details?.editRequestNote,
+          editRequestInitiatedBy:
+            er?.initiated_by ?? viewingBookingEvent.details?.editRequestInitiatedBy,
+        },
+      });
+      const nextNotes = await persistErAckNotes(parsed.id, ackDetails);
       setEvents((prev) =>
         prev.map((event) =>
           event.id === editingEventId
             ? {
                 ...event,
                 status: "Confirmed" as const,
-                bookingScenario: undefined,
-                details: {
-                  ...(event.details ?? {}),
-                  editRequestStatus:
-                    er?.status === "rejected" ? ("rejected" as const) : undefined,
-                  editRequestNote: er?.note ?? event.details?.editRequestNote,
-                  editRequestInitiatedBy:
-                    er?.initiated_by ?? event.details?.editRequestInitiatedBy,
-                },
+                bookingScenario: "ER",
+                ...(nextNotes != null ? { notes: nextNotes } : {}),
+                details: ackDetails,
               }
             : event,
         ),
@@ -98,6 +145,7 @@ export function useProfessionalFixedLocationCalendarBookingPersistEr(
   }, [
     editingEventId,
     manageBookingEditRequest,
+    persistErAckNotes,
     restoreIncomingActions,
     showSnackbar,
     viewingBookingEvent,

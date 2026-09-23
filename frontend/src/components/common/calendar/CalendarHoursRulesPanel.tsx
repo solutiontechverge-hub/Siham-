@@ -18,9 +18,10 @@ import {
 } from "../../../theme/mollureHierarchy";
 import { BodyText, SubHeading } from "../../ui/typography";
 import type { CalendarBookingLocation } from "../../../app/professionals/fixed-location/calendar/calendar.data";
-import type {
-  BookingRules,
-  ServiceOrderSettings,
+import {
+  DL_INTERVAL_MIN_MINUTES,
+  type BookingRules,
+  type ServiceOrderSettings,
 } from "./calendar-settings.types";
 import type { CalendarDesignDraft } from "./CalendarDesignModal";
 import { appearanceModeLabel } from "../../../lib/calendarDesign.utils";
@@ -93,7 +94,6 @@ export default function CalendarHoursRulesPanel({
     showDl,
     appearanceExpanded,
     setAppearanceExpanded,
-    bookingRulesEditing,
     serviceOrderEditing,
     draggingCategory,
     setDraggingCategory,
@@ -111,7 +111,6 @@ export default function CalendarHoursRulesPanel({
     appearanceConfigured,
     inactiveScope,
     inactiveColorCount,
-    handleBookingRulesEdit,
     handleServiceOrderEdit,
     handleSaveBookingRules,
     handleSaveServiceOrder,
@@ -179,18 +178,10 @@ export default function CalendarHoursRulesPanel({
         <SettingsSection
           title={copy.bookingRules}
           action={
-            bookingRulesEditing ? (
-              <SectionSaveButton
-                disabled={isSaving}
-                onClick={() => void handleSaveBookingRules()}
-              />
-            ) : (
-              <EditSectionButton
-                active={false}
-                disabled={isSaving}
-                onClick={handleBookingRulesEdit}
-              />
-            )
+            <SectionSaveButton
+              disabled={isSaving}
+              onClick={() => void handleSaveBookingRules()}
+            />
           }
         >
           <Stack spacing={1.25}>
@@ -213,7 +204,7 @@ export default function CalendarHoursRulesPanel({
                     })
                   }
                   helperText={copy.flIntervalHelper}
-                  disabled={!bookingRulesEditing || isSaving}
+                  disabled={isSaving}
                   hoursUnit={copy.hoursUnit}
                   minutesUnit={copy.minutesUnit}
                 />
@@ -238,8 +229,16 @@ export default function CalendarHoursRulesPanel({
                         dlIntervalMinutes: value,
                       })
                     }
+                    onDurationChange={(nextHours, nextMinutes) =>
+                      onBookingRulesChange({
+                        ...bookingRules,
+                        dlIntervalHours: nextHours,
+                        dlIntervalMinutes: nextMinutes,
+                      })
+                    }
                     helperText={copy.dlIntervalHelper}
-                    disabled={!bookingRulesEditing || isSaving}
+                    disabled={isSaving}
+                    minTotalMinutes={DL_INTERVAL_MIN_MINUTES}
                     hoursUnit={copy.hoursUnit}
                     minutesUnit={copy.minutesUnit}
                   />
@@ -260,7 +259,7 @@ export default function CalendarHoursRulesPanel({
                       })
                     }
                     helperText={copy.dlMinTimeslotHelper}
-                    disabled={!bookingRulesEditing || isSaving}
+                    disabled={isSaving}
                     hoursUnit={copy.hoursUnit}
                     minutesUnit={copy.minutesUnit}
                   />
