@@ -161,7 +161,9 @@ export function mergeClientBookingDraftRichness(
   const fallbackServices = liveFallback.services ?? [];
   let services = primaryServices;
 
-  if (fallbackServices.length > 0) {
+  // API/primary is source of truth for which lines exist. Session only enriches
+  // metadata — never re-append removed/cancelled services from a stale draft.
+  if (fallbackServices.length > 0 && primaryServices.length > 0) {
     const byId = new Map(fallbackServices.map((s) => [s.id, s]));
     const byName = new Map(fallbackServices.map((s) => [s.name, s]));
     services = primaryServices.map((service) => {
@@ -173,27 +175,6 @@ export function mergeClientBookingDraftRichness(
         teamMemberId: service.teamMemberId ?? match?.teamMemberId ?? null,
       };
     });
-
-    const lineKey = (row: { id: string; guestId?: string | null }) =>
-      `${row.id}::${row.guestId ?? ""}`;
-    const primaryKeys = new Set(services.map(lineKey));
-    for (const fb of fallbackServices) {
-      const key = lineKey(fb);
-      if (primaryKeys.has(key)) continue;
-      services = [
-        ...services,
-        {
-          id: fb.id,
-          name: fb.name,
-          durationMins: fb.durationMins,
-          price: fb.price,
-          guestId: fb.guestId ?? null,
-          teamMemberId: fb.teamMemberId ?? null,
-          isAddOn: fb.isAddOn,
-        },
-      ];
-      primaryKeys.add(key);
-    }
   }
 
   services = dedupeServicesByOwner(

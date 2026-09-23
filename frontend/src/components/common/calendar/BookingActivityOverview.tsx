@@ -7,7 +7,11 @@ import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import { Box, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { mollureSectionTitleSx, mollureBodySx, mollureBodyMutedSx } from "../../../theme/mollureHierarchy";
-import type { ActivityComparison, ActivityComparisonRow } from "./buildActivityComparison";
+import {
+  groupActivityComparisonSections,
+  type ActivityComparison,
+  type ActivityComparisonRow,
+} from "./buildActivityComparison";
 import type { BookingActivityItem } from "./bookingActivity.types";
 
 type BookingActivityOverviewProps = {
@@ -519,6 +523,7 @@ function ComparisonRowView({
 
 function ComparisonPanel({ comparison }: { comparison: ActivityComparison }) {
   const m = useTheme().palette.mollure;
+  const grouped = groupActivityComparisonSections(comparison.rows);
 
   return (
     <Box
@@ -555,14 +560,32 @@ function ComparisonPanel({ comparison }: { comparison: ActivityComparison }) {
         </Box>
         {comparison.proposedCaption}
       </Typography>
-      <Stack spacing={1.15}>
-        {comparison.rows.map((row) => (
-          <ComparisonRowView
-            key={row.id}
-            row={row}
-            baselineCaption={comparison.baselineCaption}
-            proposedCaption={comparison.proposedCaption}
-          />
+      <Stack spacing={1.5}>
+        {grouped.map((group) => (
+          <Box key={group.key}>
+            <Typography
+              sx={{
+                fontSize: 11,
+                fontWeight: 900,
+                letterSpacing: 0.2,
+                textTransform: "uppercase",
+                color: alpha(m.navy, 0.55),
+                mb: 0.85,
+              }}
+            >
+              {group.label}
+            </Typography>
+            <Stack spacing={1.15}>
+              {group.rows.map((row) => (
+                <ComparisonRowView
+                  key={row.id}
+                  row={row}
+                  baselineCaption={comparison.baselineCaption}
+                  proposedCaption={comparison.proposedCaption}
+                />
+              ))}
+            </Stack>
+          </Box>
         ))}
       </Stack>
     </Box>

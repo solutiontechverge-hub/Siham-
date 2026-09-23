@@ -344,4 +344,39 @@ const imagesOnlyMedia = mapApiBookingToClientRecord({
 assert.equal(imagesOnlyMedia.draft?.projectDetails?.description, "sadfas");
 assert.equal(imagesOnlyMedia.draft?.projectDetails?.uploads?.length, 2);
 
+// Cancelled ids must not seed the live draft (Date & Time / Service Summary).
+const withCancelled = mapApiBookingToClientRecord(
+  bookingWithNotes({
+    services: [
+      ...sharedService(null),
+      ...sharedService("guest-1"),
+    ],
+    guests: [{ id: "guest-1", name: "Guest umer", services: sharedService("guest-1") }],
+    originalServices: [
+      ...sharedService(null),
+      ...sharedService("guest-1"),
+    ],
+    cancelledServiceIds: ["svc-lash"],
+    clientSnapshot: {
+      people: [
+        { id: "p-requester", name: "alizaCompany", isRequester: true },
+        { id: "guest-1", name: "Guest umer", participantType: "guest" },
+      ],
+      services: [
+        ...sharedService(null),
+        ...sharedService("guest-1"),
+      ],
+    },
+  }),
+);
+assert.equal(
+  (withCancelled.draft?.services ?? []).some((row) => row.id === "svc-lash"),
+  false,
+);
+assert.equal(
+  (withCancelled.draft?.services ?? []).filter((row) => row.id === "svc-umar")
+    .length,
+  2,
+);
+
 console.log("clientBookingApi.mapper.test.ts: all assertions passed");

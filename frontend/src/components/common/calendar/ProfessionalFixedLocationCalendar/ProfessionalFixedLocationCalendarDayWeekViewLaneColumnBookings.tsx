@@ -221,7 +221,12 @@ export default function ProfessionalFixedLocationCalendarDayWeekViewLaneColumnBo
         if (cluster.length > 1) {
           return (
             <CalendarBookingTicketStack
-              key={cluster.map((event) => event.id).join("-")}
+              key={cluster
+                .map(
+                  (event) =>
+                    `${event.id}::${event.resourceId}::${event.start}`,
+                )
+                .join("|")}
               events={cluster}
               top={top}
               rowPx={rowPx}
@@ -242,7 +247,7 @@ export default function ProfessionalFixedLocationCalendarDayWeekViewLaneColumnBo
         const ev = cluster[0];
         return (
           <CalendarBookingCard
-            key={ev.id}
+            key={`${ev.id}::${ev.resourceId}::${ev.start}`}
             event={ev}
             top={top}
             height={height}

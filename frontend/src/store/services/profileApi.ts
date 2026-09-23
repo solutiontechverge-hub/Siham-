@@ -176,7 +176,7 @@ export const profileApi = baseApi.injectEndpoints({
 
         return { data };
       },
-      invalidatesTags: ["Profile"],
+      invalidatesTags: ["Profile", "BusinessSetup", "BusinessSetupsListing"],
     }),
   }),
   overrideExisting: false,

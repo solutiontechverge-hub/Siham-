@@ -640,6 +640,18 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
   const desiredLocation = desiredLocationFromColumns ?? desiredLocationFromDetails;
 
   const snapshotServices = clientSnapshot?.services ?? [];
+  const cancelledServiceIdSet = new Set([
+    ...(notesDetails?.cancelledServiceIds ?? []),
+    ...(!bookingCancelled && ebr && ebr.status !== "rejected"
+      ? (ebr.cancelledServiceIds ?? [])
+      : []),
+  ]);
+  const cancelledProductIdSet = new Set([
+    ...(notesDetails?.cancelledProductIds ?? []),
+    ...(!bookingCancelled && ebr && ebr.status !== "rejected"
+      ? (ebr.cancelledProductIds ?? [])
+      : []),
+  ]);
   const extraParticipantIds = extraBookingParticipantIds([
     ...(clientSnapshot?.people ?? []),
     ...(notesDetails?.guests ?? []),
@@ -686,6 +698,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
       discountAmount?: number;
       discount?: { type: "fixed" | "percentage"; amount: number } | null;
     }) => {
+      if (cancelledServiceIdSet.has(row.id)) return;
       merged.push({
         id: row.id,
         name: row.name,
@@ -771,17 +784,19 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
 
   const draftProducts: ClientBookingDraft["products"] = (() => {
     if (activeEbr?.suggestedProducts?.length) {
-      return activeEbr.suggestedProducts.map((product) => ({
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        quantity: product.quantity || 1,
-        unitPrice: product.unitPrice ?? product.price,
-        originalPrice: product.originalPrice,
-        discountType: product.discount?.type,
-        discountAmount: product.discount?.amount,
-        guestId: product.guestId ?? null,
-      }));
+      return activeEbr.suggestedProducts
+        .filter((product) => !cancelledProductIdSet.has(product.id))
+        .map((product) => ({
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          quantity: product.quantity || 1,
+          unitPrice: product.unitPrice ?? product.price,
+          originalPrice: product.originalPrice,
+          discountType: product.discount?.type,
+          discountAmount: product.discount?.amount,
+          guestId: product.guestId ?? null,
+        }));
     }
     const noteProducts = notesDetails?.products ?? [];
     const guestProducts = (notesDetails?.guests ?? []).flatMap((guest) =>
@@ -812,17 +827,19 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
       mergedProducts.push(product);
     }
     if (mergedProducts.length) {
-      return mergedProducts.map((product) => ({
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        quantity: product.quantity || 1,
-        unitPrice: product.unitPrice ?? product.price,
-        originalPrice: product.originalPrice,
-        discountType: product.discount?.type,
-        discountAmount: product.discount?.amount,
-        guestId: product.guestId ?? null,
-      }));
+      return mergedProducts
+        .filter((product) => !cancelledProductIdSet.has(product.id))
+        .map((product) => ({
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          quantity: product.quantity || 1,
+          unitPrice: product.unitPrice ?? product.price,
+          originalPrice: product.originalPrice,
+          discountType: product.discount?.type,
+          discountAmount: product.discount?.amount,
+          guestId: product.guestId ?? null,
+        }));
     }
     return [];
   })();

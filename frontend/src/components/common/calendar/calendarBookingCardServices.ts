@@ -326,6 +326,7 @@ export function getWeekOverviewMainServiceSpans(
 
   const spans = services
     .map((service, index) => {
+      // Always include index — same catalog id can appear twice on one booking.
       const start = service.startTime?.trim() || event.start;
       const end = service.endTime?.trim() || event.end;
       if (
@@ -337,7 +338,7 @@ export function getWeekOverviewMainServiceSpans(
       }
       const name = String(service.name ?? "").trim() || event.title;
       return {
-        key: `${event.id}::week-svc-${service.id || index}`,
+        key: `${event.id}::week-svc-${index}-${service.id || "svc"}`,
         start,
         end,
         name,

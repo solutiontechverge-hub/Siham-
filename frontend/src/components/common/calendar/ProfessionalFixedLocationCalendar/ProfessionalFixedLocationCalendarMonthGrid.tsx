@@ -218,7 +218,7 @@ export default function ProfessionalFixedLocationCalendarMonthGrid({
 
                 return (
                   <Box
-                    key={event.id}
+                    key={`${event.id}::${event.resourceId}::${event.start}`}
                     sx={{
                       minWidth: 0,
                       borderRadius: "4px",

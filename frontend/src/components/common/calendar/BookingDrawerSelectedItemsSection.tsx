@@ -218,7 +218,7 @@ export default function BookingDrawerSelectedItemsSection({
 
             return (
               <Box
-                key={`service-${service.id}`}
+                key={`service-${service.id}-${service.guestId ?? ""}-${service.startTime ?? ""}`}
                 draggable={canReorderServices}
                 onDragStart={(event) => {
                   if (!canReorderServices) return;
@@ -426,12 +426,15 @@ export default function BookingDrawerSelectedItemsSection({
           >
             Product
           </BodyText>
-          {products.map((product) => {
+          {products.map((product, productIndex) => {
             const editTags = normalizeBookingEditTags(
               resolveProductEditTag?.(product.id),
             );
             return (
-            <Box key={`product-${product.id}`} sx={cardSx}>
+            <Box
+              key={`product-${product.id}-${productIndex}`}
+              sx={cardSx}
+            >
               <Stack
                 direction="row"
                 justifyContent="space-between"
@@ -509,12 +512,12 @@ export default function BookingDrawerSelectedItemsSection({
           >
             Unique item
           </BodyText>
-          {uniqueItems.map((item) => {
+          {uniqueItems.map((item, itemIndex) => {
             const editTags = normalizeBookingEditTags(
               resolveProductEditTag?.(item.id),
             );
             return (
-            <Box key={`unique-${item.id}`} sx={cardSx}>
+            <Box key={`unique-${item.id}-${itemIndex}`} sx={cardSx}>
               <Stack
                 direction="row"
                 justifyContent="space-between"

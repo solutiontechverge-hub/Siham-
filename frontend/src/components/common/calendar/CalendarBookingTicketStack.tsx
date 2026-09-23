@@ -196,7 +196,9 @@ export default function CalendarBookingTicketStack({
           }}
         >
           {events.map((event, index) => (
-            <React.Fragment key={event.id}>
+            <React.Fragment
+              key={`${event.id}::${event.resourceId}::${event.start}::${index}`}
+            >
               <Box
                 sx={{
                   flex: isDense

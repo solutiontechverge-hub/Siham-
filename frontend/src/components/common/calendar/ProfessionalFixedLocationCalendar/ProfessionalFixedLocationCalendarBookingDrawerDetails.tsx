@@ -53,7 +53,6 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsBag = Pick<
   | "canUseBookingProject"
   | "cancelledServicesForDrawer"
   | "changeBookingServiceStaff"
-  | "confirmDrawerPrepayment"
   | "data"
   | "defaultDateIso"
   | "deleteProjectUpload"

@@ -22,7 +22,10 @@ import type {
   SalesSubCardData,
 } from "./salesOverview.types";
 import { buildSplitPaymentAmounts, parseSplitBillState, resolveSalesPayerShares } from "./salesSplitBill";
-import { formatFinanceDueDate } from "../booking-finance/formatBookingFinance";
+import {
+  formatFinanceDueDate,
+  prepaidBreakdownLabel,
+} from "../booking-finance/formatBookingFinance";
 import { roundBookingMoney as roundMoney } from "../../../data/bookingLinePricing";
 import { computeBookingPrice } from "./bookingTotal";
 import {
@@ -55,10 +58,16 @@ function buildLinesFromEvent(event: CalendarEvent): { lines: SalesLineItem[]; su
 
   const snapshotServices = details?.clientSnapshot?.services;
   if (snapshotServices?.length) {
-    for (const service of snapshotServices) {
-      lines.push({ id: service.id, label: service.name, amount: roundMoney(service.price) });
+    snapshotServices.forEach((service, index) => {
+      // Same catalog service can appear for main + guest — keep line keys unique.
+      const lineId = `${service.id}::${String(service.guestId ?? "")}::${index}`;
+      lines.push({
+        id: lineId,
+        label: service.name,
+        amount: roundMoney(service.price),
+      });
       subtotal += service.price;
-    }
+    });
   } else {
     for (const service of details?.services ?? []) {
       lines.push({ id: service.id, label: service.name, amount: roundMoney(service.price) });
@@ -906,7 +915,6 @@ export function buildCardsForEvent(input: {
   }
 
   if (isAccepted && showPrepayment && prepaidAmount > 0) {
-    const percentLabel = prepaymentPercent > 0 ? `(${prepaymentPercent}%)` : "";
     const prepayId = resolveLiveCardId(bookingId, `${bookingId}-prepayment`);
     cards.push(
       applyMeta(
@@ -925,7 +933,7 @@ export function buildCardsForEvent(input: {
           lines: effectiveLines.filter((line) => line.amount >= 0),
           total,
           totalLabel: "Total Amount",
-          highlightLabel: `Prepayment${percentLabel ? ` ${percentLabel}` : ""}`,
+          highlightLabel: prepaidBreakdownLabel(prepaymentPercent, isPrepayPaid),
           highlightAmount: prepaidAmount,
           methodDateLine: isPrepayPaid ? formatMethodDateTime(method, occurredAt) : method,
           dueDate: isPrepayPaid ? null : invoiceDueFromNotes || deriveDueDate(occurredAt, ctx.paymentTerms),

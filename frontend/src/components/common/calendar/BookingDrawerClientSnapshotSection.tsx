@@ -144,8 +144,11 @@ export default function BookingDrawerClientSnapshotSection({
                 Media
               </Typography>
               <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                {project!.uploads.map((upload) => (
-                  <ProjectUploadThumb key={upload.id} upload={upload} />
+                {project!.uploads.map((upload, uploadIndex) => (
+                  <ProjectUploadThumb
+                    key={`${upload.id}::${uploadIndex}`}
+                    upload={upload}
+                  />
                 ))}
               </Stack>
             </Box>
@@ -196,7 +199,7 @@ export default function BookingDrawerClientSnapshotSection({
 
         return (
           <Box
-            key={person.id}
+            key={`${person.id}::${person.participantType ?? "guest"}`}
             sx={{
               borderRadius: "10px",
               border: `1px solid ${alpha(m.navy, 0.1)}`,
@@ -274,7 +277,7 @@ export default function BookingDrawerClientSnapshotSection({
               </Box>
             ) : null}
             <Stack spacing={0.75}>
-              {personServices.map((service) => {
+              {personServices.map((service, serviceIndex) => {
                 const staffFull =
                   (service.teamMemberId
                     ? teamNameById.get(String(service.teamMemberId))
@@ -282,7 +285,7 @@ export default function BookingDrawerClientSnapshotSection({
                 const staff = staffFull?.split(/\s+/)[0];
                 return (
                   <Box
-                    key={service.id}
+                    key={`${service.id}::${person.id}::${serviceIndex}`}
                     sx={{
                       borderRadius: "10px",
                       border: `1px solid ${alpha(m.navy, 0.1)}`,

@@ -51,7 +51,6 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsNotesTotalsBag 
   | "bookingTotalDiscount"
   | "bookingTotalForSave"
   | "canMutateDrawerContents"
-  | "confirmDrawerPrepayment"
   | "drawerPriceDisplay"
   | "handleBookingActionSelect"
   | "incomingClientNote"
@@ -97,7 +96,6 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsNot
     bookingTotalDiscount,
     bookingTotalForSave,
     canMutateDrawerContents,
-    confirmDrawerPrepayment,
     drawerPriceDisplay,
     handleBookingActionSelect,
     incomingClientNote,
@@ -315,35 +313,8 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsNot
                 prepaymentAmount={displayPrepaidAmount}
                 remainingAmount={displayRemaining}
                 prepaidAction={
-                  showPrepayBreakdown && !isDrawerPrepaymentPaid ? (
-                    <BodyText
-                      component="button"
-                      type="button"
-                      // ponytail: testing Pay Now — ceiling: local paid override only; restore real checkout when Stripe is wired.
-                      onClick={confirmDrawerPrepayment}
-                      sx={mollureLabelSx(m.navy, {
-                        border: "none",
-                        outline: "none",
-                        boxShadow: "none",
-                        bgcolor: "transparent",
-                        p: 0,
-                        m: 0,
-                        cursor: "pointer",
-                        color: m.teal,
-                        fontFamily: "inherit",
-                        appearance: "none",
-                        WebkitAppearance: "none",
-                        "&:hover": { color: m.tealDark },
-                        "&:focus": { outline: "none" },
-                        "&:focus-visible": {
-                          outline: `2px solid ${alpha(m.teal, 0.45)}`,
-                          outlineOffset: 2,
-                        },
-                      })}
-                    >
-                      Pay Now
-                    </BodyText>
-                  ) : isDrawerPrepaymentPaid ? (
+                  // Professionals never pay here — only clients see "Pay Now".
+                  isDrawerPrepaymentPaid ? (
                     <BodyText
                       sx={{
                         fontWeight: 800,

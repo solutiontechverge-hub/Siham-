@@ -11,6 +11,8 @@ import {
 import { clearPublicProfileBookingSelection } from "../../../data/publicProfileBookingSelection";
 import { getApiErrorMessage } from "../../../lib/api-error";
 import { useSnackbar } from "../AppSnackbar";
+import { parseCalendarEntryNotes } from "../calendar/bookingEventDetails";
+import { summarizeClientBookingPrice } from "../calendar/bookingTotal";
 import type { ClientBookingDetailsPendingEbrSuggestSend } from "./clientBookingDetails.helpers";
 import {
   persistClientEbrSuggestion,
@@ -27,6 +29,56 @@ type EditRequestApi = {
   professionalNote?: string;
   suggestedProducts?: BookingEditSuggestedProduct[] | null;
 };
+
+/** Drop cancelled lines so Date & Time / EBR editors seed from current booking state. */
+function draftWithoutCancelledLines(
+  record: ClientBookingRecord,
+): ClientBookingRecord {
+  const draft = record.draft;
+  if (!draft) return record;
+  const notes = parseCalendarEntryNotes(record.notes);
+  const incoming = record.incomingEditRequest;
+  const cancelledServices = new Set([
+    ...(notes?.cancelledServiceIds ?? []),
+    ...(incoming?.cancelledServiceIds ?? []),
+  ]);
+  const cancelledProducts = new Set([
+    ...(notes?.cancelledProductIds ?? []),
+    ...(incoming?.cancelledProductIds ?? []),
+  ]);
+  if (!cancelledServices.size && !cancelledProducts.size) return record;
+
+  const services = (draft.services ?? []).filter(
+    (service) => !cancelledServices.has(service.id),
+  );
+  const products = (draft.products ?? []).filter(
+    (product) => !cancelledProducts.has(product.id),
+  );
+  if (
+    services.length === (draft.services ?? []).length &&
+    products.length === (draft.products ?? []).length
+  ) {
+    return record;
+  }
+
+  const priced = summarizeClientBookingPrice({
+    services,
+    products,
+    people: draft.people,
+  });
+  return {
+    ...record,
+    draft: {
+      ...draft,
+      services,
+      products,
+      total:
+        priced.breakdown.bookingTotal > 0
+          ? priced.breakdown.bookingTotal
+          : draft.total,
+    },
+  };
+}
 
 export function useClientBookingEbrSuggestFlow(input: {
   bookingRef: string;
@@ -66,6 +118,29 @@ export function useClientBookingEbrSuggestFlow(input: {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
 
+  const seedEditorSession = React.useCallback(
+    (booking: ClientBookingRecord) => {
+      // Prefer displayDraft (pending EBR overlay) then strip cancelled for realtime seed.
+      const withDisplay =
+        displayDraft != null
+          ? { ...booking, draft: displayDraft }
+          : booking;
+      setActiveBookingSession(
+        enrichClientBookingRecord(draftWithoutCancelledLines(withDisplay)),
+      );
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(
+          "mollure:ebr_baseline_schedule",
+          JSON.stringify({
+            dateISO: withDisplay.draft?.selectedDateISO ?? "",
+            time: withDisplay.draft?.selectedTime ?? "",
+          }),
+        );
+      }
+    },
+    [displayDraft],
+  );
+
   const runPersistClientEbrSuggestion = React.useCallback(
     async (note: string, editedServiceIdsOverride?: string[]) => {
       await persistClientEbrSuggestion({
@@ -104,21 +179,12 @@ export function useClientBookingEbrSuggestFlow(input: {
       }
       setEbrSuggestDrawerOpen(false);
       if (activeBooking) {
-        setActiveBookingSession(enrichClientBookingRecord(activeBooking));
-        if (typeof window !== "undefined") {
-          window.sessionStorage.setItem(
-            "mollure:ebr_baseline_schedule",
-            JSON.stringify({
-              dateISO: activeBooking.draft?.selectedDateISO ?? "",
-              time: activeBooking.draft?.selectedTime ?? "",
-            }),
-          );
-        }
+        seedEditorSession(activeBooking);
       }
       clearPublicProfileBookingSelection();
       router.push("/clients/booking?mode=create&ebrSuggest=1&ebrFocus=services");
     },
-    [activeBooking, router, setEbrSuggestDrawerOpen],
+    [activeBooking, router, seedEditorSession, setEbrSuggestDrawerOpen],
   );
 
   const handleEbrSuggestSend = React.useCallback(
@@ -186,17 +252,7 @@ export function useClientBookingEbrSuggestFlow(input: {
     // Client confirmed edit: schedule + Desired Location only (not services/project).
     (focus: "datetime" | "location") => {
       if (activeBooking) {
-        // Enrich from local draft snapshot so Desired Model/Planning/Project data survives reopen.
-        setActiveBookingSession(enrichClientBookingRecord(activeBooking));
-        if (typeof window !== "undefined") {
-          window.sessionStorage.setItem(
-            "mollure:ebr_baseline_schedule",
-            JSON.stringify({
-              dateISO: activeBooking.draft?.selectedDateISO ?? "",
-              time: activeBooking.draft?.selectedTime ?? "",
-            }),
-          );
-        }
+        seedEditorSession(activeBooking);
       }
       // Prevent leftover public-profile catalog from wiping the booking draft on Edit.
       clearPublicProfileBookingSelection();
@@ -204,7 +260,7 @@ export function useClientBookingEbrSuggestFlow(input: {
         `/clients/booking?mode=create&ebrSuggest=1&ebrFocus=${focus}`,
       );
     },
-    [activeBooking, router],
+    [activeBooking, router, seedEditorSession],
   );
 
   return {

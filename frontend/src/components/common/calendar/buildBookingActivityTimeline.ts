@@ -163,7 +163,8 @@ function asGuestItems(
   return (guests ?? []).map((guest) => ({
     id: String(guest.id ?? "").trim() || (guest.name ?? "").trim(),
     name: (guest.name ?? "").trim(),
-    participantType: guest.participantType,
+    // Guest-list rows are extras even when type is omitted.
+    participantType: guest.participantType ?? "guest",
     services: (guest.services ?? []).map((service) => ({
       id: service.id,
       name: service.name,
@@ -174,6 +175,21 @@ function asGuestItems(
       guestId: service.guestId ?? guest.id ?? null,
     })),
     products: [],
+  }));
+}
+
+/** Guest-list people → comparison sections (default type guest). */
+function asGuestParticipants(
+  guests?: readonly ActivityGuestLike[] | null,
+): Array<{
+  id?: string;
+  name?: string | null;
+  participantType: NonNullable<CalendarBookingGuestItem["participantType"]>;
+}> {
+  return (guests ?? []).map((guest) => ({
+    id: String(guest.id ?? "").trim() || (guest.name ?? "").trim(),
+    name: guest.name,
+    participantType: guest.participantType ?? "guest",
   }));
 }
 
@@ -272,6 +288,7 @@ function resolveComparisonForBooking(input: {
   currentStart?: string | null;
   bookingDate?: string | null;
   bookingStart?: string | null;
+  clientName?: string | null;
 }): ActivityComparison | null {
   const {
     mode,
@@ -283,6 +300,7 @@ function resolveComparisonForBooking(input: {
     currentStart,
     bookingDate,
     bookingStart,
+    clientName,
   } = input;
 
   const details = currentDetails ?? null;
@@ -416,6 +434,23 @@ function resolveComparisonForBooking(input: {
     originalDesiredLocation: snapshot?.desiredLocation,
     newDesiredLocation:
       details?.desiredLocation ?? notesDetails?.desiredLocation,
+    clientName:
+      clientName ??
+      livePeople?.find((p) => p.isRequester)?.name ??
+      snapshot?.people?.find((p) => p.isRequester)?.name ??
+      details?.clientSnapshot?.people?.find((p) => p.isRequester)?.name ??
+      notesDetails?.clientSnapshot?.people?.find((p) => p.isRequester)?.name ??
+      null,
+    participants: [
+      ...asGuestParticipants(originalGuests),
+      ...asGuestParticipants(liveGuests),
+      ...asGuestParticipants(snapshot?.guests),
+      ...(livePeople ?? []),
+      ...(snapshot?.people ?? []),
+      ...(details?.clientSnapshot?.people ??
+        notesDetails?.clientSnapshot?.people ??
+        []),
+    ],
   });
 }
 
@@ -636,6 +671,7 @@ function enrichItemsWithComparison(
         currentStart: input.currentStart,
         bookingDate: booking?.booking_date,
         bookingStart: booking?.start_time,
+        clientName: input.clientName,
       })
     : null;
 
@@ -651,6 +687,7 @@ function enrichItemsWithComparison(
           currentStart: input.currentStart,
           bookingDate: booking?.booking_date,
           bookingStart: booking?.start_time,
+          clientName: input.clientName,
         })
       : null;
 

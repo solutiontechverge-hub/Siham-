@@ -57,7 +57,6 @@ export type ProfessionalFixedLocationCalendarBookingDrawerBag = Pick<
   | "clientList"
   | "clientListSelectedEmail"
   | "closeBookingDrawer"
-  | "confirmDrawerPrepayment"
   | "data"
   | "defaultDateIso"
   | "deleteProjectUpload"

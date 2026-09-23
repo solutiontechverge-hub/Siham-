@@ -291,6 +291,8 @@ function phonePart(value?: string | null) {
 /**
  * Notes store client+guest lines in `services`; the drawer keeps guests separate.
  * Flatten so silent/ER diffs do not mix those shapes.
+ * Merge both sources and key by guestId:id — same catalog id on client + guest must both survive
+ * (do not drop flat guestId-tagged client lines when nested guest services exist).
  */
 export function flattenBookingServices(input: {
   services?: readonly CalendarBookingServiceItem[];
@@ -302,16 +304,16 @@ export function flattenBookingServices(input: {
       guestId: service.guestId ?? guest.id,
     })),
   );
-  const clientLines = (input.services ?? []).filter(
-    (service) => !String(service.guestId ?? "").trim(),
-  );
-  const guestLinesFromServices = (input.services ?? []).filter((service) =>
-    Boolean(String(service.guestId ?? "").trim()),
-  );
-  const guestLines = guestLinesFromGuests.length
-    ? guestLinesFromGuests
-    : guestLinesFromServices;
-  return [...clientLines, ...guestLines];
+  const seen = new Set<string>();
+  const next: CalendarBookingServiceItem[] = [];
+  for (const service of [...(input.services ?? []), ...guestLinesFromGuests]) {
+    const keyed = { ...service, guestId: service.guestId ?? null };
+    const key = serviceLineKey(keyed);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    next.push(keyed);
+  }
+  return next;
 }
 
 type IdentityPerson = {
