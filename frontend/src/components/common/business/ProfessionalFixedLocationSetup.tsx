@@ -133,6 +133,7 @@ export default function ProfessionalFixedLocationSetup(
     selectedPortfolioIds,
     serviceCategoryTabs,
     serviceForDisabled,
+    sectionNeedsSyncSource,
     serviceModal,
     servicesDetailsDisabled,
     setActiveServiceCategory,
@@ -185,11 +186,21 @@ export default function ProfessionalFixedLocationSetup(
     visibleLocationCards,
   } = useProfessionalFixedLocationSetup(props);
 
+  const isFreelancer = values.companyBusinessType === "freelancer";
   const fixedLocationForm = (
     <ProfessionalFixedLocationForm
       m={m}
-      fixedBiz={fixedBiz}
+      fixedBiz={{
+        salonName: fixedBiz.salonName || fixedBiz.profileName,
+        streetAddress: fixedBiz.streetAddress,
+        streetNumber: fixedBiz.streetNumber,
+        postalCode: fixedBiz.postalCode,
+        province: fixedBiz.province,
+        municipalities: fixedBiz.municipalities,
+      }}
       setFixedBizField={setFixedBizField}
+      showSalonName={isFreelancer}
+      onSalonNameChange={(value) => setBizField("profileName", value)}
       locationDisabled={locationDisabled}
       desiredMunicipalityByProvince={desiredMunicipalityByProvince as Record<string, string[]>}
       desiredProvinceOptions={desiredProvinceOptions}
@@ -311,6 +322,7 @@ export default function ProfessionalFixedLocationSetup(
         addBizKeyword={addBizKeyword}
         removeBizKeyword={removeBizKeyword}
         keywordsAtMax={keywordsAtMax}
+        showSalonName={!isFreelancer}
       />
 
       <SectionShell
@@ -457,6 +469,7 @@ export default function ProfessionalFixedLocationSetup(
         templateSyncDraft={templateSyncDraft}
         setTemplateSyncDraft={setTemplateSyncDraft}
         applyTemplateSyncSettings={applyTemplateSyncSettings}
+        sectionNeedsSyncSource={sectionNeedsSyncSource}
         businessFormDisabled={businessFormDisabled}
         setBusinessOfferingSelect={setBusinessOfferingSelect}
         onSwitchActiveBusinessTemplate={onSwitchActiveBusinessTemplate}

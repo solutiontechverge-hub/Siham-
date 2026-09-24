@@ -21,6 +21,7 @@ import { addSoftIconButtonSx } from "./professionalFixedLocationSetupShell";
 import type { ProvinceKey } from "./useProfessionalFixedLocationSetup";
 
 type FixedBizSlice = {
+  salonName: string;
   streetAddress: string;
   streetNumber: string;
   postalCode: string;
@@ -38,6 +39,9 @@ export type ProfessionalFixedLocationFormProps = {
   m: Theme["palette"]["mollure"];
   fixedBiz: FixedBizSlice;
   setFixedBizField: (key: keyof FixedBizSlice, value: FixedBizSlice[keyof FixedBizSlice]) => void;
+  /** Freelancer / individual: show Salon Name in the address block. */
+  showSalonName?: boolean;
+  onSalonNameChange?: (value: string) => void;
   locationDisabled: boolean;
   desiredMunicipalityByProvince: Record<string, string[]>;
   desiredProvinceOptions: readonly string[];
@@ -47,12 +51,28 @@ export function ProfessionalFixedLocationForm({
   m,
   fixedBiz,
   setFixedBizField,
+  showSalonName = false,
+  onSalonNameChange,
   locationDisabled,
   desiredMunicipalityByProvince,
   desiredProvinceOptions,
 }: ProfessionalFixedLocationFormProps) {
   return (
     <Grid container spacing={1.6}>
+      {showSalonName ? (
+        <Grid item xs={12}>
+          <MollureFormField
+            placeholder="Salon Name"
+            value={fixedBiz.salonName}
+            onChange={(e) => {
+              const value = e.target.value;
+              setFixedBizField("salonName", value);
+              onSalonNameChange?.(value);
+            }}
+            disabled={locationDisabled}
+          />
+        </Grid>
+      ) : null}
       <Grid item xs={12}>
         <Typography
           sx={{
@@ -68,7 +88,7 @@ export function ProfessionalFixedLocationForm({
       </Grid>
       <Grid item xs={12} sm={6}>
         <MollureFormField
-          placeholder="Street Address"
+          placeholder="Street"
           value={fixedBiz.streetAddress}
           onChange={(e) => setFixedBizField("streetAddress", e.target.value)}
           disabled={locationDisabled}
@@ -76,21 +96,13 @@ export function ProfessionalFixedLocationForm({
       </Grid>
       <Grid item xs={12} sm={6}>
         <MollureFormField
-          placeholder="Street Number"
+          placeholder="Number"
           value={fixedBiz.streetNumber}
           onChange={(e) => setFixedBizField("streetNumber", e.target.value)}
           disabled={locationDisabled}
         />
       </Grid>
-      <Grid item xs={12} sm={4}>
-        <MollureFormField
-          placeholder="Postal code"
-          value={fixedBiz.postalCode}
-          onChange={(e) => setFixedBizField("postalCode", e.target.value)}
-          disabled={locationDisabled}
-        />
-      </Grid>
-      <Grid item xs={12} sm={4}>
+      <Grid item xs={12}>
         <MollureFormField
           select
           value={fixedBiz.province}
@@ -136,9 +148,17 @@ export function ProfessionalFixedLocationForm({
           ))}
         </MollureFormField>
       </Grid>
-      <Grid item xs={12} sm={4}>
+      <Grid item xs={12} sm={6}>
+        <MollureFormField
+          placeholder="Postal code"
+          value={fixedBiz.postalCode}
+          onChange={(e) => setFixedBizField("postalCode", e.target.value)}
+          disabled={locationDisabled}
+        />
+      </Grid>
+      <Grid item xs={12} sm={6}>
         <AppMultiSelect
-          placeholder="Select municipalities"
+          placeholder="Municipality"
           value={fixedBiz.municipalities}
           onChange={(municipalities) =>
             setFixedBizField("municipalities", municipalities)

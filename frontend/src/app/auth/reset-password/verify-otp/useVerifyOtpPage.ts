@@ -36,10 +36,12 @@ export function useVerifyOtpPage() {
 
   React.useEffect(() => {
     const savedEmail = window.sessionStorage.getItem(RESET_EMAIL_KEY) || "";
-    if (savedEmail) {
-      setEmail(savedEmail);
+    if (!savedEmail) {
+      router.replace(verifyOtpPageData.backToForgotPassword.href);
+      return;
     }
-  }, []);
+    setEmail(savedEmail);
+  }, [router]);
 
   const handleDigitChange = (index: number, value: string) => {
     const digit = value.replace(/\D/g, "").slice(-1);
@@ -116,36 +118,39 @@ export function useVerifyOtpPage() {
   };
 
   const handleResend = async () => {
-    if (!email.trim()) {
+    const savedEmail =
+      email.trim() || window.sessionStorage.getItem(RESET_EMAIL_KEY) || "";
+    const emailResult = parseEmail(savedEmail);
+    if (!emailResult.ok) {
       showSnackbar({
         severity: "error",
         message: verifyOtpPageData.messages.enterEmailFirst,
       });
+      router.push(verifyOtpPageData.backToForgotPassword.href);
       return;
     }
 
     try {
       const result = await forgotPassword({
-        email: email.trim().toLowerCase(),
+        email: emailResult.value,
       }).unwrap();
 
-      window.sessionStorage.setItem(
-        RESET_EMAIL_KEY,
-        email.trim().toLowerCase(),
-      );
+      window.sessionStorage.setItem(RESET_EMAIL_KEY, emailResult.value);
+      setEmail(emailResult.value);
+      setDigits(Array(OTP_LEN).fill(""));
+      inputRefs.current[0]?.focus();
       showSnackbar({
         severity: "success",
         message:
           result.message || verifyOtpPageData.messages.otpResentFallback,
       });
     } catch (error) {
-      showSnackbar({
-        severity: "error",
-        message: getApiErrorMessage(
-          error,
-          verifyOtpPageData.messages.resendFailed,
-        ),
-      });
+      const message = getApiErrorMessage(
+        error,
+        verifyOtpPageData.messages.resendFailed,
+      );
+      if (!message) return;
+      showSnackbar({ severity: "error", message });
     }
   };
 

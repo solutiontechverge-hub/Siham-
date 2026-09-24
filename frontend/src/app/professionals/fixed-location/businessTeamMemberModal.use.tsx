@@ -11,10 +11,12 @@ import {
   groupsFromTeamService,
   groupsToTeamService,
   removeTeamMemberAssignedService,
+  setTeamMemberCategoryServices,
   TEAM_MEMBER_DRAFT_PREVIEW_ID,
   type TeamBusinessServiceRef,
   type TeamMemberFormDraft,
   type TeamMemberModalServiceContext,
+  type TeamMemberServiceGroupSelection,
   type TeamServiceSlots,
 } from "../../../data/businessTeamMemberModal.data";
 import { teamMemberRatingFromApi } from "../../../lib/teamMemberReviews";
@@ -23,6 +25,8 @@ const EMPTY_MEMBER_REVIEWS = teamMemberRatingFromApi(0, 0);
 
 export type TeamMemberUi = {
   id: string;
+  /** Shared across Fixed/Desired templates; name+photo stay in sync. */
+  personKey: string;
   name: string;
   role: string;
   photoSrc: string;
@@ -32,16 +36,36 @@ export type TeamMemberUi = {
   services: TeamServiceSlots;
 };
 
+export type ReusableTeamMemberOption = {
+  personKey: string;
+  name: string;
+  photoSrc: string;
+  pendingPhotoFile?: File | null;
+};
+
 type UseBusinessTeamMemberModalArgs = {
   businessCategories: BusinessCategory[];
   businessServices: TeamBusinessServiceRef[];
   categoryTabs: ServiceCategoryTab[];
   teamMembers: TeamMemberUi[];
   setTeamMembers: React.Dispatch<React.SetStateAction<TeamMemberUi[]>>;
+  reusableMembers?: ReusableTeamMemberOption[];
+  onSyncIdentity?: (
+    personKey: string,
+    patch: {
+      name: string;
+      photoSrc: string;
+      pendingPhotoFile?: File | null;
+    },
+  ) => void;
   onSaveBusinessSetup?: (members: TeamMemberUi[]) => Promise<void>;
   onMarkUnpublished?: () => void;
   onAfterLocalSave?: () => void;
 };
+
+function newPersonKey() {
+  return `pk-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
 
 export function useBusinessTeamMemberModal({
   businessCategories,
@@ -49,6 +73,8 @@ export function useBusinessTeamMemberModal({
   categoryTabs,
   teamMembers,
   setTeamMembers,
+  reusableMembers = [],
+  onSyncIdentity,
   onSaveBusinessSetup,
   onMarkUnpublished,
   onAfterLocalSave,
@@ -87,6 +113,7 @@ export function useBusinessTeamMemberModal({
     (draftState: TeamMemberFormDraft) => {
       const services = groupsToTeamService(draftState.selectedGroups);
       const displayName = draftState.name.trim() || "New team member";
+      const personKey = draftState.personKey || newPersonKey();
 
       setTeamMembers((prev) => {
         const withoutPreview = prev.filter(
@@ -98,6 +125,7 @@ export function useBusinessTeamMemberModal({
             member.id === editingMemberId
               ? {
                   ...member,
+                  personKey: member.personKey || personKey,
                   name: displayName,
                   photoSrc: draftState.photoSrc,
                   pendingPhotoFile: draftState.pendingPhotoFile ?? null,
@@ -109,6 +137,7 @@ export function useBusinessTeamMemberModal({
 
         const preview: TeamMemberUi = {
           id: TEAM_MEMBER_DRAFT_PREVIEW_ID,
+          personKey,
           name: displayName,
           role: "Team member",
           photoSrc: draftState.photoSrc,
@@ -142,6 +171,7 @@ export function useBusinessTeamMemberModal({
       ...createEmptyTeamMemberFormDraft(),
       categoryId: "",
       serviceId: "",
+      personKey: "",
     });
     setOpen(true);
   }, [setTeamMembers]);
@@ -160,6 +190,7 @@ export function useBusinessTeamMemberModal({
         ),
         categoryId: "",
         serviceId: "",
+        personKey: member.personKey || member.id,
       });
       setOpen(true);
     },
@@ -170,20 +201,94 @@ export function useBusinessTeamMemberModal({
     (patch: Partial<TeamMemberFormDraft>) => {
       setDraft((prev) => {
         const next = { ...prev, ...patch };
-        if ("name" in patch || "photoSrc" in patch) {
+        if ("name" in patch || "photoSrc" in patch || "pendingPhotoFile" in patch) {
           syncDraftToMainScreen(next);
+          const personKey = next.personKey?.trim();
+          if (personKey && onSyncIdentity) {
+            onSyncIdentity(personKey, {
+              name: next.name.trim() || "New team member",
+              photoSrc: next.photoSrc,
+              pendingPhotoFile: next.pendingPhotoFile ?? null,
+            });
+          }
         }
         return next;
       });
     },
-    [syncDraftToMainScreen],
+    [onSyncIdentity, syncDraftToMainScreen],
+  );
+
+  const chooseReusableMember = React.useCallback(
+    (personKey: string) => {
+      const key = String(personKey ?? "").trim();
+      if (!key) {
+        setDraft((prev) => ({
+          ...prev,
+          personKey: "",
+          name: "",
+          photoSrc: "",
+          pendingPhotoFile: null,
+        }));
+        return;
+      }
+      const source = reusableMembers.find((member) => member.personKey === key);
+      if (!source) return;
+      setDraft((prev) => {
+        const next = {
+          ...prev,
+          personKey: source.personKey,
+          name: source.name,
+          photoSrc: source.photoSrc,
+          pendingPhotoFile: source.pendingPhotoFile ?? null,
+        };
+        syncDraftToMainScreen(next);
+        return next;
+      });
+    },
+    [reusableMembers, syncDraftToMainScreen],
   );
 
   const pickService = React.useCallback(
     (categoryId: string, serviceId: string) => {
-      setDraft((prev) => ({ ...prev, categoryId, serviceId }));
+      setDraft((prev) => {
+        const next = addTeamMemberServiceSelection(
+          { ...prev, categoryId, serviceId },
+          businessCategories,
+          serviceContext,
+        );
+        syncDraftToMainScreen(next);
+        return { ...next, categoryId };
+      });
     },
-    [],
+    [businessCategories, serviceContext, syncDraftToMainScreen],
+  );
+
+  const setCategoryServices = React.useCallback(
+    (categoryId: string, serviceIds: string[]) => {
+      setDraft((prev) => {
+        const next = setTeamMemberCategoryServices(
+          { ...prev, categoryId },
+          categoryId,
+          serviceIds,
+          businessCategories,
+          serviceContext,
+        );
+        syncDraftToMainScreen(next);
+        return { ...next, categoryId };
+      });
+    },
+    [businessCategories, serviceContext, syncDraftToMainScreen],
+  );
+
+  const setSelectedGroups = React.useCallback(
+    (groups: TeamMemberServiceGroupSelection[]) => {
+      setDraft((prev) => {
+        const next = { ...prev, selectedGroups: groups };
+        syncDraftToMainScreen(next);
+        return next;
+      });
+    },
+    [syncDraftToMainScreen],
   );
 
   const removeAssignedService = React.useCallback(
@@ -207,15 +312,23 @@ export function useBusinessTeamMemberModal({
       setDraft((prev) => {
         const next = { ...prev, photoSrc: objectUrl, pendingPhotoFile: file };
         syncDraftToMainScreen(next);
+        const personKey = next.personKey?.trim();
+        if (personKey && onSyncIdentity) {
+          onSyncIdentity(personKey, {
+            name: next.name.trim() || "New team member",
+            photoSrc: objectUrl,
+            pendingPhotoFile: file,
+          });
+        }
         return next;
       });
     },
-    [syncDraftToMainScreen],
+    [onSyncIdentity, syncDraftToMainScreen],
   );
 
-  const canSubmit =
-    draft.selectedGroups.some((group) => group.subServiceIds.length > 0) ||
-    Boolean(draft.categoryId && draft.serviceId);
+  const canSubmit = draft.selectedGroups.some(
+    (group) => group.subServiceIds.length > 0,
+  );
 
   const saveModal = React.useCallback(async () => {
     let effectiveDraft = draft;
@@ -237,6 +350,7 @@ export function useBusinessTeamMemberModal({
     const name = effectiveDraft.name.trim() || "New team member";
     const services = groupsToTeamService(effectiveDraft.selectedGroups);
     const role = "Team member";
+    const personKey = effectiveDraft.personKey?.trim() || newPersonKey();
     let nextMembers: TeamMemberUi[];
 
     const persistedMembers = teamMembers.filter(
@@ -248,6 +362,7 @@ export function useBusinessTeamMemberModal({
         member.id === editingMemberId
           ? {
               ...member,
+              personKey: member.personKey || personKey,
               name,
               role,
               photoSrc: effectiveDraft.photoSrc,
@@ -260,6 +375,7 @@ export function useBusinessTeamMemberModal({
       nextMembers = [
         {
           id: `tm-${Date.now()}`,
+          personKey,
           name,
           role,
           photoSrc: effectiveDraft.photoSrc,
@@ -273,6 +389,11 @@ export function useBusinessTeamMemberModal({
     }
 
     setTeamMembers(nextMembers);
+    onSyncIdentity?.(personKey, {
+      name,
+      photoSrc: effectiveDraft.photoSrc,
+      pendingPhotoFile: effectiveDraft.pendingPhotoFile ?? null,
+    });
     onAfterLocalSave?.();
     closeModal();
 
@@ -301,6 +422,7 @@ export function useBusinessTeamMemberModal({
     onAfterLocalSave,
     onMarkUnpublished,
     onSaveBusinessSetup,
+    onSyncIdentity,
     setTeamMembers,
     showSnackbar,
     teamMembers,
@@ -322,12 +444,16 @@ export function useBusinessTeamMemberModal({
     editingMemberId,
     canSubmit,
     photoInputRef,
+    reusableMembers,
     closeModal,
     openAdd,
     openEdit,
     updateDraft,
     pickService,
+    setCategoryServices,
+    setSelectedGroups,
     removeAssignedService,
+    chooseReusableMember,
     choosePhoto,
     onPhotoSelected,
     saveModal,

@@ -1,6 +1,5 @@
 "use client";
 
-import AppButton from "../AppButton";
 import * as React from "react";
 import Image from "next/image";
 import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
@@ -9,15 +8,18 @@ import { alpha, useTheme } from "@mui/material/styles";
 import MollureFormField from "../MollureFormField";
 import { MollureLabeledSelect } from "../MollureLabeledFields";
 import AppDrawer from "../AppDrawer";
+import AppDropdown from "../AppDropdown";
 import TeamMemberAssignedServicesPanel from "./TeamMemberAssignedServicesPanel";
 import { FinanceDrawerActionsFooter } from "../FinanceDrawerFooter";
 import {
-  addTeamMemberServiceSelection,
   buildTeamCategoryOptions,
   buildTeamServiceOptionsForCategory,
   businessTeamMemberModalCopy,
+  setTeamMemberCategoryServices,
+  TEAM_MEMBER_ALL_SERVICES_VALUE,
   type TeamMemberFormDraft,
   type TeamMemberModalServiceContext,
+  type TeamMemberServiceGroupSelection,
 } from "../../../data/businessTeamMemberModal.data";
 import type { BusinessCategoryLike } from "../../../data/businessServiceCategorySlider.data";
 import {
@@ -28,6 +30,12 @@ import {
 import { useSnackbar } from "../AppSnackbar";
 import { mollureWhiteFieldInputSx } from "../mollureFormSx";
 
+export type ReusableTeamMemberOption = {
+  personKey: string;
+  name: string;
+  photoSrc: string;
+};
+
 type BusinessTeamMemberFormModalProps = {
   open: boolean;
   title: string;
@@ -37,12 +45,16 @@ type BusinessTeamMemberFormModalProps = {
   canSubmit?: boolean;
   businessCategories: BusinessCategoryLike[];
   serviceContext: TeamMemberModalServiceContext;
+  reusableMembers?: ReusableTeamMemberOption[];
   photoInputRef: React.RefObject<HTMLInputElement | null>;
   onClose: () => void;
   onSubmit: () => void;
   onChange: (patch: Partial<TeamMemberFormDraft>) => void;
   onPickService: (categoryId: string, serviceId: string) => void;
+  onSetCategoryServices?: (categoryId: string, serviceIds: string[]) => void;
   onRemoveAssignedService: (serviceId: string) => void;
+  onChangeSelectedGroups?: (groups: TeamMemberServiceGroupSelection[]) => void;
+  onChooseReusableMember?: (personKey: string) => void;
   onChoosePhoto: () => void;
   onPhotoSelected: (file: File, objectUrl: string) => void;
 };
@@ -56,12 +68,16 @@ export default function BusinessTeamMemberFormModal({
   canSubmit = true,
   businessCategories,
   serviceContext,
+  reusableMembers = [],
   photoInputRef,
   onClose,
   onSubmit,
   onChange,
   onPickService,
+  onSetCategoryServices,
   onRemoveAssignedService,
+  onChangeSelectedGroups,
+  onChooseReusableMember,
   onChoosePhoto,
   onPhotoSelected,
 }: BusinessTeamMemberFormModalProps) {
@@ -77,15 +93,16 @@ export default function BusinessTeamMemberFormModal({
 
   const activeCategoryId = draft.categoryId;
   const wasOpenRef = React.useRef(false);
+  const isAddMode = title === businessTeamMemberModalCopy.addTitle;
 
   // Add mode must always start with the category placeholder — never auto-pick.
   React.useEffect(() => {
     const justOpened = open && !wasOpenRef.current;
     wasOpenRef.current = open;
     if (!justOpened) return;
-    if (title !== businessTeamMemberModalCopy.addTitle) return;
+    if (!isAddMode) return;
     onChange({ categoryId: "", serviceId: "" });
-  }, [open, title, onChange]);
+  }, [open, isAddMode, onChange]);
 
   React.useEffect(() => {
     if (!open || !draft.categoryId) return;
@@ -100,23 +117,45 @@ export default function BusinessTeamMemberFormModal({
         activeCategoryId,
         businessCategories,
         serviceContext,
-      ),
+      ).filter((option) => option.value && option.value !== TEAM_MEMBER_ALL_SERVICES_VALUE),
     [activeCategoryId, businessCategories, serviceContext],
   );
 
-  const selectableServices = React.useMemo(
-    () => serviceOptions.filter((option) => option.value),
-    [serviceOptions],
-  );
+  const selectedServiceIdsForCategory = React.useMemo(() => {
+    if (!activeCategoryId) return [] as string[];
+    return (
+      draft.selectedGroups.find((group) => group.categoryId === activeCategoryId)
+        ?.subServiceIds ?? []
+    );
+  }, [activeCategoryId, draft.selectedGroups]);
 
-  const displaySelectedGroups = React.useMemo(() => {
-    if (!draft.categoryId || !draft.serviceId) return draft.selectedGroups;
-    return addTeamMemberServiceSelection(
-      draft,
+  const applyCategoryServices = React.useCallback(
+    (categoryId: string, serviceIds: string[]) => {
+      if (onSetCategoryServices) {
+        onSetCategoryServices(categoryId, serviceIds);
+        return;
+      }
+      const next = setTeamMemberCategoryServices(
+        draft,
+        categoryId,
+        serviceIds,
+        businessCategories,
+        serviceContext,
+      );
+      onChange({
+        categoryId,
+        selectedGroups: next.selectedGroups,
+        serviceId: "",
+      });
+    },
+    [
       businessCategories,
+      draft,
+      onChange,
+      onSetCategoryServices,
       serviceContext,
-    ).selectedGroups;
-  }, [businessCategories, draft, serviceContext]);
+    ],
+  );
 
   const footer = (
     <FinanceDrawerActionsFooter
@@ -135,6 +174,48 @@ export default function BusinessTeamMemberFormModal({
     <AppDrawer open={open} onClose={onClose} title={title} footer={footer}>
       <Box sx={{ px: 2.5, py: 2, width: "100%", boxSizing: "border-box" }}>
         <Stack spacing={2} sx={{ width: "100%", alignItems: "stretch" }}>
+          {isAddMode && reusableMembers.length > 0 && onChooseReusableMember ? (
+            <MollureLabeledSelect
+              fieldLabel={businessTeamMemberModalCopy.selectExistingLabel}
+              value={draft.personKey || ""}
+              onChange={(e) =>
+                onChooseReusableMember(String(e.target.value ?? ""))
+              }
+              disabled={disabled}
+              displayEmpty
+              renderValue={(selected) => {
+                const value = String(selected ?? "");
+                if (!value) {
+                  return (
+                    <Typography
+                      component="span"
+                      sx={{
+                        color: alpha(m.navy, 0.42),
+                        fontSize: "0.8125rem",
+                      }}
+                    >
+                      {businessTeamMemberModalCopy.selectExistingPlaceholder}
+                    </Typography>
+                  );
+                }
+                return (
+                  reusableMembers.find((option) => option.personKey === value)
+                    ?.name ?? value
+                );
+              }}
+              sx={{ bgcolor: "#fff", borderRadius: "10px" }}
+            >
+              <MenuItem value="">
+                <em>{businessTeamMemberModalCopy.selectExistingPlaceholder}</em>
+              </MenuItem>
+              {reusableMembers.map((option) => (
+                <MenuItem key={option.personKey} value={option.personKey}>
+                  {option.name}
+                </MenuItem>
+              ))}
+            </MollureLabeledSelect>
+          ) : null}
+
           <Box>
             <Typography
               sx={{
@@ -292,74 +373,41 @@ export default function BusinessTeamMemberFormModal({
 
           {activeCategoryId ? (
             <Box sx={{ width: "100%" }}>
-              <Typography
-                sx={{
-                  fontWeight: 800,
-                  fontSize: 14,
-                  color: alpha(m.navy, 0.88),
-                  mb: 1.25,
-                }}
-              >
-                {businessTeamMemberModalCopy.selectServicesLabel}
-              </Typography>
-              {selectableServices.length === 0 ? (
+              {serviceOptions.length === 0 ? (
                 <Typography sx={{ fontSize: 13, color: alpha(m.navy, 0.5) }}>
                   {businessTeamMemberModalCopy.noServicesInCategory}
                 </Typography>
               ) : (
-                <Box
-                  sx={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: 1,
+                <AppDropdown
+                  label={businessTeamMemberModalCopy.selectServicesLabel}
+                  options={serviceOptions.map((option) => ({
+                    value: option.value,
+                    label: option.label,
+                  }))}
+                  value={selectedServiceIdsForCategory}
+                  multiple
+                  selectAll
+                  selectAllLabel={businessTeamMemberModalCopy.allServicesOption}
+                  disabled={disabled}
+                  onChange={(value) => {
+                    const ids = Array.isArray(value)
+                      ? value.map(String)
+                      : [String(value)];
+                    applyCategoryServices(activeCategoryId, ids);
                   }}
-                >
-                  {selectableServices.map((option) => {
-                    const isSelected =
-                      draft.categoryId === activeCategoryId &&
-                      draft.serviceId === option.value;
-
-                    return (
-                      <AppButton
-                        key={option.value}
-                        variant="outlined"
-                        disabled={disabled}
-                        onClick={() =>
-                          onPickService(activeCategoryId, option.value)
-                        }
-                        sx={{
-                          borderRadius: "10px",
-                          textTransform: "none",
-                          fontWeight: 700,
-                          fontSize: 13,
-                          px: 1.75,
-                          py: 0.75,
-                          borderColor: isSelected
-                            ? m.teal
-                            : alpha(m.navy, 0.14),
-                          color: isSelected ? m.teal : alpha(m.navy, 0.78),
-                          bgcolor: isSelected ? alpha(m.teal, 0.08) : "#fff",
-                          "&:hover": {
-                            borderColor: m.teal,
-                            bgcolor: alpha(m.teal, 0.06),
-                          },
-                        }}
-                      >
-                        {option.label}
-                      </AppButton>
-                    );
-                  })}
-                </Box>
+                  sx={{ bgcolor: "#fff", borderRadius: "10px" }}
+                />
               )}
             </Box>
           ) : null}
 
           <TeamMemberAssignedServicesPanel
-            selectedGroups={displaySelectedGroups}
+            selectedGroups={draft.selectedGroups}
             businessCategories={businessCategories}
             serviceContext={serviceContext}
             disabled={disabled}
             onRemoveService={onRemoveAssignedService}
+            onChangeGroups={onChangeSelectedGroups}
           />
         </Stack>
       </Box>

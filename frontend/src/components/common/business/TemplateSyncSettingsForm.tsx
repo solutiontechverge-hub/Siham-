@@ -98,6 +98,7 @@ function ConfigurableSectionBlock({
   onChange: (mode: TemplateSyncMode) => void;
 }) {
   const m = useTheme().palette.mollure;
+  const isIndependent = mode === "independent";
   return (
     <Box
       sx={{
@@ -118,7 +119,7 @@ function ConfigurableSectionBlock({
         {SYNC_SECTION_LABELS[sectionId]}
       </Typography>
       <RadioGroup
-        value={mode === "sync" ? "sync" : "independent"}
+        value={isIndependent ? "independent" : "sync"}
         onChange={(e) => onChange(e.target.value as TemplateSyncMode)}
       >
         {TEMPLATE_SYNC_MODE_OPTIONS.map((option) => (
@@ -159,6 +160,19 @@ function ConfigurableSectionBlock({
           />
         ))}
       </RadioGroup>
+      {isIndependent ? (
+        <Typography
+          sx={{
+            mt: 0.25,
+            fontSize: 11.5,
+            color: alpha(m.navy, 0.55),
+            lineHeight: 1.4,
+          }}
+        >
+          This section now operates independently for Fixed Location and Desired
+          Location.
+        </Typography>
+      ) : null}
     </Box>
   );
 }
@@ -186,14 +200,14 @@ export default function TemplateSyncSettingsForm({
 
       <LockedSectionRow
         title={SYNC_SECTION_LABELS.profile}
-        status="Always sync"
-        helper="Profile is always synced automatically. Changes in either template update both in real-time."
+        status="Always synced — cannot be changed"
+        helper="Cover images, business name, bio, and keywords always stay the same across Fixed and Desired templates."
       />
 
       <LockedSectionRow
         title={SYNC_SECTION_LABELS.location}
-        status="Always separate"
-        helper="Fixed address and Desired service areas stay separate. They never sync."
+        status="Always separate — cannot be changed"
+        helper="Fixed Location keeps the salon address; Desired Location keeps the operating area. They never sync."
       />
 
       <Divider sx={{ borderColor: alpha(m.navy, 0.06) }} />

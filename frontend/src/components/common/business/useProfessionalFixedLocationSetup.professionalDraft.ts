@@ -106,8 +106,6 @@ export function useProfessionalFixedLocationSetupProfessionalDraft(
       setField("contactLastName", draft.contactLastName);
       setField("contactEmail", draft.contactEmail);
       setField("contactPhone", draft.contactPhone);
-      setField("contactPassword", draft.contactPassword);
-      setField("contactRepeatPassword", draft.contactRepeatPassword);
     },
     [setField],
   );
@@ -129,8 +127,6 @@ export function useProfessionalFixedLocationSetupProfessionalDraft(
       contactLastName: values.contactLastName,
       contactEmail: values.contactEmail,
       contactPhone: values.contactPhone,
-      contactPassword: values.contactPassword,
-      contactRepeatPassword: values.contactRepeatPassword,
     }),
     [
       values.companyBusinessType,
@@ -146,9 +142,7 @@ export function useProfessionalFixedLocationSetupProfessionalDraft(
       values.contactEmail,
       values.contactFirstName,
       values.contactLastName,
-      values.contactPassword,
       values.contactPhone,
-      values.contactRepeatPassword,
       values.socialInstagram,
       values.socialOther,
     ],

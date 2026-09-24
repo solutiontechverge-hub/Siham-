@@ -201,13 +201,13 @@ export function useProfessionalFixedLocationSetupSaveHandlers(
 
       return {
         location_mode: locationModeMap[businessOfferingSelect] ?? "fixed",
-        business_name: sourceBiz.profileName,
+        business_name: sourceBiz.profileName || fixedBiz.salonName,
         business_about: sourceBiz.about,
         business_keywords: sourceBiz.keywords,
         business_media: mediaSlides
           .filter(isPersistedMediaUrl)
           .slice(0, BUSINESS_MEDIA_MAX_COUNT),
-        salon_name: sourceBiz.profileName,
+        salon_name: sourceBiz.profileName || fixedBiz.salonName,
         fixed_location_address: addressSource.streetAddress,
         fixed_location_street_number: addressSource.streetNumber,
         fixed_location_postal_code: addressSource.postalCode,

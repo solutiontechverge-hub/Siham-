@@ -19,8 +19,6 @@ export const professionalEditableFieldKeys = [
   "contactLastName",
   "contactEmail",
   "contactPhone",
-  "contactPassword",
-  "contactRepeatPassword",
 ] as const;
 
 export const TEAM_SERVICE_SLOT_KEYS = [

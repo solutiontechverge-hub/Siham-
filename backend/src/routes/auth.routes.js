@@ -1,6 +1,7 @@
 import express from "express";
 import { body } from "express-validator";
 import {
+  changePassword,
   forgotPassword,
   login,
   refreshSession,
@@ -11,6 +12,7 @@ import {
   verifyOtp,
 } from "../controllers/auth.controller.js";
 import { loginWithApple, loginWithGoogle } from "../controllers/oauth.controller.js";
+import { authenticateUser } from "../middleware/auth.middleware.js";
 import { validateRequest } from "../middleware/validate.middleware.js";
 import { upload } from "../middleware/upload.middleware.js";
 import { validateImageUploadContent } from "../middleware/validateUploadContent.middleware.js";
@@ -183,6 +185,22 @@ router.post(
   ],
   validateRequest,
   resetPassword,
+);
+
+router.post(
+  "/change-password",
+  authenticateUser,
+  [
+    passwordBody("current_password"),
+    passwordBody("new_password"),
+    body("confirm_password")
+      .isString()
+      .withMessage("confirm_password must be a string.")
+      .custom((value, { req }) => value === req.body.new_password)
+      .withMessage("confirm_password must match new_password."),
+  ],
+  validateRequest,
+  changePassword,
 );
 
 router.post(

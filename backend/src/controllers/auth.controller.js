@@ -1,10 +1,12 @@
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import { getClient, query } from "../db/index.js";
-import { sendPasswordResetOtpEmail } from "../helpers/email.helper.js";
+import {
+  sendPasswordChangedEmail,
+  sendPasswordResetOtpEmail,
+} from "../helpers/email.helper.js";
 import {
   notifyAccountUnderReview,
-  notifyPostVerificationPro,
   notifySignupConfirmation,
   sendSignupEmails,
 } from "../services/authEmail.service.js";
@@ -646,6 +648,85 @@ export const resetPassword = async (req, res) => {
   }
 };
 
+/** Authenticated change — applies immediately; confirmation email is informational only. */
+export const changePassword = async (req, res) => {
+  try {
+    const {
+      current_password: currentPassword,
+      new_password: newPassword,
+    } = req.body;
+
+    const userResult = await query(
+      `SELECT id, email, password_hash
+       FROM users
+       WHERE id = $1`,
+      [req.user.id],
+    );
+
+    if (userResult.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+        data: null,
+      });
+    }
+
+    const user = userResult.rows[0];
+
+    if (!user.password_hash) {
+      return res.status(400).json({
+        success: false,
+        message: "This account has no password set.",
+        data: null,
+      });
+    }
+
+    const currentMatches = await bcrypt.compare(
+      currentPassword,
+      user.password_hash,
+    );
+    if (!currentMatches) {
+      return res.status(400).json({
+        success: false,
+        message: "Current password is incorrect.",
+        data: null,
+      });
+    }
+
+    if (currentPassword === newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "New password must be different from the current password.",
+        data: null,
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    await query(
+      `UPDATE users
+       SET password_hash = $1, updated_at = NOW()
+       WHERE id = $2`,
+      [passwordHash, user.id],
+    );
+
+    try {
+      await sendPasswordChangedEmail({ email: user.email });
+    } catch (emailError) {
+      logError("changePassword confirmation email", emailError);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Password changed successfully.",
+      data: null,
+    });
+  } catch (error) {
+    return sendCaughtError(res, error, {
+      fallbackMessage: "Failed to change password.",
+    });
+  }
+};
+
 export const verifyEmail = async (req, res) => {
   const client = await getClient();
 
@@ -663,7 +744,7 @@ export const verifyEmail = async (req, res) => {
     await client.query("BEGIN");
 
     const verificationResult = await client.query(
-      `SELECT id, user_id, is_used, expires_at
+      `SELECT id, user_id, new_email, is_used, expires_at
        FROM email_verifications
        WHERE token = $1
        ORDER BY created_at DESC
@@ -682,33 +763,46 @@ export const verifyEmail = async (req, res) => {
 
     const verification = verificationResult.rows[0];
 
-    const respondVerified = async (userId, { alreadyVerified = false } = {}) => {
+    const respondVerified = async (userId, { alreadyVerified = false, emailChanged = false } = {}) => {
       await client.query("COMMIT");
       const user = await getUserWithProfile(userId);
 
-      if (!alreadyVerified && user?.user_type === "professional") {
-        void notifyPostVerificationPro(userId);
-        void notifyAccountUnderReview(userId);
-      } else if (!alreadyVerified && user) {
-        void notifySignupConfirmation(userId);
+      if (!emailChanged) {
+        if (!alreadyVerified && user?.user_type === "professional") {
+          // Pending until admin validates — Stripe emails only after approval.
+          void notifyAccountUnderReview(userId);
+        } else if (!alreadyVerified && user) {
+          void notifySignupConfirmation(userId);
+        }
       }
 
       return res.status(200).json({
         success: true,
-        message: alreadyVerified
-          ? "Email already verified."
-          : "Email verified successfully.",
-        data: user,
+        message: emailChanged
+          ? alreadyVerified
+            ? "Email already updated."
+            : "Email updated successfully."
+          : alreadyVerified
+            ? "Email already verified."
+            : "Email verified successfully.",
+        data: emailChanged ? { ...user, email_changed: true } : user,
       });
     };
 
     // Idempotent: email clients / React Strict Mode often hit the link twice.
     if (verification.is_used) {
       const userState = await client.query(
-        `SELECT id, is_email_verified FROM users WHERE id = $1`,
+        `SELECT id, email, is_email_verified FROM users WHERE id = $1`,
         [verification.user_id],
       );
-      if (userState.rows[0]?.is_email_verified) {
+      const row = userState.rows[0];
+      if (verification.new_email && row?.email === verification.new_email) {
+        return respondVerified(verification.user_id, {
+          alreadyVerified: true,
+          emailChanged: true,
+        });
+      }
+      if (!verification.new_email && row?.is_email_verified) {
         return respondVerified(verification.user_id, { alreadyVerified: true });
       }
       await client.query("ROLLBACK");
@@ -738,10 +832,17 @@ export const verifyEmail = async (req, res) => {
 
     if (claimResult.rowCount === 0) {
       const userState = await client.query(
-        `SELECT id, is_email_verified FROM users WHERE id = $1`,
+        `SELECT id, email, is_email_verified FROM users WHERE id = $1`,
         [verification.user_id],
       );
-      if (userState.rows[0]?.is_email_verified) {
+      const row = userState.rows[0];
+      if (verification.new_email && row?.email === verification.new_email) {
+        return respondVerified(verification.user_id, {
+          alreadyVerified: true,
+          emailChanged: true,
+        });
+      }
+      if (!verification.new_email && row?.is_email_verified) {
         return respondVerified(verification.user_id, { alreadyVerified: true });
       }
       await client.query("ROLLBACK");
@@ -750,6 +851,30 @@ export const verifyEmail = async (req, res) => {
         message: "Verification token has already been used.",
         data: null,
       });
+    }
+
+    if (verification.new_email) {
+      const taken = await client.query(
+        `SELECT 1 FROM users WHERE email = $1 AND id <> $2 LIMIT 1`,
+        [verification.new_email, verification.user_id],
+      );
+      if (taken.rowCount > 0) {
+        await client.query("ROLLBACK");
+        return res.status(409).json({
+          success: false,
+          message: "Email is already in use.",
+          data: null,
+        });
+      }
+
+      await client.query(
+        `UPDATE users
+         SET email = $1, is_email_verified = true, updated_at = NOW()
+         WHERE id = $2`,
+        [verification.new_email, verification.user_id],
+      );
+
+      return respondVerified(verification.user_id, { emailChanged: true });
     }
 
     await client.query(
