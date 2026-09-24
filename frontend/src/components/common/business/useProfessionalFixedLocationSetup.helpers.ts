@@ -9,6 +9,8 @@ import { formatCompactEuro } from "../booking-finance/formatBookingFinance";
 import {
   isBusinessServiceDiscountActive,
   applyBusinessServiceDiscount,
+  formatBusinessServiceDiscountFeatureLabel,
+  formatBusinessServiceDiscountTooltip,
   normalizeBusinessServicePriceType,
   parseEuroAmountString,
   parsePriceLabelForModal,
@@ -122,20 +124,30 @@ export function formatPriceForCard(priceType: string, amount: number): string {
 export function getServiceCardPriceParts(it: ServiceDetailUiItem): {
   primary: string;
   strikethrough?: string;
+  discountLabel?: string;
+  discountTooltip?: string;
 } {
+  const discountLabel =
+    formatBusinessServiceDiscountFeatureLabel(it) ?? undefined;
+  const discountTooltip =
+    formatBusinessServiceDiscountTooltip(it) || undefined;
+  const meta = { discountLabel, discountTooltip };
   const parsed = parsePriceLabelForModal(it.priceLabel);
   const pt = normalizePriceType(it.priceType ?? parsed.type);
   const base = getServiceBaseAmountNumber(it);
   if (base === null) {
     const fallback = it.priceLabel?.trim();
-    return { primary: fallback && fallback !== "" ? fallback : "—" };
+    return {
+      primary: fallback && fallback !== "" ? fallback : "—",
+      ...meta,
+    };
   }
   const originalStr = formatPriceForCard(pt, base);
-  if (!hasServiceDiscount(it)) return { primary: originalStr };
+  if (!hasServiceDiscount(it)) return { primary: originalStr, ...meta };
   const finalAmount = computeDiscountedBaseAmount(base, it);
   const finalStr = formatPriceForCard(pt, finalAmount);
-  if (finalStr === originalStr) return { primary: originalStr };
-  return { primary: finalStr, strikethrough: originalStr };
+  if (finalStr === originalStr) return { primary: originalStr, ...meta };
+  return { primary: finalStr, strikethrough: originalStr, ...meta };
 }
 
 export function parseFixedLocationMunicipalities(
@@ -191,8 +203,6 @@ export function buildProfessionalDraftFromProfile(
     contactLastName: professionalProfile?.contact_last_name || "",
     contactEmail: profileData?.email || "",
     contactPhone: professionalProfile?.phone || "",
-    contactPassword: "",
-    contactRepeatPassword: "",
   };
 }
 

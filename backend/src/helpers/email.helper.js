@@ -1,5 +1,8 @@
 import nodemailer from "nodemailer";
-import { buildVerifyEmailEmail } from "./authEmailTemplates.js";
+import {
+  buildPasswordChangedEmail,
+  buildVerifyEmailEmail,
+} from "./authEmailTemplates.js";
 
 const requiredEmailEnv = [
   "SMTP_HOST",
@@ -247,5 +250,15 @@ export const sendPasswordResetOtpEmail = async ({ email, otp }) => {
         <p>This OTP expires in 10 minutes.</p>
       </div>
     `,
+  });
+};
+
+export const sendPasswordChangedEmail = async ({ email }) => {
+  const { html, text } = buildPasswordChangedEmail();
+  await sendMail({
+    to: email,
+    subject: "Your Mollure password was changed",
+    html,
+    text,
   });
 };

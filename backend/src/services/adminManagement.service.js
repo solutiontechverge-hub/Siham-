@@ -2,6 +2,10 @@ import bcrypt from "bcrypt";
 import { query } from "../db/index.js";
 import { LISTING_RANKING_WEIGHTS } from "./listing-ranking.service.js";
 import { replyToContactMessage } from "./contact.service.js";
+import {
+  notifyAccountApproved,
+  notifyAccountNotApproved,
+} from "./authEmail.service.js";
 
 const CATEGORY_FALLBACK = "Hair & Beauty";
 const SALT_ROUNDS = 10;
@@ -175,12 +179,21 @@ export async function updateAdminProfessional(userId, patch = {}) {
   if (!existing.rows.length) return null;
 
   if (patch.validationStatus) {
+    const nextStatus = mapValidation(patch.validationStatus);
+    const prevStatus = mapValidation(existing.rows[0].validation_status);
     await query(
       `UPDATE professional_profiles
        SET validation_status = $2
        WHERE user_id = $1`,
-      [userId, mapValidation(patch.validationStatus)],
+      [userId, nextStatus],
     );
+    if (nextStatus !== prevStatus) {
+      if (nextStatus === "validated") {
+        void notifyAccountApproved(userId);
+      } else if (nextStatus === "not_validated") {
+        void notifyAccountNotApproved(userId);
+      }
+    }
   }
 
   if (patch.accountStatus === "disabled") {

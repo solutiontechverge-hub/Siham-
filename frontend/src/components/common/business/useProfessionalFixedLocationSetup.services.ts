@@ -18,6 +18,9 @@ import {
   normalizeTemplateSyncSettings,
   pickSectionFields,
   type TemplateSyncSettings,
+  type TemplateSyncSources,
+  type TemplateSyncSource,
+  type ConfigurableSyncSectionId,
 } from "../businessSetupTemplateSync";
 import {
   BUSINESS_SERVICE_CATEGORY_CATALOG,
@@ -37,7 +40,8 @@ import {
   useBusinessTeamMemberModal,
   type TeamMemberUi,
 } from "../../../app/professionals/fixed-location/businessTeamMemberModal.use";
-import { buildTeamBusinessServiceRefs } from "../../../data/businessTeamMemberModal.data";
+import { buildTeamBusinessServiceRefs, TEAM_MEMBER_DRAFT_PREVIEW_ID } from "../../../data/businessTeamMemberModal.data";
+import type { FixedLocationFormState } from "../../../app/professionals/fixed-location/fixedLocation.use";
 import type { ServiceDetailUiItem } from "./useProfessionalFixedLocationSetup.helpers";
 import type {
   BusinessTemplateState,
@@ -56,12 +60,23 @@ export type UseProfessionalFixedLocationSetupServicesArgs = {
   servicesDesiredRef: React.MutableRefObject<ServiceDetailUiItem[]>;
   setIsBusinessPublishEnabled: React.Dispatch<React.SetStateAction<boolean>>;
   getCurrentBusinessState: () => BusinessTemplateState;
+  desiredBusiness: BusinessTemplateState;
   setDesiredBusiness: React.Dispatch<React.SetStateAction<BusinessTemplateState>>;
+  setField: <K extends keyof FixedLocationFormState>(
+    key: K,
+    value: FixedLocationFormState[K],
+  ) => void;
   setTemplateSyncSettings: React.Dispatch<React.SetStateAction<TemplateSyncSettings>>;
   setTemplateSyncDraft: React.Dispatch<React.SetStateAction<TemplateSyncSettings>>;
   teamMembersFixed: TeamMemberUi[];
+  teamMembersDesired: TeamMemberUi[];
+  setTeamMembersFixed: React.Dispatch<React.SetStateAction<TeamMemberUi[]>>;
   setTeamMembersDesired: React.Dispatch<React.SetStateAction<TeamMemberUi[]>>;
   portfolioItemsFixed: Array<{ id: string; src: string }>;
+  portfolioItemsDesired: Array<{ id: string; src: string }>;
+  setPortfolioItemsFixed: React.Dispatch<
+    React.SetStateAction<Array<{ id: string; src: string }>>
+  >;
   setPortfolioItemsDesired: React.Dispatch<
     React.SetStateAction<Array<{ id: string; src: string }>>
   >;
@@ -115,12 +130,18 @@ export function useProfessionalFixedLocationSetupServices(
     servicesDesiredRef,
     setIsBusinessPublishEnabled,
     getCurrentBusinessState,
+    desiredBusiness,
     setDesiredBusiness,
+    setField,
     setTemplateSyncSettings,
     setTemplateSyncDraft,
     teamMembersFixed,
+    teamMembersDesired,
+    setTeamMembersFixed,
     setTeamMembersDesired,
     portfolioItemsFixed,
+    portfolioItemsDesired,
+    setPortfolioItemsFixed,
     setPortfolioItemsDesired,
     teamMembers,
     setTeamMembers,
@@ -297,52 +318,95 @@ export function useProfessionalFixedLocationSetupServices(
   );
 
   const applyTemplateSyncSettings = React.useCallback(
-    (settings: TemplateSyncSettings) => {
+    (settings: TemplateSyncSettings, sources: TemplateSyncSources = {}) => {
       const normalized = normalizeTemplateSyncSettings(settings);
-      const source = getCurrentBusinessState();
+      const fixedState = getCurrentBusinessState();
+      const sourceFor = (sectionId: ConfigurableSyncSectionId): TemplateSyncSource =>
+        sources[sectionId] ?? "fixed";
+
+      const fieldSections = ["serviceFor", "infoAndPolicy"] as const;
 
       setDesiredBusiness((prev) => {
         let next: BusinessTemplateState = {
           ...prev,
           // Profile is always synced from Fixed.
-          ...pickSectionFields(source as Record<string, unknown>, "profile"),
+          ...pickSectionFields(fixedState as Record<string, unknown>, "profile"),
         };
 
-        const applySection = (sectionId: "serviceFor" | "infoAndPolicy") => {
+        for (const sectionId of fieldSections) {
           // Independent keeps current content in both templates as-is.
-          if (normalized[sectionId] !== "sync") return;
+          if (normalized[sectionId] !== "sync") continue;
+          if (sourceFor(sectionId) !== "fixed") continue;
           next = {
             ...next,
             ...pickSectionFields(
-              source as Record<string, unknown>,
+              fixedState as Record<string, unknown>,
               sectionId,
             ),
           };
-        };
-
-        applySection("serviceFor");
-        applySection("infoAndPolicy");
+        }
         return next;
       });
 
+      for (const sectionId of fieldSections) {
+        if (normalized[sectionId] !== "sync") continue;
+        if (sourceFor(sectionId) !== "desired") continue;
+        const patch = pickSectionFields(
+          desiredBusiness as Record<string, unknown>,
+          sectionId,
+        );
+        for (const [key, value] of Object.entries(patch)) {
+          setField(
+            key as keyof FixedLocationFormState,
+            value as FixedLocationFormState[keyof FixedLocationFormState],
+          );
+        }
+      }
+
       if (normalized.servicesDetails === "sync") {
-        setServicesDesired(servicesFixed.map((item) => ({ ...item })));
-        setMainServicesDesired(mainServicesFixed.map((item) => ({ ...item })));
+        if (sourceFor("servicesDetails") === "desired") {
+          const nextServices = servicesDesired.map((item) => ({ ...item }));
+          const nextMains = mainServicesDesired.map((item) => ({ ...item }));
+          servicesFixedRef.current = nextServices;
+          setServicesFixed(nextServices);
+          setMainServicesFixed(nextMains);
+        } else {
+          const nextServices = servicesFixed.map((item) => ({ ...item }));
+          const nextMains = mainServicesFixed.map((item) => ({ ...item }));
+          servicesDesiredRef.current = nextServices;
+          setServicesDesired(nextServices);
+          setMainServicesDesired(nextMains);
+        }
       }
 
       if (normalized.manageTeam === "sync") {
-        setTeamMembersDesired(
-          teamMembersFixed.map((member) => ({
-            ...member,
-            pendingPhotoFile: null,
-          })),
-        );
+        if (sourceFor("manageTeam") === "desired") {
+          setTeamMembersFixed(
+            teamMembersDesired.map((member) => ({
+              ...member,
+              pendingPhotoFile: null,
+            })),
+          );
+        } else {
+          setTeamMembersDesired(
+            teamMembersFixed.map((member) => ({
+              ...member,
+              pendingPhotoFile: null,
+            })),
+          );
+        }
       }
 
       if (normalized.portfolio === "sync") {
-        setPortfolioItemsDesired(
-          portfolioItemsFixed.map((item) => ({ ...item })),
-        );
+        if (sourceFor("portfolio") === "desired") {
+          setPortfolioItemsFixed(
+            portfolioItemsDesired.map((item) => ({ ...item })),
+          );
+        } else {
+          setPortfolioItemsDesired(
+            portfolioItemsFixed.map((item) => ({ ...item })),
+          );
+        }
       }
 
       setTemplateSyncSettings(normalized);
@@ -350,10 +414,16 @@ export function useProfessionalFixedLocationSetupServices(
       setIsBusinessPublishEnabled(true);
     },
     [
+      desiredBusiness,
       getCurrentBusinessState,
+      mainServicesDesired,
       mainServicesFixed,
+      portfolioItemsDesired,
       portfolioItemsFixed,
+      servicesDesired,
       servicesFixed,
+      setField,
+      teamMembersDesired,
       teamMembersFixed,
     ],
   );
@@ -361,6 +431,78 @@ export function useProfessionalFixedLocationSetupServices(
   const teamBusinessServices = React.useMemo(
     () => buildTeamBusinessServiceRefs(activeServices),
     [activeServices],
+  );
+
+  const reusableTeamMembers = React.useMemo(() => {
+    if (!isBothOffering || templateSyncSettings.manageTeam === "sync") {
+      return [];
+    }
+    const otherMembers =
+      activeBusinessTemplate === "Fixed Location"
+        ? teamMembersDesired
+        : teamMembersFixed;
+    const currentKeys = new Set(
+      teamMembers
+        .filter((member) => member.id !== TEAM_MEMBER_DRAFT_PREVIEW_ID)
+        .map(
+          (member) =>
+            member.personKey ||
+            member.id ||
+            member.name.trim().toLowerCase(),
+        ),
+    );
+    return otherMembers
+      .filter((member) => {
+        const key =
+          member.personKey || member.id || member.name.trim().toLowerCase();
+        return Boolean(key) && !currentKeys.has(key);
+      })
+      .map((member) => ({
+        personKey: member.personKey || member.id,
+        name: member.name,
+        photoSrc: member.photoSrc,
+        pendingPhotoFile: member.pendingPhotoFile ?? null,
+      }));
+  }, [
+    activeBusinessTemplate,
+    isBothOffering,
+    teamMembers,
+    teamMembersDesired,
+    teamMembersFixed,
+    templateSyncSettings.manageTeam,
+  ]);
+
+  const syncTeamMemberIdentity = React.useCallback(
+    (
+      personKey: string,
+      patch: {
+        name: string;
+        photoSrc: string;
+        pendingPhotoFile?: File | null;
+      },
+    ) => {
+      const key = String(personKey ?? "").trim();
+      if (!key) return;
+      // Only the other template — active list is updated by the modal itself.
+      const apply = (list: TeamMemberUi[]) =>
+        list.map((member) =>
+          (member.personKey || member.id) === key
+            ? {
+                ...member,
+                personKey: member.personKey || key,
+                name: patch.name,
+                photoSrc: patch.photoSrc,
+                pendingPhotoFile: patch.pendingPhotoFile ?? null,
+              }
+            : member,
+        );
+      if (activeBusinessTemplate === "Fixed Location") {
+        setTeamMembersDesired(apply);
+      } else {
+        setTeamMembersFixed(apply);
+      }
+    },
+    [activeBusinessTemplate, setTeamMembersDesired, setTeamMembersFixed],
   );
 
   const buildTeamMemberServiceGroups = React.useCallback(
@@ -466,6 +608,8 @@ export function useProfessionalFixedLocationSetupServices(
     categoryTabs: serviceCategoryTabs,
     teamMembers,
     setTeamMembers,
+    reusableMembers: reusableTeamMembers,
+    onSyncIdentity: syncTeamMemberIdentity,
     onAfterLocalSave: () => setTeamServiceMenu(null),
     onMarkUnpublished: () => setIsBusinessPublishEnabled(true),
     onSaveBusinessSetup: onSaveBusinessSetup

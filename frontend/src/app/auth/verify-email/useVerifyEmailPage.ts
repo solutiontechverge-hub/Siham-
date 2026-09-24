@@ -11,7 +11,9 @@ export type VerifyUser = {
   user_type?: string;
   is_active?: boolean;
   email?: string;
+  email_changed?: boolean;
   stripe_connect_status?: string;
+  profile?: { validation_status?: string };
 };
 
 export function useVerifyEmailPage() {
@@ -64,16 +66,31 @@ export function useVerifyEmailPage() {
           // ignore
         }
 
+        if (user.email_changed) {
+          router.replace("/auth/email-verified?changed=1");
+          return;
+        }
+
         if (!user.is_active) {
           router.replace("/auth/account-not-approved?reason=inactive");
           return;
         }
 
+        // Pros stay in review until admin validates; clients skip that gate.
         if (user.user_type === "professional") {
-          const stripe = user.stripe_connect_status ?? "not_connected";
-          router.replace(
-            `/auth/account-approved?stripe=${encodeURIComponent(stripe)}`,
-          );
+          const validation = user.profile?.validation_status ?? "pending";
+          if (validation === "validated") {
+            const stripe = user.stripe_connect_status ?? "not_connected";
+            router.replace(
+              `/auth/account-approved?stripe=${encodeURIComponent(stripe)}`,
+            );
+            return;
+          }
+          if (validation === "not_validated") {
+            router.replace("/auth/account-not-approved?reason=inactive");
+            return;
+          }
+          router.replace("/auth/email-verified?review=1");
           return;
         }
 

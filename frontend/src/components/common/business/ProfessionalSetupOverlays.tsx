@@ -1,7 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { Box, Stack } from "@mui/material";
+import {
+  Box,
+  FormControlLabel,
+  Radio,
+  RadioGroup,
+  Stack,
+} from "@mui/material";
 import { alpha, type Theme } from "@mui/material/styles";
 import AppButton from "../AppButton";
 import AppModal, {
@@ -14,14 +20,21 @@ import type { BusinessCategoryLike } from "../../../data/businessServiceCategory
 import type {
   TeamMemberFormDraft,
   TeamMemberModalServiceContext,
+  TeamMemberServiceGroupSelection,
 } from "../../../data/businessTeamMemberModal.data";
 import type {
   BusinessServiceFormDraft,
   BusinessServiceModalMode,
 } from "../../../data/businessServiceModal.data";
 import {
+  CONFIGURABLE_SYNC_SECTION_IDS,
+  SYNC_SECTION_LABELS,
   createDefaultTemplateSyncSettings,
+  findIndependentToSyncNeedingSource,
+  type ConfigurableSyncSectionId,
   type TemplateSyncSettings,
+  type TemplateSyncSource,
+  type TemplateSyncSources,
 } from "../businessSetupTemplateSync";
 import type { ShowSnackbarOptions } from "../AppSnackbar";
 import TemplateSyncSettingsForm from "./TemplateSyncSettingsForm";
@@ -83,7 +96,11 @@ export type ProfessionalSetupOverlaysProps = {
   setTemplateSyncDraft: React.Dispatch<
     React.SetStateAction<TemplateSyncSettings>
   >;
-  applyTemplateSyncSettings: (settings: TemplateSyncSettings) => void;
+  applyTemplateSyncSettings: (
+    settings: TemplateSyncSettings,
+    sources?: TemplateSyncSources,
+  ) => void;
+  sectionNeedsSyncSource: (sectionId: ConfigurableSyncSectionId) => boolean;
   businessFormDisabled: boolean;
   setBusinessOfferingSelect: (v: OfferingSelectOption) => void;
   onSwitchActiveBusinessTemplate: (opt: OfferingOption) => void;
@@ -113,6 +130,7 @@ export function ProfessionalSetupOverlays({
   templateSyncDraft,
   setTemplateSyncDraft,
   applyTemplateSyncSettings,
+  sectionNeedsSyncSource,
   businessFormDisabled,
   setBusinessOfferingSelect,
   onSwitchActiveBusinessTemplate,
@@ -123,6 +141,48 @@ export function ProfessionalSetupOverlays({
   teamMemberModal,
   serviceModal,
 }: ProfessionalSetupOverlaysProps) {
+  const [pendingSyncSources, setPendingSyncSources] =
+    React.useState<TemplateSyncSources>({});
+  const [syncSourcePrompt, setSyncSourcePrompt] = React.useState<{
+    sectionId: ConfigurableSyncSectionId;
+    pendingDraft: TemplateSyncSettings;
+  } | null>(null);
+  const [syncSourceChoice, setSyncSourceChoice] =
+    React.useState<TemplateSyncSource>("fixed");
+
+  const handleTemplateSyncDraftChange = React.useCallback(
+    (next: TemplateSyncSettings) => {
+      const needingSource = findIndependentToSyncNeedingSource(
+        templateSyncDraft,
+        next,
+        sectionNeedsSyncSource,
+      );
+      if (needingSource) {
+        setSyncSourceChoice("fixed");
+        setSyncSourcePrompt({
+          sectionId: needingSource,
+          pendingDraft: next,
+        });
+        return;
+      }
+      setPendingSyncSources((prev) => {
+        const cleaned: TemplateSyncSources = { ...prev };
+        for (const sectionId of CONFIGURABLE_SYNC_SECTION_IDS) {
+          if (next[sectionId] !== "sync") delete cleaned[sectionId];
+        }
+        return cleaned;
+      });
+      setTemplateSyncDraft(next);
+    },
+    [sectionNeedsSyncSource, setTemplateSyncDraft, templateSyncDraft],
+  );
+
+  const closeTemplateSyncDrawer = React.useCallback(() => {
+    setSyncSourcePrompt(null);
+    setPendingSyncSources({});
+    setTemplateSyncDrawerOpen(false);
+  }, [setTemplateSyncDrawerOpen]);
+
   return (
     <>
       <AppModal
@@ -250,10 +310,71 @@ export function ProfessionalSetupOverlays({
         </Box>
       </AppModal>
 
+      <AppModal
+        open={Boolean(syncSourcePrompt)}
+        onClose={() => setSyncSourcePrompt(null)}
+        title={
+          syncSourcePrompt
+            ? `Sync ${SYNC_SECTION_LABELS[syncSourcePrompt.sectionId]}?`
+            : "Sync section?"
+        }
+        maxWidth="xs"
+        fullWidth
+        contentSx={{ px: 2.5, py: 1.5 }}
+        footerVariant="actions"
+        footer={
+          <>
+            <AppModalCancelButton onClick={() => setSyncSourcePrompt(null)} />
+            <AppModalPrimaryButton
+              label="Sync"
+              onClick={() => {
+                if (!syncSourcePrompt) return;
+                const { sectionId, pendingDraft } = syncSourcePrompt;
+                const sources: TemplateSyncSources = {
+                  ...pendingSyncSources,
+                  [sectionId]: syncSourceChoice,
+                };
+                applyTemplateSyncSettings(pendingDraft, sources);
+                setPendingSyncSources({});
+                setSyncSourcePrompt(null);
+                showSnackbar({
+                  severity: "success",
+                  message: "Template sync settings saved.",
+                });
+              }}
+            />
+          </>
+        }
+      >
+        <Typography
+          sx={{ fontSize: 13, color: alpha(m.navy, 0.68), lineHeight: 1.5, mb: 1.5 }}
+        >
+          Choose which template is the source. Unique edits on the other
+          template will be overwritten.
+        </Typography>
+        <RadioGroup
+          value={syncSourceChoice}
+          onChange={(e) =>
+            setSyncSourceChoice(e.target.value as TemplateSyncSource)
+          }
+        >
+          <FormControlLabel
+            value="fixed"
+            control={<Radio size="small" />}
+            label="Fixed Location"
+          />
+          <FormControlLabel
+            value="desired"
+            control={<Radio size="small" />}
+            label="Desired Location"
+          />
+        </RadioGroup>
+      </AppModal>
+
       <AppDrawer
         anchor="right"
         open={templateSyncDrawerOpen}
-        onClose={() => setTemplateSyncDrawerOpen(false)}
+        onClose={closeTemplateSyncDrawer}
         title="Template Sync Settings"
         subtitle="Control how each section is shared between your Fixed Location and Desired Location templates."
         contentSx={{ px: 2.5, py: 2 }}
@@ -266,7 +387,7 @@ export function ProfessionalSetupOverlays({
           >
             <AppButton
               tone="secondary"
-              onClick={() => setTemplateSyncDrawerOpen(false)}
+              onClick={closeTemplateSyncDrawer}
               disabled={businessFormDisabled}
               sx={{ px: 3 }}
             >
@@ -275,7 +396,8 @@ export function ProfessionalSetupOverlays({
             <AppButton
               tone="primary"
               onClick={() => {
-                applyTemplateSyncSettings(templateSyncDraft);
+                applyTemplateSyncSettings(templateSyncDraft, pendingSyncSources);
+                setPendingSyncSources({});
                 setTemplateSyncDrawerOpen(false);
                 showSnackbar({
                   severity: "success",
@@ -293,7 +415,7 @@ export function ProfessionalSetupOverlays({
         <TemplateSyncSettingsForm
           value={templateSyncDraft}
           disabled={businessFormDisabled}
-          onChange={setTemplateSyncDraft}
+          onChange={handleTemplateSyncDraftChange}
         />
       </AppDrawer>
 

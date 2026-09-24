@@ -371,6 +371,7 @@ export function useProfessionalFixedLocationSetupHydration(
         );
         return {
           id: String(member.id ?? `tm-${member.display_order}`),
+          personKey: String(member.id ?? `tm-${member.display_order}`),
           name: member.full_name,
           role: member.role,
           photoSrc: member.profile_photo || "",

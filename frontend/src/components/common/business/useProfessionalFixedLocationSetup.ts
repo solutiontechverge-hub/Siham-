@@ -18,7 +18,10 @@ import { toIsoLocalDate } from "../calendar/calendar.utils";
 import { useSnackbar } from "../AppSnackbar";
 import {
   createDefaultTemplateSyncSettings,
+  pickSectionFields,
+  sectionNeedsSyncSourceChoice,
   shouldLiveSyncField,
+  type ConfigurableSyncSectionId,
   type TemplateSyncSettings,
 } from "../businessSetupTemplateSync";
 import { MAX_BUSINESS_KEYWORDS } from "./professionalFixedLocationSetup.data";
@@ -704,12 +707,18 @@ export function useProfessionalFixedLocationSetup({
     servicesDesiredRef,
     setIsBusinessPublishEnabled,
     getCurrentBusinessState,
+    desiredBusiness,
     setDesiredBusiness,
+    setField,
     setTemplateSyncSettings,
     setTemplateSyncDraft,
     teamMembersFixed,
+    teamMembersDesired,
+    setTeamMembersFixed,
     setTeamMembersDesired,
     portfolioItemsFixed,
+    portfolioItemsDesired,
+    setPortfolioItemsFixed,
     setPortfolioItemsDesired,
     teamMembers,
     setTeamMembers,
@@ -724,6 +733,62 @@ export function useProfessionalFixedLocationSetup({
     notifyBusinessSetupPersisted,
     showSnackbar,
   });
+
+  const sectionNeedsSyncSource = React.useCallback(
+    (sectionId: ConfigurableSyncSectionId) => {
+      const fixed = getCurrentBusinessState();
+      switch (sectionId) {
+        case "serviceFor":
+          return sectionNeedsSyncSourceChoice(
+            pickSectionFields(fixed as Record<string, unknown>, "serviceFor"),
+            pickSectionFields(
+              desiredBusiness as Record<string, unknown>,
+              "serviceFor",
+            ),
+          );
+        case "infoAndPolicy":
+          return sectionNeedsSyncSourceChoice(
+            pickSectionFields(
+              fixed as Record<string, unknown>,
+              "infoAndPolicy",
+            ),
+            pickSectionFields(
+              desiredBusiness as Record<string, unknown>,
+              "infoAndPolicy",
+            ),
+          );
+        case "servicesDetails":
+          return sectionNeedsSyncSourceChoice(
+            { services: servicesFixed, mains: mainServicesFixed },
+            { services: servicesDesired, mains: mainServicesDesired },
+          );
+        case "manageTeam":
+          return sectionNeedsSyncSourceChoice(
+            teamMembersFixed,
+            teamMembersDesired,
+          );
+        case "portfolio":
+          return sectionNeedsSyncSourceChoice(
+            portfolioItemsFixed,
+            portfolioItemsDesired,
+          );
+        default:
+          return false;
+      }
+    },
+    [
+      desiredBusiness,
+      getCurrentBusinessState,
+      mainServicesDesired,
+      mainServicesFixed,
+      portfolioItemsDesired,
+      portfolioItemsFixed,
+      servicesDesired,
+      servicesFixed,
+      teamMembersDesired,
+      teamMembersFixed,
+    ],
+  );
 
   const { hydratedBusinessRef } = useProfessionalFixedLocationSetupHydration({
     businessSetupData,
@@ -964,6 +1029,7 @@ export function useProfessionalFixedLocationSetup({
     selectedPortfolioIds,
     serviceCategoryTabs,
     serviceForDisabled,
+    sectionNeedsSyncSource,
     serviceModal,
     servicesDesired,
     servicesDesiredRef,

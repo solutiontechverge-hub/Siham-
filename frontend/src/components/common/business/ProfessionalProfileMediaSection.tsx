@@ -44,6 +44,8 @@ export type ProfessionalProfileMediaSectionProps = {
   m: Theme["palette"]["mollure"];
   data: { profile: ProfileCopy };
   action: React.ReactNode;
+  /** When false, name field is in Fixed Location address (freelancer Salon Name). */
+  showSalonName?: boolean;
   mediaSlides: string[];
   mediaIdx: number;
   setMediaIdx: React.Dispatch<React.SetStateAction<number>>;
@@ -69,6 +71,7 @@ export function ProfessionalProfileMediaSection({
   m,
   data,
   action,
+  showSalonName = true,
   mediaSlides,
   mediaIdx,
   setMediaIdx,
@@ -313,12 +316,14 @@ export function ProfessionalProfileMediaSection({
               width: "100%",
             }}
           >
-            <MollureFormField
-              label={data.profile.nameLabel}
-              value={biz.profileName}
-              onChange={(e) => setBizField("profileName", e.target.value)}
-              disabled={profileDisabled}
-            />
+            {showSalonName ? (
+              <MollureFormField
+                label="Business Name"
+                value={biz.profileName}
+                onChange={(e) => setBizField("profileName", e.target.value)}
+                disabled={profileDisabled}
+              />
+            ) : null}
             <MollureFormField
               label={data.profile.aboutLabel}
               value={biz.about}

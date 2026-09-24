@@ -4,8 +4,10 @@ import {
   buildAccountApprovedEmail,
   buildAccountNotApprovedEmail,
   buildAccountUnderReviewEmail,
+  buildChangeEmailVerifyEmail,
   buildContactAcknowledgmentEmail,
   buildContactReplyEmail,
+  buildEmailChangeAlertEmail,
   buildNotRegisteredProfessionalEmail,
   buildPostVerificationProEmail,
   buildSignupConfirmationEmail,
@@ -16,6 +18,8 @@ import {
 export const AUTH_EMAIL_TYPES = {
   SIGNUP_CONFIRMATION: "signup_confirmation",
   VERIFY_EMAIL: "verify_email",
+  CHANGE_EMAIL_VERIFY: "change_email_verify",
+  EMAIL_CHANGE_ALERT: "email_change_alert",
   POST_VERIFICATION_PRO: "post_verification_pro",
   ACCOUNT_UNDER_REVIEW: "account_under_review",
   ACCOUNT_APPROVED: "account_approved",
@@ -32,19 +36,27 @@ const EMAIL_BUILDERS = {
     build: buildSignupConfirmationEmail,
   },
   [AUTH_EMAIL_TYPES.VERIFY_EMAIL]: {
-    subject: "Please verify your email",
+    subject: "One last step — verify your email",
     build: buildVerifyEmailEmail,
   },
+  [AUTH_EMAIL_TYPES.CHANGE_EMAIL_VERIFY]: {
+    subject: "Confirm your new Mollure email",
+    build: buildChangeEmailVerifyEmail,
+  },
+  [AUTH_EMAIL_TYPES.EMAIL_CHANGE_ALERT]: {
+    subject: "Email change requested on your Mollure account",
+    build: buildEmailChangeAlertEmail,
+  },
   [AUTH_EMAIL_TYPES.POST_VERIFICATION_PRO]: {
-    subject: "Email verified — next steps",
+    subject: "Your email has been verified — account under review",
     build: buildPostVerificationProEmail,
   },
   [AUTH_EMAIL_TYPES.ACCOUNT_UNDER_REVIEW]: {
-    subject: "Your account is under review",
+    subject: "Your email has been verified — account under review",
     build: buildAccountUnderReviewEmail,
   },
   [AUTH_EMAIL_TYPES.ACCOUNT_APPROVED]: {
-    subject: "Your Mollure account has been approved",
+    subject: "Your Mollure account is approved",
     build: buildAccountApprovedEmail,
   },
   [AUTH_EMAIL_TYPES.ACCOUNT_NOT_APPROVED]: {
@@ -52,7 +64,7 @@ const EMAIL_BUILDERS = {
     build: buildAccountNotApprovedEmail,
   },
   [AUTH_EMAIL_TYPES.STRIPE_ONBOARDING]: {
-    subject: "Complete your Stripe onboarding",
+    subject: "Welcome to Mollure — finalize Stripe onboarding",
     build: buildStripeOnboardingEmail,
   },
   [AUTH_EMAIL_TYPES.NOT_REGISTERED_PROFESSIONAL]: {
@@ -177,6 +189,15 @@ export const notifySignupConfirmation = (userId) =>
 export const notifyVerifyEmail = async (email, token) =>
   sendDirectAuthEmail(email, AUTH_EMAIL_TYPES.VERIFY_EMAIL, { token });
 
+export const notifyChangeEmailVerify = async (newEmail, token) =>
+  sendDirectAuthEmail(newEmail, AUTH_EMAIL_TYPES.CHANGE_EMAIL_VERIFY, {
+    token,
+    newEmail,
+  });
+
+export const notifyEmailChangeAlert = async (oldEmail, newEmail) =>
+  sendDirectAuthEmail(oldEmail, AUTH_EMAIL_TYPES.EMAIL_CHANGE_ALERT, { newEmail });
+
 /** Sends only the verification email after password signup. Welcome/confirmation is sent after verify. */
 export const sendSignupEmails = async (_userId, { email, token }) => {
   const results = {
@@ -201,6 +222,7 @@ export const notifyAccountUnderReview = (userId) =>
   sendAuthEmailOnce(userId, AUTH_EMAIL_TYPES.ACCOUNT_UNDER_REVIEW);
 
 export const notifyAccountApproved = async (userId) => {
+  // Approved + Stripe CTA (design screens 3/5). One email — avoid duplicate nudge.
   await sendAuthEmailOnce(userId, AUTH_EMAIL_TYPES.ACCOUNT_APPROVED);
   await sendAuthEmailOnce(userId, AUTH_EMAIL_TYPES.STRIPE_ONBOARDING);
 };

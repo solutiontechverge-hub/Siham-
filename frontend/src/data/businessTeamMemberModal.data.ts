@@ -52,6 +52,8 @@ export type TeamMemberFormDraft = {
   selectedGroups: TeamMemberServiceGroupSelection[];
   categoryId: string;
   serviceId: string;
+  /** Stable identity across FL/DL templates (name/photo shared). */
+  personKey?: string;
 };
 
 export const businessTeamMemberModalCopy = {
@@ -64,6 +66,8 @@ export const businessTeamMemberModalCopy = {
   uploadProfileLabel: "Upload profile",
   nameLabel: "Name",
   namePlaceholder: "Enter team member name",
+  selectExistingLabel: "Select existing team member",
+  selectExistingPlaceholder: "Choose from other template",
   selectCategoryLabel: "Select category",
   selectServicesLabel: "Select services",
   selectedHeading: "Selected Category & Services",
@@ -99,13 +103,34 @@ type BusinessCategoryWithSubs = BusinessCategoryLike & {
   subcategories?: Array<{ id: string | number; title: string }>;
 };
 
+/** Nested under another assignable service → sub-service; exclude from team picker. */
+export function isNestedTeamSubservice(
+  service: { id?: string; parentServiceId?: string },
+  allServiceIds: ReadonlySet<string>,
+): boolean {
+  const parentId = String(service.parentServiceId ?? "").trim();
+  if (!parentId) return false;
+  if (parentId.startsWith("main-") && parentId.endsWith("-hydrated")) return false;
+  return allServiceIds.has(parentId);
+}
+
 export function buildTeamBusinessServiceRefs(
-  subservices: readonly { serviceId: string; categoryId: string; name: string }[],
+  subservices: readonly {
+    serviceId: string;
+    categoryId: string;
+    name: string;
+    id?: string;
+    parentServiceId?: string;
+  }[],
 ): TeamBusinessServiceRef[] {
+  const allIds = new Set(
+    subservices.map((item) => String(item.id ?? item.serviceId ?? "").trim()).filter(Boolean),
+  );
   const seen = new Set<string>();
   const refs: TeamBusinessServiceRef[] = [];
 
   for (const item of subservices) {
+    if (isNestedTeamSubservice(item, allIds)) continue;
     const serviceId = String(item.serviceId ?? "").trim();
     if (!serviceId || seen.has(serviceId)) continue;
     seen.add(serviceId);
@@ -337,6 +362,47 @@ export function addTeamMemberServiceSelection(
   return {
     ...draft,
     selectedGroups,
+    serviceId: "",
+  };
+}
+
+/** Replace the selected services for one category (Cell 2 multi-select). */
+export function setTeamMemberCategoryServices(
+  draft: TeamMemberFormDraft,
+  categoryId: string,
+  serviceIds: readonly string[],
+  businessCategories: readonly BusinessCategoryLike[],
+  context: TeamMemberModalServiceContext = {},
+): TeamMemberFormDraft {
+  const category = resolveTeamCategoryRecord(categoryId, businessCategories, context);
+  if (!category) return draft;
+
+  const uniqueIds = Array.from(
+    new Set(
+      serviceIds
+        .map((id) => String(id ?? "").trim())
+        .filter((id) => id && id !== TEAM_MEMBER_ALL_SERVICES_VALUE),
+    ),
+  );
+
+  const withoutCategory = draft.selectedGroups.filter(
+    (group) => group.categoryId !== category.id,
+  );
+
+  if (uniqueIds.length === 0) {
+    return { ...draft, selectedGroups: withoutCategory, serviceId: "" };
+  }
+
+  return {
+    ...draft,
+    selectedGroups: [
+      ...withoutCategory,
+      {
+        categoryId: category.id,
+        categoryTitle: category.title,
+        subServiceIds: uniqueIds,
+      },
+    ],
     serviceId: "",
   };
 }

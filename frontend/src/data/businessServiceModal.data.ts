@@ -295,6 +295,36 @@ export function applyBusinessServiceDiscount(
   };
 }
 
+/** Visible chip/label when a discount amount is configured (date window optional). */
+export function formatBusinessServiceDiscountFeatureLabel(
+  source?: BusinessServiceDiscountSource | null,
+): string | null {
+  const fields = readBusinessServiceDiscountFields(source);
+  const amount = parseEuroAmountString(fields.discountAmount);
+  if (amount === null || amount <= 0) return null;
+  if (fields.discountType === "percent") {
+    if (amount > 100) return null;
+    return `${amount}% Discount`;
+  }
+  return `€${amount} Discount`;
+}
+
+/** Description + validity dates for hover (empty when neither is set). */
+export function formatBusinessServiceDiscountTooltip(
+  source?: BusinessServiceDiscountSource | null,
+): string {
+  const fields = readBusinessServiceDiscountFields(source);
+  const lines: string[] = [];
+  const desc = fields.discountDescription.trim();
+  if (desc) lines.push(desc);
+  const start = fields.discountStartDate;
+  const end = fields.discountEndDate;
+  if (start && end) lines.push(`${start} – ${end}`);
+  else if (start) lines.push(`From ${start}`);
+  else if (end) lines.push(`Until ${end}`);
+  return lines.join("\n");
+}
+
 export function sanitizeDurationHours(value: string): string {
   return value.replace(/\D/g, "").slice(0, 2);
 }

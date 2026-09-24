@@ -2,12 +2,13 @@
 
 import * as React from "react";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
-import { Box, IconButton, MenuItem, Paper, Typography } from "@mui/material";
+import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
+import { Box, IconButton, Popover, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import { MollureLabeledSelect } from "../MollureLabeledFields";
 import {
   businessTeamMemberModalCopy,
-  flattenTeamMemberAssignedServices,
+  formatTeamMemberGroupLabel,
+  getTeamMemberGroupServiceLabels,
   type TeamMemberModalServiceContext,
   type TeamMemberServiceGroupSelection,
 } from "../../../data/businessTeamMemberModal.data";
@@ -19,6 +20,7 @@ type TeamMemberAssignedServicesPanelProps = {
   serviceContext: TeamMemberModalServiceContext;
   disabled?: boolean;
   onRemoveService: (serviceId: string) => void;
+  onChangeGroups?: (groups: TeamMemberServiceGroupSelection[]) => void;
 };
 
 export default function TeamMemberAssignedServicesPanel({
@@ -27,56 +29,24 @@ export default function TeamMemberAssignedServicesPanel({
   serviceContext,
   disabled = false,
   onRemoveService,
+  onChangeGroups,
 }: TeamMemberAssignedServicesPanelProps) {
   const m = useTheme().palette.mollure;
+  const [menu, setMenu] = React.useState<{
+    anchorEl: HTMLElement;
+    categoryId: string;
+  } | null>(null);
 
-  const assignedServices = React.useMemo(
-    () =>
-      flattenTeamMemberAssignedServices(
-        selectedGroups,
+  const openGroup =
+    selectedGroups.find((group) => group.categoryId === menu?.categoryId) ??
+    null;
+  const openLabels = openGroup
+    ? getTeamMemberGroupServiceLabels(
+        openGroup,
         businessCategories,
         serviceContext,
-      ),
-    [selectedGroups, businessCategories, serviceContext],
-  );
-
-  const [selectedServiceId, setSelectedServiceId] = React.useState("");
-
-  React.useEffect(() => {
-    if (assignedServices.length === 0) {
-      setSelectedServiceId("");
-      return;
-    }
-    if (!assignedServices.some((s) => s.serviceId === selectedServiceId)) {
-      setSelectedServiceId(assignedServices[0]?.serviceId ?? "");
-    }
-  }, [assignedServices, selectedServiceId]);
-
-  const selectedService =
-    assignedServices.find((s) => s.serviceId === selectedServiceId) ??
-    assignedServices[0] ??
-    null;
-  const spansMultipleCategories =
-    new Set(assignedServices.map((s) => s.categoryId)).size > 1;
-
-  const removeButton = (
-    serviceId: string | undefined,
-    label: string,
-    mt: number,
-  ) => (
-    <IconButton
-      size="small"
-      aria-label={label}
-      onClick={() => {
-        if (!serviceId) return;
-        onRemoveService(serviceId);
-      }}
-      disabled={disabled || !serviceId}
-      sx={{ color: alpha(m.navy, 0.45), mt }}
-    >
-      <DeleteOutlineRoundedIcon sx={{ fontSize: 20 }} />
-    </IconButton>
-  );
+      )
+    : [];
 
   return (
     <Box
@@ -100,98 +70,168 @@ export default function TeamMemberAssignedServicesPanel({
         {businessTeamMemberModalCopy.selectedHeading}
       </Typography>
 
-      {assignedServices.length === 0 ? (
+      {selectedGroups.length === 0 ? (
         <Typography sx={{ fontSize: 13, color: alpha(m.navy, 0.5) }}>
           {businessTeamMemberModalCopy.noSelections}
         </Typography>
       ) : (
-        <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.75 }}>
-          {assignedServices.length === 1 ? (
-            <>
-              <Paper
-                elevation={0}
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+          {selectedGroups.map((group) => {
+            const label = formatTeamMemberGroupLabel(
+              group,
+              businessCategories,
+              serviceContext,
+            );
+            const isOpen = menu?.categoryId === group.categoryId;
+            return (
+              <Box
+                key={group.categoryId}
+                sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}
+              >
+                <Box
+                  component="button"
+                  type="button"
+                  disabled={disabled}
+                  onClick={(e) => {
+                    if (disabled) return;
+                    setMenu({
+                      anchorEl: e.currentTarget,
+                      categoryId: group.categoryId,
+                    });
+                  }}
+                  sx={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 0.75,
+                    minWidth: 160,
+                    maxWidth: 220,
+                    minHeight: 42,
+                    px: 1.5,
+                    py: 0,
+                    borderRadius: "10px",
+                    border: `1.5px solid ${
+                      isOpen ? alpha(m.teal, 0.45) : alpha(m.teal, 0.22)
+                    }`,
+                    bgcolor: "#fff",
+                    cursor: disabled ? "not-allowed" : "pointer",
+                    font: "inherit",
+                    color: alpha(m.navy, 0.82),
+                    opacity: disabled ? 0.72 : 1,
+                  }}
+                >
+                  <Typography
+                    component="span"
+                    sx={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {label}
+                  </Typography>
+                  <KeyboardArrowDownRoundedIcon
+                    sx={{
+                      fontSize: 18,
+                      color: alpha(m.navy, 0.4),
+                      transform: isOpen ? "rotate(180deg)" : "none",
+                      transition: "transform 0.2s ease",
+                    }}
+                  />
+                </Box>
+                <IconButton
+                  size="small"
+                  aria-label={`Remove ${group.categoryTitle}`}
+                  disabled={disabled}
+                  onClick={() => {
+                    if (onChangeGroups) {
+                      onChangeGroups(
+                        selectedGroups.filter(
+                          (g) => g.categoryId !== group.categoryId,
+                        ),
+                      );
+                      return;
+                    }
+                    for (const serviceId of group.subServiceIds) {
+                      onRemoveService(serviceId);
+                    }
+                  }}
+                  sx={{ color: alpha(m.navy, 0.45) }}
+                >
+                  <DeleteOutlineRoundedIcon sx={{ fontSize: 18 }} />
+                </IconButton>
+              </Box>
+            );
+          })}
+        </Box>
+      )}
+
+      <Popover
+        anchorEl={menu?.anchorEl}
+        open={Boolean(menu)}
+        onClose={() => setMenu(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+        transformOrigin={{ vertical: "top", horizontal: "left" }}
+        slotProps={{
+          paper: {
+            sx: {
+              mt: 0.75,
+              p: 1,
+              borderRadius: "12px",
+              border: `1px solid ${alpha(m.teal, 0.18)}`,
+              boxShadow: "0 14px 32px rgba(16, 35, 63, 0.14)",
+              minWidth: 200,
+              maxWidth: 300,
+            },
+          },
+        }}
+      >
+        <Stack spacing={0.65}>
+          {openGroup && openLabels.length > 0 ? (
+            openGroup.subServiceIds.map((serviceId, index) => (
+              <Box
+                key={serviceId}
                 sx={{
-                  flex: 1,
-                  minWidth: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.5,
+                  px: 1.25,
+                  py: 0.85,
                   borderRadius: "10px",
-                  border: `1px solid ${alpha(m.teal, 0.22)}`,
-                  px: 1.75,
-                  py: 1.35,
+                  border: `1px solid ${alpha(m.navy, 0.1)}`,
                   bgcolor: "#fff",
-                  boxShadow: "0 2px 8px rgba(16, 35, 63, 0.06)",
                 }}
               >
                 <Typography
                   sx={{
-                    fontSize: 13.5,
-                    fontWeight: 800,
-                    color: alpha(m.navy, 0.88),
-                    lineHeight: 1.25,
-                  }}
-                >
-                  {assignedServices[0].label}
-                </Typography>
-                <Typography
-                  sx={{
-                    fontSize: 11.5,
+                    flex: 1,
+                    fontSize: 13,
                     fontWeight: 600,
-                    color: alpha(m.navy, 0.48),
-                    mt: 0.35,
+                    color: alpha(m.navy, 0.7),
                   }}
                 >
-                  {assignedServices[0].categoryTitle}
+                  {openLabels[index] ?? serviceId}
                 </Typography>
-              </Paper>
-              {removeButton(
-                assignedServices[0].serviceId,
-                `Remove ${assignedServices[0].label}`,
-                0.5,
-              )}
-            </>
-          ) : (
-            <>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <MollureLabeledSelect
-                  fieldLabel={businessTeamMemberModalCopy.selectServicesLabel}
-                  value={selectedServiceId}
-                  onChange={(e) =>
-                    setSelectedServiceId(String(e.target.value ?? ""))
-                  }
+                <IconButton
+                  size="small"
+                  aria-label={`Remove ${openLabels[index] ?? serviceId}`}
                   disabled={disabled}
-                  sx={{ bgcolor: "#fff", borderRadius: "10px" }}
+                  onClick={() => onRemoveService(serviceId)}
+                  sx={{ color: alpha(m.navy, 0.4) }}
                 >
-                  {assignedServices.map((service) => (
-                    <MenuItem key={service.serviceId} value={service.serviceId}>
-                      {spansMultipleCategories
-                        ? `${service.label} (${service.categoryTitle})`
-                        : service.label}
-                    </MenuItem>
-                  ))}
-                </MollureLabeledSelect>
-                {selectedService ? (
-                  <Typography
-                    sx={{
-                      mt: 0.75,
-                      px: 0.5,
-                      fontSize: 11.5,
-                      color: alpha(m.navy, 0.58),
-                    }}
-                  >
-                    {selectedService.categoryTitle}
-                  </Typography>
-                ) : null}
+                  <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
+                </IconButton>
               </Box>
-              {removeButton(
-                selectedService?.serviceId,
-                selectedService
-                  ? `Remove ${selectedService.label}`
-                  : "Remove selected service",
-                3.25,
-              )}
-            </>
+            ))
+          ) : (
+            <Typography sx={{ fontSize: 12, color: alpha(m.navy, 0.5), px: 0.5 }}>
+              {businessTeamMemberModalCopy.noSelectionsInCategory}
+            </Typography>
           )}
-        </Box>
-      )}
+        </Stack>
+      </Popover>
     </Box>
   );
 }

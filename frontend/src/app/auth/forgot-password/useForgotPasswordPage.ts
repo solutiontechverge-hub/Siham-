@@ -19,6 +19,11 @@ export function useForgotPasswordPage() {
 
   const cardBorder = m.cardBorder ?? alpha(m.navy, 0.12);
 
+  React.useEffect(() => {
+    const saved = window.sessionStorage.getItem(RESET_EMAIL_KEY) || "";
+    if (saved) setEmail(saved);
+  }, []);
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
