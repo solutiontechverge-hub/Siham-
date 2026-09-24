@@ -22,10 +22,10 @@ import AppButton from "../AppButton";
 import AppCountryPhoneFields from "../AppCountryPhoneFields";
 import {
   MollureLabeledField,
-  MollureLabeledPasswordField,
   MollureTextField,
 } from "../MollureLabeledFields";
 import { PROFILE_IMAGE_FILE_ACCEPT } from "../../../lib/profileImageUpload";
+import { INPUT_LIMITS, parseText } from "../../../lib/inputSchema";
 import {
   formatContactPhone,
   getPhoneValidationErrors,
@@ -87,10 +87,6 @@ export type ProfessionalAccountSectionProps = {
   ) => void;
   setIsProfessionalEditing: (editing: boolean) => void;
 };
-
-function isValidEmail(email: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-}
 
 function isValidName(name: string) {
   const trimmed = name.trim();
@@ -497,23 +493,44 @@ export function ProfessionalAccountSection({
         </Grid>
         <Grid item xs={12}>
           <MollureLabeledField
-            fieldLabel="Email"
+            fieldLabel="Email (Non Editable)"
             labelPlacement="inCell"
             placeholder="you@gmail.com"
             value={values.contactEmail}
-            onChange={(e) => {
-              setField("contactEmail", e.target.value);
-              setProfileErrors((prev) =>
-                prev.contactEmail
-                  ? { ...prev, contactEmail: undefined }
-                  : prev,
-              );
-            }}
-            disabled={professionalFieldsDisabled}
-            error={Boolean(profileErrors.contactEmail)}
-            helperText={profileErrors.contactEmail}
+            disabled
             required
           />
+          <Box
+            sx={{
+              mt: 0.75,
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 2,
+            }}
+          >
+            <Link
+              href="/auth/change-email"
+              style={{
+                fontSize: "0.8125rem",
+                color: alpha(m.navy, 0.52),
+                textDecoration: "none",
+                fontWeight: 500,
+              }}
+            >
+              Change email
+            </Link>
+            <Link
+              href="/auth/change-password"
+              style={{
+                fontSize: "0.8125rem",
+                color: alpha(m.navy, 0.52),
+                textDecoration: "none",
+                fontWeight: 500,
+              }}
+            >
+              Change password
+            </Link>
+          </Box>
         </Grid>
         <Grid item xs={12}>
           <AppCountryPhoneFields
@@ -540,46 +557,6 @@ export function ProfessionalAccountSection({
             disabled={professionalFieldsDisabled}
             required
             phonePlaceholder="Enter phone number"
-          />
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <MollureLabeledPasswordField
-            fieldLabel="Password"
-            labelPlacement="inCell"
-            placeholder="Enter password"
-            value={values.contactPassword}
-            onChange={(e) => {
-              setField("contactPassword", e.target.value);
-              setProfileErrors((prev) =>
-                prev.contactPassword
-                  ? { ...prev, contactPassword: undefined }
-                  : prev,
-              );
-            }}
-            disabled={professionalFieldsDisabled}
-            error={Boolean(profileErrors.contactPassword)}
-            helperText={profileErrors.contactPassword}
-            required
-          />
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <MollureLabeledPasswordField
-            fieldLabel="Repeat password"
-            labelPlacement="inCell"
-            placeholder="Confirm password"
-            value={values.contactRepeatPassword}
-            onChange={(e) => {
-              setField("contactRepeatPassword", e.target.value);
-              setProfileErrors((prev) =>
-                prev.contactRepeatPassword
-                  ? { ...prev, contactRepeatPassword: undefined }
-                  : prev,
-              );
-            }}
-            disabled={professionalFieldsDisabled}
-            error={Boolean(profileErrors.contactRepeatPassword)}
-            helperText={profileErrors.contactRepeatPassword}
-            required
           />
         </Grid>
       </Grid>
@@ -651,10 +628,13 @@ export function ProfessionalAccountSection({
               const nextErrors: Partial<
                 Record<ProfileValidationField, string>
               > = {};
-              if (!isValidEmail(values.contactEmail))
-                nextErrors.contactEmail = "Enter a valid email address.";
-              if (!isValidName(values.companyLegalName))
-                nextErrors.companyLegalName = "Enter a valid legal name.";
+              // Legal names may include corporate suffixes (B.V., N.V., Ltd., Inc.) — same rules as signup parseText.
+              const legalName = parseText(values.companyLegalName, {
+                label: "Legal name",
+                max: INPUT_LIMITS.personName,
+              });
+              if (!legalName.ok)
+                nextErrors.companyLegalName = legalName.error;
               if (!isValidName(values.contactFirstName))
                 nextErrors.contactFirstName = "Enter a valid first name.";
               if (!isValidName(values.contactLastName))
@@ -671,24 +651,6 @@ export function ProfessionalAccountSection({
               if (phoneErrors.phone)
                 nextErrors.contactPhone = phoneErrors.phone;
 
-              const password = values.contactPassword.trim();
-              const repeatPassword = values.contactRepeatPassword.trim();
-              if (password || repeatPassword) {
-                if (!password)
-                  nextErrors.contactPassword = "Password is required.";
-                if (!repeatPassword)
-                  nextErrors.contactRepeatPassword =
-                    "Repeat password is required.";
-                if (
-                  password &&
-                  repeatPassword &&
-                  password !== repeatPassword
-                ) {
-                  nextErrors.contactRepeatPassword =
-                    "Password and repeat password must match.";
-                }
-              }
-
               if (Object.keys(nextErrors).length) {
                 setProfileErrors(nextErrors);
                 return;
@@ -700,9 +662,6 @@ export function ProfessionalAccountSection({
               );
 
               const jsonPayload = {
-                email: values.contactEmail,
-                password: values.contactPassword || undefined,
-                confirm_password: values.contactRepeatPassword || undefined,
                 legal_name: values.companyLegalName,
                 ccc_number: values.companyCocNumber,
                 vat_number: values.companyVatNumber,
@@ -741,8 +700,6 @@ export function ProfessionalAccountSection({
               const nextSavedProfessionalDraft = {
                 ...professionalDraft,
                 contactPhone: contactPhoneValue,
-                contactPassword: "",
-                contactRepeatPassword: "",
               };
               setSavedProfessionalDraft(nextSavedProfessionalDraft);
               setSavedProfessionalPhotoSrc(nextPhotoSrc);

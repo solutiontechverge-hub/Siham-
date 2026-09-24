@@ -8,11 +8,13 @@ import {
   IconButton,
   Paper,
   Stack,
+  Tooltip,
 } from "@mui/material";
 import { alpha, type Theme } from "@mui/material/styles";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import { mollureSectionTitleSx, mollureBodyMutedSx } from "../../../theme/mollureHierarchy";
 import MollureFormField from "../MollureFormField";
@@ -31,6 +33,71 @@ import {
   addSoftIconButtonSx,
   SectionShell,
 } from "./professionalFixedLocationSetupShell";
+
+function ServiceCardPriceBlock({
+  cardPrice,
+  m,
+}: {
+  cardPrice: ReturnType<typeof getServiceCardPriceParts>;
+  m: Theme["palette"]["mollure"];
+}) {
+  return (
+    <Stack direction="row" alignItems="center" spacing={0.5}>
+      <Stack alignItems="flex-end" spacing={0.15} sx={{ minWidth: 56 }}>
+        {cardPrice.strikethrough ? (
+          <Typography
+            sx={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: alpha(m.navy, 0.42),
+              textDecoration: "line-through",
+              lineHeight: 1.15,
+            }}
+          >
+            {cardPrice.strikethrough}
+          </Typography>
+        ) : null}
+        <Typography
+          sx={mollureSectionTitleSx(m.navy, { textAlign: "right", lineHeight: 1.2 })}
+        >
+          {cardPrice.primary}
+        </Typography>
+        {cardPrice.discountLabel ? (
+          <Typography
+            sx={{
+              fontSize: 10.5,
+              fontWeight: 800,
+              color: m.teal,
+              lineHeight: 1.15,
+              textAlign: "right",
+            }}
+          >
+            {cardPrice.discountLabel}
+          </Typography>
+        ) : null}
+      </Stack>
+      {cardPrice.discountTooltip ? (
+        <Tooltip
+          title={
+            <Box
+              component="span"
+              sx={{ whiteSpace: "pre-line", display: "block" }}
+            >
+              {cardPrice.discountTooltip}
+            </Box>
+          }
+          arrow
+          placement="top"
+        >
+          <InfoOutlinedIcon
+            sx={{ fontSize: 16, color: m.teal, cursor: "default" }}
+            aria-label="Discount details"
+          />
+        </Tooltip>
+      ) : null}
+    </Stack>
+  );
+}
 
 type ServiceModalSlice = {
   subservicesByParent: Map<string, ServiceDetailUiItem[]>;
@@ -182,26 +249,7 @@ function ServiceDetailRow({
           spacing={1.25}
           sx={{ ml: { xs: 0, sm: "auto" } }}
         >
-          <Stack alignItems="flex-end" spacing={0.15} sx={{ minWidth: 56 }}>
-            {cardPrice.strikethrough ? (
-              <Typography
-                sx={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: alpha(m.navy, 0.42),
-                  textDecoration: "line-through",
-                  lineHeight: 1.15,
-                }}
-              >
-                {cardPrice.strikethrough}
-              </Typography>
-            ) : null}
-            <Typography
-              sx={mollureSectionTitleSx(m.navy, { textAlign: "right", lineHeight: 1.2 })}
-            >
-              {cardPrice.primary}
-            </Typography>
-          </Stack>
+          <ServiceCardPriceBlock cardPrice={cardPrice} m={m} />
 
           <Stack
             direction="row"
@@ -376,11 +424,7 @@ function MainServiceRow({
             spacing={1.25}
             sx={{ ml: { xs: 0, sm: "auto" } }}
           >
-            <Typography
-              sx={mollureSectionTitleSx(m.navy)}
-            >
-              {cardPrice.primary}
-            </Typography>
+            <ServiceCardPriceBlock cardPrice={cardPrice} m={m} />
             <IconButton
               size="small"
               aria-label="Edit service"

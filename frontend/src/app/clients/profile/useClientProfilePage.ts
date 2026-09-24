@@ -3,13 +3,10 @@
 import * as React from "react";
 import { useTheme } from "@mui/material/styles";
 import { profilePageData } from "./profile.data";
-import { getPasswordStrength } from "../../../lib/passwordStrength";
 import { getOptionalPhoneValidationErrors } from "../../../lib/phone-validation";
 import {
   INPUT_LIMITS,
   parseCoc,
-  parseEmail,
-  parsePassword,
   parsePersonName,
   parseText,
   parseVat,
@@ -46,8 +43,6 @@ export type ProfileFormState = {
   countryCode: string;
   phone: string;
   email: string;
-  password: string;
-  confirmPassword: string;
   legalName: string;
   cccNumber: string;
   vatNumber: string;
@@ -70,8 +65,6 @@ const initialForm: ProfileFormState = {
   countryCode: "",
   phone: "",
   email: "",
-  password: "",
-  confirmPassword: "",
   legalName: "",
   cccNumber: "",
   vatNumber: "",
@@ -159,7 +152,6 @@ function profileFormHasChanges(
   hasPendingAvatar: boolean,
 ) {
   if (hasPendingAvatar) return true;
-  if (current.password.trim() || current.confirmPassword.trim()) return true;
 
   const keys = isCompany ? COMPANY_FORM_KEYS : INDIVIDUAL_FORM_KEYS;
   return keys.some(
@@ -273,11 +265,7 @@ export function useClientProfilePage() {
       return;
     }
 
-    setForm((prev) => ({
-      ...mapProfileToForm(profile),
-      password: prev.password,
-      confirmPassword: prev.confirmPassword,
-    }));
+    setForm(mapProfileToForm(profile));
 
     // Keep messaging / header avatar in sync even before the user hits Save.
     if (profile.user_type === "company") {
@@ -362,11 +350,7 @@ export function useClientProfilePage() {
     setIsEditing((editing) => {
       const next = !editing;
       if (!next && profile) {
-        setForm({
-          ...mapProfileToForm(profile),
-          password: "",
-          confirmPassword: "",
-        });
+        setForm(mapProfileToForm(profile));
         setPendingAvatarFile(null);
         clearMessages();
       }
@@ -385,18 +369,6 @@ export function useClientProfilePage() {
 
     if (!hasProfileChanges) {
       return;
-    }
-
-    if (form.password || form.confirmPassword) {
-      if (form.password !== form.confirmPassword) {
-        setErrorMessage("Password and repeat password must match.");
-        return;
-      }
-
-      if (!getPasswordStrength(form.password).isStrong) {
-        setErrorMessage("Only strong passwords are allowed.");
-        return;
-      }
     }
 
     const schema = isCompanyProfile
@@ -445,12 +417,10 @@ export function useClientProfilePage() {
             label: "Phone",
             max: 32,
           }),
-          password: parsePassword(form.password, { required: false, strong: true }),
         })
       : rejectInvalid({
           firstName: parsePersonName(form.firstName, { label: "First name" }),
           lastName: parsePersonName(form.lastName, { label: "Last name" }),
-          email: parseEmail(form.email, { required: false }),
           phone: parseText(form.phone, {
             required: false,
             label: "Phone",
@@ -461,7 +431,6 @@ export function useClientProfilePage() {
             label: "Gender",
             max: 32,
           }),
-          password: parsePassword(form.password, { required: false, strong: true }),
         });
 
     if (!schema.ok) {
@@ -500,8 +469,6 @@ export function useClientProfilePage() {
               contact_first_name: form.contactFirstName.trim(),
               contact_last_name: form.contactLastName.trim(),
               phone: form.phone.trim(),
-              password: form.password || undefined,
-              confirm_password: form.confirmPassword || undefined,
             }
           : {
               first_name: form.firstName.trim(),
@@ -511,8 +478,6 @@ export function useClientProfilePage() {
               gender: form.gender || undefined,
               country_code: form.countryCode.trim() || undefined,
               phone: form.phone.trim() || undefined,
-              password: form.password || undefined,
-              confirm_password: form.confirmPassword || undefined,
             };
 
       let result;
@@ -569,7 +534,6 @@ export function useClientProfilePage() {
 
       setSuccessMessage("Profile updated.");
       setIsEditing(false);
-      setForm((prev) => ({ ...prev, password: "", confirmPassword: "" }));
     } catch {
       setErrorMessage("Could not update profile.");
     }

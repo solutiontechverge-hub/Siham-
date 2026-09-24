@@ -1,6 +1,6 @@
 import express from "express";
 import { body, param } from "express-validator";
-import { getProfile, setProfessionalValidation, updateProfile } from "../controllers/user.controller.js";
+import { getProfile, requestChangeEmail, setProfessionalValidation, updateProfile } from "../controllers/user.controller.js";
 import {
   listUserFavorites,
   putUserFavorites,
@@ -26,6 +26,21 @@ import {
 const router = express.Router();
 
 router.get("/profile", authenticateUser, getProfile);
+
+router.post(
+  "/change-email",
+  authenticateUser,
+  [
+    emailBody("new_email"),
+    passwordBody("current_password"),
+    body("confirm_email")
+      .optional({ values: "falsy" })
+      .custom((value, { req }) => String(value).trim().toLowerCase() === String(req.body.new_email).trim().toLowerCase())
+      .withMessage("confirm_email must match new_email."),
+  ],
+  validateRequest,
+  requestChangeEmail,
+);
 
 router.get("/favorites", authenticateUser, listUserFavorites);
 router.put(

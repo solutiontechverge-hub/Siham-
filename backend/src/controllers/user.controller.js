@@ -1,15 +1,23 @@
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 import { query } from "../db/index.js";
 import {
   deleteProfileMediaIfOwned,
   isS3UploadConfigured,
   uploadProfileMulterFilesToS3,
 } from "../services/s3-upload.service.js";
-import { updateProfessionalValidation } from "../services/authEmail.service.js";
+import {
+  notifyChangeEmailVerify,
+  notifyEmailChangeAlert,
+  updateProfessionalValidation,
+} from "../services/authEmail.service.js";
 import { logAdminActivityFromRequest } from "../services/adminActivity.service.js";
 import { logError, sendCaughtError } from "../utils/httpError.js";
 
 const SALT_ROUNDS = 12;
+
+const hashToken = (value) =>
+  crypto.createHash("sha256").update(value).digest("hex");
 
 const profileConfig = {
   individual: {
@@ -154,7 +162,11 @@ export const updateProfile = async (req, res) => {
     }
 
     if (req.body.email !== undefined) {
-      userUpdates.email = req.body.email.trim().toLowerCase();
+      return res.status(400).json({
+        success: false,
+        message: "To change your email, use the change-email flow.",
+        data: null,
+      });
     }
 
     if (req.body.password) {
@@ -246,6 +258,123 @@ export const updateProfile = async (req, res) => {
     }
 
     return sendCaughtError(res, error, { fallbackMessage: "Failed to update profile." });
+  }
+};
+
+export const requestChangeEmail = async (req, res) => {
+  try {
+    const newEmail = String(req.body.new_email || "")
+      .trim()
+      .toLowerCase();
+    const currentPassword = req.body.current_password;
+
+    if (!newEmail || !currentPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "New email and current password are required.",
+        data: null,
+      });
+    }
+
+    const userResult = await query(
+      `SELECT id, email, password_hash
+       FROM users
+       WHERE id = $1
+       LIMIT 1`,
+      [req.user.id],
+    );
+
+    if (userResult.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+        data: null,
+      });
+    }
+
+    const user = userResult.rows[0];
+
+    if (!user.password_hash) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "This account uses social login and has no password. Set a password before changing email.",
+        data: null,
+      });
+    }
+
+    const passwordMatches = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!passwordMatches) {
+      return res.status(401).json({
+        success: false,
+        message: "Current password is incorrect.",
+        data: null,
+      });
+    }
+
+    if (newEmail === String(user.email).toLowerCase()) {
+      return res.status(400).json({
+        success: false,
+        message: "Enter a different email address.",
+        data: null,
+      });
+    }
+
+    const taken = await query(
+      `SELECT 1 FROM users WHERE email = $1 AND id <> $2 LIMIT 1`,
+      [newEmail, user.id],
+    );
+    if (taken.rowCount > 0) {
+      return res.status(409).json({
+        success: false,
+        message: "Email is already in use.",
+        data: null,
+      });
+    }
+
+    // Drop prior unused change-email tokens for this user.
+    await query(
+      `UPDATE email_verifications
+       SET is_used = true
+       WHERE user_id = $1 AND is_used = false AND new_email IS NOT NULL`,
+      [user.id],
+    );
+
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    await query(
+      `INSERT INTO email_verifications (user_id, token, new_email, is_used, expires_at, created_at)
+       VALUES ($1, $2, $3, false, NOW() + INTERVAL '24 hours', NOW())`,
+      [user.id, hashToken(rawToken), newEmail],
+    );
+
+    try {
+      await notifyChangeEmailVerify(newEmail, rawToken);
+    } catch (error) {
+      logError("requestChangeEmail.verify", error);
+      return res.status(502).json({
+        success: false,
+        message: "Could not send verification email. Please try again.",
+        data: null,
+      });
+    }
+
+    try {
+      await notifyEmailChangeAlert(user.email, newEmail);
+    } catch (error) {
+      // Alert is best-effort; verification already sent.
+      logError("requestChangeEmail.alert", error);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "Check your new email for a confirmation link. Your address will update after you confirm.",
+      data: { pending_email: newEmail },
+    });
+  } catch (error) {
+    return sendCaughtError(res, error, {
+      fallbackMessage: "Failed to request email change.",
+    });
   }
 };
 

@@ -130,7 +130,8 @@ export default function AuthEmailScreen({
                 mt: 0.35,
               }}
             >
-              123 Beauty Lane, Suite 100, Wellness City, 90210
+              {process.env.NEXT_PUBLIC_MOLLURE_COMPANY_ADDRESS ||
+                "123 Beauty Lane, Suite 100, Wellness City, 90210"}
             </Typography>
             <Stack
               direction="row"

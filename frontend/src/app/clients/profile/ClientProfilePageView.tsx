@@ -57,9 +57,7 @@ import {
   AppCountryPhoneFields,
   AppDatePicker,
   MollureLabeledField,
-  MollureLabeledPasswordField,
   MollureSnackbar,
-  PasswordStrengthBar,
 } from "../../../components/common";
 
 function imgSrc(img: unknown): string {
@@ -728,31 +726,43 @@ export default function ClientProfilePageView() {
                     value={form.email}
                     disabled
                   />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <MollureLabeledPasswordField
-                    name="password"
-                    fieldLabel={profilePageData.fields.password.label}
-                    placeholder={profilePageData.fields.password.placeholder}
-                    value={form.password}
-                    onChange={handleChange}
-                    disabled={fieldsDisabled}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <MollureLabeledPasswordField
-                    name="confirmPassword"
-                    fieldLabel={profilePageData.fields.repeatPassword.label}
-                    placeholder={
-                      profilePageData.fields.repeatPassword.placeholder
-                    }
-                    value={form.confirmPassword}
-                    onChange={handleChange}
-                    disabled={fieldsDisabled}
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <PasswordStrengthBar password={form.password} />
+                  <Box
+                    sx={{
+                      mt: 0.75,
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 2,
+                    }}
+                  >
+                    <Typography
+                      component={Link}
+                      href={profilePageData.credentialLinks.changeEmail.href}
+                      sx={{
+                        fontSize: "0.8125rem",
+                        color: alpha(tokens.navy, 0.52),
+                        textDecoration: "none",
+                        fontWeight: 500,
+                        "&:hover": { textDecoration: "underline" },
+                      }}
+                    >
+                      {profilePageData.credentialLinks.changeEmail.label}
+                    </Typography>
+                    <Typography
+                      component={Link}
+                      href={
+                        profilePageData.credentialLinks.changePassword.href
+                      }
+                      sx={{
+                        fontSize: "0.8125rem",
+                        color: alpha(tokens.navy, 0.52),
+                        textDecoration: "none",
+                        fontWeight: 500,
+                        "&:hover": { textDecoration: "underline" },
+                      }}
+                    >
+                      {profilePageData.credentialLinks.changePassword.label}
+                    </Typography>
+                  </Box>
                 </Grid>
               </Grid>
 

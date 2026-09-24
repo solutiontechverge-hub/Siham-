@@ -82,6 +82,12 @@ type ResetPasswordRequest = {
   confirm_password: string;
 };
 
+type ChangePasswordRequest = {
+  current_password: string;
+  new_password: string;
+  confirm_password: string;
+};
+
 const toMutationError = (error: FetchBaseQueryError): MutationError => {
   const fallbackMessage = "Something went wrong. Please try again.";
 
@@ -269,10 +275,34 @@ export const authApi = baseApi.injectEndpoints({
         return { data };
       },
     }),
+    changePassword: builder.mutation<ApiEnvelope<null>, ChangePasswordRequest>({
+      async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: "/api/auth/change-password",
+          method: "POST",
+          body: payload,
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<null>;
+
+        if (!data.success) {
+          return {
+            error: customError(data.message || "Unable to change password."),
+          };
+        }
+
+        return { data };
+      },
+    }),
   }),
 });
 
 export const {
+  useChangePasswordMutation,
   useForgotPasswordMutation,
   useLoginMutation,
   useLoginWithAppleMutation,

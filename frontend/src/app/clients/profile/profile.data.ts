@@ -30,8 +30,13 @@ export const profilePageData = {
     countryCode: { label: "Country Code" },
     phone: { label: "Contact Number", placeholder: "+316xxxxxxxxx" },
     email: { label: "Email (Non Editable)", placeholder: "You@gmail.com" },
-    password: { label: "Password*", placeholder: "Enter Password" },
-    repeatPassword: { label: "Repeat password*", placeholder: "Confirm Password" },
+  },
+  credentialLinks: {
+    changeEmail: { label: "Change email", href: "/auth/change-email" },
+    changePassword: {
+      label: "Change password",
+      href: "/auth/change-password",
+    },
   },
   reviewNameOptions: [
     { value: "first_name", label: "First Name (e.g., John)" },

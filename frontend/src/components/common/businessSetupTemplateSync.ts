@@ -1,5 +1,8 @@
 export type TemplateSyncMode = "sync" | "independent";
 
+/** Which template wins when re-enabling Sync after Independent divergence. */
+export type TemplateSyncSource = "fixed" | "desired";
+
 /** Sections that appear in the sync settings UI. */
 export type TemplateSyncSectionId =
   | "profile"
@@ -40,6 +43,10 @@ export const CONFIGURABLE_SYNC_SECTION_IDS = [
 ] as const satisfies ReadonlyArray<TemplateSyncSectionId>;
 
 export type ConfigurableSyncSectionId = (typeof CONFIGURABLE_SYNC_SECTION_IDS)[number];
+
+export type TemplateSyncSources = Partial<
+  Record<ConfigurableSyncSectionId, TemplateSyncSource>
+>;
 
 export const SYNC_SECTION_LABELS: Record<TemplateSyncSectionId, string> = {
   profile: "Profile",
@@ -136,4 +143,56 @@ export function shouldLiveSyncField(settings: TemplateSyncSettings, key: string)
   if (sectionId === "profile") return true;
   if (sectionId === "location") return false;
   return settings[sectionId] === "sync";
+}
+
+function isEffectivelyBlank(value: unknown): boolean {
+  if (value == null) return true;
+  if (typeof value === "string") return !value.trim();
+  if (typeof value === "boolean") return !value;
+  if (typeof value === "number") return Number.isNaN(value);
+  if (Array.isArray(value)) return value.length === 0;
+  if (typeof value === "object") {
+    return Object.values(value as Record<string, unknown>).every(isEffectivelyBlank);
+  }
+  return false;
+}
+
+function stableStringify(value: unknown): string {
+  if (value == null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+  const obj = value as Record<string, unknown>;
+  const keys = Object.keys(obj).sort();
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(obj[k])}`).join(",")}}`;
+}
+
+/**
+ * Independent → Sync needs a source-choice popup only when FL/DL content differs.
+ * Both blank (or identical) → silent Sync, no popup.
+ */
+export function sectionNeedsSyncSourceChoice(
+  fixedSnapshot: unknown,
+  desiredSnapshot: unknown,
+): boolean {
+  if (isEffectivelyBlank(fixedSnapshot) && isEffectivelyBlank(desiredSnapshot)) {
+    return false;
+  }
+  return stableStringify(fixedSnapshot) !== stableStringify(desiredSnapshot);
+}
+
+/** First Independent → Sync section that needs an FL/DL source pick, if any. */
+export function findIndependentToSyncNeedingSource(
+  prev: TemplateSyncSettings,
+  next: TemplateSyncSettings,
+  needsChoice: (sectionId: ConfigurableSyncSectionId) => boolean,
+): ConfigurableSyncSectionId | null {
+  for (const sectionId of CONFIGURABLE_SYNC_SECTION_IDS) {
+    if (
+      prev[sectionId] === "independent" &&
+      next[sectionId] === "sync" &&
+      needsChoice(sectionId)
+    ) {
+      return sectionId;
+    }
+  }
+  return null;
 }

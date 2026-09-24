@@ -14,6 +14,10 @@ import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import AppButton from "../AppButton";
+import AppModal, {
+  AppModalCancelButton,
+  AppModalPrimaryButton,
+} from "../AppModal";
 import MollureFormField from "../MollureFormField";
 import { Typography } from "../../ui/typography";
 import { formatBusinessSetupValidationMessage } from "../businessSetupPublishValidation";
@@ -49,7 +53,10 @@ export type ProfessionalFixedLocationSetupToolbarProps = {
   businessStatusMenuAnchor: HTMLElement | null;
   setBusinessStatusMenuAnchor: (el: HTMLElement | null) => void;
   isBusinessProfileStatusSaving: boolean;
-  setBusinessProfileActive: (active: boolean) => void | Promise<void>;
+  setBusinessProfileActive: (
+    active: boolean,
+    successMessage?: string,
+  ) => void | Promise<void>;
   isBusinessProfileActive: boolean;
   onToggleBusinessProfileActive: () => void | Promise<void>;
 };
@@ -85,6 +92,9 @@ export function ProfessionalFixedLocationSetupToolbar(
     isBusinessProfileActive,
     onToggleBusinessProfileActive,
   } = props;
+
+  const [tempDeactivateOpen, setTempDeactivateOpen] = React.useState(false);
+  const [permDeactivateOpen, setPermDeactivateOpen] = React.useState(false);
 
   return (
     <>
@@ -346,7 +356,7 @@ export function ProfessionalFixedLocationSetupToolbar(
                 paper: {
                   sx: {
                     mt: 0.75,
-                    minWidth: 140,
+                    minWidth: 220,
                     borderRadius: "10px",
                     border: `1px solid ${alpha(m.navy, 0.1)}`,
                     boxShadow: "0 10px 24px rgba(16, 35, 63, 0.12)",
@@ -354,25 +364,59 @@ export function ProfessionalFixedLocationSetupToolbar(
                 },
               }}
             >
-              <MenuItem
-                disabled={isBusinessProfileStatusSaving}
-                onClick={() => {
-                  setBusinessStatusMenuAnchor(null);
-                  void setBusinessProfileActive(!isBusinessProfileActive);
-                }}
-                sx={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: alpha(m.navy, 0.82),
-                  py: 1,
-                }}
-              >
-                {isBusinessProfileStatusSaving
-                  ? "Saving..."
-                  : isBusinessProfileActive
-                    ? "Deactive"
-                    : "Active"}
-              </MenuItem>
+              {isBusinessProfileActive ? (
+                <>
+                  <MenuItem
+                    disabled={isBusinessProfileStatusSaving}
+                    onClick={() => {
+                      setBusinessStatusMenuAnchor(null);
+                      setTempDeactivateOpen(true);
+                    }}
+                    sx={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: alpha(m.navy, 0.82),
+                      py: 1,
+                    }}
+                  >
+                    Temporarily deactivate template
+                  </MenuItem>
+                  <MenuItem
+                    disabled={isBusinessProfileStatusSaving}
+                    onClick={() => {
+                      setBusinessStatusMenuAnchor(null);
+                      setPermDeactivateOpen(true);
+                    }}
+                    sx={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: "#C62828",
+                      py: 1,
+                    }}
+                  >
+                    Permanently deactivate template
+                  </MenuItem>
+                </>
+              ) : (
+                <MenuItem
+                  disabled={isBusinessProfileStatusSaving}
+                  onClick={() => {
+                    setBusinessStatusMenuAnchor(null);
+                    void setBusinessProfileActive(
+                      true,
+                      "Template reactivated successfully.",
+                    );
+                  }}
+                  sx={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: alpha(m.navy, 0.82),
+                    py: 1,
+                  }}
+                >
+                  {isBusinessProfileStatusSaving ? "Saving..." : "Activate"}
+                </MenuItem>
+              )}
             </Menu>
           </Box>
         </Stack>
@@ -441,6 +485,78 @@ export function ProfessionalFixedLocationSetupToolbar(
         </Paper>
       ) : null}
 
+      <AppModal
+        open={tempDeactivateOpen}
+        onClose={() => setTempDeactivateOpen(false)}
+        title="Temporarily deactivate template?"
+        maxWidth="xs"
+        fullWidth
+        contentSx={{ px: 2.5, py: 1 }}
+        footerVariant="actions"
+        footer={
+          <>
+            <AppModalCancelButton
+              onClick={() => setTempDeactivateOpen(false)}
+              disabled={isBusinessProfileStatusSaving}
+            />
+            <AppModalPrimaryButton
+              label="Deactivate"
+              disabled={isBusinessProfileStatusSaving}
+              onClick={() => {
+                setTempDeactivateOpen(false);
+                void setBusinessProfileActive(
+                  false,
+                  "Template temporarily deactivated.",
+                );
+              }}
+            />
+          </>
+        }
+      >
+        <Typography sx={{ fontSize: 13, color: alpha(m.navy, 0.68) }}>
+          Your public profile will be hidden from clients until you reactivate
+          it. You can turn it back on anytime.
+        </Typography>
+      </AppModal>
+
+      <AppModal
+        open={permDeactivateOpen}
+        onClose={() => setPermDeactivateOpen(false)}
+        title="Permanently deactivate template?"
+        headerTone="danger"
+        maxWidth="xs"
+        fullWidth
+        contentSx={{ px: 2.5, py: 1 }}
+        footerVariant="actions"
+        footer={
+          <>
+            <AppModalCancelButton
+              onClick={() => setPermDeactivateOpen(false)}
+              disabled={isBusinessProfileStatusSaving}
+            />
+            <AppModalPrimaryButton
+              tone="danger"
+              label="Deactivate permanently"
+              disabled={isBusinessProfileStatusSaving}
+              onClick={() => {
+                setPermDeactivateOpen(false);
+                // ponytail: same is_active API as temporary; distinct permanent
+                // endpoint when backend adds one.
+                void setBusinessProfileActive(
+                  false,
+                  "Template permanently deactivated.",
+                );
+              }}
+            />
+          </>
+        }
+      >
+        <Typography sx={{ fontSize: 13, color: alpha(m.navy, 0.68) }}>
+          This will take your template offline for clients. Unique edits stay in
+          your account, but the listing will not appear until you activate it
+          again.
+        </Typography>
+      </AppModal>
     </>
   );
 }

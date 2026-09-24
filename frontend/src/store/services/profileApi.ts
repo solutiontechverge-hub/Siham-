@@ -104,6 +104,12 @@ export type UpdateProfileRequest = Partial<{
 
 export type UpdateProfilePayload = UpdateProfileRequest | FormData;
 
+export type ChangeEmailRequest = {
+  new_email: string;
+  current_password: string;
+  confirm_email?: string;
+};
+
 type MutationError = FetchBaseQueryError;
 
 const toMutationError = (error: FetchBaseQueryError): MutationError => {
@@ -178,8 +184,38 @@ export const profileApi = baseApi.injectEndpoints({
       },
       invalidatesTags: ["Profile", "BusinessSetup", "BusinessSetupsListing"],
     }),
+    changeEmail: builder.mutation<
+      ApiEnvelope<{ pending_email: string }>,
+      ChangeEmailRequest
+    >({
+      async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: "/api/user/change-email",
+          method: "POST",
+          body: payload,
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<{ pending_email: string }>;
+
+        if (!data.success) {
+          return {
+            error: customError(data.message || "Unable to request email change."),
+          };
+        }
+
+        return { data };
+      },
+    }),
   }),
   overrideExisting: false,
 });
 
-export const { useGetProfileQuery, useUpdateProfileMutation } = profileApi;
+export const {
+  useGetProfileQuery,
+  useUpdateProfileMutation,
+  useChangeEmailMutation,
+} = profileApi;

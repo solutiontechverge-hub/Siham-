@@ -1,7 +1,7 @@
 export const verifyOtpPageData = {
   title: "Reset Password",
   subtitle:
-    "Enter The 4 Digit Verification Code That Was Sent To Your Email To Change Your Password",
+    "Enter The 6 Digit Verification Code That Was Sent To Your Email To Change Your Password",
   actions: {
     submit: "Send OTP",
     submitting: "Verifying...",
@@ -16,7 +16,7 @@ export const verifyOtpPageData = {
   messages: {
     otpVerified: "OTP verified. You can now set a new password.",
     verifyFailed: "OTP verification failed.",
-    enterEmailFirst: "Enter your email address first.",
+    enterEmailFirst: "Email missing. Go back to forgot password first.",
     otpResentFallback: "OTP sent again.",
     resendFailed: "Unable to resend OTP.",
   },
