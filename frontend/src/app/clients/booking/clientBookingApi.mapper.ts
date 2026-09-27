@@ -10,6 +10,7 @@ import type { ClientBookingRecord, ClientBookingStatus } from "./clientBookingRe
 import { fmtMinutesToTimeLabel, parseTimeLabelToMinutes, buildWallClockDateTimeIso } from "./booking-time";
 import { wallClockDateFromDateTime, wallClockTimeFromDateTime } from "../../../components/common/calendar/calendar.utils";
 import { parseCalendarEntryNotes, parseStoredEbrFromNotes, resolveKilometerAllowanceAmount } from "../../../components/common/calendar/bookingEventDetails";
+import { unpaidSplitPayers, parseSplitBillState } from "../../../components/common/calendar/salesSplitBill";
 import { summarizeClientBookingPrice } from "../../../components/common/calendar/bookingTotal";
 import { buildResponseDeadline } from "../../../components/common/calendar/bookingResponseDeadline";
 import { syncEditRequestFromBookingApi } from "../../../components/common/client-booking/syncEditRequestFromApi";
@@ -566,6 +567,18 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
   const prepaid =
     String(booking.prepayment_status ?? "").toLowerCase() === "paid" ||
     notesDetails?.prepaymentStatus === "confirmed";
+  const paymentPending =
+    Boolean(notesDetails?.waitingForPayment) ||
+    unpaidSplitPayers(parseSplitBillState(notesDetails?.splitBill)).length > 0;
+  // Explicit false only while post-booking settlement is open (drives payment-due UI).
+  const paid =
+    status === "completed" || status === "in_progress"
+      ? paymentPending
+        ? false
+        : status === "completed"
+          ? true
+          : undefined
+      : undefined;
   const isEbrIncoming = incomingEditRequest?.status === "suggested";
   const notesRequestDirection = notesDetails?.requestDirection;
   // Notes requestDirection is from the professional's perspective:
@@ -849,9 +862,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
       ? resolveKilometerAllowanceAmount(notesDetails?.kilometerAllowance)
       : 0;
   const extrasAmount =
-    booking.location_type === "desired" &&
-    Boolean(notesDetails?.showKilometerAllowance) &&
-    kilometerAllowanceAmount > 0
+    booking.location_type === "desired" && kilometerAllowanceAmount > 0
       ? kilometerAllowanceAmount
       : 0;
   const mappedPrepaymentPercent = Number(notesDetails?.prepaymentPercent) || 0;
@@ -958,6 +969,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
     },
     createdAt: booking.created_at ?? undefined,
     prepaid,
+    paid,
     requiresPrepayment:
       prepaid ||
       ["required", "pending"].includes(

@@ -48,11 +48,9 @@ export function useClientBookingPaymentDisplay(input: {
       ),
     [input.bookingNotesMeta?.kilometerAllowance],
   );
-  /** Only for desired-location bookings when the professional enabled it. */
+  /** Desired-location bookings: show when a kilometer allowance amount is set. */
   const showKilometerAllowance =
-    input.locationMode === "desired" &&
-    Boolean(input.bookingNotesMeta?.showKilometerAllowance) &&
-    kilometerAllowanceAmount > 0;
+    input.locationMode === "desired" && kilometerAllowanceAmount > 0;
   /** Prepayment breakdown when the professional has a % set. */
   const effectivePrepayPercent =
     Number(input.activeBooking?.prepaymentPercent ?? input.prepaymentPercent) ||

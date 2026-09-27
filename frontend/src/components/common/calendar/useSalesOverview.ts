@@ -254,6 +254,7 @@ export function useSalesOverview({
         checkoutBookingCode || match?.bookingCode || checkoutBookingId,
       clientName: displayName,
       clientEmail: match?.clientEmail || clientEmail,
+      priorLines: match?.lines ?? [],
     };
   }, [
     cards,
@@ -788,9 +789,10 @@ export function useSalesOverview({
           )
         : undefined;
       try {
+        // Invoice / payment pending stays In Progress; Completed only after settlement.
         await updateBookingStatus({
           id: editingCard.bookingId,
-          status: "completed",
+          status: "in_progress",
           ...(nextNotes != null ? { notes: nextNotes } : {}),
         }).unwrap();
         onBookingCompleted?.(editingCard.bookingId);

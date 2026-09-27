@@ -73,7 +73,7 @@ const falseClientFlags = (): ClientActionFlags => ({
 export function resolveProfessionalBookingActions(
   event: Pick<
     CalendarEvent,
-    "status" | "bookingScenario" | "bookingType" | "details"
+    "status" | "bookingScenario" | "bookingType" | "details" | "date" | "start"
   > | null | undefined,
   opts?: {
     protectiveFeeCheckoutApplicable?: boolean;

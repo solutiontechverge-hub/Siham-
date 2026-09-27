@@ -280,11 +280,7 @@ export default function ClientBookingCreateSummaryView() {
     [bookingNotesMeta?.kilometerAllowance, isDesired],
   );
   const extrasAmount =
-    isDesired &&
-    Boolean(bookingNotesMeta?.showKilometerAllowance) &&
-    kilometerAllowanceAmount > 0
-      ? kilometerAllowanceAmount
-      : 0;
+    isDesired && kilometerAllowanceAmount > 0 ? kilometerAllowanceAmount : 0;
   const prepaymentPercent =
     Number(activeBooking?.prepaymentPercent) > 0
       ? Number(activeBooking?.prepaymentPercent)

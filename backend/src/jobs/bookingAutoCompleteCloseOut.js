@@ -24,13 +24,11 @@ export function parseBookingNotesMeta(notes) {
 
 /**
  * Close-out ready for Completed — not merely because the clock passed.
- * Invoice with due date (payment may still be pending) OR every billed payer paid.
- * No split / no invoice → incomplete checkout; stay In Progress.
+ * Every billed payer must be paid. Invoice / waitingForPayment alone is not
+ * settlement — stay In Progress until the pending amount is paid.
  */
 export function isCheckoutCloseOutComplete(meta) {
-  const due =
-    typeof meta?.invoiceDueDate === "string" ? meta.invoiceDueDate.trim() : "";
-  if (due) return true;
+  if (meta?.waitingForPayment) return false;
   const payers = meta?.splitBill?.payers;
   if (!Array.isArray(payers) || payers.length === 0) return false;
   return payers.every(
@@ -41,7 +39,7 @@ export function isCheckoutCloseOutComplete(meta) {
 /**
  * Walk-out: scheduled end + BOOKING_WALKOUT_GRACE_MINUTES passed and still no
  * checkout/payment close-out → block auto-complete (stay in_progress for
- * manual unpaid marking). Paid / invoice-due-date close-out is never blocked.
+ * manual unpaid marking). Intentional invoice / payment-pending is not a walk-out.
  */
 export function isWalkOutBlockingAutoComplete(
   meta,
@@ -51,6 +49,9 @@ export function isWalkOutBlockingAutoComplete(
   graceMinutes = BOOKING_WALKOUT_GRACE_MINUTES,
 ) {
   if (isCheckoutCloseOutComplete(meta)) return false;
+  const due =
+    typeof meta?.invoiceDueDate === "string" ? meta.invoiceDueDate.trim() : "";
+  if (due || meta?.waitingForPayment) return false;
   const graceMs = graceMinutes * 60 * 1000;
   if (endTime != null) {
     const endMs = new Date(endTime).getTime();

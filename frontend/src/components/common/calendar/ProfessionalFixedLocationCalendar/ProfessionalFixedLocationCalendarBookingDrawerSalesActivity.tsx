@@ -80,6 +80,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerSalesActiv
               "unassigned"
             }
             onBookingCompleted={(bookingId) => {
+              // Invoice issued → In Progress + payment pending (Completed after pay).
               setEvents((prev) =>
                 prev.map((event) => {
                   const parsed = parseApiCalendarEventId(event.id);
@@ -88,7 +89,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerSalesActiv
                   }
                   return {
                     ...event,
-                    status: "Completed",
+                    status: "In Progress",
                     details: {
                       ...(event.details ?? {}),
                       waitingForPayment: true,
@@ -96,7 +97,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerSalesActiv
                   };
                 }),
               );
-              setSlotStatus("Completed");
+              setSlotStatus("In Progress");
             }}
           />
         ) : (
