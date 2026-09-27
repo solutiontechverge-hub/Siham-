@@ -73,24 +73,26 @@ export function useProfessionalFixedLocationCalendarBookingPersistCheckout(
         prepaidApplied,
         { mode: result.mode, existing: existingSplit },
       );
-      const nextSplit = markSplitPayersPaid(
+      const splitBase =
         parseSplitBillState(basePatch.splitBill) ?? {
           mode: result.mode,
           prepaidAmount: prepaidApplied,
           payers: [],
-        },
-        result.payerKeys,
-        result.paymentMethod,
-      );
-      const stillUnpaid = nextSplit.payers.filter(
-        (payer) => !payer.paid && payer.paymentAmount > 0,
-      ).length;
+        };
       const isDirect =
         result.paymentMethod === "onlineDirect" ||
         result.paymentMethod === "offlineDirect";
+      // Invoice / non-direct leaves payers unpaid — stay In Progress until paid.
+      const nextSplit = isDirect
+        ? markSplitPayersPaid(splitBase, result.payerKeys, result.paymentMethod)
+        : splitBase;
+      const stillUnpaid = nextSplit.payers.filter(
+        (payer) => !payer.paid && payer.paymentAmount > 0,
+      ).length;
       const allSettled = stillUnpaid === 0 && isDirect;
-      const nextStatus: CalendarEvent["status"] =
-        stillUnpaid === 0 ? "Completed" : "In Progress";
+      const nextStatus: CalendarEvent["status"] = allSettled
+        ? "Completed"
+        : "In Progress";
       const nextDetails = {
         ...(current.details ?? {}),
         ...basePatch,

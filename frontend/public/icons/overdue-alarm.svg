@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <!-- Twin-bell alarm clock (Overdue) -->
+  <path d="M7.2 6.2c0-1.1.9-1.8 1.9-1.5.5.8.6 1.6.3 2.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M16.8 6.2c0-1.1-.9-1.8-1.9-1.5-.5.8-.6 1.6-.3 2.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="12" cy="13" r="7" stroke="currentColor" stroke-width="1.6"/>
+  <path d="M12 13V8.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  <path d="M12 13l3.2 2.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  <path d="M8.6 19.6L7.4 21.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  <path d="M15.4 19.6l1.2 1.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+</svg>

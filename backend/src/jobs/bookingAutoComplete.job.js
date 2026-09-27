@@ -17,15 +17,16 @@ let running = false;
 
 /**
  * Catch-up: in_progress past end → completed ONLY when close-out rules are
- * already met (invoice due date / all payers paid). Clock alone must not force
- * Completed — incomplete checkout stays In Progress (timing out of sync is OK).
+ * already met (every billed payer paid, not waiting for payment). Clock alone
+ * must not force Completed — incomplete checkout / invoice pending stays
+ * In Progress (timing out of sync is OK).
  *
  * Walk-out: after scheduled end + BOOKING_WALKOUT_GRACE_MINUTES without
  * checkout/payment, never auto-complete — stay in_progress for manual unpaid.
+ * Intentional invoice / payment-pending is not treated as a walk-out.
  *
  * Confirmed bookings are left alone so No Show remains available.
- * Paid/invoice transitions normally happen on checkout persist; this job only
- * heals lag.
+ * Paid transitions normally happen on checkout persist; this job only heals lag.
  */
 const runAutoCompleteCycle = async () => {
   if (running) return;

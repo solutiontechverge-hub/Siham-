@@ -21,14 +21,27 @@ assert.equal(isCheckoutCloseOutComplete({}), false);
 assert.equal(isCheckoutCloseOutComplete({ waitingForPayment: true }), false);
 assert.equal(
   isCheckoutCloseOutComplete({ invoiceDueDate: "2026-09-30", waitingForPayment: true }),
-  true,
+  false,
 );
+assert.equal(isCheckoutCloseOutComplete({ invoiceDueDate: "2026-09-30" }), false);
 assert.equal(
   isCheckoutCloseOutComplete({
     splitBill: {
       payers: [
         { paymentAmount: 40, paid: true },
         { paymentAmount: 20, paid: false },
+      ],
+    },
+  }),
+  false,
+);
+assert.equal(
+  isCheckoutCloseOutComplete({
+    waitingForPayment: true,
+    splitBill: {
+      payers: [
+        { paymentAmount: 40, paid: true },
+        { paymentAmount: 20, paid: true },
       ],
     },
   }),
@@ -57,7 +70,7 @@ assert.equal(
 );
 assert.equal(
   isWalkOutBlockingAutoComplete(
-    { invoiceDueDate: "2026-09-30" },
+    { invoiceDueDate: "2026-09-30", waitingForPayment: true },
     end,
     null,
     new Date("2026-09-23T11:00:00.000Z"),

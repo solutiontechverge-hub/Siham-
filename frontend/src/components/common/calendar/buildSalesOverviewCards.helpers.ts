@@ -5,7 +5,10 @@ import {
   lineTotal,
   type ManualEntryDiscount,
 } from "../../sections/finance/manualEntry.data";
-import { parseApiCalendarEventId } from "./bookingEventDetails";
+import {
+  parseApiCalendarEventId,
+  resolveKilometerAllowanceAmount,
+} from "./bookingEventDetails";
 import { isBookingRequestRejected } from "./bookingStatus";
 import { getSalesCardMeta, resolveLiveCardId } from "./salesOverview.storage";
 import type {
@@ -103,6 +106,16 @@ function buildLinesFromEvent(event: CalendarEvent): { lines: SalesLineItem[]; su
     subtotal += product.price;
   }
 
+  const kmAmount = resolveKilometerAllowanceAmount(details?.kilometerAllowance);
+  if (kmAmount > 0) {
+    lines.push({
+      id: "kilometer-allowance",
+      label: "Kilometer Allowance",
+      amount: roundMoney(kmAmount),
+    });
+    subtotal += kmAmount;
+  }
+
   const discount = discountLine(details?.totalDiscount ?? null, subtotal);
   if (discount) {
     lines.push(discount);
@@ -110,6 +123,107 @@ function buildLinesFromEvent(event: CalendarEvent): { lines: SalesLineItem[]; su
   }
 
   return { lines, subtotal: roundMoney(Math.max(0, subtotal)) };
+}
+
+/** Keep booking discount rows on the payer card so Total matches listed lines. */
+function withNegativeLines(
+  shareLines: SalesLineItem[],
+  allLines: SalesLineItem[],
+): SalesLineItem[] {
+  const negatives = allLines.filter((line) => line.amount < 0);
+  if (!negatives.length) return shareLines;
+  const seen = new Set(shareLines.map((line) => line.id));
+  return [
+    ...shareLines,
+    ...negatives.filter((line) => !seen.has(line.id)),
+  ];
+}
+
+function sumLineAmounts(lines: SalesLineItem[]): number {
+  return roundMoney(lines.reduce((sum, line) => sum + line.amount, 0));
+}
+
+/** Fold saved add-ons into the live booking summary (not a separate add-ons-only card). */
+export function mergeAddonRecordsIntoCards(
+  cards: SalesOverviewCardData[],
+  addonRecords: SalesAddonRecord[],
+  ctx: BuilderCtx,
+): SalesOverviewCardData[] {
+  const active = addonRecords.filter((row) => !row.voided && !row.refunded);
+  if (!active.length) {
+    return [
+      ...cards,
+      ...addonRecords.map((record) => buildAddonCard(record, ctx)),
+    ];
+  }
+
+  const byBooking = new Map<string, SalesAddonRecord[]>();
+  for (const row of active) {
+    const key = String(row.bookingId);
+    const prev = byBooking.get(key) ?? [];
+    prev.push(row);
+    byBooking.set(key, prev);
+  }
+
+  const mergedBookingIds = new Set<string>();
+
+  const next = cards.map((card) => {
+    if (mergedBookingIds.has(String(card.bookingId))) return card;
+    const records = byBooking.get(String(card.bookingId));
+    if (!records?.length) return card;
+    // Merge into after-treatment / Summary; keep dedicated prepayment cards separate.
+    if (card.kind === "prepayment" && card.title !== "Summary") return card;
+    if (card.kind === "addon") return card;
+
+    const addonLines: SalesLineItem[] = [];
+    let addonTotal = 0;
+    for (const record of records) {
+      for (const line of record.lines) {
+        const amount = roundMoney(lineTotal(line));
+        addonLines.push({
+          id: `addon-${record.id}-${line.id}`,
+          label: line.quantity > 1 ? `${line.name} ×${line.quantity}` : line.name,
+          amount,
+        });
+        addonTotal += amount;
+      }
+      if (record.discountAmount > 0) {
+        const discountAmount = -roundMoney(record.discountAmount);
+        addonLines.push({
+          id: `addon-${record.id}-discount`,
+          label:
+            record.discount?.type === "percentage"
+              ? `Discount (${record.discount.amount}%)`
+              : "Discount",
+          amount: discountAmount,
+        });
+        addonTotal += discountAmount;
+      }
+    }
+    addonTotal = roundMoney(addonTotal);
+    if (!addonLines.length) return card;
+
+    mergedBookingIds.add(String(card.bookingId));
+    return {
+      ...card,
+      lines: [...card.lines, ...addonLines],
+      highlightedLineIds: [
+        ...(card.highlightedLineIds ?? card.lines.map((line) => line.id)),
+        ...addonLines.map((line) => line.id),
+      ],
+      total: roundMoney(card.total + addonTotal),
+      highlightAmount: roundMoney(card.highlightAmount + addonTotal),
+      documentAmount: roundMoney((card.documentAmount ?? card.highlightAmount) + addonTotal),
+    };
+  });
+
+  const leftoverActive = active.filter((row) => !mergedBookingIds.has(String(row.bookingId)));
+  const inactive = addonRecords.filter((row) => row.voided || row.refunded);
+  return [
+    ...next,
+    ...leftoverActive.map((record) => buildAddonCard(record, ctx)),
+    ...inactive.map((record) => buildAddonCard(record, ctx)),
+  ];
 }
 
 function applyPenaltyAmount<T extends {
@@ -586,12 +700,7 @@ export function buildCancellationFeeInvoiceMetaLines(input: {
 }
 
 function kilometerExtrasAmount(event: CalendarEvent): number {
-  if (!event.details?.showKilometerAllowance) return 0;
-  const ka = event.details.kilometerAllowance;
-  if (!ka) return 0;
-  const eur = Number(ka.eurPerKm) || 0;
-  const km = Number(ka.totalKilometer) || 0;
-  return roundMoney(Math.max(0, eur * km));
+  return resolveKilometerAllowanceAmount(event.details?.kilometerAllowance);
 }
 
 /**
@@ -859,6 +968,9 @@ export function buildCardsForEvent(input: {
     if (!mainShareBase) return [];
     const summaryId = resolveLiveCardId(bookingId, `${bookingId}-summary`);
     const requestDue = invoiceDueFromNotes || deriveDueDate(occurredAt, ctx.paymentTerms);
+    const hasGuestSubs = guestModelSharesBase.length > 0;
+    const mainLines = withNegativeLines(mainShareBase.lines, effectiveLines);
+    const mainTotal = sumLineAmounts(mainLines);
 
     const subCards: SalesSubCardData[] = guestModelSharesBase.map((share) => ({
       id: `${summaryId}-sub-${share.key}`,
@@ -891,19 +1003,19 @@ export function buildCardsForEvent(input: {
           clientEmail: email,
           clientPhone: phone,
           clientKind,
-          lines: mainShareBase.lines,
-          highlightedLineIds: mainShareBase.lines.map((line) => line.id),
+          lines: mainLines,
+          highlightedLineIds: mainLines.map((line) => line.id),
           subCards: subCards.length ? subCards : undefined,
-          total,
+          total: hasGuestSubs ? total : mainTotal,
           totalLabel: "Total",
           highlightLabel: "Payment",
-          highlightAmount: mainShareBase.subtotal,
+          highlightAmount: mainTotal,
           methodDateLine: method,
           dueDate: requestDue,
           showAddOns: true,
           paymentMethod: eventPaymentMethod,
           paymentMethodLabel: method,
-          documentAmount: mainShareBase.subtotal,
+          documentAmount: mainTotal,
           occurredAt,
           bookingEndAt: endAt,
         },
@@ -976,6 +1088,15 @@ export function buildCardsForEvent(input: {
         isPrepayPaid && prepaidAmount > 0
           ? [{ id: "prepaid-deduction", label: "Prepaid", amount: -prepaidAmount }]
           : [];
+      const hasGuestSubs = guestModelShares.length > 0;
+      const mainLines = withNegativeLines(mainShare.lines, effectiveLines);
+      const mainListedTotal = sumLineAmounts(mainLines);
+      const mainPayable = roundMoney(
+        Math.max(
+          0,
+          mainListedTotal - (isPrepayPaid && prepaidAmount > 0 ? prepaidAmount : 0),
+        ),
+      );
 
       const subCards: SalesSubCardData[] = guestModelShares.map((share) => {
         const subPaid = isSplitPayerPaid(splitState, share.key);
@@ -1014,19 +1135,19 @@ export function buildCardsForEvent(input: {
             clientEmail: email,
             clientPhone: phone,
             clientKind,
-            lines: mainShare.lines,
-            highlightedLineIds: mainShare.lines.map((line) => line.id),
+            lines: mainLines,
+            highlightedLineIds: mainLines.map((line) => line.id),
             subCards: subCards.length ? subCards : undefined,
-            total,
+            total: hasGuestSubs ? total : mainListedTotal,
             totalLabel: "Total",
             secondaryRows,
             highlightLabel: "Payment",
-            highlightAmount: mainShare.paymentAmount,
+            highlightAmount: mainPayable,
             dueDate: invoiceDueFromNotes,
             showAddOns: true,
             paymentMethod: eventPaymentMethod,
             paymentMethodLabel: method,
-            documentAmount: mainShare.paymentAmount,
+            documentAmount: mainPayable,
             occurredAt,
             bookingEndAt: endAt,
           },

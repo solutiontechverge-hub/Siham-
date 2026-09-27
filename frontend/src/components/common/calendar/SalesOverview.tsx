@@ -95,6 +95,7 @@ export default function SalesOverview({
       <SalesAddOnCheckout
         clientName={checkoutContext.clientName}
         clientEmail={checkoutContext.clientEmail}
+        priorLines={checkoutContext.priorLines}
         onCancel={clearCheckout}
         onSave={handleSaveAddon}
       />
