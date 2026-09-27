@@ -3,6 +3,8 @@ import type { BookingIndicatorVariant } from "./BookingIndicatorIcon";
 import { prepayBlocksConfirmation } from "./bookingAcknowledgment";
 import { resolvePostBookingPendingPayment } from "./bookingCheckout";
 import {
+  hasStoredResponseDeadline,
+  isBookingStartPast,
   isResponseWindowOverdue,
   type ResponseWindowInput,
 } from "./bookingResponseDeadline";
@@ -11,7 +13,10 @@ import { resolveCalendarPrepaymentStatus } from "./prepaymentStatus";
 export type CalendarResponseStatus = "suggestion_for_change" | "overdue_response";
 
 export function resolveBookingResponseIndicators(
-  event: Pick<CalendarEvent, "id" | "bookingScenario" | "details" | "status">,
+  event: Pick<
+    CalendarEvent,
+    "id" | "bookingScenario" | "details" | "status" | "date" | "start"
+  >,
   opts?: {
     responseTimeConfigured?: boolean;
     responseTime?: ResponseWindowInput | null;
@@ -67,21 +72,17 @@ export function resolveBookingResponseIndicators(
     indicators.push(overdue ? "overdue_payment" : "waiting_for_payment");
   }
 
-  if (
-    pendingNegotiation &&
-    opts?.responseTimeConfigured !== false &&
-    isResponseWindowOverdue(
-      {
-        responseStatus: details?.responseStatus,
-        responseStartedAt: details?.responseStartedAt,
-        respondBy: details?.respondBy,
-        responseWindowMinutes: details?.responseWindowMinutes,
-      },
-      new Date(),
-      opts?.responseTime,
-    )
-  ) {
-    indicators.push("overdue_response");
+  if (pendingNegotiation && opts?.responseTimeConfigured !== false) {
+    const deadlineFields = {
+      responseStatus: details?.responseStatus,
+      responseStartedAt: details?.responseStartedAt,
+      respondBy: details?.respondBy,
+      responseWindowMinutes: details?.responseWindowMinutes,
+    };
+    const overdue = hasStoredResponseDeadline(deadlineFields)
+      ? isResponseWindowOverdue(deadlineFields, new Date(), opts?.responseTime)
+      : isBookingStartPast(event);
+    if (overdue) indicators.push("overdue_response");
   }
 
   return indicators;

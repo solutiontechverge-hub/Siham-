@@ -52,6 +52,8 @@ type Step = "items" | "payment" | "summary";
 type SalesAddOnCheckoutProps = {
   clientName: string;
   clientEmail?: string;
+  /** Existing booking summary lines — shown with new add-ons on the checkout summary step. */
+  priorLines?: Array<{ id: string; label: string; amount: number }>;
   onCancel: () => void;
   onSave: (payload: SalesAddOnCheckoutPayload) => void | Promise<void>;
 };
@@ -59,6 +61,7 @@ type SalesAddOnCheckoutProps = {
 export default function SalesAddOnCheckout({
   clientName,
   clientEmail,
+  priorLines = [],
   onCancel,
   onSave,
 }: SalesAddOnCheckoutProps) {
@@ -214,6 +217,11 @@ export default function SalesAddOnCheckout({
   );
   const totalPrice = Math.max(0, subtotal - discountAmount);
   const hasItems = lines.length > 0;
+  const priorSubtotal = React.useMemo(
+    () => priorLines.reduce((sum, line) => sum + line.amount, 0),
+    [priorLines],
+  );
+  const summaryTotal = Math.max(0, priorSubtotal + totalPrice);
 
   const addLinesFromCatalog = (
     kind: ManualEntryLineKind,
@@ -560,6 +568,35 @@ export default function SalesAddOnCheckout({
           )}
 
           <Stack spacing={0.85} sx={{ mb: 1.5 }}>
+            {priorLines.map((line) => (
+              <Stack
+                key={`prior-${line.id}`}
+                direction="row"
+                justifyContent="space-between"
+                spacing={1.5}
+              >
+                <Typography
+                  sx={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.72),
+                  }}
+                >
+                  {line.label}
+                </Typography>
+                <Typography
+                  sx={{
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: alpha(m.navy, 0.82),
+                  }}
+                >
+                  {line.amount < 0
+                    ? `-€${Math.abs(line.amount).toFixed(2)}`
+                    : `€${line.amount.toFixed(2)}`}
+                </Typography>
+              </Stack>
+            ))}
             {lines.map((line) => (
               <Stack
                 key={line.id}
@@ -627,7 +664,7 @@ export default function SalesAddOnCheckout({
               Total Price
             </Typography>
             <Typography sx={{ fontSize: 22, fontWeight: 900, color: m.headingText }}>
-              €{totalPrice % 1 === 0 ? totalPrice : totalPrice.toFixed(2)}
+              €{summaryTotal % 1 === 0 ? summaryTotal : summaryTotal.toFixed(2)}
             </Typography>
           </Stack>
           <Typography

@@ -11,8 +11,8 @@ import type {
 } from "./salesOverview.types";
 import {
   type BuilderCtx,
-  buildAddonCard,
   buildCardsForEvent,
+  mergeAddonRecordsIntoCards,
 } from "./buildSalesOverviewCards.helpers";
 
 export type BuildSalesOverviewInput = {
@@ -122,11 +122,9 @@ export function buildSalesOverviewCards(input: BuildSalesOverviewInput): SalesOv
   }
 
   const addonRecords = listSalesAddonsForBookings([...seenBookingIds]);
-  for (const record of addonRecords) {
-    cards.push(buildAddonCard(record, ctx));
-  }
+  const withAddons = mergeAddonRecordsIntoCards(cards, addonRecords, ctx);
 
-  return cards
+  return withAddons
     .filter((card) => !card.canceled)
     .sort((a, b) => {
       const at = new Date(a.occurredAt).getTime();

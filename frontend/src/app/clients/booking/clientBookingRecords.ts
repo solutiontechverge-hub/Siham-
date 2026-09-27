@@ -96,11 +96,11 @@ function normalizeStatus(record: ClientBookingRecord): ClientBookingStatus {
   return "confirmed";
 }
 
-/** Past appointment still awaiting settlement (invoice / remaining balance). */
+/** Post-booking settlement still open (In Progress payment pending, or Completed unpaid). */
 export function isClientBookingPaymentDue(record: ClientBookingRecord): boolean {
   const status = normalizeStatus(record);
   if (status === "cancelled" || status === "no_show" || status === "invalid") return false;
-  if (status !== "completed") return false;
+  if (status !== "completed" && status !== "in_progress") return false;
   return record.paid === false;
 }
 

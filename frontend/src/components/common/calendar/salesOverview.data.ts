@@ -35,7 +35,7 @@ export const SALES_OVERVIEW_COPY = {
   clientNotifyFailed: "Sale saved, but client notification failed.",
   saleUpdated: "Sale updated.",
   bookingCompleteFailed:
-    "Invoice saved, but the booking could not be marked Completed.",
+    "Invoice saved, but the booking status could not be updated.",
   invoiceReissued: "Invoice reissued with new due date.",
   noteSaved: "Note saved.",
   noteDeleted: "Note deleted.",

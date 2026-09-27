@@ -5,8 +5,10 @@ import assert from "node:assert/strict";
 import {
   DEFAULT_RESPONSE_WINDOW_MINUTES,
   buildResponseDeadline,
+  isBookingStartPast,
   isResponseTimeConfigured,
   isResponseWindowOverdue,
+  resolveBookingStartMs,
   resolveEffectiveRespondByMs,
   shouldShowExpiredResponseBanner,
 } from "./bookingResponseDeadline";
@@ -82,6 +84,65 @@ assert.equal(
   ),
   false,
 );
+
+// No stamped window: overdue once appointment start has passed.
+assert.equal(
+  resolveBookingStartMs({ date: "2026-09-21", start: "11:15" }),
+  Date.parse("2026-09-21T11:15:00"),
+);
+assert.equal(
+  isBookingStartPast(
+    { date: "2026-09-21", start: "11:15" },
+    new Date("2026-09-21T11:16:00"),
+  ),
+  true,
+);
+assert.equal(
+  isBookingStartPast(
+    { date: "2026-09-21", start: "11:15" },
+    new Date("2026-09-21T11:15:00"),
+  ),
+  false,
+);
+assert.equal(
+  shouldShowExpiredResponseBanner(
+    {
+      status: "Requested",
+      bookingScenario: "BR",
+      details: {},
+      date: "2026-09-21",
+      start: "11:15",
+    },
+    blank,
+    new Date("2026-09-28T12:00:00"),
+  ),
+  true,
+);
+assert.equal(
+  shouldShowExpiredResponseBanner(
+    {
+      status: "Requested",
+      bookingScenario: "BR",
+      details: {},
+      date: "2026-09-28",
+      start: "18:00",
+    },
+    blank,
+    new Date("2026-09-28T12:00:00"),
+  ),
+  false,
+);
+const pastStartFlags = resolveProfessionalBookingActions(
+  {
+    status: "Requested",
+    bookingScenario: "BR",
+    details: { requestDirection: "outgoing" },
+    date: "2026-09-21",
+    start: "11:15",
+  },
+  { responseTime: blank },
+);
+assert.equal(pastStartFlags.restart_response, true);
 
 // Dynamic: live template length overrides stamped snapshot.
 const started = Date.parse("2026-01-01T12:00:00.000Z");

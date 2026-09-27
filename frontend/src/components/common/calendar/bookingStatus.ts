@@ -144,12 +144,12 @@ export const BOOKING_STATUS_THEME: Record<CalendarBookingStatus, StatusTheme> = 
     chipBorder: "#75D9A6",
   },
   "In Progress": {
-    accent: "#3B82F6",
-    cardBg: "#EFF6FF",
-    cardBorder: alpha("#3B82F6", 0.35),
-    chipBg: alpha("#3B82F6", 0.1),
-    chipColor: "#2563EB",
-    chipBorder: alpha("#3B82F6", 0.35),
+    accent: "#30B5C0",
+    cardBg: "#E8F8FA",
+    cardBorder: alpha("#30B5C0", 0.35),
+    chipBg: "#E8F8FA",
+    chipColor: "#30B5C0",
+    chipBorder: alpha("#30B5C0", 0.35),
   },
   Completed: {
     accent: "#98A2B3",

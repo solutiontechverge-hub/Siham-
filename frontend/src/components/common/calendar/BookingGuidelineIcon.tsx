@@ -1,15 +1,18 @@
 "use client";
 
-import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { Box } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import type { ReactNode } from "react";
+
+/** Twin-bell alarm clock asset path (Overdue). Rendered inline via OverdueAlarmSvg. */
+export const OVERDUE_ALARM_ICON_SRC = "/icons/overdue-alarm.svg";
+// Also mirrored at /icons/overdue-alarm.png (source thumbnail from design).
 
 /**
  * Booking status guideline icons — inline SVGs (was PNG set).
  * Main stroke uses slate `#607080` (sibling set). Badges keep status green/red.
  * Waiting-for-prepayment uses solid navy + bold € coin for clear card-row weight.
- * Overdue uses theme `statusRedFg`.
+ * Overdue uses the alarm-clock asset tinted with theme `statusRedFg`.
  */
 export type BookingGuidelineIconVariant =
   | "refund_pending"
@@ -320,6 +323,62 @@ function SuggestionForChangeSvg({ size }: SvgProps) {
   );
 }
 
+function OverdueAlarmSvg({ size, color }: SvgProps & { color: string }) {
+  return (
+    <SvgRoot size={size}>
+      {/* Twin bells */}
+      <path
+        d="M7.2 6.2c0-1.1.9-1.8 1.9-1.5.5.8.6 1.6.3 2.3"
+        stroke={color}
+        strokeWidth={1.6}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <path
+        d="M16.8 6.2c0-1.1-.9-1.8-1.9-1.5-.5.8-.6 1.6-.3 2.3"
+        stroke={color}
+        strokeWidth={1.6}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <circle
+        cx="12"
+        cy="13"
+        r="7"
+        stroke={color}
+        strokeWidth={1.6}
+        fill="none"
+      />
+      <path
+        d="M12 13V8.8"
+        stroke={color}
+        strokeWidth={1.6}
+        strokeLinecap="round"
+      />
+      <path
+        d="M12 13l3.2 2.4"
+        stroke={color}
+        strokeWidth={1.6}
+        strokeLinecap="round"
+      />
+      <path
+        d="M8.6 19.6L7.4 21.2"
+        stroke={color}
+        strokeWidth={1.6}
+        strokeLinecap="round"
+      />
+      <path
+        d="M15.4 19.6l1.2 1.6"
+        stroke={color}
+        strokeWidth={1.6}
+        strokeLinecap="round"
+      />
+    </SvgRoot>
+  );
+}
+
 const VARIANT_SVG: Partial<
   Record<BookingGuidelineIconVariant, (p: SvgProps) => ReactNode>
 > = {
@@ -358,13 +417,10 @@ export default function BookingGuidelineIcon({ variant, size = 16 }: Props) {
           alignItems: "center",
           justifyContent: "center",
           lineHeight: 0,
-          color: overdueColor,
         }}
+        aria-hidden
       >
-        <WarningAmberRoundedIcon
-          aria-hidden
-          sx={{ fontSize: size, color: "inherit", display: "block" }}
-        />
+        <OverdueAlarmSvg size={size} color={overdueColor} />
       </Box>
     );
   }
