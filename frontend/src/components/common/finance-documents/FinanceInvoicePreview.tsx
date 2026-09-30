@@ -38,6 +38,8 @@ import {
   getInvoiceLineItemCellValue,
   getInvoiceLineItemColumns,
   getProfessionalProfile,
+  getIssuedDocument,
+  hasStoredDocumentSnapshot,
   parseCurrencyValue,
   professionalBusinessInfoLines,
   resolveInvoiceLineItemLayout,
@@ -73,9 +75,15 @@ export default function FinanceInvoicePreview({
 }: Props) {
   const m = useTheme().palette.mollure;
   const { showSnackbar } = useSnackbar();
+  const document = getIssuedDocument(row);
+  const frozenDocument = hasStoredDocumentSnapshot(row);
+  const frozenInvoiceSettings = frozenDocument && document?.issuedSnapshot?.invoiceSettings && typeof document.issuedSnapshot.invoiceSettings === "object"
+    ? (document.issuedSnapshot.invoiceSettings as { logoDataUrl?: string })
+    : null;
+  const logoDataUrl = frozenDocument ? frozenInvoiceSettings?.logoDataUrl : settings.logoDataUrl;
   const professionalProfile = React.useMemo(
-    () => getProfessionalProfile(profileData),
-    [profileData],
+    () => (frozenDocument ? null : getProfessionalProfile(profileData)),
+    [profileData, row],
   );
   const lineItems = React.useMemo(
     () => buildPreviewLineItems(settings, row),
@@ -83,8 +91,8 @@ export default function FinanceInvoicePreview({
   );
   const lineItemLayout = resolveInvoiceLineItemLayout(invoiceType);
   const displayLineItems = React.useMemo(
-    () => toInvoiceDisplayLineItems(lineItems, invoiceType),
-    [invoiceType, lineItems],
+    () => toInvoiceDisplayLineItems(lineItems, invoiceType, frozenDocument),
+    [frozenDocument, invoiceType, lineItems],
   );
   const lineItemColumns = React.useMemo(
     () => getInvoiceLineItemColumns(lineItemLayout),
@@ -92,37 +100,37 @@ export default function FinanceInvoicePreview({
   );
   const serviceDate =
     formatDocumentDateTime(
-      row?.document?.serviceDate || row?.date,
-      row?.document?.serviceTime,
-    ) || "12/04/2023";
+      document?.serviceDate || row?.date,
+      document?.serviceTime,
+    ) || "";
   const invoiceDate =
-    formatDocumentDate(row?.document?.invoiceDate || row?.date) ||
-    formatDocumentDate(row?.document?.serviceDate || row?.date) ||
+    formatDocumentDate(document?.invoiceDate || row?.date) ||
+    formatDocumentDate(document?.serviceDate || row?.date) ||
     serviceDate;
-  const dueDate =
-    formatDocumentDate(row?.document?.dueDate) ||
-    addDuration(
-      row?.date || "",
-      settings.paymentTerms.originalDueValue,
-      settings.paymentTerms.originalDueUnit,
-    ) ||
-    "12/04/2023";
+  const dueDate = frozenDocument
+    ? formatDocumentDate(document?.dueDate)
+    : formatDocumentDate(document?.dueDate) || addDuration(
+        row?.date || "",
+        settings.paymentTerms.originalDueValue,
+        settings.paymentTerms.originalDueUnit,
+      );
   const documentNumber =
-    row?.document?.documentNumber || row?.entryId || row?.id || "0535833";
+    document?.documentNumber || row?.entryId || row?.id || "";
   const totalAmount = displayLineItems.reduce(
     (sum, item) => sum + parseCurrencyValue(item.totalPrice),
     0,
   );
   const totalPriceLabel =
-    row?.document?.totalPrice ||
+    document?.totalPrice ||
     formatCurrencyValue(
-      totalAmount || parseCurrencyValue(row?.netAmount) || 250,
+      (frozenDocument ? parseCurrencyValue(row?.grossAmount) : totalAmount || parseCurrencyValue(row?.grossAmount)) || 0,
     );
   const clientInfoTitle =
     invoiceType === "company" ? "Company Clients Business Info" : "Client Info";
-  const penaltySummary =
-    row?.document?.lateFeeNotice ||
-    (settings.paymentTerms.originalPenaltyValue
+  const penaltySummary = frozenDocument
+    ? document?.lateFeeNotice || ""
+    : document?.lateFeeNotice ||
+      (settings.paymentTerms.originalPenaltyValue
       ? `Late payment fee: ${settings.paymentTerms.originalPenaltyValue} ${settings.paymentTerms.originalPenaltyUnit} applies after the due date.`
       : "Late payment fee applies after the due date.");
 
@@ -134,7 +142,10 @@ export default function FinanceInvoicePreview({
     professionalDisplay,
     invoiceType,
   );
-  const prepaidAmountLabel = row?.document?.prepaymentAmount;
+  const prepaidAmountLabel = document?.prepaymentAmount;
+  const prepaymentDateTime = row?.issuedAt
+    ? new Date(row.issuedAt).toLocaleString()
+    : row?.date;
   const prepaidAmountValue = parseCurrencyValue(prepaidAmountLabel);
   const remainingAfterPrepayment =
     prepaidAmountValue > 0
@@ -142,11 +153,11 @@ export default function FinanceInvoicePreview({
           Math.max(0, parseCurrencyValue(totalPriceLabel) - prepaidAmountValue),
         )
       : null;
-  const clientParty = clientPartyOverride ?? row?.document?.client;
+  const clientParty = clientPartyOverride ?? document?.client;
 
   const clientLines = React.useMemo(
     () => [
-      `Legal Name: ${clientParty?.legalName || row?.clientName || "Sara Johnson"}`,
+      `Legal Name: ${clientParty?.legalName || row?.clientName || ""}`,
       ...(clientParty?.address
         ? [`Client Address: ${clientParty.address}`]
         : []),
@@ -183,9 +194,9 @@ export default function FinanceInvoicePreview({
         { align: "left" },
       );
 
-      if (settings.logoDataUrl) {
+      if (logoDataUrl) {
         const match = /^data:image\/(png|jpeg|jpg);base64,/.exec(
-          settings.logoDataUrl,
+          logoDataUrl,
         );
         const format =
           match?.[1]?.toUpperCase() === "JPG"
@@ -193,7 +204,7 @@ export default function FinanceInvoicePreview({
             : match?.[1]?.toUpperCase();
         if (format === "PNG" || format === "JPEG") {
           doc.addImage(
-            settings.logoDataUrl,
+            logoDataUrl,
             format,
             left + usableWidth / 2 - 22,
             top - 6,
@@ -352,10 +363,10 @@ export default function FinanceInvoicePreview({
             flexShrink: 0,
           }}
         >
-          {settings.logoDataUrl ? (
+          {logoDataUrl ? (
             <Box sx={{ position: "relative", width: 48, height: 48 }}>
               <Image
-                src={settings.logoDataUrl}
+                src={logoDataUrl}
                 alt="Invoice logo"
                 fill
                 unoptimized
@@ -448,11 +459,29 @@ export default function FinanceInvoicePreview({
               {totalPriceLabel}
             </BodyText>
           </Stack>
+          {row?.grossAmount ? (
+            <Stack direction="row" justifyContent="space-between">
+              <BodyText sx={mollureBodyMutedSx(m.navy, { color: alpha(m.navy, 0.65) })}>Gross amount</BodyText>
+              <BodyText sx={mollureLabelSx(m.navy)}>{row.grossAmount}</BodyText>
+            </Stack>
+          ) : null}
+          {row?.stripeFee ? (
+            <Stack direction="row" justifyContent="space-between">
+              <BodyText sx={mollureBodyMutedSx(m.navy, { color: alpha(m.navy, 0.65) })}>Stripe fee</BodyText>
+              <BodyText sx={mollureLabelSx(m.navy)}>{row.stripeFee}</BodyText>
+            </Stack>
+          ) : null}
+          {row?.mollureFee ? (
+            <Stack direction="row" justifyContent="space-between">
+              <BodyText sx={mollureBodyMutedSx(m.navy, { color: alpha(m.navy, 0.65) })}>Mollure fee</BodyText>
+              <BodyText sx={mollureLabelSx(m.navy)}>{row.mollureFee}</BodyText>
+            </Stack>
+          ) : null}
           {prepaidAmountLabel && prepaidAmountValue > 0 ? (
             <>
               <Stack direction="row" justifyContent="space-between">
                 <BodyText sx={mollureBodyMutedSx(m.navy, { color: alpha(m.navy, 0.65) })}>
-                  Prepayment
+                  {prepaymentDateTime ? `Prepayment · ${prepaymentDateTime}` : "Prepayment"}
                 </BodyText>
                 <BodyText
                   sx={{

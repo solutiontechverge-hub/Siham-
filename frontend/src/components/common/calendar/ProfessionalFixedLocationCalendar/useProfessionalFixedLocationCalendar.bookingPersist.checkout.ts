@@ -164,6 +164,8 @@ export function useProfessionalFixedLocationCalendarBookingPersistCheckout(
               name: line.label,
               quantity: 1,
               unitPrice: line.amount,
+              sourceReference: line.id,
+              sourceType: "serviceId",
             })),
             bookingId,
             bookingRef: current.bookingCode,

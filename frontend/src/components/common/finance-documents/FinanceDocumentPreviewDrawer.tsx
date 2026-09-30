@@ -17,7 +17,7 @@ import FinanceInvoicePreview from "./FinanceInvoicePreview";
 import FinanceReceiptPreview, {
   resolveReceiptTotalLabel,
 } from "./FinanceReceiptPreview";
-import { buildPreviewLineItems, resolveInvoiceTemplateType } from "./financeDocumentUtils";
+import { buildPreviewLineItems, getIssuedDocument, getIssuedDocumentSnapshot, hasStoredDocumentSnapshot, resolveInvoiceTemplateType } from "./financeDocumentUtils";
 import {
   canEditFinanceInvoiceClient,
   isMollureFinanceClient,
@@ -53,20 +53,35 @@ export default function FinanceDocumentPreviewDrawer({
   professionalBusinessOverride = null,
 }: FinanceDocumentPreviewDrawerProps) {
   const m = useTheme().palette.mollure;
+  const frozenDocument = hasStoredDocumentSnapshot(row);
+  const renderRow = row && row.issuedDocument
+    ? { ...row, document: getIssuedDocument(row) ?? row.document }
+    : row;
+  const issuedSnapshot = getIssuedDocumentSnapshot(row);
+  const issuedBusinessOverride = issuedSnapshot?.professionalBusiness
+    ? {
+        legalName: issuedSnapshot.professionalBusiness.legalName ?? "",
+        phone: issuedSnapshot.professionalBusiness.phone ?? undefined,
+        address: issuedSnapshot.professionalBusiness.address ?? undefined,
+        vatNumber: issuedSnapshot.professionalBusiness.vatNumber ?? undefined,
+        cocNumber: issuedSnapshot.professionalBusiness.cocNumber ?? undefined,
+      }
+    : null;
   const resolvedInvoiceType = React.useMemo(
-    () =>
-      resolveInvoiceTemplateType({
+    () => frozenDocument
+      ? issuedSnapshot?.templateType ?? "individual"
+      : resolveInvoiceTemplateType({
         fallback: invoiceType,
         invoiceType,
         clientType: row?.clientType,
         vatNumber: row?.document?.client?.vatNumber,
         cocNumber: row?.document?.client?.cocNumber,
       }),
-    [invoiceType, row],
+    [frozenDocument, invoiceType, issuedSnapshot, row],
   );
   const lineItems = React.useMemo(
-    () => buildPreviewLineItems(settings, row),
-    [settings, row],
+    () => buildPreviewLineItems(settings, renderRow),
+    [renderRow, settings],
   );
   const totalPriceLabel = React.useMemo(
     () => resolveReceiptTotalLabel(row, lineItems),
@@ -74,9 +89,9 @@ export default function FinanceDocumentPreviewDrawer({
   );
   const titleLabel = documentType === "receipt" ? "Receipt" : "Invoice";
   const canEditClient =
-    documentType === "invoice" && canEditFinanceInvoiceClient(row);
+    !frozenDocument && documentType === "invoice" && canEditFinanceInvoiceClient(row);
   const isMollureClient =
-    documentType === "invoice" && isMollureFinanceClient(row);
+    !frozenDocument && documentType === "invoice" && isMollureFinanceClient(row);
 
   const [clientDraft, setClientDraft] =
     React.useState<TransactionDocumentParty>(() => ({
@@ -111,12 +126,12 @@ export default function FinanceDocumentPreviewDrawer({
       <Stack spacing={2}>
         {documentType === "receipt" ? (
           <FinanceReceiptPreview
-            row={row}
+            row={renderRow}
             lineItems={lineItems}
             totalPriceLabel={totalPriceLabel}
             invoiceType={resolvedInvoiceType}
-            profileData={profileData}
-            professionalBusinessOverride={professionalBusinessOverride}
+            profileData={frozenDocument ? null : profileData}
+            professionalBusinessOverride={frozenDocument ? issuedBusinessOverride : professionalBusinessOverride}
           />
         ) : (
           <>
@@ -225,12 +240,12 @@ export default function FinanceDocumentPreviewDrawer({
             ) : null}
 
             <FinanceInvoicePreview
-              row={row}
+              row={renderRow}
               settings={settings}
               invoiceType={resolvedInvoiceType}
-              profileData={profileData}
-              professionalBusinessOverride={professionalBusinessOverride}
-              clientPartyOverride={canEditClient ? clientDraft : null}
+              profileData={frozenDocument ? null : profileData}
+              professionalBusinessOverride={frozenDocument ? issuedBusinessOverride : professionalBusinessOverride}
+              clientPartyOverride={frozenDocument ? null : canEditClient ? clientDraft : null}
             />
           </>
         )}

@@ -228,7 +228,7 @@ export default function FinanceOverviewPageView() {
         onEntryClick={(row) => {
           if (row.bookingId) {
             router.push(
-              `/professionals/calendar?booking=${encodeURIComponent(row.bookingId)}`,
+              `/professionals/calendar?booking=${encodeURIComponent(row.bookingId)}${row.date ? `&date=${encodeURIComponent(row.date)}` : ""}`,
             );
           }
         }}
@@ -260,6 +260,7 @@ export default function FinanceOverviewPageView() {
         profileData={profileResponse?.data ?? null}
         professionalBusinessOverride={professionalBusinessOverride}
       />
+
 
       <CancelPendingPaymentModal
         open={voidPaymentModalOpen}

@@ -45,6 +45,20 @@ export type PreviewLineItem = {
   totalPrice: string;
 };
 
+/** A transaction document is frozen once its identifying metadata is persisted. */
+export function hasStoredDocumentSnapshot(row?: TransactionRow | null): boolean {
+  const document = row?.issuedDocument ?? row?.document;
+  return Boolean(document?.documentNumber || document?.invoiceDate || document?.lineItems?.length);
+}
+
+export function getIssuedDocumentSnapshot(row?: TransactionRow | null) {
+  return row?.issuedDocument?.issuedSnapshot ?? row?.document?.issuedSnapshot ?? null;
+}
+
+export function getIssuedDocument(row?: TransactionRow | null) {
+  return row?.issuedDocument ?? row?.document ?? null;
+}
+
 /** B2B invoices are fully itemized; individual invoices use a simplified table. */
 export type InvoiceLineItemLayout = "itemized" | "simplified";
 
@@ -308,7 +322,11 @@ function aggregatePreviewLineItems(items: PreviewLineItem[]): PreviewLineItem[] 
 export function toInvoiceDisplayLineItems(
   items: PreviewLineItem[],
   invoiceType?: FinanceInvoiceTemplateType | string | null,
+  preserveStoredValues = false,
 ): InvoiceDisplayLineItem[] {
+  if (preserveStoredValues) {
+    return items.map((item) => ({ ...item, quantity: item.quantity, unit: item.quantity, displayDescription: item.description }));
+  }
   const layout = resolveInvoiceLineItemLayout(invoiceType);
   return aggregatePreviewLineItems(items).map((item) => {
     const quantity = parseLineItemQuantity(item);
@@ -342,54 +360,38 @@ export function addDuration(dateText: string, value: string, unit: string) {
 export function normalizePreviewLineItems(items: TransactionDocumentLineItem[]): PreviewLineItem[] {
   return items.map((item) => ({
     description: item.description,
-    quantity: formatLineItemQuantity(parseLineItemQuantity(item)),
+    quantity: item.quantity,
     vat: item.vat,
     pricePerUnit: item.pricePerUnit,
     totalPrice: item.totalPrice,
   }));
 }
 
-export function buildPreviewLineItems(settings: FinanceInvoiceSettings, row?: TransactionRow | null): PreviewLineItem[] {
-  if (row?.document?.lineItems?.length) {
-    const items = normalizePreviewLineItems(row.document.lineItems);
-    const serviceItems = items.filter((item) => item.description.toLowerCase() !== "prepayment");
-    return serviceItems.length ? serviceItems : items;
+export function buildPreviewLineItems(_settings: FinanceInvoiceSettings, row?: TransactionRow | null): PreviewLineItem[] {
+  const document = getIssuedDocument(row);
+  if (document?.lineItems?.length) {
+    return normalizePreviewLineItems(document.lineItems);
   }
 
-  const templateItems = [
-    ...settings.services.map((service) => ({
-      description: service.service || service.category || "Service",
-      vat: service.vat || "0%",
-    })),
-    ...settings.products.map((product) => ({
-      description: product.name || "Product",
-      vat: product.vat || "0%",
-    })),
-  ].filter((item) => item.description);
-
-  const items = templateItems.length
-    ? templateItems.slice(0, 4)
-    : [{ description: row?.entryLabel || "Service", vat: "0%" }];
-
-  const totalAmount = parseCurrencyValue(row?.netAmount) || 250;
-  const perItemAmount = items.length ? totalAmount / items.length : totalAmount;
-
-  return items.map((item, index) => {
-    const amount = index === items.length - 1 ? totalAmount - perItemAmount * (items.length - 1) : perItemAmount;
-    return {
-      description: item.description,
-      quantity: "1",
-      vat: item.vat,
-      pricePerUnit: formatCurrencyValue(amount),
-      totalPrice: formatCurrencyValue(amount),
-    };
-  });
+  // Never reconstruct missing historical lines from today's catalog/settings.
+  const totalAmount = parseCurrencyValue(document?.totalPrice) || parseCurrencyValue(row?.grossAmount) || parseCurrencyValue(row?.netAmount) || 0;
+  if (hasStoredDocumentSnapshot(row) && !totalAmount) return [];
+  if (!document && !row) return [];
+  return [{
+    description: "Professional Service",
+    quantity: "1",
+    vat: "0%",
+    pricePerUnit: formatCurrencyValue(totalAmount),
+    totalPrice: formatCurrencyValue(totalAmount),
+  }];
 }
 
 export function buildBookingItems(row: TransactionRow | null, lineItems: PreviewLineItem[]): TransactionDocumentBookingItem[] {
-  if (row?.document?.bookingItems?.length) {
-    return row.document.bookingItems.filter((item) => item.label.toLowerCase() !== "prepayment");
+  const document = getIssuedDocument(row);
+  if (document?.bookingItems?.length) {
+    return document.bookingItems.filter((item) => item.label.toLowerCase() !== "prepayment");
   }
+  if (hasStoredDocumentSnapshot(row)) return [];
   return lineItems.map((item) => ({
     label: item.description,
     value: item.totalPrice,
