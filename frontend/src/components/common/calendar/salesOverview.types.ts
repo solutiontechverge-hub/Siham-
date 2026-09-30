@@ -173,6 +173,7 @@ export type SalesCardMetaRecord = {
   discountAmount?: number;
   totalPrice?: number;
   paid?: boolean;
+  addon?: SalesAddonRecord;
 };
 
 export type SalesAddOnCheckoutPayload = {

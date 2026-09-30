@@ -16,7 +16,9 @@ import {
 import {
   formatDocumentDateTime,
   formatPaymentMethod,
+  getIssuedDocument,
   getProfessionalProfile,
+  hasStoredDocumentSnapshot,
   parseCurrencyValue,
   professionalBusinessInfoLines,
   receiptItemsTitleForStatus,
@@ -56,7 +58,9 @@ export default function FinanceReceiptPreview({
 }: Props) {
   const m = useTheme().palette.mollure;
   const { showSnackbar } = useSnackbar();
-  const professionalProfile = getProfessionalProfile(profileData);
+  const frozenDocument = hasStoredDocumentSnapshot(row);
+  const document = getIssuedDocument(row);
+  const professionalProfile = frozenDocument ? null : getProfessionalProfile(profileData);
   const professionalDisplay = resolveProfessionalBusinessDisplay(
     professionalBusinessOverride,
     professionalProfile,
@@ -66,33 +70,38 @@ export default function FinanceReceiptPreview({
     invoiceType,
   );
   const displayLineItems = React.useMemo(
-    () => toInvoiceDisplayLineItems(lineItems, invoiceType),
-    [invoiceType, lineItems],
+    () => toInvoiceDisplayLineItems(lineItems, invoiceType, frozenDocument),
+    [frozenDocument, invoiceType, lineItems],
   );
 
   const receiptTitle = receiptTitleForStatus(row?.status);
   const itemsTitle = receiptItemsTitleForStatus(row?.status);
   const receiptNumberLabel = receiptNumberLabelForStatus(row?.status);
   const invoiceNumber =
-    row?.document?.documentNumber || row?.entryId || row?.id || "—";
+    document?.documentNumber || row?.entryId || row?.id || "—";
   const receiptNumber =
-    row?.document?.creditNoteNumber ||
-    row?.document?.receiptNumber ||
+    document?.creditNoteNumber ||
+    document?.receiptNumber ||
     row?.id ||
     "—";
   const date =
     formatDocumentDateTime(
-      row?.document?.refundedAt ||
-        row?.document?.serviceDate ||
-        row?.document?.invoiceDate ||
+      document?.refundedAt ||
+        document?.serviceDate ||
+        document?.invoiceDate ||
         row?.date,
-      row?.document?.serviceTime,
-    ) || formatDocumentDateTime(new Date().toISOString().slice(0, 10));
-  const paymentMethod = formatPaymentMethod(row);
+        document?.serviceTime,
+    ) || "";
+  const paymentMethod = frozenDocument
+    ? [row?.methodTitle, row?.methodDetail].filter(Boolean).join(" ")
+    : formatPaymentMethod(row);
   const paymentStatus = row?.status ?? "Paid";
-  const refundAmount = row?.document?.refundAmount;
+  const refundAmount = document?.refundAmount;
   const isRefund = row?.status === "Refunded";
-  const prepaidAmountLabel = row?.document?.prepaymentAmount;
+  const prepaidAmountLabel = document?.prepaymentAmount;
+  const prepaymentDateTime = row?.issuedAt
+    ? new Date(row.issuedAt).toLocaleString()
+    : row?.date;
 
   const downloadReceiptPdf = React.useCallback(async () => {
     if (onDownload) {
@@ -153,7 +162,7 @@ export default function FinanceReceiptPreview({
         y += 18;
       });
       if (
-        prepaidAmountLabel &&
+        !frozenDocument && prepaidAmountLabel &&
         !displayLineItems.some((item) => item.description.toLowerCase() === "prepayment")
       ) {
         doc.text("Prepayment", left, y);
@@ -245,12 +254,12 @@ export default function FinanceReceiptPreview({
             variant="line"
           />
         ))}
-        {prepaidAmountLabel &&
+        {!frozenDocument && prepaidAmountLabel &&
         !displayLineItems.some(
           (item) => item.description.toLowerCase() === "prepayment",
         ) ? (
           <FinancePreviewLabelValueRow
-            label="Prepayment"
+            label={prepaymentDateTime ? `Prepayment · ${prepaymentDateTime}` : "Prepayment"}
             value={prepaidAmountLabel}
             variant="line"
           />
@@ -294,7 +303,9 @@ export function resolveReceiptTotalLabel(
   row: TransactionRow | null,
   lineItems: PreviewLineItem[],
 ) {
-  if (row?.document?.totalPrice) return row.document.totalPrice;
+  const document = getIssuedDocument(row);
+  if (document?.totalPrice) return document.totalPrice;
+  if (hasStoredDocumentSnapshot(row)) return row?.grossAmount || row?.netAmount || "€0.00";
   const totalAmount = lineItems.reduce(
     (sum, item) => sum + parseCurrencyValue(item.totalPrice),
     0,
