@@ -89,7 +89,10 @@ const mapTransactionRow = (row) => ({
   statusDetail: row.status_detail ?? undefined,
   note: row.note ?? undefined,
   bookingId: row.booking_id ?? undefined,
+  createdAt: row.created_at ? new Date(row.created_at).toISOString() : undefined,
   document: row.document ?? undefined,
+  issuedDocument: row.issued_document ?? row.document ?? undefined,
+  issuedAt: row.issued_at ? new Date(row.issued_at).toISOString() : undefined,
 });
 
 const ensureFinanceSettings = async (professionalProfileId) => {
@@ -112,6 +115,25 @@ const ensureFinanceSettings = async (professionalProfileId) => {
     ],
   );
   return inserted.rows[0];
+};
+
+const loadProfessionalDocumentSnapshot = async (professionalProfileId) => {
+  const result = await query(
+    `SELECT legal_name, ccc_number, vat_number, street, street_number,
+            postal_code, province, municipality, phone
+     FROM professional_profiles WHERE id = $1`,
+    [professionalProfileId],
+  );
+  const profile = result.rows[0] ?? {};
+  return {
+    legalName: profile.legal_name ?? null,
+    cocNumber: profile.ccc_number ?? null,
+    vatNumber: profile.vat_number ?? null,
+    address: [profile.street, profile.street_number, profile.postal_code, profile.municipality, profile.province]
+      .filter(Boolean)
+      .join(", "),
+    phone: profile.phone ?? null,
+  };
 };
 
 const mapSettingsRow = (row) => ({
@@ -240,6 +262,105 @@ export const getFinanceSettings = async (req, res) => {
   } catch (error) {
     return sendCaughtError(res, error, { fallbackMessage: "Request failed." });
   }
+};
+
+export const listSalesCardMetadata = async (req, res) => {
+  try {
+    const profile = await requireProfessional(req, res);
+    if (!profile) return;
+    const result = await query(
+      `SELECT card_id, booking_id, card_kind, metadata
+       FROM sales_card_metadata
+       WHERE professional_profile_id = $1
+       ORDER BY updated_at DESC`,
+      [profile.id],
+    );
+    return res.status(200).json({
+      success: true,
+      message: "Sales card metadata loaded.",
+      data: result.rows.map((row) => ({
+        ...row.metadata,
+        cardId: row.card_id,
+        bookingId: row.booking_id,
+        cardKind: row.card_kind,
+      })),
+    });
+  } catch (error) {
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to load sales card metadata." });
+  }
+};
+
+export const upsertSalesCardMetadata = async (req, res) => {
+  try {
+    const profile = await requireProfessional(req, res);
+    if (!profile) return;
+    const body = req.body ?? {};
+    if (!body.cardId || !body.bookingId || !body.cardKind) {
+      return res.status(400).json({ success: false, message: "cardId, bookingId and cardKind are required.", data: null });
+    }
+    const { cardId, bookingId, cardKind, ...metadata } = body;
+    const result = await query(
+      `INSERT INTO sales_card_metadata (professional_profile_id, card_id, booking_id, card_kind, metadata)
+       VALUES ($1, $2, $3, $4, $5::jsonb)
+       ON CONFLICT (professional_profile_id, card_id)
+       DO UPDATE SET booking_id = EXCLUDED.booking_id,
+                     card_kind = EXCLUDED.card_kind,
+                     metadata = sales_card_metadata.metadata || EXCLUDED.metadata,
+                     updated_at = NOW()
+       RETURNING card_id, booking_id, card_kind, metadata`,
+      [profile.id, String(cardId), String(bookingId), String(cardKind), JSON.stringify(metadata)],
+    );
+    const row = result.rows[0];
+    return res.status(200).json({ success: true, message: "Sales card metadata saved.", data: {
+      ...row.metadata, cardId: row.card_id, bookingId: row.booking_id, cardKind: row.card_kind,
+    }});
+  } catch (error) {
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to save sales card metadata." });
+  }
+};
+
+export const listSalesAddons = async (req, res) => {
+  try {
+    const profile = await requireProfessional(req, res);
+    if (!profile) return;
+    const result = await query(`SELECT * FROM sales_addons WHERE professional_profile_id = $1 ORDER BY created_at DESC`, [profile.id]);
+    return res.status(200).json({ success: true, message: "Sales add-ons loaded.", data: result.rows.map(mapSalesAddonRow) });
+  } catch (error) { return sendCaughtError(res, error, { fallbackMessage: "Failed to load sales add-ons." }); }
+};
+
+const mapSalesAddonRow = (row) => ({
+  id: row.id, bookingId: row.booking_id, bookingCode: row.booking_code,
+  clientName: row.client_name, clientEmail: row.client_email ?? undefined,
+  lines: row.lines ?? [], discount: row.discount ?? null,
+  discountAmount: Number(row.discount_amount ?? 0), totalPrice: Number(row.total_price ?? 0),
+  paymentMethod: row.payment_method, createdAt: row.created_at?.toISOString?.() ?? row.created_at,
+  note: row.note ?? undefined, voided: row.voided, refunded: row.refunded,
+});
+
+export const upsertSalesAddon = async (req, res) => {
+  try {
+    const profile = await requireProfessional(req, res);
+    if (!profile) return;
+    const body = req.body ?? {};
+    if (!body.id || !body.bookingId || !body.bookingCode || !Array.isArray(body.lines)) {
+      return res.status(400).json({ success: false, message: "Invalid sales add-on payload.", data: null });
+    }
+    const result = await query(`INSERT INTO sales_addons
+      (id, professional_profile_id, booking_id, booking_code, client_name, client_email, lines, discount, discount_amount, total_price, payment_method, created_at, note, voided, refunded)
+      VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9,$10,$11,$12::timestamptz,$13,$14,$15)
+      ON CONFLICT (professional_profile_id,id) DO UPDATE SET booking_id=EXCLUDED.booking_id, booking_code=EXCLUDED.booking_code, client_name=EXCLUDED.client_name, client_email=EXCLUDED.client_email, lines=EXCLUDED.lines, discount=EXCLUDED.discount, discount_amount=EXCLUDED.discount_amount, total_price=EXCLUDED.total_price, payment_method=EXCLUDED.payment_method, note=EXCLUDED.note, voided=EXCLUDED.voided, refunded=EXCLUDED.refunded, updated_at=NOW()
+      RETURNING *`, [String(body.id), profile.id, String(body.bookingId), String(body.bookingCode), body.clientName ?? "", body.clientEmail ?? null, JSON.stringify(body.lines), JSON.stringify(body.discount ?? null), Number(body.discountAmount ?? 0), Number(body.totalPrice ?? 0), String(body.paymentMethod ?? ""), body.createdAt ?? new Date().toISOString(), body.note ?? null, Boolean(body.voided), Boolean(body.refunded)]);
+    return res.status(200).json({ success: true, message: "Sales add-on saved.", data: mapSalesAddonRow(result.rows[0]) });
+  } catch (error) { return sendCaughtError(res, error, { fallbackMessage: "Failed to save sales add-on." }); }
+};
+
+export const deleteSalesAddon = async (req, res) => {
+  try {
+    const profile = await requireProfessional(req, res);
+    if (!profile) return;
+    await query(`DELETE FROM sales_addons WHERE professional_profile_id = $1 AND id = $2`, [profile.id, String(req.params.id)]);
+    return res.status(200).json({ success: true, message: "Sales add-on deleted.", data: null });
+  } catch (error) { return sendCaughtError(res, error, { fallbackMessage: "Failed to delete sales add-on." }); }
 };
 
 export const updateFinanceInvoiceSettings = async (req, res) => {
@@ -429,9 +550,15 @@ export const createFinanceTransaction = async (req, res) => {
       (typeof body.addonId === "string" && body.addonId.trim()) ||
       (isAddon ? `addon-${Date.now()}` : null);
 
-    const lineItems = Array.isArray(body.lines)
-      ? body.lines.map((line) => ({
+    const submittedLines = Array.isArray(body.lines) ? body.lines : [];
+    if (submittedLines.some((line) => !line.sourceReference || !line.sourceType)) {
+      return res.status(400).json({ success: false, message: "Each line must include a valid source reference.", data: null });
+    }
+    const lineItems = submittedLines.length
+      ? submittedLines.map((line) => ({
           description: line.name,
+          sourceReference: String(line.sourceReference),
+          sourceType: line.sourceType,
           quantity: String(line.quantity ?? 1),
           vat: "21%",
           pricePerUnit: formatEuro(line.unitPrice),
@@ -446,6 +573,15 @@ export const createFinanceTransaction = async (req, res) => {
         vat: "0%",
         pricePerUnit: formatEuro(-body.discountAmount),
         totalPrice: formatEuro(-body.discountAmount),
+      });
+    }
+    if (!lineItems.length) {
+      lineItems.push({
+        description: "Professional Service",
+        quantity: "1",
+        vat: "0%",
+        pricePerUnit: formatEuro(gross),
+        totalPrice: formatEuro(gross),
       });
     }
 
@@ -486,6 +622,9 @@ export const createFinanceTransaction = async (req, res) => {
         ? "Pending"
         : "Paid";
 
+    const issuedFinanceSettings = await ensureFinanceSettings(profile.id);
+    const issuedInvoiceSettings = issuedFinanceSettings.invoice_settings;
+    const issuedProfessionalBusiness = await loadProfessionalDocumentSnapshot(profile.id);
     const document = {
       documentNumber: `INV-G${entryNum}`,
       receiptNumber: isOnline ? undefined : `RCP-G${entryNum}`,
@@ -500,6 +639,12 @@ export const createFinanceTransaction = async (req, res) => {
       totalPrice: formatEuro(gross),
       ...(paymentPhase ? { paymentPhase } : {}),
       ...(addonId ? { addonId, payerKey: addonId } : {}),
+      issuedSnapshot: {
+        templateType: issuedInvoiceSettings.defaultInvoiceType,
+        layout: issuedInvoiceSettings.defaultInvoiceType === "company" ? "itemized" : "simplified",
+        invoiceSettings: issuedInvoiceSettings,
+        professionalBusiness: issuedProfessionalBusiness,
+      },
     };
 
     const result = await query(
@@ -507,12 +652,12 @@ export const createFinanceTransaction = async (req, res) => {
         professional_profile_id, entry_type, entry_id, transaction_date, entry_label,
         client_name, client_email, client_type,
         gross_amount, stripe_fee, mollure_fee, net_amount,
-        method_title, method_detail, status, status_detail, booking_id, document
+        method_title, method_detail, status, status_detail, booking_id, document, issued_document, issued_at
       ) VALUES (
         $1, $2, $3, $4::date, $5,
         $6, $7, $8,
         $9, $10, $11, $12,
-        $13, $14, $15, $16, $17, $18::jsonb
+        $13, $14, $15, $16, $17, $18::jsonb, $18::jsonb, NOW()
       ) RETURNING *`,
       [
         profile.id,
@@ -703,6 +848,8 @@ export const bulkFinanceTransactionAction = async (req, res) => {
           `UPDATE finance_transactions
            SET status = 'Refunded',
                document = $3::jsonb,
+               issued_document = $3::jsonb,
+               issued_at = NOW(),
                updated_at = NOW()
            WHERE id = $1 AND professional_profile_id = $2`,
           [row.id, profile.id, JSON.stringify(creditDocument)],
@@ -825,18 +972,21 @@ export const replaceFinanceTransaction = async (req, res) => {
     const net = gross - (stripeFee ?? 0) - (mollureFee ?? 0);
     const today = new Date().toISOString().slice(0, 10);
     const entryNum = String(100 + Math.floor(Math.random() * 900));
+    const issuedFinanceSettings = await ensureFinanceSettings(profile.id);
+    const issuedInvoiceSettings = issuedFinanceSettings.invoice_settings;
+    const issuedProfessionalBusiness = await loadProfessionalDocumentSnapshot(profile.id);
 
     const result = await query(
       `INSERT INTO finance_transactions (
         professional_profile_id, entry_type, entry_id, transaction_date, entry_label,
         client_name, client_email, client_type,
         gross_amount, stripe_fee, mollure_fee, net_amount,
-        method_title, method_detail, status, document
+        method_title, method_detail, status, document, issued_document, issued_at
       ) VALUES (
         $1, 'manualEntry', $2, $3::date, 'Manual entry (replaced)',
         $4, $5, $6,
         $7, $8, $9, $10,
-        $11, $12, $13, $14::jsonb
+        $11, $12, $13, $14::jsonb, $14::jsonb, NOW()
       ) RETURNING *`,
       [
         profile.id,
@@ -857,8 +1007,19 @@ export const replaceFinanceTransaction = async (req, res) => {
           serviceDate: today,
           invoiceDate: today,
           dueDate: today,
+          client: {
+            legalName: body.clientName ?? "Guest",
+            email: body.clientEmail ?? "",
+          },
+          lineItems,
           totalPrice: formatEuro(gross),
           replacedTransactionId: id,
+          issuedSnapshot: {
+            templateType: issuedInvoiceSettings.defaultInvoiceType,
+            layout: issuedInvoiceSettings.defaultInvoiceType === "company" ? "itemized" : "simplified",
+            invoiceSettings: issuedInvoiceSettings,
+            professionalBusiness: issuedProfessionalBusiness,
+          },
         }),
       ],
     );
@@ -1040,6 +1201,8 @@ export const reissueFinanceInvoiceForBooking = async (req, res) => {
        SET status = 'Payment due',
            status_detail = $2,
            document = $3::jsonb,
+           issued_document = $3::jsonb,
+           issued_at = NOW(),
            gross_amount = $4,
            net_amount = $4,
            client_email = CASE WHEN $5 = '' THEN client_email ELSE $5 END,

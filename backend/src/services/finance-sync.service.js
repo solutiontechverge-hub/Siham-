@@ -79,6 +79,26 @@ async function loadInvoiceSettingsForProfessional(professionalProfileId) {
   return mergeInvoiceSettings(result.rows[0]?.invoice_settings);
 }
 
+async function loadProfessionalDocumentSnapshot(professionalProfileId) {
+  const result = await query(
+    `SELECT legal_name, ccc_number, vat_number, street, street_number,
+            postal_code, province, municipality, phone
+     FROM professional_profiles
+     WHERE id = $1`,
+    [professionalProfileId],
+  );
+  const profile = result.rows[0] ?? {};
+  return {
+    legalName: profile.legal_name ?? null,
+    cocNumber: profile.ccc_number ?? null,
+    vatNumber: profile.vat_number ?? null,
+    address: [profile.street, profile.street_number, profile.postal_code, profile.municipality, profile.province]
+      .filter(Boolean)
+      .join(", "),
+    phone: profile.phone ?? null,
+  };
+}
+
 function resolveOriginalDueDate(invoiceDate, paymentTerms) {
   const days =
     durationToDays(paymentTerms?.originalDueValue, paymentTerms?.originalDueUnit) ?? 14;
@@ -187,10 +207,13 @@ function resolveSplitPayers(booking, meta) {
     const groups = new Map();
 
     for (const service of services) {
+      if (!service.id && !service.serviceId) continue;
       const assigneeId = String(service.guestId || requester.id);
       const prev = groups.get(assigneeId) ?? [];
       prev.push({
         description: service.name || "Service",
+        sourceReference: service.id || service.serviceId,
+        sourceType: "serviceId",
         quantity: "1",
         vat: "21%",
         pricePerUnit: formatEuro(service.price),
@@ -263,6 +286,8 @@ function resolveSplitPayers(booking, meta) {
       const lines = [
         ...guestServices.map((s) => ({
           description: s.name || "Service",
+          sourceReference: s.id || s.serviceId,
+          sourceType: "serviceId",
           quantity: "1",
           vat: "21%",
           pricePerUnit: formatEuro(s.price),
@@ -271,13 +296,15 @@ function resolveSplitPayers(booking, meta) {
         })),
         ...guestProducts.map((p) => ({
           description: p.name || "Product",
+          sourceReference: p.id || p.productId,
+          sourceType: "productId",
           quantity: String(p.quantity || 1),
           vat: "21%",
           pricePerUnit: formatEuro(p.unitPrice ?? p.price),
           totalPrice: formatEuro(p.price),
           amount: roundMoney(Number(p.price) || 0),
         })),
-      ];
+      ].filter((line) => Boolean(line.sourceReference));
       if (!lines.length) continue;
       assigned += lines.reduce((sum, line) => sum + line.amount, 0);
       const isModel = guest.participantType === "model";
@@ -310,17 +337,15 @@ function resolveSplitPayers(booking, meta) {
       displayName: booking.customer_name || "Client",
       subtotal: mainSubtotal,
       paymentAmount: roundMoney(Math.max(0, mainSubtotal - prepaidAmount)),
-      lineItems: booking.service_title
-        ? [
-            {
-              description: booking.service_title,
-              quantity: "1",
-              vat: "21%",
-              pricePerUnit: formatEuro(mainSubtotal),
-              totalPrice: formatEuro(mainSubtotal),
-            },
-          ]
-        : [],
+        lineItems: [
+          {
+            description: booking.service_title || "Professional Service",
+            quantity: "1",
+            vat: "0%",
+            pricePerUnit: formatEuro(mainSubtotal),
+            totalPrice: formatEuro(mainSubtotal),
+          },
+        ],
     });
 
     return { prepaidAmount, payers };
@@ -336,17 +361,15 @@ function resolveSplitPayers(booking, meta) {
         displayName: booking.customer_name || "Client",
         subtotal: total,
         paymentAmount: roundMoney(Math.max(0, total - prepaidAmount)),
-        lineItems: booking.service_title
-          ? [
-              {
-                description: booking.service_title,
-                quantity: "1",
-                vat: "21%",
-                pricePerUnit: formatEuro(total),
-                totalPrice: formatEuro(total),
-              },
-            ]
-          : [],
+        lineItems: [
+          {
+            description: booking.service_title || "Professional Service",
+            quantity: "1",
+            vat: "0%",
+            pricePerUnit: formatEuro(total),
+            totalPrice: formatEuro(total),
+          },
+        ],
       },
     ],
   };
@@ -466,6 +489,9 @@ async function insertFinanceTransaction({
   const invoiceSettings = await loadInvoiceSettingsForProfessional(
     booking.professional_profile_id,
   );
+  const professionalBusiness = await loadProfessionalDocumentSnapshot(
+    booking.professional_profile_id,
+  );
   const dueDate =
     status === "Payment due" || status === "Pending" || status === "Overdue"
       ? resolveOriginalDueDate(invoiceDate, invoiceSettings.paymentTerms)
@@ -489,18 +515,22 @@ async function insertFinanceTransaction({
     },
     lineItems: lineItems?.length
       ? lineItems
-      : booking.service_title
-        ? [
-            {
-              description: booking.service_title,
-              quantity: "1",
-              vat: "21%",
-              pricePerUnit: formatEuro(gross),
-              totalPrice: formatEuro(gross),
-            },
-          ]
-        : [],
+      : [
+          {
+            description: booking.service_title || "Professional Service",
+            quantity: "1",
+            vat: "0%",
+            pricePerUnit: formatEuro(gross),
+            totalPrice: formatEuro(gross),
+          },
+        ],
     totalPrice: formatEuro(gross),
+    issuedSnapshot: {
+      templateType: invoiceSettings.defaultInvoiceType,
+      layout: invoiceSettings.defaultInvoiceType === "company" ? "itemized" : "simplified",
+      invoiceSettings,
+      professionalBusiness,
+    },
   };
 
   const inserted = await query(
@@ -508,12 +538,12 @@ async function insertFinanceTransaction({
       professional_profile_id, entry_type, entry_id, transaction_date, entry_label,
       client_name, client_email, client_type,
       gross_amount, stripe_fee, mollure_fee, net_amount,
-      method_title, method_detail, status, status_detail, booking_id, document
+      method_title, method_detail, status, status_detail, booking_id, document, issued_document, issued_at
     ) VALUES (
       $1, $2, $3, $4::date, $5,
       $6, $7, $8,
       $9, $10, $11, $12,
-      $13, $14, $15, $16, $17, $18::jsonb
+      $13, $14, $15, $16, $17, $18::jsonb, $18::jsonb, NOW()
     ) RETURNING id`,
     [
       booking.professional_profile_id,
@@ -717,6 +747,8 @@ async function applySettingsBasedReissue(row, paymentTerms, level) {
      SET status = 'Payment due',
          status_detail = $2,
          document = $3::jsonb,
+         issued_document = $3::jsonb,
+         issued_at = NOW(),
          gross_amount = $4,
          net_amount = $4,
          updated_at = NOW()

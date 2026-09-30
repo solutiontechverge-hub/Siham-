@@ -26,6 +26,9 @@ export type ManualEntryLineKind = "product" | "item";
 
 export type ManualEntryLine = {
   id: string;
+  /** Stable catalog reference for the item actually sold. */
+  sourceReference?: string;
+  sourceType?: "serviceId" | "productId" | "uniqueItemCode";
   kind: ManualEntryLineKind;
   name: string;
   quantity: number;
@@ -217,6 +220,8 @@ export function createManualEntryLineFromOption(
 ): ManualEntryLine {
   return {
     id: `${kind}-${option.id}-${Date.now()}`,
+    sourceReference: option.id,
+    sourceType: kind === "item" ? "serviceId" : "productId",
     kind,
     name: option.label,
     quantity: Math.max(1, quantity),

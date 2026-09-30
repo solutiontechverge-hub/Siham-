@@ -6,6 +6,11 @@ import {
   createFinanceTransactionFromBooking,
   createStripeConnectOnboardingLink,
   getFinanceSettings,
+  listSalesCardMetadata,
+  upsertSalesCardMetadata,
+  listSalesAddons,
+  upsertSalesAddon,
+  deleteSalesAddon,
   getPublicInvoiceSettings,
   getPublicTransactionOptions,
   listFinanceTransactions,
@@ -33,6 +38,11 @@ const requireProfessional = authorizeRoles("professional");
 router.use(authenticateUser);
 
 router.get("/settings", requireProfessional, getFinanceSettings);
+router.get("/sales-card-metadata", requireProfessional, listSalesCardMetadata);
+router.put("/sales-card-metadata", requireProfessional, upsertSalesCardMetadata);
+router.get("/sales-addons", requireProfessional, listSalesAddons);
+router.put("/sales-addons", requireProfessional, upsertSalesAddon);
+router.delete("/sales-addons/:id", requireProfessional, deleteSalesAddon);
 
 router.put(
   "/settings/invoice",

@@ -1642,6 +1642,32 @@ export function useProfessionalFixedLocationCalendar({
       },
     });
 
+  const deepLinkedBookingRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    const linkedDate = searchParams.get("date");
+    if (/^\d{4}-\d{2}-\d{2}$/.test(linkedDate ?? "")) {
+      setActiveDateIso(linkedDate!);
+    }
+  }, [searchParams, setActiveDateIso]);
+
+  React.useEffect(() => {
+    const bookingId = searchParams.get("booking");
+    if (
+      !bookingId ||
+      !events.length ||
+      slotDrawerOpen ||
+      deepLinkedBookingRef.current === bookingId
+    ) return;
+    const event = events.find((item) =>
+      item.id === bookingId || item.bookingCode === bookingId,
+    );
+    if (!event) return;
+    deepLinkedBookingRef.current = bookingId;
+    if (event.date) setActiveDateIso(event.date);
+    openExistingBooking(event);
+    router.replace("/professionals/calendar", { scroll: false });
+  }, [events, openExistingBooking, router, searchParams, setActiveDateIso, slotDrawerOpen]);
+
   const {
     handleAcceptConfirmedEr,
     handleRejectConfirmedEr,

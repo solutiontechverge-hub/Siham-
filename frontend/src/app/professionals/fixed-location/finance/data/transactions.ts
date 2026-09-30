@@ -246,6 +246,8 @@ export type TransactionDocumentParty = {
 
 export type TransactionDocumentLineItem = {
   description: string;
+  sourceReference?: string;
+  sourceType?: "serviceId" | "productId" | "uniqueItemCode";
   quantity: string;
   vat: string;
   pricePerUnit: string;
@@ -276,6 +278,18 @@ export type TransactionDocument = {
   totalPrice?: string;
   /** Formatted prepayment amount shown on invoice/receipt as "Prepayment". */
   prepaymentAmount?: string;
+  issuedSnapshot?: {
+    templateType?: "individual" | "company";
+    layout?: "itemized" | "simplified";
+    invoiceSettings?: unknown;
+    professionalBusiness?: {
+      legalName?: string | null;
+      cocNumber?: string | null;
+      vatNumber?: string | null;
+      address?: string | null;
+      phone?: string | null;
+    };
+  };
 };
 
 export type TransactionRow = {
@@ -300,10 +314,13 @@ export type TransactionRow = {
   /** Sub-label under status (e.g. due date, pay within 15 min) */
   statusDetail?: string;
   document?: TransactionDocument;
+  issuedDocument?: TransactionDocument;
+  issuedAt?: string;
   /** Internal note attached to this transaction entry */
   note?: string;
   /** Booking ID for navigation to calendar */
   bookingId?: string;
+  createdAt?: string;
 };
 
 

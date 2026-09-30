@@ -55,5 +55,5 @@ export function refundItemsFromTransactions(rows: readonly TransactionRow[]): Re
     }));
   }
 
-  return DEFAULT_REFUND_ITEMS;
+  return [];
 }

@@ -13,6 +13,10 @@ import {
   useBulkFinanceTransactionActionMutation,
   useCreateFinanceTransactionMutation,
   useProcessFinanceInvoiceReissuesMutation,
+  useGetSalesCardMetadataQuery,
+  useUpsertSalesCardMetadataMutation,
+  useGetSalesAddonsQuery,
+  useUpsertSalesAddonMutation,
 } from "../../../store/services/financeApi";
 import {
   parseStoredEbrFromNotes,
@@ -43,6 +47,10 @@ import {
   saveSalesAddon,
   updateSalesAddon,
   upsertSalesCardMeta,
+  configureSalesCardMetadataPersistence,
+  hydrateSalesCardMetadata,
+  hydrateSalesAddons,
+  configureSalesAddonPersistence,
 } from "./salesOverview.storage";
 import type {
   SalesAddOnCheckoutPayload,
@@ -93,6 +101,30 @@ export function useSalesOverview({
   const [bulkFinanceAction] = useBulkFinanceTransactionActionMutation();
   const [createFinanceTransaction] = useCreateFinanceTransactionMutation();
   const [processFinanceInvoiceReissues] = useProcessFinanceInvoiceReissuesMutation();
+  const { data: salesMetadataResponse } = useGetSalesCardMetadataQuery();
+  const { data: salesAddonsResponse } = useGetSalesAddonsQuery();
+  const [saveSalesCardMetadata] = useUpsertSalesCardMetadataMutation();
+  const [saveSalesAddon] = useUpsertSalesAddonMutation();
+
+  React.useEffect(() => {
+    hydrateSalesCardMetadata((salesMetadataResponse?.data ?? []) as never[] as import("./salesOverview.types").SalesCardMetaRecord[]);
+  }, [salesMetadataResponse?.data]);
+
+  React.useEffect(() => {
+    hydrateSalesAddons((salesAddonsResponse?.data ?? []) as never[] as import("./salesOverview.types").SalesAddonRecord[]);
+  }, [salesAddonsResponse?.data]);
+
+  React.useEffect(() => {
+    configureSalesCardMetadataPersistence((record) => {
+      void saveSalesCardMetadata(record as never);
+    });
+    return () => configureSalesCardMetadataPersistence(null);
+  }, [saveSalesCardMetadata]);
+
+  React.useEffect(() => {
+    configureSalesAddonPersistence((record) => { void saveSalesAddon(record as never); });
+    return () => configureSalesAddonPersistence(null);
+  }, [saveSalesAddon]);
 
   const financeQuery = currentEvent?.bookingCode || bookings[0]?.unique_code || bookings[0]?.id || "";
   const { data: financeResponse } = useGetFinanceTransactionsQuery(
@@ -642,6 +674,8 @@ export function useSalesOverview({
           name: line.name,
           quantity: line.quantity,
           unitPrice: line.unitPrice,
+          sourceReference: line.sourceReference ?? line.id,
+          sourceType: line.sourceType ?? "uniqueItemCode",
         })),
         bookingId: checkoutContext.bookingId,
         bookingRef: checkoutContext.bookingCode,

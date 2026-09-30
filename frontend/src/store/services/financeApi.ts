@@ -27,6 +27,13 @@ export type FinanceTransactionsResponse = {
   total: number;
 };
 
+export type SalesCardMetadata = Record<string, unknown> & {
+  cardId: string;
+  bookingId: string;
+  cardKind: string;
+};
+export type SalesAddonRecord = Record<string, unknown> & { id: string; bookingId: string; bookingCode: string };
+
 export type ListFinanceTransactionsParams = ListPaginationParams & {
   q?: string;
   fromDate?: string | null;
@@ -44,7 +51,13 @@ export type CreateFinanceTransactionRequest = {
   paymentMethod: "onlineDirect" | "offlineDirect";
   totalPrice: number;
   discountAmount?: number;
-  lines: Array<{ name: string; quantity: number; unitPrice: number }>;
+  lines: Array<{
+    name: string;
+    quantity: number;
+    unitPrice: number;
+    sourceReference: string;
+    sourceType: "serviceId" | "productId" | "uniqueItemCode";
+  }>;
   /** Link to booking unique_code or UUID for add-on / booking-linked sales */
   bookingId?: string;
   bookingRef?: string;
@@ -67,6 +80,17 @@ export type UpdateFinanceStripeRequest = {
 
 const financeApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
+    getSalesCardMetadata: builder.query<ApiEnvelope<SalesCardMetadata[]>, void>({
+      query: () => "/api/finance/sales-card-metadata",
+      providesTags: ["FinanceTransactions"],
+    }),
+    upsertSalesCardMetadata: builder.mutation<ApiEnvelope<SalesCardMetadata>, SalesCardMetadata>({
+      query: (body) => ({ url: "/api/finance/sales-card-metadata", method: "PUT", body }),
+      invalidatesTags: ["FinanceTransactions"],
+    }),
+    getSalesAddons: builder.query<ApiEnvelope<SalesAddonRecord[]>, void>({ query: () => "/api/finance/sales-addons", providesTags: ["FinanceTransactions"] }),
+    upsertSalesAddon: builder.mutation<ApiEnvelope<SalesAddonRecord>, SalesAddonRecord>({ query: (body) => ({ url: "/api/finance/sales-addons", method: "PUT", body }), invalidatesTags: ["FinanceTransactions"] }),
+    deleteSalesAddon: builder.mutation<ApiEnvelope<null>, string>({ query: (id) => ({ url: `/api/finance/sales-addons/${id}`, method: "DELETE" }), invalidatesTags: ["FinanceTransactions"] }),
     getFinanceSettings: builder.query<ApiEnvelope<FinanceSettings>, void>({
       query: () => "/api/finance/settings",
       providesTags: ["FinanceSettings"],
@@ -270,6 +294,11 @@ export const {
   useGetPublicInvoiceSettingsQuery,
   useProcessFinanceInvoiceReissuesMutation,
   useReissueFinanceInvoiceMutation,
+  useGetSalesCardMetadataQuery,
+  useUpsertSalesCardMetadataMutation,
+  useGetSalesAddonsQuery,
+  useUpsertSalesAddonMutation,
+  useDeleteSalesAddonMutation,
   useCreateStripeConnectLinkMutation,
 } = financeApi;
 

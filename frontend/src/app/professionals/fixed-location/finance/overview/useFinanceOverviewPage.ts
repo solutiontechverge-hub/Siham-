@@ -348,6 +348,8 @@ export function useFinanceOverviewPage() {
           name: line.name,
           quantity: line.quantity,
           unitPrice: line.unitPrice,
+          sourceReference: line.sourceReference ?? line.id,
+          sourceType: line.sourceType ?? (line.kind === "item" ? "serviceId" : "productId"),
         })),
       };
       const isReplace = Boolean(replaceTransactionId);

@@ -1,7 +1,9 @@
 import type { SalesAddonRecord, SalesCardMetaRecord } from "./salesOverview.types";
 
-const ADDONS_KEY = "mollure.sales.addons.v1";
-const META_KEY = "mollure.sales.cardMeta.v1";
+let cardMetadata: SalesCardMetaRecord[] = [];
+let persistSalesCardMeta: ((record: SalesCardMetaRecord) => void) | null = null;
+let addonRecords: SalesAddonRecord[] = [];
+let persistSalesAddon: ((record: SalesAddonRecord) => void) | null = null;
 
 /** Dispatched after sales card meta is written so calendar cards can refresh. */
 export const SALES_META_CHANGED_EVENT = "mollure:sales-meta-changed";
@@ -11,37 +13,42 @@ function emitSalesMetaChanged() {
   window.dispatchEvent(new Event(SALES_META_CHANGED_EVENT));
 }
 
-function readJson<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return fallback;
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
+export function hydrateSalesCardMetadata(records: SalesCardMetaRecord[]) {
+  cardMetadata = records;
+  addonRecords = records
+    .map((record) => record.addon)
+    .filter((record): record is SalesAddonRecord => Boolean(record));
+  emitSalesMetaChanged();
 }
 
-function writeJsonValue(key: string, value: unknown) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(key, JSON.stringify(value));
+export function hydrateSalesAddons(records: SalesAddonRecord[]) {
+  addonRecords = records;
+  emitSalesMetaChanged();
+}
+
+export function configureSalesAddonPersistence(persist: ((record: SalesAddonRecord) => void) | null) {
+  persistSalesAddon = persist;
+}
+
+export function configureSalesCardMetadataPersistence(
+  persist: ((record: SalesCardMetaRecord) => void) | null,
+) {
+  persistSalesCardMeta = persist;
 }
 
 export function listSalesAddons(bookingId?: string | null): SalesAddonRecord[] {
-  const all = readJson<SalesAddonRecord[]>(ADDONS_KEY, []);
-  if (!bookingId) return all;
-  return all.filter((row) => row.bookingId === bookingId);
+  if (!bookingId) return addonRecords;
+  return addonRecords.filter((row) => row.bookingId === bookingId);
 }
 
 export function listSalesAddonsForBookings(bookingIds: readonly string[]): SalesAddonRecord[] {
   const idSet = new Set(bookingIds.map(String));
-  return readJson<SalesAddonRecord[]>(ADDONS_KEY, []).filter((row) => idSet.has(String(row.bookingId)));
+  return addonRecords.filter((row) => idSet.has(String(row.bookingId)));
 }
 
 export function saveSalesAddon(record: SalesAddonRecord) {
-  const all = readJson<SalesAddonRecord[]>(ADDONS_KEY, []);
-  const next = [record, ...all.filter((row) => row.id !== record.id)];
-  writeJsonValue(ADDONS_KEY, next);
+  addonRecords = [record, ...addonRecords.filter((row) => row.id !== record.id)];
+  persistSalesAddon?.(record);
   emitSalesMetaChanged();
 }
 
@@ -49,28 +56,27 @@ export function updateSalesAddon(
   id: string,
   patch: Partial<Pick<SalesAddonRecord, "note" | "voided" | "refunded">>,
 ) {
-  const all = readJson<SalesAddonRecord[]>(ADDONS_KEY, []);
-  writeJsonValue(
-    ADDONS_KEY,
-    all.map((row) => (row.id === id ? { ...row, ...patch } : row)),
-  );
+  addonRecords = addonRecords.map((row) => (row.id === id ? { ...row, ...patch } : row));
+  const record = addonRecords.find((row) => row.id === id);
+  if (record) persistSalesAddon?.(record);
   emitSalesMetaChanged();
 }
 
 export function getSalesCardMeta(cardId: string): SalesCardMetaRecord | null {
-  return readJson<SalesCardMetaRecord[]>(META_KEY, []).find((row) => row.cardId === cardId) ?? null;
+  return cardMetadata.find((row) => row.cardId === cardId) ?? null;
 }
 
 export function listSalesCardMetaForBooking(bookingId: string): SalesCardMetaRecord[] {
-  return readJson<SalesCardMetaRecord[]>(META_KEY, []).filter((row) => row.bookingId === bookingId);
+  return cardMetadata.filter((row) => row.bookingId === bookingId);
 }
 
 export function upsertSalesCardMeta(record: SalesCardMetaRecord) {
-  const all = readJson<SalesCardMetaRecord[]>(META_KEY, []);
+  const all = cardMetadata;
   const existing = all.find((row) => row.cardId === record.cardId);
   const merged = existing ? { ...existing, ...record } : record;
   const next = [...all.filter((row) => row.cardId !== record.cardId), merged];
-  writeJsonValue(META_KEY, next);
+  cardMetadata = next;
+  persistSalesCardMeta?.(merged);
   emitSalesMetaChanged();
 }
 
