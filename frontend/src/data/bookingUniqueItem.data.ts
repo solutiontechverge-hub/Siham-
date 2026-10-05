@@ -22,6 +22,12 @@ export type BookingUniqueItemDraft = {
 /** Common local VAT rate — editable on the Unique Item form. */
 export const DEFAULT_UNIQUE_ITEM_VAT = "21";
 
+/** Product/unique-item entry uses the standard VAT unless explicitly edited. */
+export function normalizeVatRate(value?: string | number | null) {
+  const normalized = String(value ?? "").trim().replace(/%$/, "");
+  return normalized || DEFAULT_UNIQUE_ITEM_VAT;
+}
+
 export const BOOKING_CATALOG_PRICE_TYPE_OPTIONS: { label: string; value: string }[] = [
   { label: "Fixed price", value: "fixed" },
   { label: "Starting from", value: "starting_from" },
@@ -47,7 +53,7 @@ export function buildUniqueItemDraftFromProduct(
     "name" | "price" | "vat" | "unit" | "discountType" | "discountAmount"
   >,
 ): BookingUniqueItemDraft {
-  const vat = product.vat?.trim().replace(/%$/, "") || DEFAULT_UNIQUE_ITEM_VAT;
+  const vat = normalizeVatRate(product.vat);
   return {
     productName: product.name,
     vat,
@@ -72,7 +78,7 @@ export function buildCatalogProductFromUniqueItemDraft(
     id,
     name: productName,
     price: unitPrice,
-    vat: draft.vat.trim() || undefined,
+    vat: normalizeVatRate(draft.vat),
     unit: Math.max(1, draft.unit),
     discountType: draft.discountType,
     discountAmount: draft.discountAmount,

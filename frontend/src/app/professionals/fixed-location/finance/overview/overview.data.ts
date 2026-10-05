@@ -17,6 +17,7 @@ export const ACTION_EXPORT_ITEMS = [
 
 export function buildActionMenuItems(
   category: ReturnType<typeof getTransactionActionCategory>,
+  canMarkUnpaid = false,
 ): ActionMenuItem[] {
   const exportItem: ActionMenuItem = {
     id: "export",
@@ -51,6 +52,8 @@ export function buildActionMenuItems(
     case "due":
       // Overdue / unpaid — no refund until payment is received
       return [
+        ...(canMarkUnpaid ? [{ id: "markUnpaid", label: "Mark Unpaid", requiresSelection: true as const }] : []),
+        { id: "markPaid", label: "Mark Paid", requiresSelection: true },
         { id: "voidSales", label: "Void Sales", requiresSelection: true },
         exportItem,
       ];

@@ -25,13 +25,15 @@ export function usePublicFinanceSettings(businessSetupId: string | undefined) {
   );
 
   const transactionOptions = React.useMemo<FinanceTransactionOptions>(
-    () =>
-      txResponse?.data ?? {
-        onlineImmediate: false,
+    () => ({
+      ...(txResponse?.data ?? {
+        onlineImmediate: true,
         onlineInvoiceDueDate: false,
         offlineImmediate: false,
         offlineInvoiceDueDate: false,
-      },
+      }),
+      onlineImmediate: true,
+    }),
     [txResponse?.data],
   );
 

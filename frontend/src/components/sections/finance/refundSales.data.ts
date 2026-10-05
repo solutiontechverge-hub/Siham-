@@ -4,6 +4,7 @@ export type RefundSalesItem = {
   id: string;
   name: string;
   meta: string;
+  amount?: number;
 };
 
 export const DEFAULT_REFUND_ITEMS: RefundSalesItem[] = [
@@ -43,6 +44,7 @@ export function refundItemsFromTransactions(rows: readonly TransactionRow[]): Re
       id: `booking-${index}`,
       name: item.label,
       meta: item.value,
+      amount: Number(String(item.value).replace(/[^\d.]/g, "")) || 0,
     }));
   }
 
@@ -51,7 +53,8 @@ export function refundItemsFromTransactions(rows: readonly TransactionRow[]): Re
     return lineItems.map((item, index) => ({
       id: `line-${index}`,
       name: item.description,
-      meta: item.totalPrice,
+      meta: typeof item.totalPrice === "number" ? `€${item.totalPrice.toFixed(2)}` : item.totalPrice,
+      amount: Number(String(item.totalPrice).replace(/[^\d.]/g, "")) || 0,
     }));
   }
 

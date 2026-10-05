@@ -175,9 +175,18 @@ export function hydrateBookingDrawerFromEvent(ev: CalendarEvent): BookingDrawerH
   }
 
   const requesterIds = requesterPersonIds(details.clientSnapshot);
-  const rawServices = details.services?.length
-    ? filterMainClientAssignedLines(details.services, requesterIds)
-    : (mainDrawerServicesFromClientSnapshot(details.clientSnapshot) ?? []);
+  // The flat `details.services` field can be a legacy single-service mirror of
+  // the booking row. Always merge it with the durable client snapshot so a
+  // client-added service is never silently dropped from the drawer.
+  const snapshotMainServices = mainDrawerServicesFromClientSnapshot(
+    details.clientSnapshot,
+  ) ?? [];
+  const rawServices = [
+    ...snapshotMainServices,
+    ...filterMainClientAssignedLines(details.services, requesterIds),
+  ].filter((service, index, all) =>
+    all.findIndex((candidate) => String(candidate.id) === String(service.id)) === index,
+  );
   const rawProducts = filterMainClientAssignedLines(
     details.products ?? [],
     requesterIds,

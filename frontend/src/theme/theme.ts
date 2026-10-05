@@ -6,24 +6,26 @@ import {
   MOLLURE_FONT_CONTENT_PX,
   MOLLURE_FONT_HEADING_PX,
   MOLLURE_FONT_SUBHEADING_PX,
+  MOLLURE_FONT_BODY,
+  MOLLURE_FONT_DISPLAY,
   mollureFontSizes,
 } from "./typography";
 
 const headingStyle = {
-  fontFamily: "inherit",
-  fontWeight: 500,
+  fontFamily: MOLLURE_FONT_DISPLAY,
+  fontWeight: 700,
   fontSize: mollureFontSizes.heading,
-  lineHeight: 1,
-  letterSpacing: 0,
+  lineHeight: 1.12,
+  letterSpacing: "-0.025em",
   color: "#333333",
 } as const;
 
 const subheadingStyle = {
-  fontFamily: "inherit",
-  fontWeight: 500,
+  fontFamily: MOLLURE_FONT_DISPLAY,
+  fontWeight: 700,
   fontSize: mollureFontSizes.subheading,
   lineHeight: 1.2,
-  letterSpacing: 0,
+  letterSpacing: "-0.015em",
   color: "#333333",
 } as const;
 
@@ -180,9 +182,9 @@ const theme = createTheme({
 
   typography: {
     fontFamily:
-      "var(--font-poppins), Poppins, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
+      MOLLURE_FONT_BODY,
     fontSize: MOLLURE_FONT_CONTENT_PX,
-    h1: { ...headingStyle, fontWeight: 600 },
+    h1: { ...headingStyle, fontWeight: 700 },
     h2: headingStyle,
     h3: subheadingStyle,
     h4: subheadingStyle,
@@ -202,7 +204,7 @@ const theme = createTheme({
     },
     mainHeading: {
       ...headingStyle,
-      fontWeight: 600,
+      fontWeight: 700,
       color: "#344054",
     },
     subHeading: subheadingStyle,

@@ -169,7 +169,9 @@ export function useClientBookingCreateAvailability(
         catalogServiceId:
           service.catalogServiceId ?? extractUuidFromSyntheticId(service.id),
         durationMins: service.durationMins,
-        teamMemberId: service.teamMemberId,
+        // Fixed Location must recalculate from live availability. A temporary
+        // first-member value should not pin every service to that person.
+        teamMemberId: isDesiredLocation ? service.teamMemberId : undefined,
       })),
       candidateMemberIds,
       fallbackCatalogIds: catalogList.map((service) => service.id),

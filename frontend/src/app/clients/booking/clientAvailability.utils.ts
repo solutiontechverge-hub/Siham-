@@ -386,9 +386,15 @@ export function autoAssignServicesByAvailability(input: {
     }));
   }
 
-  // Fixed Location: per-service assign, prefer free-at-slot, else lowest
-  // occupancy; reuse already-picked members; cap distinct members at 3.
+  // Fixed Location: choose the least busy capable member per service. Each
+  // provisional assignment counts immediately, so concurrent work can spread.
   const usedMemberIds = new Set<string>();
+  const plannedBusyByMember: Record<string, Interval[]> = Object.fromEntries(
+    Object.entries(snapshot.busyByMember).map(([memberId, intervals]) => [
+      memberId,
+      [...intervals],
+    ]),
+  );
   let cursor = startMin;
   return services.map((service) => {
     const catalogServiceId =
@@ -397,63 +403,24 @@ export function autoAssignServicesByAvailability(input: {
       service.id;
     const durationMins = service.durationMins || 30;
 
-    if (service.teamMemberId) {
-      const wouldExceedCap =
-        !usedMemberIds.has(service.teamMemberId) &&
-        usedMemberIds.size >= FIXED_LOCATION_MAX_DISTINCT_TEAM_MEMBERS;
-      if (!wouldExceedCap) {
-        const member = snapshot.teamMembers.find(
-          (row) => row.id === service.teamMemberId,
-        );
-        if (member) {
-          const working = getMemberWorkingIntervals(
-            service.teamMemberId,
-            snapshot.date,
-            snapshot.location,
-            snapshot,
-          );
-          const busy = snapshot.busyByMember[service.teamMemberId] ?? [];
-          if (
-            memberCanPerformService(
-              member,
-              catalogServiceId,
-              fallbackCatalogIds,
-            ) &&
-            isMemberAvailableAt(cursor, durationMins, working, busy)
-          ) {
-            usedMemberIds.add(service.teamMemberId);
-            cursor += durationMins;
-            return { id: service.id, teamMemberId: service.teamMemberId };
-          }
-        }
-      }
-    }
-
     const atCap =
       usedMemberIds.size >= FIXED_LOCATION_MAX_DISTINCT_TEAM_MEMBERS;
-    const preferredIds = candidateMemberIds.filter((id) =>
-      usedMemberIds.has(id),
-    );
+    const assignSnapshot: SetupAvailabilitySnapshot = {
+      ...snapshot,
+      busyByMember: plannedBusyByMember,
+    };
+    const preferredIds = atCap
+      ? candidateMemberIds.filter((id) => usedMemberIds.has(id))
+      : candidateMemberIds;
 
-    let memberId =
-      findAvailableMemberForService(
-        snapshot,
-        preferredIds,
-        catalogServiceId,
-        fallbackCatalogIds,
-        cursor,
-        durationMins,
-      ) ??
-      (!atCap
-        ? findAvailableMemberForService(
-            snapshot,
-            candidateMemberIds,
-            catalogServiceId,
-            fallbackCatalogIds,
-            cursor,
-            durationMins,
-          )
-        : null);
+    let memberId = findAvailableMemberForService(
+      assignSnapshot,
+      preferredIds,
+      catalogServiceId,
+      fallbackCatalogIds,
+      cursor,
+      durationMins,
+    );
 
     if (!memberId) {
       // Nobody free → still assign: prefer already-used, else expand (under cap).
@@ -464,17 +431,23 @@ export function autoAssignServicesByAvailability(input: {
           : candidateMemberIds;
       memberId =
         findLowestOccupancyMemberForService(
-          snapshot,
+          assignSnapshot,
           fallbackPool,
           catalogServiceId,
           fallbackCatalogIds,
         ) ??
         (atCap
-          ? sortMembersByLowestOccupancy(snapshot, fallbackPool)[0] ?? null
+          ? sortMembersByLowestOccupancy(assignSnapshot, fallbackPool)[0] ?? null
           : null);
     }
 
-    if (memberId) usedMemberIds.add(memberId);
+    if (memberId) {
+      usedMemberIds.add(memberId);
+      plannedBusyByMember[memberId] = [
+        ...(plannedBusyByMember[memberId] ?? []),
+        { startMin: cursor, endMin: cursor + durationMins },
+      ];
+    }
     cursor += durationMins;
     return {
       id: service.id,

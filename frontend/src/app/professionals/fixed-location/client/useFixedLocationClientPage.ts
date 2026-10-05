@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 import { getApiErrorMessage } from "../../../../lib/api-error";
 import { getPhoneValidationErrors } from "../../../../lib/phone-validation";
 import {
@@ -60,6 +61,7 @@ function parseDobForApi(raw: string): string | undefined {
 }
 
 export function useFixedLocationClientPage() {
+  const searchParams = useSearchParams();
   const { data: clientsResponse, isLoading: clientsLoading, isError: clientsError } = useGetProfessionalClientsQuery();
   const [createProfessionalClient] = useCreateProfessionalClientMutation();
   const [updateProfessionalClient] = useUpdateProfessionalClientMutation();
@@ -516,6 +518,17 @@ export function useFixedLocationClientPage() {
     },
     [],
   );
+
+  React.useEffect(() => {
+    const email = searchParams.get("clientEmail")?.trim().toLowerCase() || "";
+    const name = searchParams.get("clientName")?.trim().toLowerCase() || "";
+    if (!email && !name || !clients.length) return;
+    const match = clients.find((client) =>
+      (email && client.email?.trim().toLowerCase() === email) ||
+      (!email && name && client.name.trim().toLowerCase() === name),
+    );
+    if (match) openClientDetailsView(match.id);
+  }, [clients, openClientDetailsView, searchParams]);
 
   const clearTechnicalNoteFocus = React.useCallback(() => {
     setFocusTechnicalNoteOnOpen(false);

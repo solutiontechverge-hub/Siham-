@@ -30,6 +30,20 @@ export const DEFAULT_INVOICE_SETTINGS = {
   },
 };
 
+const numericCatalogItem = (item) => {
+  if (!item || typeof item !== "object") return item;
+  const next = { ...item };
+  for (const key of ["price", "unitPrice", "originalPrice", "discountAmount"]) {
+    if (next[key] == null || next[key] === "") continue;
+    const value = Number(next[key]);
+    if (Number.isFinite(value)) next[key] = Math.round(value * 100) / 100;
+  }
+  return next;
+};
+
+const numericCatalog = (items, fallback) =>
+  Array.isArray(items) ? items.map(numericCatalogItem) : fallback;
+
 export const mergeInvoiceSettings = (raw) => {
   if (!raw || typeof raw !== "object") return { ...DEFAULT_INVOICE_SETTINGS };
   return {
@@ -43,11 +57,9 @@ export const mergeInvoiceSettings = (raw) => {
       ...DEFAULT_INVOICE_SETTINGS.reminders,
       ...(raw.reminders ?? {}),
     },
-    products: Array.isArray(raw.products) ? raw.products : DEFAULT_INVOICE_SETTINGS.products,
-    uniqueItems: Array.isArray(raw.uniqueItems)
-      ? raw.uniqueItems
-      : DEFAULT_INVOICE_SETTINGS.uniqueItems,
-    services: Array.isArray(raw.services) ? raw.services : DEFAULT_INVOICE_SETTINGS.services,
+    products: numericCatalog(raw.products, DEFAULT_INVOICE_SETTINGS.products),
+    uniqueItems: numericCatalog(raw.uniqueItems, DEFAULT_INVOICE_SETTINGS.uniqueItems),
+    services: numericCatalog(raw.services, DEFAULT_INVOICE_SETTINGS.services),
   };
 };
 

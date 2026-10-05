@@ -26,6 +26,7 @@ import {
   receiptTitleForStatus,
   resolveProfessionalBusinessDisplay,
   financePreviewCardSx,
+  formatCurrencyDisplay,
   toInvoiceDisplayLineItems,
   type PreviewLineItem,
 } from "./financeDocumentUtils";
@@ -40,7 +41,7 @@ import type { FinanceInvoiceTemplateType } from "./useFinanceInvoiceSettings";
 type Props = {
   row: TransactionRow | null;
   lineItems: PreviewLineItem[];
-  totalPriceLabel: string;
+  totalPriceLabel: number | string;
   invoiceType?: FinanceInvoiceTemplateType;
   profileData?: ProfileResponse | null;
   professionalBusinessOverride?: FinanceProfessionalBusinessOverride | null;
@@ -70,19 +71,19 @@ export default function FinanceReceiptPreview({
     invoiceType,
   );
   const displayLineItems = React.useMemo(
-    () => toInvoiceDisplayLineItems(lineItems, invoiceType, frozenDocument),
-    [frozenDocument, invoiceType, lineItems],
+    // Receipts must preserve stored transaction rows exactly as invoices do.
+    () => toInvoiceDisplayLineItems(lineItems, invoiceType, true),
+    [invoiceType, lineItems],
   );
 
   const receiptTitle = receiptTitleForStatus(row?.status);
   const itemsTitle = receiptItemsTitleForStatus(row?.status);
   const receiptNumberLabel = receiptNumberLabelForStatus(row?.status);
   const invoiceNumber =
-    document?.documentNumber || row?.entryId || row?.id || "—";
+    document?.documentNumber || "—";
   const receiptNumber =
     document?.creditNoteNumber ||
     document?.receiptNumber ||
-    row?.id ||
     "—";
   const date =
     formatDocumentDateTime(
@@ -136,7 +137,7 @@ export default function FinanceReceiptPreview({
       metaRows.forEach(([label, value]) => {
         doc.setFont("helvetica", "normal");
         doc.text(label, left, y);
-        doc.text(value, left + usableWidth, y, { align: "right" });
+        doc.text(formatCurrencyDisplay(value), left + usableWidth, y, { align: "right" });
         y += 20;
       });
 
@@ -158,7 +159,7 @@ export default function FinanceReceiptPreview({
       doc.setFont("helvetica", "normal");
       displayLineItems.forEach((item) => {
         doc.text(item.displayDescription, left, y);
-        doc.text(item.totalPrice, left + usableWidth, y, { align: "right" });
+        doc.text(formatCurrencyDisplay(item.totalPrice), left + usableWidth, y, { align: "right" });
         y += 18;
       });
       if (
@@ -166,7 +167,7 @@ export default function FinanceReceiptPreview({
         !displayLineItems.some((item) => item.description.toLowerCase() === "prepayment")
       ) {
         doc.text("Prepayment", left, y);
-        doc.text(prepaidAmountLabel, left + usableWidth, y, { align: "right" });
+        doc.text(formatCurrencyDisplay(prepaidAmountLabel), left + usableWidth, y, { align: "right" });
         y += 18;
       }
 
@@ -176,7 +177,7 @@ export default function FinanceReceiptPreview({
       y += 20;
       doc.setFont("helvetica", "bold");
       doc.text("Total Amount (VAT included)", left, y);
-      doc.text(totalPriceLabel, left + usableWidth, y, { align: "right" });
+      doc.text(formatCurrencyDisplay(totalPriceLabel), left + usableWidth, y, { align: "right" });
 
       doc.save(`receipt-${receiptNumber}.pdf`);
       showSnackbar({
@@ -224,7 +225,7 @@ export default function FinanceReceiptPreview({
         {isRefund && refundAmount ? (
           <FinancePreviewLabelValueRow
             label="Refund Amount"
-            value={refundAmount}
+            value={formatCurrencyDisplay(refundAmount)}
           />
         ) : null}
         <FinancePreviewLabelValueRow
@@ -250,7 +251,7 @@ export default function FinanceReceiptPreview({
           <FinancePreviewLabelValueRow
             key={`${item.displayDescription}-${index}`}
             label={item.displayDescription}
-            value={item.totalPrice}
+            value={formatCurrencyDisplay(item.totalPrice)}
             variant="line"
           />
         ))}
@@ -260,7 +261,7 @@ export default function FinanceReceiptPreview({
         ) ? (
           <FinancePreviewLabelValueRow
             label={prepaymentDateTime ? `Prepayment · ${prepaymentDateTime}` : "Prepayment"}
-            value={prepaidAmountLabel}
+            value={formatCurrencyDisplay(prepaidAmountLabel)}
             variant="line"
           />
         ) : null}
@@ -270,7 +271,7 @@ export default function FinanceReceiptPreview({
 
       <FinancePreviewLabelValueRow
         label="Total Amount (VAT included)"
-        value={totalPriceLabel}
+        value={formatCurrencyDisplay(totalPriceLabel)}
         variant="total"
       />
 
@@ -304,6 +305,7 @@ export function resolveReceiptTotalLabel(
   lineItems: PreviewLineItem[],
 ) {
   const document = getIssuedDocument(row);
+  if (document?.paidAmount) return document.paidAmount;
   if (document?.totalPrice) return document.totalPrice;
   if (hasStoredDocumentSnapshot(row)) return row?.grossAmount || row?.netAmount || "€0.00";
   const totalAmount = lineItems.reduce(

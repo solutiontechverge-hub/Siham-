@@ -199,7 +199,7 @@ export function useManualEntryDrawer({
             ? {
                 ...product,
                 name: option.label,
-                price: `${option.unitPrice}EUR`,
+                price: option.unitPrice,
                 vat: option.vat?.trim() || product.vat,
                 unit: option.unit,
                 discountType: option.discountType,

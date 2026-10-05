@@ -11,11 +11,11 @@ export type FinanceInvoiceTemplateType = "individual" | "company";
 export type FinanceInvoiceProduct = {
   id: string;
   name: string;
-  price: string;
+  price: number;
   vat: string;
   unit?: number;
   discountType?: "fixed" | "percentage";
-  discountAmount?: string;
+  discountAmount?: number;
 };
 
 export type FinanceInvoiceService = {
@@ -93,6 +93,34 @@ export function readFinanceInvoiceSettings(): FinanceInvoiceSettings {
   return defaultFinanceInvoiceSettings;
 }
 
+function moneyNumber(value: unknown): number {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  const raw = String(value ?? "").replace(/[^0-9.,-]/g, "");
+  const lastComma = raw.lastIndexOf(",");
+  const lastDot = raw.lastIndexOf(".");
+  const separator = lastComma >= 0 || lastDot >= 0
+    ? (lastComma > lastDot ? "," : ".")
+    : "";
+  const occurrences = separator ? raw.split(separator).length - 1 : 0;
+  const decimalDigits = separator ? raw.length - raw.lastIndexOf(separator) - 1 : 0;
+  const isDecimal = separator && (occurrences === 1 ? decimalDigits !== 3 : decimalDigits <= 2);
+  const normalized = isDecimal
+    ? `${raw.slice(0, raw.lastIndexOf(separator)).replace(/[.,]/g, "")}.${raw.slice(raw.lastIndexOf(separator) + 1)}`
+    : raw.replace(/[.,]/g, "");
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function normalizeProducts(products: readonly FinanceInvoiceProduct[] | undefined) {
+  return (products ?? []).map((product) => ({
+    ...product,
+    price: moneyNumber(product.price),
+    ...(product.discountAmount == null
+      ? {}
+      : { discountAmount: moneyNumber(product.discountAmount) }),
+  }));
+}
+
 export function useFinanceInvoiceSettings() {
   const { data: settingsResponse, isLoading } = useGetFinanceSettingsQuery();
   const [updateInvoiceSettings] = useUpdateFinanceInvoiceSettingsMutation();
@@ -100,21 +128,24 @@ export function useFinanceInvoiceSettings() {
 
   const rawSettings =
     localDraft ?? settingsResponse?.data?.invoiceSettings ?? defaultFinanceInvoiceSettings;
-  const settings: FinanceInvoiceSettings = {
-    ...defaultFinanceInvoiceSettings,
-    ...rawSettings,
-    products: rawSettings.products ?? [],
-    uniqueItems: rawSettings.uniqueItems ?? [],
-    services: rawSettings.services ?? [],
-    paymentTerms: {
-      ...defaultFinanceInvoiceSettings.paymentTerms,
-      ...rawSettings.paymentTerms,
-    },
-    reminders: {
-      ...defaultFinanceInvoiceSettings.reminders,
-      ...rawSettings.reminders,
-    },
-  };
+  const settings = React.useMemo<FinanceInvoiceSettings>(
+    () => ({
+      ...defaultFinanceInvoiceSettings,
+      ...rawSettings,
+      products: normalizeProducts(rawSettings.products),
+      uniqueItems: normalizeProducts(rawSettings.uniqueItems),
+      services: rawSettings.services ?? [],
+      paymentTerms: {
+        ...defaultFinanceInvoiceSettings.paymentTerms,
+        ...rawSettings.paymentTerms,
+      },
+      reminders: {
+        ...defaultFinanceInvoiceSettings.reminders,
+        ...rawSettings.reminders,
+      },
+    }),
+    [rawSettings],
+  );
 
   const setSettings = React.useCallback(
     (updater: FinanceInvoiceSettings | ((prev: FinanceInvoiceSettings) => FinanceInvoiceSettings)) => {
@@ -123,8 +154,8 @@ export function useFinanceInvoiceSettings() {
         const base: FinanceInvoiceSettings = {
           ...defaultFinanceInvoiceSettings,
           ...raw,
-          products: raw.products ?? [],
-          uniqueItems: raw.uniqueItems ?? [],
+          products: normalizeProducts(raw.products),
+          uniqueItems: normalizeProducts(raw.uniqueItems),
           services: raw.services ?? [],
           paymentTerms: {
             ...defaultFinanceInvoiceSettings.paymentTerms,
@@ -139,8 +170,8 @@ export function useFinanceInvoiceSettings() {
         const normalized: FinanceInvoiceSettings = {
           ...defaultFinanceInvoiceSettings,
           ...next,
-          products: next.products ?? [],
-          uniqueItems: next.uniqueItems ?? [],
+          products: normalizeProducts(next.products),
+          uniqueItems: normalizeProducts(next.uniqueItems),
           services: next.services ?? [],
         };
         void updateInvoiceSettings({ invoiceSettings: normalized });

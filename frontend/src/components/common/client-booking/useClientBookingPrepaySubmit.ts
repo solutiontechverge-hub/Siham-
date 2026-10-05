@@ -179,8 +179,8 @@ export function useClientBookingPrepaySubmit(input: {
         message: selectedPaymentMethod.includes("Invoice")
           ? "Invoice requested. You will receive payment details before the due date."
           : confirmAfterPay
-            ? "Prepayment received. Your booking is confirmed."
-            : "Prepayment received.",
+            ? "Payment received. Your booking is confirmed."
+            : "Payment received.",
       });
     } catch (error) {
       const message = getApiErrorMessage(error, "Unable to record prepayment.");

@@ -2,7 +2,6 @@ import type {
   ExpectItemDef,
   ProductDraft,
   ServiceDraft,
-  ServiceOption,
   TransactionOptionItem,
 } from "./setting.types";
 
@@ -81,12 +80,6 @@ export const PRODUCT_NAME_OPTIONS = [
   "Shampoo",
   "Eye Lashes",
 ] as const;
-
-export const SERVICE_OPTIONS: ServiceOption[] = [
-  { label: "Hair Protein", category: "Hair" },
-  { label: "Dye", category: "Hair" },
-  { label: "Eye Makeup", category: "Makeup" },
-];
 
 export const DEFAULT_PRODUCT_DRAFT: ProductDraft = {
   productName: "",

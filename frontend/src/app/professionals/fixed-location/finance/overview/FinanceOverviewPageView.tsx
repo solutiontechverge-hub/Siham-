@@ -52,7 +52,9 @@ export default function FinanceOverviewPageView() {
     toDate,
     setToDate,
     dateRangeError,
-    setVisibleCount,
+    page,
+    pageCount,
+    setPage,
     activeDocument,
     setActiveDocument,
     voidPaymentModalOpen,
@@ -65,7 +67,6 @@ export default function FinanceOverviewPageView() {
     noteModalTransactionId,
     setNoteModalTransactionId,
     visibleRows,
-    canLoadMore,
     toggleOne,
     toggleAll,
     selectedCount,
@@ -113,7 +114,7 @@ export default function FinanceOverviewPageView() {
         query={query}
         onQueryChange={(next) => {
           setQuery(next);
-          setVisibleCount(INITIAL_VISIBLE);
+          setPage(1);
         }}
         onAddClick={setAddAnchor}
         onMoreClick={setMoreAnchor}
@@ -232,15 +233,15 @@ export default function FinanceOverviewPageView() {
             );
           }
         }}
-        onClientClick={() => {
-          router.push("/professionals/client");
+        onClientClick={(row) => {
+          const params = new URLSearchParams();
+          if (row.clientEmail?.trim()) params.set("clientEmail", row.clientEmail.trim());
+          if (row.clientName?.trim()) params.set("clientName", row.clientName.trim());
+          router.push(`/professionals/client?${params.toString()}`);
         }}
-        canLoadMore={canLoadMore}
-        onLoadMore={
-          canLoadMore
-            ? () => setVisibleCount((c) => c + INITIAL_VISIBLE)
-            : undefined
-        }
+        page={page}
+        pageCount={pageCount}
+        onPageChange={setPage}
         theme={theme as Theme}
         m={m}
       />

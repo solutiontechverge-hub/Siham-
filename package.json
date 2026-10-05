@@ -12,6 +12,7 @@
     "dev": "npm run dev:all",
     "dev:all": "node scripts/dev-all.mjs",
     "dev:frontend-only": "npm run dev:frontend",
+    "migrate": "npm --workspace backend run migrate",
     "build:frontend": "npm --workspace frontend run build",
     "build:backend": "npm --workspace backend run build",
     "build": "npm run build:backend && npm run build:frontend",

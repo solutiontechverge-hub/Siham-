@@ -27,6 +27,7 @@ import { validateRequest } from "../middleware/validate.middleware.js";
 import {
   emailBody,
   enumBody,
+  numericBody,
   textBody,
   uuidParam,
   LIMITS,
@@ -39,9 +40,27 @@ router.use(authenticateUser);
 
 router.get("/settings", requireProfessional, getFinanceSettings);
 router.get("/sales-card-metadata", requireProfessional, listSalesCardMetadata);
-router.put("/sales-card-metadata", requireProfessional, upsertSalesCardMetadata);
+router.put(
+  "/sales-card-metadata",
+  requireProfessional,
+  [numericBody("totalPrice", { optional: true, min: 0 })],
+  validateRequest,
+  upsertSalesCardMetadata,
+);
 router.get("/sales-addons", requireProfessional, listSalesAddons);
-router.put("/sales-addons", requireProfessional, upsertSalesAddon);
+router.put(
+  "/sales-addons",
+  requireProfessional,
+  [
+    numericBody("discountAmount", { optional: true, min: 0 }),
+    numericBody("discount.amount", { optional: true, min: 0 }),
+    numericBody("totalPrice", { min: 0 }),
+    numericBody("lines.*.quantity", { min: 0 }),
+    numericBody("lines.*.unitPrice", { min: 0 }),
+  ],
+  validateRequest,
+  upsertSalesAddon,
+);
 router.delete("/sales-addons/:id", requireProfessional, deleteSalesAddon);
 
 router.put(
@@ -98,8 +117,8 @@ router.post(
     body("bookingId").optional({ values: "falsy" }).isUUID(),
     textBody("bookingRef", { optional: true, max: 120 }),
     textBody("dueDate", { min: 1, max: 32, label: "dueDate" }),
-    body("penaltyAmount").optional({ values: "falsy" }).isFloat({ min: 0 }),
-    body("totalPrice").optional({ values: "falsy" }).isFloat({ min: 0 }),
+    numericBody("penaltyAmount", { optional: true, min: 0 }),
+    numericBody("totalPrice", { optional: true, min: 0 }),
     emailBody("clientEmail", { optional: true }),
     textBody("clientName", { optional: true, max: LIMITS.personName }),
     textBody("paymentMethod", { optional: true, max: 64 }),
@@ -131,13 +150,16 @@ router.post(
     emailBody("clientEmail", { optional: true }),
     textBody("clientType", { optional: true, max: 32 }),
     enumBody("paymentMethod", ["onlineDirect", "offlineDirect"], { optional: true }),
-    body("totalPrice").isFloat({ min: 0 }).withMessage("totalPrice must be a non-negative number."),
+    numericBody("totalPrice", { min: 0 }),
+    numericBody("discountAmount", { optional: true, min: 0 }),
     body("lines").optional().isArray({ max: 100 }).withMessage("lines must be an array."),
     body("lines.*.name")
       .optional()
       .isString()
       .isLength({ max: LIMITS.textShort })
       .withMessage("line name is too long."),
+    numericBody("lines.*.quantity", { min: 0 }),
+    numericBody("lines.*.unitPrice", { min: 0 }),
   ],
   validateRequest,
   createFinanceTransaction,
@@ -161,7 +183,7 @@ router.post(
   requireProfessional,
   [
     uuidParam("id"),
-    body("totalPrice").isFloat({ min: 0 }).withMessage("totalPrice must be a non-negative number."),
+    numericBody("totalPrice", { min: 0 }),
   ],
   validateRequest,
   replaceFinanceTransaction,

@@ -443,6 +443,9 @@ router.post(
     body("business_setup_id")
       .isUUID()
       .withMessage("business_setup_id must be a valid UUID."),
+    body("service_id")
+      .isUUID()
+      .withMessage("service_id is required and must be a valid UUID."),
     body("location_type")
       .optional({ values: "falsy" })
       .trim()

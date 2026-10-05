@@ -48,6 +48,8 @@ export type CreateFinanceTransactionRequest = {
   clientName: string;
   clientEmail: string;
   clientType: string;
+  vatNumber?: string;
+  cocNumber?: string;
   paymentMethod: "onlineDirect" | "offlineDirect";
   totalPrice: number;
   discountAmount?: number;
@@ -69,7 +71,7 @@ export type CreateFinanceTransactionRequest = {
 
 export type BulkFinanceTransactionAction = {
   ids: string[];
-  action: "refund" | "void" | "cancel" | "delete";
+  action: "refund" | "void" | "cancel" | "delete" | "markUnpaid" | "markPaid";
 };
 
 export type UpdateFinanceStripeRequest = {

@@ -39,10 +39,11 @@ export function getProfessionalProfile(
 
 export type PreviewLineItem = {
   description: string;
-  quantity: string;
+  quantity: number | string;
   vat: string;
-  pricePerUnit: string;
-  totalPrice: string;
+  vatRate?: number | null;
+  pricePerUnit: number | string;
+  totalPrice: number | string;
 };
 
 /** A transaction document is frozen once its identifying metadata is persisted. */
@@ -139,25 +140,25 @@ export function resolveProfessionalBusinessDisplay(
   const location = override?.address?.trim() || profileAddress || "—";
   const vat = override?.vatNumber?.trim() || profile?.vat_number?.trim() || "—";
   const coc = override?.cocNumber?.trim() || profile?.ccc_number?.trim() || "—";
-  return { shopName, phone, location, vat, coc };
+  return { shopName, legalName: override?.legalName?.trim() || profile?.legal_name?.trim() || shopName, phone, location, vat, coc };
 }
 
 export function professionalBusinessInfoLines(
   display: ReturnType<typeof resolveProfessionalBusinessDisplay>,
   invoiceType: FinanceInvoiceTemplateType,
 ) {
+  if (invoiceType !== "company") return [`Professional: ${display.shopName}`];
   const lines = [
-    `Shop Name: ${display.shopName}`,
-    `Contact number: ${display.phone}`,
-    `Location: ${display.location}`,
+    `Legal Name: ${display.legalName}`,
+    `COC No: ${display.coc}`,
+    `VAT No: ${display.vat}`,
+    `Address: ${display.location}`,
   ];
-  if (invoiceType === "company") {
-    lines.push(`Professional VAT No: ${display.vat}`, `Professional COC No: ${display.coc}`);
-  }
   return lines;
 }
 
-export function parseCurrencyValue(input?: string | null) {
+export function parseCurrencyValue(input?: number | string | null) {
+  if (typeof input === "number") return Number.isFinite(input) ? input : 0;
   if (!input) return 0;
   const normalized = input.replace(/[^0-9.,-]/g, "").replace(/,/g, "");
   const parsed = Number(normalized);
@@ -171,6 +172,12 @@ export function formatCurrencyValue(amount: number) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount);
+}
+
+/** Format numeric API values only when rendering; also supports legacy string snapshots. */
+export function formatCurrencyDisplay(value?: number | string | null) {
+  if (typeof value === "number") return formatCurrencyValue(value);
+  return value || formatCurrencyValue(0);
 }
 
 export function isBusinessInvoiceTemplate(
@@ -222,8 +229,7 @@ export function getInvoiceLineItemColumns(
   }
   return [
     { key: "description", label: "Description", pdfWidth: 190 },
-    { key: "unit", label: "Unit", pdfWidth: 60 },
-    { key: "vat", label: "VAT %", pdfWidth: 60 },
+    { key: "vat", label: "VAT", pdfWidth: 60 },
     { key: "pricePerUnit", label: "Price per unit", pdfWidth: 110, align: "right" },
     { key: "totalPrice", label: "Total", pdfWidth: 90, align: "right" },
   ];
@@ -272,9 +278,9 @@ export function getInvoiceLineItemCellValue(
     case "vat":
       return item.vat;
     case "pricePerUnit":
-      return item.pricePerUnit;
+      return formatCurrencyDisplay(item.pricePerUnit);
     case "totalPrice":
-      return item.totalPrice;
+      return formatCurrencyDisplay(item.totalPrice);
   }
 }
 
@@ -293,13 +299,13 @@ function aggregatePreviewLineItems(items: PreviewLineItem[]): PreviewLineItem[] 
     if (existing) {
       existing.qty += qty;
       existing.total += parseCurrencyValue(item.totalPrice);
-      existing.quantity = formatLineItemQuantity(existing.qty);
-      existing.totalPrice = formatCurrencyValue(existing.total);
+      existing.quantity = existing.qty;
+      existing.totalPrice = existing.total;
       return;
     }
     groups.set(key, {
       description: baseDescription,
-      quantity: formatLineItemQuantity(qty),
+      quantity: qty,
       vat: item.vat,
       pricePerUnit: item.pricePerUnit,
       totalPrice: item.totalPrice,
@@ -325,7 +331,12 @@ export function toInvoiceDisplayLineItems(
   preserveStoredValues = false,
 ): InvoiceDisplayLineItem[] {
   if (preserveStoredValues) {
-    return items.map((item) => ({ ...item, quantity: item.quantity, unit: item.quantity, displayDescription: item.description }));
+    return items.map((item) => ({
+      ...item,
+      quantity: item.quantity,
+      unit: formatLineItemQuantity(parseLineItemQuantity(item)),
+      displayDescription: item.description,
+    }));
   }
   const layout = resolveInvoiceLineItemLayout(invoiceType);
   return aggregatePreviewLineItems(items).map((item) => {
@@ -358,10 +369,11 @@ export function addDuration(dateText: string, value: string, unit: string) {
 }
 
 export function normalizePreviewLineItems(items: TransactionDocumentLineItem[]): PreviewLineItem[] {
-  return items.map((item) => ({
+  return (Array.isArray(items) ? items : []).filter(Boolean).map((item) => ({
     description: item.description,
     quantity: item.quantity,
     vat: item.vat,
+    vatRate: item.vatRate,
     pricePerUnit: item.pricePerUnit,
     totalPrice: item.totalPrice,
   }));
@@ -369,8 +381,11 @@ export function normalizePreviewLineItems(items: TransactionDocumentLineItem[]):
 
 export function buildPreviewLineItems(_settings: FinanceInvoiceSettings, row?: TransactionRow | null): PreviewLineItem[] {
   const document = getIssuedDocument(row);
-  if (document?.lineItems?.length) {
-    return normalizePreviewLineItems(document.lineItems);
+  const storedLineItems = Array.isArray(document?.lineItems)
+    ? document.lineItems.filter((item) => item && typeof item === "object")
+    : [];
+  if (storedLineItems.length) {
+    return normalizePreviewLineItems(storedLineItems);
   }
 
   // Never reconstruct missing historical lines from today's catalog/settings.
@@ -379,10 +394,10 @@ export function buildPreviewLineItems(_settings: FinanceInvoiceSettings, row?: T
   if (!document && !row) return [];
   return [{
     description: "Professional Service",
-    quantity: "1",
+    quantity: 1,
     vat: "0%",
-    pricePerUnit: formatCurrencyValue(totalAmount),
-    totalPrice: formatCurrencyValue(totalAmount),
+    pricePerUnit: totalAmount,
+    totalPrice: totalAmount,
   }];
 }
 
@@ -394,7 +409,7 @@ export function buildBookingItems(row: TransactionRow | null, lineItems: Preview
   if (hasStoredDocumentSnapshot(row)) return [];
   return lineItems.map((item) => ({
     label: item.description,
-    value: item.totalPrice,
+    value: formatCurrencyDisplay(item.totalPrice),
   }));
 }
 

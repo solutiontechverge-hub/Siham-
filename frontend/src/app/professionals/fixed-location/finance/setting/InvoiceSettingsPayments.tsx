@@ -110,6 +110,7 @@ export function InvoiceSettingsPayments(props: {
                               }
                             />
                             <MollureFormField
+                              select
                               disabled={!paymentsEditing}
                               value={settings.paymentTerms.originalDueUnit}
                               onChange={(e) =>
@@ -118,7 +119,10 @@ export function InvoiceSettingsPayments(props: {
                                   e.target.value,
                                 )
                               }
-                            />
+                              SelectProps={{ native: true }}
+                            >
+                              <option value="Days">Days</option><option value="Weeks">Weeks</option>
+                            </MollureFormField>
                           </Stack>
                         </Stack>
 
@@ -144,6 +148,7 @@ export function InvoiceSettingsPayments(props: {
                               }
                             />
                             <MollureFormField
+                              select
                               disabled={!paymentsEditing}
                               value={settings.paymentTerms.originalPenaltyUnit}
                               onChange={(e) =>
@@ -152,7 +157,10 @@ export function InvoiceSettingsPayments(props: {
                                   e.target.value,
                                 )
                               }
-                            />
+                              SelectProps={{ native: true }}
+                            >
+                              <option value="%">Percentage</option><option value="fixed">Fixed amount</option>
+                            </MollureFormField>
                           </Stack>
                         </Stack>
                       </Stack>
@@ -167,16 +175,18 @@ export function InvoiceSettingsPayments(props: {
                           alignItems={{ md: "flex-start" }}
                         >
                           <BodyText sx={rowLabelSx}>Trigger:</BodyText>
-                          <MollureFormField
-                            disabled={!paymentsEditing}
-                            value={settings.paymentTerms.firstReissueTrigger}
+                            <MollureFormField
+                              select
+                              disabled={!paymentsEditing}
+                              value={settings.paymentTerms.firstReissueTrigger}
                             onChange={(e) =>
                               updatePaymentTerm(
                                 "firstReissueTrigger",
                                 e.target.value,
                               )
                             }
-                          />
+                              SelectProps={{ native: true }}
+                            ><option value="Automatic">Automatic</option><option value="Manual">Manual</option></MollureFormField>
                         </Stack>
 
                         <Stack
@@ -201,6 +211,7 @@ export function InvoiceSettingsPayments(props: {
                               }
                             />
                             <MollureFormField
+                              select
                               disabled={!paymentsEditing}
                               value={settings.paymentTerms.firstReissueDueUnit}
                               onChange={(e) =>
@@ -209,7 +220,8 @@ export function InvoiceSettingsPayments(props: {
                                   e.target.value,
                                 )
                               }
-                            />
+                              SelectProps={{ native: true }}
+                            ><option value="Days">Days</option><option value="Weeks">Weeks</option></MollureFormField>
                           </Stack>
                         </Stack>
 
@@ -262,16 +274,18 @@ export function InvoiceSettingsPayments(props: {
                           alignItems={{ md: "flex-start" }}
                         >
                           <BodyText sx={rowLabelSx}>Trigger:</BodyText>
-                          <MollureFormField
-                            disabled={!paymentsEditing}
-                            value={settings.paymentTerms.secondReissueTrigger}
+                            <MollureFormField
+                              select
+                              disabled={!paymentsEditing}
+                              value={settings.paymentTerms.secondReissueTrigger}
                             onChange={(e) =>
                               updatePaymentTerm(
                                 "secondReissueTrigger",
                                 e.target.value,
                               )
                             }
-                          />
+                              SelectProps={{ native: true }}
+                            ><option value="Automatic">Automatic</option><option value="Manual">Manual</option></MollureFormField>
                         </Stack>
 
                         <Stack
@@ -298,6 +312,7 @@ export function InvoiceSettingsPayments(props: {
                               }
                             />
                             <MollureFormField
+                              select
                               disabled={!paymentsEditing}
                               value={settings.paymentTerms.secondReissueDueUnit}
                               onChange={(e) =>
@@ -306,7 +321,8 @@ export function InvoiceSettingsPayments(props: {
                                   e.target.value,
                                 )
                               }
-                            />
+                              SelectProps={{ native: true }}
+                            ><option value="Days">Days</option><option value="Weeks">Weeks</option></MollureFormField>
                           </Stack>
                         </Stack>
 
@@ -375,12 +391,14 @@ export function InvoiceSettingsPayments(props: {
                             }
                           />
                           <MollureFormField
+                            select
                             disabled={!paymentsEditing}
                             value={settings.reminders.reminder1Unit}
                             onChange={(e) =>
                               updateReminder("reminder1Unit", e.target.value)
                             }
-                          />
+                            SelectProps={{ native: true }}
+                          ><option value="Days">Days</option><option value="Weeks">Weeks</option></MollureFormField>
                         </Stack>
                       </Stack>
                       <Stack
@@ -402,12 +420,14 @@ export function InvoiceSettingsPayments(props: {
                             }
                           />
                           <MollureFormField
+                            select
                             disabled={!paymentsEditing}
                             value={settings.reminders.reminder2Unit}
                             onChange={(e) =>
                               updateReminder("reminder2Unit", e.target.value)
                             }
-                          />
+                            SelectProps={{ native: true }}
+                          ><option value="Days">Days</option><option value="Weeks">Weeks</option></MollureFormField>
                         </Stack>
                       </Stack>
                     </Box>

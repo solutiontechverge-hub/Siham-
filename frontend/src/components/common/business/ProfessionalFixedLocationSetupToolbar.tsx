@@ -364,9 +364,9 @@ export function ProfessionalFixedLocationSetupToolbar(
                 },
               }}
             >
-              {isBusinessProfileActive ? (
-                <>
+              {isBusinessProfileActive ? [
                   <MenuItem
+                    key="temporary-deactivate"
                     disabled={isBusinessProfileStatusSaving}
                     onClick={() => {
                       setBusinessStatusMenuAnchor(null);
@@ -380,8 +380,9 @@ export function ProfessionalFixedLocationSetupToolbar(
                     }}
                   >
                     Temporarily deactivate template
-                  </MenuItem>
+                  </MenuItem>,
                   <MenuItem
+                    key="permanent-deactivate"
                     disabled={isBusinessProfileStatusSaving}
                     onClick={() => {
                       setBusinessStatusMenuAnchor(null);
@@ -395,9 +396,8 @@ export function ProfessionalFixedLocationSetupToolbar(
                     }}
                   >
                     Permanently deactivate template
-                  </MenuItem>
-                </>
-              ) : (
+                  </MenuItem>,
+              ] : (
                 <MenuItem
                   disabled={isBusinessProfileStatusSaving}
                   onClick={() => {

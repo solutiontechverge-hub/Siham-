@@ -40,6 +40,7 @@ const STATUS_MAP: Record<string, string> = {
   "status:overdueInvoice": "Overdue",
   "status:overdueResponse": "Overdue response",
   "status:voided": "Voided",
+  "status:unpaid": "Unpaid",
 };
 
 export function buildFinanceTransactionQueryParams(input: {

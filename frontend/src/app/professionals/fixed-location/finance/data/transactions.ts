@@ -14,6 +14,7 @@ export type TransactionStatus =
   | "Failed"
   | "Overdue"
   | "Overdue response"
+  | "Unpaid"
   | "Voided";
 
 /** Visual tone for status chips per design spec. */
@@ -31,6 +32,8 @@ export function getTransactionStatusTone(status: TransactionStatus): Transaction
     case "Overdue response":
     case "Failed":
       return "warning";
+    case "Unpaid":
+      return "danger";
     case "Refunded":
     case "Voided":
       return "muted";
@@ -45,7 +48,7 @@ export function formatTransactionStatusLabel(status: TransactionStatus): string 
     case "Overdue":
       return "!Overdue";
     case "Voided":
-      return "Void";
+      return "Voided";
     default:
       return status;
   }
@@ -56,17 +59,15 @@ export function formatEntryIdDisplay(
   entryId: string | null,
   entryLabel?: string,
 ): string {
-  if (entryLabel?.toLowerCase().includes("manual") || entryType === "manualEntry") {
-    return entryId ? `M${entryId}` : "Manual entry";
-  }
-  if (entryId) {
-    const lower = entryId.toLowerCase();
-    if (lower.startsWith("of") || lower.startsWith("ol") || lower.startsWith("m")) {
-      return entryId;
+  if (entryId !== null && entryId !== undefined && entryId !== "") {
+    const raw = String(entryId).trim();
+    const digits = raw.replace(/\D/g, "");
+    if (digits) {
+      if (entryType === "offlineBooking") return `OF${digits}`;
+      if (entryType === "manualEntry" || entryLabel?.toLowerCase().includes("manual")) return `M${digits}`;
+      return digits;
     }
-    if (entryType === "offlineBooking") return `of${entryId}`;
-    if (entryType === "onlineBooking") return `ol${entryId}`;
-    return entryId;
+    return raw;
   }
   return entryLabel ?? "";
 }
@@ -107,6 +108,8 @@ export function transactionMatchesStatusFilter(
         return status === "Overdue response";
       case "status:voided":
         return status === "Voided";
+      case "status:unpaid":
+        return status === "Unpaid";
       default:
         return false;
     }
@@ -136,7 +139,13 @@ export type ManualEntryTransactionInput = {
   clientEmail: string;
   clientType: TransactionClientType;
   paymentMethod: "onlineDirect" | "offlineDirect";
-  lines: { name: string; quantity: number; unitPrice: number }[];
+  lines: {
+    name: string;
+    quantity: number;
+    unitPrice: number;
+    sourceReference: string;
+    sourceType: "serviceId" | "productId" | "uniqueItemCode";
+  }[];
   totalPrice: number;
   discountAmount?: number;
 };
@@ -148,19 +157,25 @@ export function buildManualEntryTransactionRow(input: ManualEntryTransactionInpu
 
   const lineItems = input.lines.map((line) => ({
     description: line.name,
-    quantity: String(line.quantity),
+    sourceReference: line.sourceReference,
+    sourceType: line.sourceType,
+    quantity: line.quantity,
     vat: "21%",
-    pricePerUnit: formatNetAmountEur(line.unitPrice),
-    totalPrice: formatNetAmountEur(line.quantity * line.unitPrice),
+    vatRate: 21,
+    pricePerUnit: line.unitPrice,
+    totalPrice: line.quantity * line.unitPrice,
   }));
 
   if (input.discountAmount && input.discountAmount > 0) {
     lineItems.push({
       description: "Discount",
-      quantity: "1",
+      sourceReference: "discount",
+      sourceType: "uniqueItemCode",
+      quantity: 1,
       vat: "0%",
-      pricePerUnit: formatNetAmountEur(-input.discountAmount),
-      totalPrice: formatNetAmountEur(-input.discountAmount),
+      vatRate: 0,
+      pricePerUnit: -input.discountAmount,
+      totalPrice: -input.discountAmount,
     });
   }
 
@@ -178,12 +193,12 @@ export function buildManualEntryTransactionRow(input: ManualEntryTransactionInpu
     clientName: input.clientName,
     clientEmail: input.clientEmail,
     clientType: input.clientType,
-    grossAmount: formatNetAmountEur(gross),
-    stripeFee: formatNetAmountEur(stripeFee),
-    mollureFee: formatNetAmountEur(mollureFee),
-    netAmount: formatNetAmountEur(net),
+    grossAmount: gross,
+    stripeFee,
+    mollureFee,
+    netAmount: net,
     methodTitle: isOnline ? "Online – direct" : "Offline – direct",
-    methodDetail: isOnline ? "iDeal" : "",
+    methodDetail: "",
     status: isOnline ? "Pending" : "Paid",
     statusDetail: isOnline ? "Pay within 15 min" : undefined,
     document: {
@@ -197,7 +212,7 @@ export function buildManualEntryTransactionRow(input: ManualEntryTransactionInpu
         email: input.clientEmail || undefined,
       },
       lineItems,
-      totalPrice: formatNetAmountEur(input.totalPrice),
+      totalPrice: input.totalPrice,
     },
   };
 }
@@ -248,10 +263,12 @@ export type TransactionDocumentLineItem = {
   description: string;
   sourceReference?: string;
   sourceType?: "serviceId" | "productId" | "uniqueItemCode";
-  quantity: string;
+  quantity: number;
   vat: string;
-  pricePerUnit: string;
-  totalPrice: string;
+  /** Numeric VAT rate for integrations; VAT text remains display/reference-only. */
+  vatRate?: number | null;
+  pricePerUnit: number;
+  totalPrice: number;
 };
 
 export type TransactionDocumentBookingItem = {
@@ -260,10 +277,10 @@ export type TransactionDocumentBookingItem = {
 };
 
 export type TransactionDocument = {
-  documentNumber: string;
+  documentNumber?: string;
   receiptNumber?: string;
   creditNoteNumber?: string;
-  refundAmount?: string;
+  refundAmount?: number;
   refundedAt?: string;
   serviceDate: string;
   /** Appointment clock time, e.g. "14:00" or "2:00 PM". */
@@ -272,12 +289,15 @@ export type TransactionDocument = {
   dueDate: string;
   lateFeeNotice?: string;
   reissuedFrom?: string;
+  reissueLevel?: number;
   client?: TransactionDocumentParty;
   bookingItems?: TransactionDocumentBookingItem[];
   lineItems?: TransactionDocumentLineItem[];
-  totalPrice?: string;
+  totalPrice?: number;
   /** Formatted prepayment amount shown on invoice/receipt as "Prepayment". */
-  prepaymentAmount?: string;
+  prepaymentAmount?: number;
+  /** Exact amount settled by this document (distinct from invoice total). */
+  paidAmount?: number;
   issuedSnapshot?: {
     templateType?: "individual" | "company";
     layout?: "itemized" | "simplified";
@@ -299,15 +319,17 @@ export type TransactionRow = {
   entryId: string | null;
   /** YYYY-MM-DD or null when grouped under a parent row */
   date: string | null;
+  /** Persisted payment/due deadline (YYYY-MM-DD), when available. */
+  paymentDeadline?: string | null;
   /** Optional label instead of/alongside entry id (e.g. "Manual entry") */
   entryLabel?: string;
   clientName: string;
   clientEmail: string;
   clientType: TransactionClientType;
-  grossAmount?: string;
-  stripeFee?: string;
-  mollureFee?: string;
-  netAmount: string;
+  grossAmount?: number | null;
+  stripeFee?: number | null;
+  mollureFee?: number | null;
+  netAmount: number;
   methodTitle: string;
   methodDetail: string;
   status: TransactionStatus;
@@ -350,6 +372,9 @@ export function getTransactionActionCategory(
       case "Paid":
       case "Prepaid":
         categories.add("paid");
+        break;
+      case "Unpaid":
+        categories.add("due");
         break;
       case "Failed":
         categories.add("failed");

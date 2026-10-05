@@ -14,6 +14,7 @@ import {
   TableHead,
   TableRow,
   Tooltip,
+  Pagination,
 } from "@mui/material";
 import { alpha, type Theme } from "@mui/material/styles";
 import {
@@ -23,6 +24,7 @@ import {
 } from "../../../theme/mollureHierarchy";
 import {
   formatEntryIdDisplay,
+  formatNetAmountEur,
   formatTransactionDate,
   formatTransactionStatusLabel,
   getTransactionClientTypeLabel,
@@ -68,15 +70,13 @@ function statusChipSx(status: TransactionStatus, theme: Theme) {
 
 function netAmountTooltip(row: TransactionRow): string | null {
   if (!row.grossAmount) return null;
-  const parts = [`Gross: ${row.grossAmount}`];
-  if (row.stripeFee) parts.push(`Stripe fee: ${row.stripeFee}`);
-  if (row.mollureFee) parts.push(`Mollure fee: ${row.mollureFee}`);
+  const parts = [`Gross: ${formatNetAmountEur(row.grossAmount)}`];
+  if (row.stripeFee) parts.push(`- Stripe fee: ${formatNetAmountEur(row.stripeFee)}`);
+  if (row.mollureFee) parts.push(`- Mollure fee: ${formatNetAmountEur(row.mollureFee)}`);
   if (row.stripeFee || row.mollureFee) {
-    const feeTotal = [row.stripeFee, row.mollureFee]
-      .filter(Boolean)
-      .join(" + ");
-    parts.push(`Net = Gross − (${feeTotal})`);
+    parts.push(`Net: ${formatNetAmountEur(row.netAmount)}`);
   }
+  if (!row.stripeFee && !row.mollureFee) parts.push(`Net: ${formatNetAmountEur(row.netAmount)}`);
   return parts.join("\n");
 }
 
@@ -92,9 +92,12 @@ export type TransactionsTableProps = {
   onOpenNote?: (row: TransactionRow) => void;
   onEntryClick?: (row: TransactionRow) => void;
   onClientClick?: (row: TransactionRow) => void;
+  /** Opens the manual review/reissue surface for an overdue row. */
+  onReviewOverdue?: (row: TransactionRow) => void;
   disableDocumentLinks?: boolean;
-  canLoadMore: boolean;
-  onLoadMore?: () => void;
+  page: number;
+  pageCount: number;
+  onPageChange: (page: number) => void;
   theme: Theme;
   m: { navy: string; teal: string };
 };
@@ -108,9 +111,11 @@ export default function TransactionsTable({
   onOpenNote,
   onEntryClick,
   onClientClick,
+  onReviewOverdue,
   disableDocumentLinks = false,
-  canLoadMore,
-  onLoadMore,
+  page,
+  pageCount,
+  onPageChange,
   theme,
   m,
 }: TransactionsTableProps) {
@@ -361,7 +366,7 @@ export default function TransactionsTable({
                             cursor: "help",
                           })}
                         >
-                          {row.netAmount}
+                          {formatNetAmountEur(row.netAmount)}
                         </BodyText>
                       </Tooltip>
                     ) : (
@@ -369,7 +374,7 @@ export default function TransactionsTable({
                         component="span"
                         sx={mollureLabelSx(m.navy)}
                       >
-                        {row.netAmount}
+                        {formatNetAmountEur(row.netAmount)}
                       </BodyText>
                     )}
                   </TableCell>
@@ -427,6 +432,20 @@ export default function TransactionsTable({
                         >
                           {row.statusDetail}
                         </BodyText>
+                      ) : null}
+                      {row.status === "Overdue" ? (
+                        <MuiLink
+                          component="button"
+                          type="button"
+                          onClick={() => {
+                            if (onReviewOverdue) onReviewOverdue(row);
+                            else onOpenDocument(row, "invoice");
+                          }}
+                          underline="hover"
+                          sx={{ fontSize: 10.5, fontWeight: 800, color: theme.palette.warning.main, width: "fit-content", p: 0, border: 0, bgcolor: "transparent" }}
+                        >
+                          Review
+                        </MuiLink>
                       ) : null}
                     </Stack>
                   </TableCell>
@@ -507,17 +526,9 @@ export default function TransactionsTable({
         </Table>
       </TableContainer>
 
-      {canLoadMore ? (
+      {pageCount > 1 ? (
         <Stack alignItems="center" sx={{ mt: 2 }}>
-          <AppButton
-            tone="secondary"
-            onClick={onLoadMore}
-            sx={{
-              px: 3,
-            }}
-          >
-            Load More
-          </AppButton>
+          <Pagination count={pageCount} page={page} onChange={(_event, value) => onPageChange(value)} color="primary" shape="rounded" />
         </Stack>
       ) : null}
     </Box>

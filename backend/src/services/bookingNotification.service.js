@@ -608,9 +608,9 @@ export async function dispatchBookingUpdatedNotifications(booking, previousStatu
     prepaymentChanged && String(booking.prepayment_status ?? "").toLowerCase() === "paid";
 
   if (prepaymentPaid) {
-    await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_PREPAYMENT_RECEIVED, ctx.professional_name, {
-      message: "Prepayment made successfully.",
-    });
+    // Prepayment receipt is an action item for the professional. The client
+    // already receives the checkout result locally; do not create a second
+    // client notification/toast from the server.
     await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_PREPAYMENT_RECEIVED, ctx.client_name, {
       message: `Prepayment received from ${ctx.client_name}.`,
     });
@@ -999,9 +999,9 @@ export async function processPaymentOverdueNotifications() {
     `UPDATE finance_transactions ft
      SET status = 'Overdue',
          updated_at = NOW()
-     WHERE ft.status = 'Payment due'
-       AND (ft.document->>'dueDate') IS NOT NULL
-       AND (ft.document->>'dueDate')::date < CURRENT_DATE
+     WHERE ft.status IN ('Payment due', 'Pending')
+       AND COALESCE(ft.payment_deadline, NULLIF(ft.document->>'dueDate', '')::date) IS NOT NULL
+       AND COALESCE(ft.payment_deadline, NULLIF(ft.document->>'dueDate', '')::date) < CURRENT_DATE
      RETURNING ft.id, ft.booking_id`,
   );
 
@@ -1037,8 +1037,8 @@ export async function processPaymentDueReminders() {
     `SELECT ft.id
      FROM finance_transactions ft
      WHERE ft.status IN ('Payment due', 'Pending')
-       AND (ft.document->>'dueDate') IS NOT NULL
-       AND (ft.document->>'dueDate')::date = CURRENT_DATE`,
+       AND COALESCE(ft.payment_deadline, NULLIF(ft.document->>'dueDate', '')::date) IS NOT NULL
+       AND COALESCE(ft.payment_deadline, NULLIF(ft.document->>'dueDate', '')::date) = CURRENT_DATE`,
   );
 
   let sent = 0;

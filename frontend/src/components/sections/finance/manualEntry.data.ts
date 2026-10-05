@@ -73,11 +73,21 @@ export type ManualEntryCatalogOption = {
   vat?: string;
   unit?: number;
   discountType?: "fixed" | "percentage";
-  discountAmount?: string;
+  discountAmount?: number;
 };
 
-export function parseFinancePrice(price: string): number {
-  const normalized = price.replace(/[^\d.,-]/g, "").replace(",", ".");
+export function parseFinancePrice(price: number | string): number {
+  if (typeof price === "number") return Number.isFinite(price) ? price : 0;
+  const raw = price.replace(/[^\d.,-]/g, "");
+  const lastComma = raw.lastIndexOf(",");
+  const lastDot = raw.lastIndexOf(".");
+  const separator = lastComma > lastDot ? "," : lastDot >= 0 ? "." : "";
+  const occurrences = separator ? raw.split(separator).length - 1 : 0;
+  const decimalDigits = separator ? raw.length - raw.lastIndexOf(separator) - 1 : 0;
+  const isDecimal = separator && (occurrences === 1 ? decimalDigits !== 3 : decimalDigits <= 2);
+  const normalized = isDecimal
+    ? `${raw.slice(0, raw.lastIndexOf(separator)).replace(/[.,]/g, "")}.${raw.slice(raw.lastIndexOf(separator) + 1)}`
+    : raw.replace(/[.,]/g, "");
   const value = Number.parseFloat(normalized);
   return Number.isFinite(value) ? value : 0;
 }
@@ -175,7 +185,7 @@ export function manualEntryClientFields(
   selection: ManualEntryClientSelection,
   guestEmail?: string,
   guestName?: string,
-): { clientName: string; clientEmail: string; clientType: "mollure" | "nonMollure" | "business" | "guest" } {
+): { clientName: string; clientEmail: string; clientType: "mollure" | "nonMollure" | "business" | "guest"; vatNumber?: string; cocNumber?: string } {
   if (selection.type === "guest") {
     const name = guestName?.trim() || selection.name?.trim() || "Guest";
     return { clientName: name, clientEmail: guestEmail?.trim() ?? "", clientType: "guest" };
@@ -185,6 +195,8 @@ export function manualEntryClientFields(
     return {
       clientName: client.name,
       clientEmail: client.email,
+      vatNumber: client.vat,
+      cocNumber: client.coc,
       clientType: client.tags.includes("Mollure")
         ? "mollure"
         : client.kind === "company"
@@ -196,6 +208,8 @@ export function manualEntryClientFields(
     clientName: selection.client.name,
     clientEmail: selection.client.email,
     clientType: "mollure",
+    vatNumber: (selection.client as MollureDirectoryRow & { vat?: string }).vat,
+    cocNumber: (selection.client as MollureDirectoryRow & { coc?: string }).coc,
   };
 }
 

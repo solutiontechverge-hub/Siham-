@@ -8,6 +8,12 @@
     "start": "node src/index.js",
     "start:backend": "node src/index.js",
     "migrate": "node src/migrate-once.js",
+    "audit:sales-card-lines": "node src/scripts/audit-sales-card-line-items.js",
+    "reconcile:sales-cards": "node src/scripts/reconcile-sales-card-finance-rows.js",
+    "audit:matched-invoice-failures": "node src/scripts/audit-matched-invoice-failures.js",
+    "compare:calendar-finance": "node src/scripts/compare-calendar-sales-finance.js",
+    "audit:finance-deadlines": "node src/scripts/audit-finance-deadlines.js",
+    "audit:finance-catalog": "node src/scripts/audit-finance-catalog-integrity.js",
     "seed:reset": "node src/scripts/reset-dev-seed.js",
     "build": "node -e \"console.log('Backend: no compile step')\""
   },

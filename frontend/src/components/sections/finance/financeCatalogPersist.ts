@@ -11,16 +11,19 @@ export function toFinanceCatalogProduct(input: {
   vat?: string;
   unit?: number;
   discountType?: "fixed" | "percentage";
-  discountAmount?: string;
+  discountAmount?: number | string;
 }): FinanceInvoiceProduct {
   return {
     id: input.id,
     name: input.name,
-    price: `${input.price}EUR`,
+    price: input.price,
     vat: input.vat?.trim() || "0%",
     unit: input.unit,
     discountType: input.discountType,
-    discountAmount: input.discountAmount,
+    discountAmount:
+      input.discountAmount == null
+        ? undefined
+        : Number(input.discountAmount) || 0,
   };
 }
 

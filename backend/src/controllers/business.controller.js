@@ -2228,7 +2228,8 @@ const parseBookingsTabFilter = (tab, alias = "b") => {
   )`;
 
   if (normalized === "past") {
-    return `AND ${alias}.status IN ('completed', 'cancelled', 'no_show')`;
+    return `AND ${alias}.status IN ('completed', 'cancelled', 'no_show')
+      AND COALESCE(${alias}.booking_date, ${alias}.start_time::date) >= CURRENT_DATE - INTERVAL '30 days'`;
   }
   if (normalized === "ongoing") {
     return `AND ${alias}.status = 'in_progress'`;
@@ -2562,6 +2563,11 @@ export const createBooking = async (req, res) => {
     );
 
     const booking = result.rows[0];
+    await query(
+      `INSERT INTO booking_service_links (booking_id, service_id)
+       VALUES ($1, $2::uuid) ON CONFLICT DO NOTHING`,
+      [booking.id, req.body.service_id],
+    );
     if (booking && ["confirmed", "completed"].includes(booking.status)) {
       try {
         await syncBookingToFinanceTransaction(booking.id, {
@@ -3125,7 +3131,7 @@ export const updateMyBooking = async (req, res) => {
       }
     }
 
-    if (["confirmed", "completed"].includes(booking.status)) {
+    if (["confirmed", "completed", "no_show"].includes(booking.status)) {
       try {
         await syncBookingToFinanceTransaction(booking.id, {
           paymentPhase: booking.prepayment_status === "paid" ? "prepay" : "full",
@@ -3295,6 +3301,19 @@ export const updateBookingStatus = async (req, res) => {
        SET status = $1,
            notes = $2,
            total_price = $3,
+           no_show_fee_amount = CASE
+             WHEN $1 = 'no_show' THEN ROUND(($3 * COALESCE((SELECT no_show_fee_percentage FROM business_setups WHERE id = $9), 0) / 100)::numeric, 2)
+             ELSE no_show_fee_amount
+           END,
+           no_show_fee_due = CASE
+             WHEN $1 = 'no_show' THEN GREATEST(0, ROUND((
+               ($3 * COALESCE((SELECT no_show_fee_percentage FROM business_setups WHERE id = $9), 0) / 100)
+               - CASE WHEN LOWER(COALESCE(prepayment_status, '')) = 'paid'
+                      THEN ($3 * COALESCE(prepayment_percentage, 0) / 100)
+                      ELSE 0 END
+             )::numeric, 2))
+             ELSE no_show_fee_due
+           END,
            booking_date = $4,
            start_time = $5,
            end_time = $6,

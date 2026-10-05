@@ -149,81 +149,29 @@ export function mergeAddonRecordsIntoCards(
   addonRecords: SalesAddonRecord[],
   ctx: BuilderCtx,
 ): SalesOverviewCardData[] {
-  const active = addonRecords.filter((row) => !row.voided && !row.refunded);
-  if (!active.length) {
-    return [
-      ...cards,
-      ...addonRecords.map((record) => buildAddonCard(record, ctx)),
-    ];
-  }
-
-  const byBooking = new Map<string, SalesAddonRecord[]>();
-  for (const row of active) {
-    const key = String(row.bookingId);
-    const prev = byBooking.get(key) ?? [];
-    prev.push(row);
-    byBooking.set(key, prev);
-  }
-
-  const mergedBookingIds = new Set<string>();
-
-  const next = cards.map((card) => {
-    if (mergedBookingIds.has(String(card.bookingId))) return card;
-    const records = byBooking.get(String(card.bookingId));
-    if (!records?.length) return card;
-    // Merge into after-treatment / Summary; keep dedicated prepayment cards separate.
-    if (card.kind === "prepayment" && card.title !== "Summary") return card;
-    if (card.kind === "addon") return card;
-
-    const addonLines: SalesLineItem[] = [];
-    let addonTotal = 0;
-    for (const record of records) {
-      for (const line of record.lines) {
-        const amount = roundMoney(lineTotal(line));
-        addonLines.push({
-          id: `addon-${record.id}-${line.id}`,
-          label: line.quantity > 1 ? `${line.name} ×${line.quantity}` : line.name,
-          amount,
-        });
-        addonTotal += amount;
-      }
-      if (record.discountAmount > 0) {
-        const discountAmount = -roundMoney(record.discountAmount);
-        addonLines.push({
-          id: `addon-${record.id}-discount`,
-          label:
-            record.discount?.type === "percentage"
-              ? `Discount (${record.discount.amount}%)`
-              : "Discount",
-          amount: discountAmount,
-        });
-        addonTotal += discountAmount;
-      }
+  // Keep one add-ons card per booking. New add-ons are folded into the same
+  // card, so the summary and total never repeat for the same booking.
+  const grouped = new Map<string, SalesAddonRecord>();
+  for (const record of addonRecords) {
+    const key = String(record.bookingId);
+    const previous = grouped.get(key);
+    if (!previous) {
+      grouped.set(key, { ...record, lines: [...record.lines] });
+      continue;
     }
-    addonTotal = roundMoney(addonTotal);
-    if (!addonLines.length) return card;
-
-    mergedBookingIds.add(String(card.bookingId));
-    return {
-      ...card,
-      lines: [...card.lines, ...addonLines],
-      highlightedLineIds: [
-        ...(card.highlightedLineIds ?? card.lines.map((line) => line.id)),
-        ...addonLines.map((line) => line.id),
-      ],
-      total: roundMoney(card.total + addonTotal),
-      highlightAmount: roundMoney(card.highlightAmount + addonTotal),
-      documentAmount: roundMoney((card.documentAmount ?? card.highlightAmount) + addonTotal),
-    };
-  });
-
-  const leftoverActive = active.filter((row) => !mergedBookingIds.has(String(row.bookingId)));
-  const inactive = addonRecords.filter((row) => row.voided || row.refunded);
-  return [
-    ...next,
-    ...leftoverActive.map((record) => buildAddonCard(record, ctx)),
-    ...inactive.map((record) => buildAddonCard(record, ctx)),
-  ];
+    const latest = new Date(record.createdAt).getTime() > new Date(previous.createdAt).getTime()
+      ? record
+      : previous;
+    grouped.set(key, {
+      ...latest,
+      id: previous.id,
+      lines: [...previous.lines, ...record.lines],
+      discountAmount: roundMoney(previous.discountAmount + record.discountAmount),
+      totalPrice: roundMoney(previous.totalPrice + record.totalPrice),
+      createdAt: latest.createdAt,
+    });
+  }
+  return [...cards, ...[...grouped.values()].map((record) => buildAddonCard(record, ctx))];
 }
 
 function applyPenaltyAmount<T extends {
@@ -741,8 +689,8 @@ export function resolveProtectiveFeeSalesCardSpec(input: {
     price.lateCancellationFeeAmount > 0
   ) {
     return {
-      title: "Cancellation Fee Invoice",
-      feeLabel: "Cancellation fee",
+      title: "Fee Summary",
+      feeLabel: `Late cancellation fee (${Number(input.lateCancellationFeePercent) || 0}% of €${price.afterDiscount.toFixed(2)})`,
       feeAmount: price.lateCancellationFeeAmount,
       metaLines: buildCancellationFeeInvoiceMetaLines({
         cancellationFeeAt: input.cancellationFeeAt,
@@ -904,20 +852,44 @@ export function buildCardsForEvent(input: {
   if (!lines.length && !booking) return [];
 
   const totalFromBooking = Number(booking?.total_price);
-  const total = lines.length
+  const baseTotal = lines.length
     ? subtotal
     : roundMoney(Number.isFinite(totalFromBooking) ? totalFromBooking : 0);
 
-  const effectiveLines =
-    lines.length > 0
+  const lateReschedulePercent = Math.max(
+    0,
+    Number(event.details?.lateRescheduleFeePercent) || 0,
+  );
+  const lateRescheduleCeiling = Number(
+    event.details?.lateRescheduleFeePercentCeiling,
+  );
+  const effectiveLateReschedulePercent =
+    Number.isFinite(lateRescheduleCeiling) && lateRescheduleCeiling >= 0
+      ? Math.min(lateReschedulePercent, lateRescheduleCeiling)
+      : lateReschedulePercent;
+  const lateRescheduleFee = event.details?.showLateRescheduling
+    ? roundMoney((baseTotal * effectiveLateReschedulePercent) / 100)
+    : 0;
+  const total = roundMoney(baseTotal + lateRescheduleFee);
+
+  const effectiveLines: SalesLineItem[] = [
+    ...(lines.length > 0
       ? lines
       : [
           {
             id: `svc-${bookingId}`,
             label: booking?.service_title || event.title || "Service",
-            amount: total,
+            amount: baseTotal,
           },
-        ];
+        ]),
+    ...(lateRescheduleFee > 0
+      ? [{
+          id: `late-reschedule-${bookingId}`,
+          label: `Late Rescheduling fee (${effectiveLateReschedulePercent}% of €${baseTotal.toFixed(2)})`,
+          amount: lateRescheduleFee,
+        }]
+      : []),
+  ];
 
   const prepayStatus = String(booking?.prepayment_status ?? event.details?.prepaymentStatus ?? "").toLowerCase();
   const showPrepayment =
@@ -930,11 +902,11 @@ export function buildCardsForEvent(input: {
   const prepaymentPercent = Number(event.details?.prepaymentPercent) || 0;
   const prepaidAmount =
     showPrepayment && prepaymentPercent > 0
-      ? roundMoney((total * prepaymentPercent) / 100)
+      ? roundMoney((baseTotal * prepaymentPercent) / 100)
       : showPrepayment && (prepayStatus === "paid" || prepayStatus === "confirmed")
-        ? roundMoney(total * 0.25)
+        ? roundMoney(baseTotal * 0.25)
         : showPrepayment
-          ? roundMoney(prepaymentPercent > 0 ? (total * prepaymentPercent) / 100 : total * 0.5)
+          ? roundMoney(prepaymentPercent > 0 ? (baseTotal * prepaymentPercent) / 100 : baseTotal * 0.5)
           : 0;
 
   const isPrepayPaid = prepayStatus === "paid" || prepayStatus === "confirmed";
@@ -1164,4 +1136,3 @@ export function buildCardsForEvent(input: {
 
   return cards;
 }
-

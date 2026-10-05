@@ -406,6 +406,9 @@ export type CalendarBooking = {
   notes: string | null;
   status: string;
   prepayment_status?: string | null;
+  prepayment_percentage?: string | number | null;
+  no_show_fee_amount?: string | number | null;
+  no_show_fee_due?: string | number | null;
   contact_number?: string | null;
   booking_type?: "online" | "offline" | "project" | "request" | null;
   unique_code?: string | null;

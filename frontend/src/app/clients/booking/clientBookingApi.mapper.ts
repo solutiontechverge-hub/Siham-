@@ -299,6 +299,11 @@ export function buildClientBookingApiPayload(input: {
       endTime: s.endTime,
       guestId: s.guestId ?? null,
       teamMemberId: s.teamMemberId ?? null,
+      teamMemberName:
+        s.teamMemberName ??
+        input.draft.teamMembers?.find((member) => member.id === s.teamMemberId)
+          ?.name ??
+        null,
       originalPrice: s.originalPrice,
       discountPct: s.discountPct,
       ...(s.discountType && s.discountAmount
@@ -381,7 +386,11 @@ export function buildClientBookingApiPayload(input: {
           postal_code: desiredLocation.postalCode.trim() || null,
         }
       : {}),
-    ...(input.draft.projectDetails ||
+    // Keep a durable booking snapshot for every request. The booking table
+    // only has one service/team-member column, while a client can select many
+    // services and assign each one to a different professional.
+    ...(clientSnapshot.services.length ||
+    input.draft.projectDetails ||
     hasDesiredVisitAddress ||
     (clientSnapshot.people?.length ?? 0) > 1
       ? {
@@ -526,15 +535,19 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
     activeEbr?.suggestedServices?.[0]?.name ||
     booking.service_title ||
     serviceNames[0] ||
-    "Booking";
+    "";
   const names = activeEbr?.suggestedServices?.length
     ? activeEbr.suggestedServices.map((s) => s.name)
     : notesDetails?.services?.length
       ? notesDetails.services.map((s) => s.name)
       : serviceNames.length
         ? serviceNames
-        : [title];
-  const total = activeEbr?.suggestedServices?.length
+        : title
+          ? [title]
+          : [];
+  const total = String(booking.status ?? "").toLowerCase() === "no_show" && Number(booking.no_show_fee_due) > 0
+    ? Number(booking.no_show_fee_due)
+    : activeEbr?.suggestedServices?.length
     ? activeEbr.suggestedServices.reduce(
         (sum, s) => sum + effectiveServiceAmount(s),
         0,
@@ -562,7 +575,6 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
     const [eh, em] = endHhmm.split(":").map(Number);
     return Math.max(15, eh * 60 + em - (sh * 60 + sm));
   })();
-  const priceEach = names.length > 1 ? Math.round((total / names.length) * 100) / 100 : total;
   // Notes confirmed covers column lag right after Pay Now (same write as markNotesPrepaymentPaid).
   const prepaid =
     String(booking.prepayment_status ?? "").toLowerCase() === "paid" ||
@@ -572,7 +584,9 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
     unpaidSplitPayers(parseSplitBillState(notesDetails?.splitBill)).length > 0;
   // Explicit false only while post-booking settlement is open (drives payment-due UI).
   const paid =
-    status === "completed" || status === "in_progress"
+    status === "no_show"
+      ? false
+      : status === "completed" || status === "in_progress"
       ? paymentPending
         ? false
         : status === "completed"
@@ -784,15 +798,9 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
     const unique = dedupeServicesByOwner(merged, extraParticipantIds);
     if (unique.length) return unique;
 
-    return names.map((name, index) => ({
-      id: `${booking.service_id ?? booking.id}-${index}`,
-      name,
-      durationMins: names.length === 1 ? durationMins : Math.round(durationMins / names.length),
-      price: priceEach,
-      guestId: null as string | null,
-      teamMemberId: booking.team_member_id,
-      teamMemberName: booking.team_member_name || null,
-    }));
+    // Do not manufacture service rows from a booking total. A missing service
+    // must stay visibly missing until the API provides a real stored service.
+    return [];
   })();
 
   const draftProducts: ClientBookingDraft["products"] = (() => {
@@ -965,7 +973,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
         : notesDetails?.internalNote?.trim()
           ? { clientNote: notesDetails.internalNote.trim() }
           : {}),
-      total: draftTotal,
+    total: draftTotal,
     },
     createdAt: booking.created_at ?? undefined,
     prepaid,

@@ -37,8 +37,9 @@ export function useFinanceTransactionOptions() {
       setLocalDraft((prev) => {
         const base = prev ?? settingsResponse?.data?.transactionOptions ?? defaultFinanceTransactionOptions;
         const next = typeof updater === "function" ? updater(base) : updater;
-        void updateOptions(next);
-        return next;
+        const locked = { ...next, onlineImmediate: true };
+        void updateOptions(locked);
+        return locked;
       });
     },
     [settingsResponse?.data?.transactionOptions, updateOptions],
@@ -46,7 +47,7 @@ export function useFinanceTransactionOptions() {
 
   React.useEffect(() => {
     if (settingsResponse?.data?.transactionOptions) {
-      setLocalDraft(null);
+      setLocalDraft({ ...settingsResponse.data.transactionOptions, onlineImmediate: true });
     }
   }, [settingsResponse?.data?.transactionOptions]);
 

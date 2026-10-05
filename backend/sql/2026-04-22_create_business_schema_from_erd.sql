@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS business_setups (
   kilometer_allowance_instruction TEXT,
   response_time_hours INTEGER,
   response_time_minutes INTEGER,
+  response_deadline_at TIMESTAMPTZ,
   policy_custom_instruction TEXT,
   appointment_before_hours INTEGER,
   appointment_before_minutes INTEGER,

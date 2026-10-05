@@ -61,16 +61,22 @@ export function useProfessionalFixedLocationCalendarDrawerLineItemsState({
 
   /** Sync retail products from this professional's finance settings (backend). */
   React.useEffect(() => {
-    setProductCatalog(
-      financeProducts.map((product) => ({
-        id: product.id,
-        name: product.name,
-        price: parseFinancePrice(product.price),
-        vat: product.vat,
-        unit: product.unit,
-        discountType: product.discountType,
-        discountAmount: product.discountAmount,
-      })),
+    const nextCatalog = financeProducts.map((product) => ({
+      id: product.id,
+      name: product.name,
+      price: parseFinancePrice(product.price),
+      vat: product.vat,
+      unit: product.unit,
+      discountType: product.discountType,
+      discountAmount:
+        product.discountAmount == null
+          ? undefined
+          : String(product.discountAmount),
+    }));
+    setProductCatalog((current) =>
+      JSON.stringify(current) === JSON.stringify(nextCatalog)
+        ? current
+        : nextCatalog,
     );
   }, [financeProducts]);
 
@@ -83,7 +89,7 @@ export function useProfessionalFixedLocationCalendarDrawerLineItemsState({
         vat: item.vat,
         unit: item.unit,
         discountType: item.discountType,
-        discountAmount: item.discountAmount,
+        discountAmount: item.discountAmount == null ? undefined : String(item.discountAmount),
       })),
     [financeUniqueItems],
   );

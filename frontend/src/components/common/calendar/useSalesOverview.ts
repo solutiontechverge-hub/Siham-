@@ -50,6 +50,7 @@ import {
   configureSalesCardMetadataPersistence,
   hydrateSalesCardMetadata,
   hydrateSalesAddons,
+  listSalesAddons,
   configureSalesAddonPersistence,
 } from "./salesOverview.storage";
 import type {
@@ -100,6 +101,8 @@ export function useSalesOverview({
   const [fetchFinanceTransactions] = useLazyGetFinanceTransactionsQuery();
   const [bulkFinanceAction] = useBulkFinanceTransactionActionMutation();
   const [createFinanceTransaction] = useCreateFinanceTransactionMutation();
+  const [refundCard, setRefundCard] = React.useState<SalesOverviewCardData | null>(null);
+  const [refundTransactions, setRefundTransactions] = React.useState<TransactionRow[]>([]);
   const [processFinanceInvoiceReissues] = useProcessFinanceInvoiceReissuesMutation();
   const { data: salesMetadataResponse } = useGetSalesCardMetadataQuery();
   const { data: salesAddonsResponse } = useGetSalesAddonsQuery();
@@ -184,7 +187,7 @@ export function useSalesOverview({
         financeHints,
         paymentTerms: financeSettings.paymentTerms,
       }),
-    // revision forces rebuild after localStorage mutations
+    // revision forces rebuild after backend-backed sales mutations
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       bookings,
@@ -280,13 +283,31 @@ export function useSalesOverview({
       match?.payerLabel && match.payerRole !== "main_client"
         ? `${match.payerLabel} · ${match.clientName}`
         : match?.clientName || clientName || SALES_OVERVIEW_COPY.fallbackClient;
+    const existingLines = match?.lines ?? [];
+    const existingLineIds = new Set(existingLines.map((line) => String(line.id)));
+    const persistedAddonLines = listSalesAddons(checkoutBookingId)
+      .filter((addon) => !addon.voided && !addon.refunded)
+      .flatMap((addon) =>
+        (addon.lines ?? []).map((line) => ({
+          id: `addon-${addon.id}-${line.id}`,
+          label: line.quantity > 1 ? `${line.name} ×${line.quantity}` : line.name,
+          amount: Number(line.unitPrice ?? 0) * Number(line.quantity ?? 1),
+        })),
+      )
+      .filter((line) => !existingLineIds.has(String(line.id)));
+
     return {
       bookingId: checkoutBookingId,
       bookingCode:
         checkoutBookingCode || match?.bookingCode || checkoutBookingId,
       clientName: displayName,
       clientEmail: match?.clientEmail || clientEmail,
-      priorLines: match?.lines ?? [],
+      priorLines: [...existingLines, ...persistedAddonLines],
+      prepaymentAmount:
+        cards.find(
+          (card) =>
+            card.bookingId === checkoutBookingId && card.kind === "prepayment",
+        )?.documentAmount ?? 0,
     };
   }, [
     cards,
@@ -411,10 +432,10 @@ export function useSalesOverview({
         if (!matchesBooking) return false;
         const phase = (row.document as { paymentPhase?: string; addonId?: string } | undefined)
           ?.paymentPhase;
-        const addonId = (row.document as { addonId?: string } | undefined)?.addonId;
         if (card.kind === "addon") {
-          const cardAddonId = card.id.replace(/^addon-/, "");
-          return phase === "addon" && (!addonId || addonId === cardAddonId || card.id.includes(addonId));
+          // The UI groups every add-on for a booking into one summary card;
+          // refund every add-on transaction represented by that card.
+          return phase === "addon";
         }
         if (card.kind === "prepayment") return phase === "prepay" || !phase;
         if (card.kind === "after_treatment") return phase === "full" || !phase;
@@ -429,7 +450,9 @@ export function useSalesOverview({
       }
 
       if (card.kind === "addon") {
-        updateSalesAddon(card.id.replace(/^addon-/, ""), { refunded: true });
+        listSalesAddons(card.bookingId)
+          .filter((addon) => !addon.refunded && !addon.voided)
+          .forEach((addon) => updateSalesAddon(addon.id, { refunded: true }));
       } else {
         upsertSalesCardMeta({
           bookingId: card.bookingId,
@@ -464,27 +487,26 @@ export function useSalesOverview({
             parseStoredEbrFromNotes(booking.notes),
             parseStoredErFromNotes(booking.notes),
           );
-          await updateBookingStatus({
-            id: String(booking.id),
-            status: (() => {
-              const normalized = String(booking.status || "")
-                .toLowerCase()
-                .replace(/\s+/g, "_");
-              const allowed = [
-                "requested",
-                "cancelled",
-                "completed",
-                "confirmed",
-                "in_progress",
-                "no_show",
-                "invalid",
-              ] as const;
-              return (
-                allowed.find((value) => value === normalized) ?? "confirmed"
-              );
-            })(),
-            notes: nextNotes,
-          }).unwrap();
+          // Refund is already persisted in finance/meta. Calendar-note sync is
+          // best-effort and must not turn a successful refund into an error.
+          try {
+            await updateBookingStatus({
+              id: String(booking.id),
+              status: (() => {
+                const normalized = String(booking.status || "")
+                  .toLowerCase()
+                  .replace(/\s+/g, "_");
+                const allowed = [
+                  "requested", "cancelled", "completed", "confirmed",
+                  "in_progress", "no_show", "invalid",
+                ] as const;
+                return allowed.find((value) => value === normalized) ?? "confirmed";
+              })(),
+              notes: nextNotes,
+            }).unwrap();
+          } catch {
+            // Do not fail the refund because an unrelated calendar update failed.
+          }
         }
       }
 
@@ -493,11 +515,12 @@ export function useSalesOverview({
         severity: "success",
         message: SALES_OVERVIEW_COPY.refunded,
       });
-    } catch {
+    } catch (error) {
       showSnackbar({
         severity: "error",
         message: SALES_OVERVIEW_COPY.refundFailed,
       });
+      throw error;
     }
   };
 
@@ -514,7 +537,12 @@ export function useSalesOverview({
       return;
     }
     if (action === "refundSales") {
-      await handleRefundSales(card);
+      const result = await fetchFinanceTransactions({
+        q: card.bookingCode || card.bookingId,
+        limit: 50,
+      }).unwrap();
+      setRefundTransactions(result.data?.rows ?? []);
+      setRefundCard(card);
       return;
     }
     if (action === "markUnpaid") {
@@ -563,25 +591,23 @@ export function useSalesOverview({
         limit: 50,
       }).unwrap();
       const rows = financeResult.data?.rows ?? [];
+      const voidSettledSale =
+        cancelCard.paymentState === "paid" ||
+        cancelCard.paymentState === "prepaid";
       const cancelable = rows.filter((row) => {
         const matchesBooking =
           row.bookingId === cancelCard.bookingCode ||
           row.bookingId === cancelCard.bookingId ||
           row.entryId === cancelCard.bookingCode;
         if (!matchesBooking) return false;
-        const open =
-          row.status === "Pending" ||
-          row.status === "Payment due" ||
-          row.status === "Overdue" ||
-          row.status === "Failed" ||
-          row.status === "Prepayment due";
+        const open = voidSettledSale
+          ? ["Paid", "Prepaid", "Payment due", "Overdue", "Unpaid"].includes(row.status)
+          : row.status === "Pending";
         if (!open) return false;
         const phase = (row.document as { paymentPhase?: string; addonId?: string } | undefined)
           ?.paymentPhase;
         if (cancelCard.kind === "addon") {
-          const cardAddonId = cancelCard.id.replace(/^addon-/, "");
-          const addonId = (row.document as { addonId?: string } | undefined)?.addonId;
-          return phase === "addon" && (!addonId || addonId === cardAddonId || cancelCard.id.includes(addonId));
+          return phase === "addon";
         }
         if (cancelCard.kind === "prepayment") return phase === "prepay" || !phase;
         return phase === "full" || !phase;
@@ -590,7 +616,7 @@ export function useSalesOverview({
       if (cancelable.length) {
         await bulkFinanceAction({
           ids: cancelable.map((row) => row.id),
-          action: "cancel",
+          action: voidSettledSale ? "void" : "cancel",
         }).unwrap();
       }
 
@@ -611,15 +637,21 @@ export function useSalesOverview({
           parseStoredEbrFromNotes(booking.notes),
           parseStoredErFromNotes(booking.notes),
         );
-        await updateBookingStatus({
-          id: String(booking.id),
-          status: allowedBookingStatus(booking.status),
-          notes: nextNotes,
-        }).unwrap();
+        try {
+          await updateBookingStatus({
+            id: String(booking.id),
+            status: allowedBookingStatus(booking.status),
+            notes: nextNotes,
+          }).unwrap();
+        } catch {
+          // Finance cancellation/void is authoritative; calendar-note sync is best-effort.
+        }
       }
 
       if (cancelCard.kind === "addon") {
-        updateSalesAddon(cancelCard.id.replace(/^addon-/, ""), { voided: true });
+        listSalesAddons(cancelCard.bookingId)
+          .filter((addon) => !addon.refunded && !addon.voided)
+          .forEach((addon) => updateSalesAddon(addon.id, { voided: true }));
       }
 
       const seqMatch = cancelCard.id.match(/-v(\d+)$/);
@@ -668,6 +700,13 @@ export function useSalesOverview({
         clientEmail: payload.clientEmail || checkoutContext.clientEmail || clientEmail || "",
         clientType: clientKind === "company" ? "company" : "individual",
         paymentMethod: payload.paymentMethod,
+        // Add-ons inherit the booking's channel.  Without this field the API
+        // defaults every booking sale to `onlineBooking`, which makes an
+        // Offline Direct add-on fail/land in the wrong finance flow.
+        entryType:
+          payload.paymentMethod === "offlineDirect"
+            ? "offlineBooking"
+            : "onlineBooking",
         totalPrice: payload.totalPrice,
         discountAmount: payload.discountAmount,
         lines: payload.lines.map((line) => ({
@@ -703,10 +742,21 @@ export function useSalesOverview({
         severity: "success",
         message: SALES_OVERVIEW_COPY.addonCreated,
       });
-    } catch {
+    } catch (error) {
+      const apiError = error as {
+        data?: { message?: string };
+        error?: string;
+        message?: string;
+      };
+      const detail =
+        apiError?.data?.message ||
+        (typeof apiError?.data === "string" ? apiError.data : "") ||
+        apiError?.error ||
+        apiError?.message ||
+        "Request failed";
       showSnackbar({
         severity: "error",
-        message: SALES_OVERVIEW_COPY.addonFailed,
+        message: `${SALES_OVERVIEW_COPY.addonFailed} ${detail}`,
       });
     }
   };
@@ -959,6 +1009,10 @@ export function useSalesOverview({
     handleSaveAddon,
     handleSaveEdit,
     handleSaveNote,
+    handleRefundSales,
+    refundCard,
+    refundTransactions,
+    setRefundCard,
     noteCard,
     openAddOns,
     openDocument,

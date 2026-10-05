@@ -65,6 +65,7 @@ const DEFAULT_SECTIONS: readonly FinanceFiltersSection[] = [
       { key: "status:pending", label: "Pending" },
       { key: "status:prepaymentDue", label: "Prepayment due" },
       { key: "status:paymentDue", label: "Payment due" },
+      { key: "status:unpaid", label: "Unpaid" },
       { key: "status:failed", label: "Failed" },
       { key: "status:overdueInvoice", label: "Overdue (past due date)" },
       {

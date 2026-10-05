@@ -50,7 +50,7 @@ export function useFinanceOverviewPage() {
   const [dateRangeError, setDateRangeError] = React.useState<string | null>(
     null,
   );
-  const [visibleCount, setVisibleCount] = React.useState(INITIAL_VISIBLE);
+  const [page, setPage] = React.useState(1);
   const [activeDocument, setActiveDocument] = React.useState<{
     row: TransactionRow;
     documentType: "invoice" | "receipt";
@@ -79,9 +79,10 @@ export function useFinanceOverviewPage() {
         fromDate,
         toDate,
         filters: filtersValue,
-        limit: visibleCount,
+        limit: INITIAL_VISIBLE,
+        offset: (page - 1) * INITIAL_VISIBLE,
       }),
-    [filtersValue, fromDate, query, toDate, visibleCount],
+    [filtersValue, fromDate, page, query, toDate],
   );
 
   const { data: transactionsResponse, refetch } =
@@ -90,8 +91,8 @@ export function useFinanceOverviewPage() {
   const totalTransactions = transactionsResponse?.data?.total ?? 0;
 
   React.useEffect(() => {
-    setVisibleCount(INITIAL_VISIBLE);
-  }, [filtersValue, fromDate, toDate]);
+    setPage(1);
+  }, [filtersValue, fromDate, query, toDate]);
 
   React.useEffect(() => {
     if (!fromDate && !toDate) {
@@ -111,7 +112,7 @@ export function useFinanceOverviewPage() {
 
   const filtered = transactions;
   const visibleRows = filtered;
-  const canLoadMore = visibleCount < totalTransactions;
+  const pageCount = Math.max(1, Math.ceil(totalTransactions / INITIAL_VISIBLE));
 
   const toggleOne = (id: string) => {
     setSelected((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -148,8 +149,15 @@ export function useFinanceOverviewPage() {
   );
 
   const actionMenuItems = React.useMemo(
-    () => buildActionMenuItems(selectedCount > 0 ? actionCategory : null),
-    [actionCategory, selectedCount],
+    () => buildActionMenuItems(
+      selectedCount > 0 ? actionCategory : null,
+      selectedRows.length > 0 && selectedRows.every((row) =>
+        row.entryType === "manualEntry" &&
+        ["Payment due", "Overdue"].includes(row.status) &&
+        Number(row.document?.reissueLevel ?? 0) >= 2,
+      ),
+    ),
+    [actionCategory, selectedCount, selectedRows],
   );
 
   const closeAddMenus = React.useCallback(() => {
@@ -341,6 +349,8 @@ export function useFinanceOverviewPage() {
         clientName: client.clientName,
         clientEmail: client.clientEmail,
         clientType: client.clientType,
+        vatNumber: client.vatNumber,
+        cocNumber: client.cocNumber,
         paymentMethod: payload.paymentMethod,
         totalPrice: payload.totalPrice,
         discountAmount: payload.discountAmount,
@@ -366,7 +376,7 @@ export function useFinanceOverviewPage() {
         setReplaceTransactionId(null);
         setFromDate(null);
         setToDate(null);
-        setVisibleCount(INITIAL_VISIBLE);
+        setPage(1);
         setSelected({});
         void refetch();
         showSnackbar({
@@ -453,6 +463,22 @@ export function useFinanceOverviewPage() {
         return;
       }
 
+      if (actionId === "markUnpaid" || actionId === "markPaid") {
+        if (selectedCount === 0) {
+          showSnackbar({ severity: "warning", message: "Select at least one transaction first." });
+          return;
+        }
+        void bulkAction({
+          ids: selectedRows.map((row) => row.id),
+          action: actionId === "markUnpaid" ? "markUnpaid" : "markPaid",
+        }).unwrap().then(() => {
+          showSnackbar({ severity: "success", message: actionId === "markUnpaid" ? "Marked unpaid." : "Marked paid." });
+        }).catch(() => {
+          showSnackbar({ severity: "error", message: "Unable to update payment status." });
+        });
+        return;
+      }
+
       if (actionId === "deleteSales") {
         if (selectedCount === 0) {
           showSnackbar({
@@ -494,6 +520,8 @@ export function useFinanceOverviewPage() {
       closeMoreMenus,
       deleteSelectedSales,
       openRefundDrawer,
+      bulkAction,
+      selectedRows,
       openVoidPaymentModal,
       selectedCount,
       showSnackbar,
@@ -577,8 +605,9 @@ export function useFinanceOverviewPage() {
     toDate,
     setToDate,
     dateRangeError,
-    visibleCount,
-    setVisibleCount,
+    page,
+    pageCount,
+    setPage,
     activeDocument,
     setActiveDocument,
     voidPaymentModalOpen,
@@ -591,7 +620,6 @@ export function useFinanceOverviewPage() {
     noteModalTransactionId,
     setNoteModalTransactionId,
     visibleRows,
-    canLoadMore,
     toggleOne,
     toggleAll,
     allVisibleSelected,

@@ -179,6 +179,7 @@ function useActionsMenu(onAction?: (action: SalesCardMenuAction) => void) {
 }
 
 function SalesActionsMenu({
+  isAddon,
   limitedMenu,
   showRefund,
   showMarkUnpaid,
@@ -188,6 +189,7 @@ function SalesActionsMenu({
   closeAll,
   run,
 }: {
+  isAddon?: boolean;
   limitedMenu?: boolean;
   /** Show Refund when the sale has received money and is not already muted. */
   showRefund?: boolean;
@@ -205,12 +207,14 @@ function SalesActionsMenu({
   }> = limitedMenu
     ? [
         { id: "editSales", label: "Edit Sales" },
+        { id: "cancelSales", label: "Void sale" },
+        ...(showRefund ? [{ id: "refundSales" as const, label: "Refund" }] : []),
         { id: "downloadInvoice", label: "Download Invoice" },
         { id: "addNote", label: "Add note" },
       ]
     : [
         { id: "editSales", label: "Edit Sales" },
-        { id: "cancelSales", label: "Cancel Sales" },
+        { id: "cancelSales", label: "Void sale" },
         ...(showMarkUnpaid ? [{ id: "markUnpaid" as const, label: "Mark as Unpaid" }] : []),
         ...(showRefund ? [{ id: "refundSales" as const, label: "Refund" }] : []),
         { id: "downloadInvoice", label: "Download Invoice" },
@@ -491,6 +495,7 @@ function SubSummaryCard({
       ) : null}
 
       <SalesActionsMenu
+        isAddon={sub.kind === "addon"}
         limitedMenu={limitedMenu}
         showRefund={
           sub.paymentState === "paid" || sub.paymentState === "prepaid"
@@ -838,6 +843,7 @@ export default function SalesOverviewCard({
       ) : null}
 
       <SalesActionsMenu
+        isAddon={card.kind === "addon"}
         limitedMenu={card.limitedMenu}
         showRefund={
           card.paymentState === "paid" || card.paymentState === "prepaid"

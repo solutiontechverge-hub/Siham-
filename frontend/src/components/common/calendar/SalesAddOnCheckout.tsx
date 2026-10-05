@@ -54,6 +54,7 @@ type SalesAddOnCheckoutProps = {
   clientEmail?: string;
   /** Existing booking summary lines — shown with new add-ons on the checkout summary step. */
   priorLines?: Array<{ id: string; label: string; amount: number }>;
+  prepaymentAmount?: number;
   onCancel: () => void;
   onSave: (payload: SalesAddOnCheckoutPayload) => void | Promise<void>;
 };
@@ -62,6 +63,7 @@ export default function SalesAddOnCheckout({
   clientName,
   clientEmail,
   priorLines = [],
+  prepaymentAmount = 0,
   onCancel,
   onSave,
 }: SalesAddOnCheckoutProps) {
@@ -166,7 +168,7 @@ export default function SalesAddOnCheckout({
             ? {
                 ...product,
                 name: option.label,
-                price: `${option.unitPrice}EUR`,
+                price: option.unitPrice,
                 vat: option.vat?.trim() || product.vat,
               }
             : product,
@@ -221,7 +223,7 @@ export default function SalesAddOnCheckout({
     () => priorLines.reduce((sum, line) => sum + line.amount, 0),
     [priorLines],
   );
-  const summaryTotal = Math.max(0, priorSubtotal + totalPrice);
+  const payableTotal = Math.max(0, priorSubtotal - prepaymentAmount + totalPrice);
 
   const addLinesFromCatalog = (
     kind: ManualEntryLineKind,
@@ -597,6 +599,16 @@ export default function SalesAddOnCheckout({
                 </Typography>
               </Stack>
             ))}
+            {prepaymentAmount > 0 ? (
+              <Stack direction="row" justifyContent="space-between" spacing={1.5}>
+                <Typography sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.62) }}>
+                  Prepaid (already paid)
+                </Typography>
+                <Typography sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.72) }}>
+                  -€{prepaymentAmount.toFixed(2)}
+                </Typography>
+              </Stack>
+            ) : null}
             {lines.map((line) => (
               <Stack
                 key={line.id}
@@ -664,7 +676,7 @@ export default function SalesAddOnCheckout({
               Total Price
             </Typography>
             <Typography sx={{ fontSize: 22, fontWeight: 900, color: m.headingText }}>
-              €{summaryTotal % 1 === 0 ? summaryTotal : summaryTotal.toFixed(2)}
+              €{payableTotal % 1 === 0 ? payableTotal : payableTotal.toFixed(2)}
             </Typography>
           </Stack>
           <Typography

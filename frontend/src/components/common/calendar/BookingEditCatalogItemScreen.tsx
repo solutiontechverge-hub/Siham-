@@ -48,6 +48,7 @@ export default function BookingEditCatalogItemScreen({
         errors={errors}
         onChange={onChange}
         disabled={disabled}
+        showUnit
       />
     </Stack>
   );

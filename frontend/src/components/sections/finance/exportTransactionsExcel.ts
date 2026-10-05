@@ -29,7 +29,7 @@ function formatMethodCell(row: TransactionRow): string {
   return lines.join("\n");
 }
 
-export function transactionRowToExportRow(row: TransactionRow): string[] {
+export function transactionRowToExportRow(row: TransactionRow): Array<string | number> {
   return [
     row.entryLabel ?? row.entryId ?? "",
     row.date ?? "",

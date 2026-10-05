@@ -16,11 +16,9 @@ import type {
   ProfessionalReviewItem,
 } from "./ratingReviewAnalytics.data";
 
-function parseMoney(value: string | number | null | undefined): number {
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  if (!value) return 0;
-  const parsed = Number(String(value).replace(/[^\d.-]/g, ""));
-  return Number.isFinite(parsed) ? parsed : 0;
+function numericAmount(value: unknown): number {
+  const amount = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(amount) ? amount : 0;
 }
 
 function pct(part: number, total: number): number {
@@ -201,19 +199,28 @@ function buildSalesVolume(
   let gross = 0;
 
   for (const row of transactions) {
-    const amount = parseMoney(row.netAmount);
+    const amount = numericAmount(row.netAmount);
+    const grossAmount = numericAmount(row.grossAmount ?? row.netAmount);
     const status = String(row.status || "").toLowerCase();
     if (status.includes("refund")) {
-      refunds += Math.abs(amount);
+      gross += grossAmount;
+      refunds += Math.abs(
+        numericAmount(
+          row.issuedDocument?.refundAmount ??
+            row.document?.refundAmount ??
+            amount,
+        ),
+      );
       continue;
     }
     if (status.includes("unpaid") || status.includes("pending") || status.includes("overdue")) {
       unpaidCount += 1;
       unpaidValue += amount;
+      continue;
     }
     if (status.includes("void") || status.includes("cancel")) continue;
 
-    gross += amount;
+    gross += grossAmount;
     if (row.entryType === "onlineBooking") {
       onlineCount += 1;
       onlineSales += amount;
@@ -233,7 +240,7 @@ function buildSalesVolume(
     for (const line of lines) {
       const name = line.description || "Item";
       const qty = Number(line.quantity) || 1;
-      const lineSales = parseMoney(line.totalPrice ?? line.pricePerUnit) || amount;
+      const lineSales = numericAmount(line.totalPrice ?? line.pricePerUnit) || amount;
       const prev = productMap.get(name) || { count: 0, sales: 0 };
       productMap.set(name, {
         count: prev.count + qty,
@@ -419,7 +426,7 @@ function buildPerformance(
         normalizeStatus(booking.status) === "Completed",
     );
     const revenue = memberBookings.reduce(
-      (sum, booking) => sum + parseMoney(booking.total_price),
+      (sum, booking) => sum + numericAmount(booking.total_price),
       0,
     );
     const memberReviews = reviews.filter(

@@ -103,12 +103,14 @@ function buildFallbackCreateBookingPayload(
           postal_code: draft.desiredLocation.postalCode.trim() || null,
         }
       : {}),
-    ...(draft.projectDetails || (locationMode === "desired" && draft.desiredLocation)
+    // Fallback requests must preserve the same full service/assignee snapshot
+    // as the normal API mapper. A booking row has room for only one service.
+    ...(draft.services?.length || draft.projectDetails || (locationMode === "desired" && draft.desiredLocation)
       ? {
           location_details: {
-            ...(draft.people?.length
-              ? {
-                  clientSnapshot: {
+            clientSnapshot: {
+              ...(draft.people?.length
+                ? {
                     people: draft.people
                       .filter(
                         (p) =>
@@ -126,28 +128,33 @@ function buildFallbackCreateBookingPayload(
                         bufferStartTime: p.bufferStartTime,
                         bufferEndTime: p.bufferEndTime,
                       })),
-                    services: (draft.services ?? []).map((s) => ({
-                      id: s.id,
-                      name: s.name,
-                      price: s.price,
-                      durationMins: s.durationMins,
-                      startTime: s.startTime,
-                      endTime: s.endTime,
-                      guestId: s.guestId ?? null,
-                      teamMemberId: s.teamMemberId ?? null,
-                    })),
-                    teamMembers: draft.teamMembers ?? [],
-                    ...(draft.projectDetails?.description?.trim()
-                      ? {
-                          projectDetails: {
-                            description: draft.projectDetails.description,
-                            uploads: [],
-                          },
-                        }
-                      : {}),
-                  },
-                }
-              : {}),
+                  }
+                : {}),
+              services: (draft.services ?? []).map((s) => ({
+                id: s.id,
+                name: s.name,
+                price: s.price,
+                durationMins: s.durationMins,
+                startTime: s.startTime,
+                endTime: s.endTime,
+                guestId: s.guestId ?? null,
+                teamMemberId: s.teamMemberId ?? null,
+                teamMemberName:
+                  s.teamMemberName ??
+                  draft.teamMembers?.find((member) => member.id === s.teamMemberId)
+                    ?.name ??
+                  null,
+              })),
+              teamMembers: draft.teamMembers ?? [],
+              ...(draft.projectDetails?.description?.trim()
+                ? {
+                    projectDetails: {
+                      description: draft.projectDetails.description,
+                      uploads: [],
+                    },
+                  }
+                : {}),
+            },
             ...(draft.projectDetails
               ? {
                   projectDescription: draft.projectDetails.description ?? "",

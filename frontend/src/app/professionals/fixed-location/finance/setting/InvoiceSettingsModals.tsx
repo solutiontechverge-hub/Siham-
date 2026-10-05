@@ -10,7 +10,8 @@ import AppButton from "../../../../../components/common/AppButton";
 import MollureFormField from "../../../../../components/common/MollureFormField";
 import AppModal from "../../../../../components/common/AppModal";
 import FinanceDocumentPreviewDrawer from "../../../../../components/sections/finance/FinanceDocumentPreviewDrawer";
-import { PRODUCT_NAME_OPTIONS, SERVICE_OPTIONS } from "./setting.data";
+import { PRODUCT_NAME_OPTIONS } from "./setting.data";
+import { useGetBusinessSetupQuery } from "../../../../../store/services/businessApi";
 
 export function InvoiceSettingsModals(props: {
   m: { navy: string };
@@ -60,6 +61,25 @@ export function InvoiceSettingsModals(props: {
     profileResponse,
     professionalBusinessOverride,
   } = props;
+  const { data: businessSetupResponse } = useGetBusinessSetupQuery({ includeDraft: false });
+  const realServices = React.useMemo(() => {
+    const rows = businessSetupResponse?.data?.service_categories ?? [];
+    type ServicePickerOption = { id: string; label: string; category: string; group?: boolean };
+    const grouped = new Map<string, ServicePickerOption[]>();
+    rows.forEach((row) => {
+      if (!row.service_id || !row.service_title) return;
+      const category = row.category_title || "Other";
+      const list = grouped.get(category) ?? [];
+      if (!list.some((item) => item.id === row.service_id)) {
+        list.push({ id: row.service_id, label: row.service_title, category });
+      }
+      grouped.set(category, list);
+    });
+    return Array.from(grouped.entries()).flatMap(([category, items]) => [
+      { id: `group-${category}`, label: category, category, group: true },
+      ...items,
+    ]);
+  }, [businessSetupResponse?.data?.service_categories]);
 
   return (
     <>
@@ -130,6 +150,7 @@ export function InvoiceSettingsModals(props: {
 
             <Box>
               <BodyText
+                title="Every service uses 21% VAT by default. Only add a service here if it has a different VAT rate — these are the exceptions."
                 sx={mollureLabelSx(m.navy, { mb: 0.5 })}
               >
                 VAT
@@ -224,11 +245,15 @@ export function InvoiceSettingsModals(props: {
                 }
                 SelectProps={{ native: true }}
               >
-                {SERVICE_OPTIONS.map((opt) => (
-                  <option key={opt.label} value={opt.label}>
-                    {opt.label}
-                  </option>
-                ))}
+                {realServices.length ? realServices.map((opt) => (
+                  opt.group ? (
+                    <optgroup key={opt.id} label={opt.label}>
+                      {realServices.filter((item) => !item.group && item.category === opt.category).map((item) => (
+                        <option key={item.id} value={item.label}>{item.label}</option>
+                      ))}
+                    </optgroup>
+                  ) : null
+                )) : <option value="">No services configured</option>}
               </MollureFormField>
             </Box>
 

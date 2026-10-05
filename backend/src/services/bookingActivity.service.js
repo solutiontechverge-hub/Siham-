@@ -28,6 +28,7 @@ function mapEventRow(row) {
     title: row.title,
     actor: row.actor || "system",
     actorLabel: row.actor_label || "System",
+    action: row.action || row.title,
     subtitle: row.subtitle ?? null,
     payload: row.payload ?? {},
     occurredAt: row.occurred_at
@@ -52,9 +53,9 @@ export async function appendBookingActivityEvent(input, { throwOnError = false }
 
     const result = await query(
       `INSERT INTO booking_activity_events (
-         booking_id, booking_code, kind, title, actor, actor_label, subtitle, payload, occurred_at
+         booking_id, booking_code, kind, title, action, actor, actor_label, subtitle, payload, occurred_at
        ) VALUES (
-         $1::uuid, $2, $3, $4, $5, $6, $7, $8::jsonb, COALESCE($9::timestamptz, NOW())
+         $1::uuid, $2, $3, $4, $4, $5, $6, $7, $8::jsonb, COALESCE($9::timestamptz, NOW())
        )
        RETURNING *`,
       [

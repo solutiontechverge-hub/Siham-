@@ -13,6 +13,7 @@ import SalesCancelModal from "./SalesCancelModal";
 import SalesEditCheckout from "./SalesEditCheckout";
 import SalesOverdueReissueModal from "./SalesOverdueReissueModal";
 import SalesOverviewCard from "./SalesOverviewCard";
+import RefundSalesDrawer from "../../sections/finance/RefundSalesDrawer";
 import {
   SALES_OVERVIEW_COPY,
   SALES_OVERVIEW_OVERDUE_COLOR,
@@ -54,6 +55,7 @@ export default function SalesOverview({
     handleSaveAddon,
     handleSaveEdit,
     handleSaveNote,
+    handleRefundSales,
     noteCard,
     openAddOns,
     openDocument,
@@ -66,6 +68,9 @@ export default function SalesOverview({
     setEditingCard,
     setNoteCard,
     setOverdueCard,
+    refundCard,
+    refundTransactions,
+    setRefundCard,
     subToCard,
   } = useSalesOverview({
     bookings,
@@ -78,6 +83,25 @@ export default function SalesOverview({
     onBookingCancelled,
     onBookingCompleted,
   });
+
+  if (refundCard) {
+    return (
+      <RefundSalesDrawer
+        open
+        transactions={refundTransactions}
+        fallbackItems={refundCard.lines.map((line) => ({
+          id: line.id,
+          name: line.label,
+          meta: `€${line.amount.toFixed(2)}`,
+          amount: line.amount,
+        }))}
+        onClose={() => setRefundCard(null)}
+        onSave={async () => {
+          await handleRefundSales(refundCard);
+        }}
+      />
+    );
+  }
 
   if (editingCard) {
     return (
@@ -96,6 +120,7 @@ export default function SalesOverview({
         clientName={checkoutContext.clientName}
         clientEmail={checkoutContext.clientEmail}
         priorLines={checkoutContext.priorLines}
+        prepaymentAmount={checkoutContext.prepaymentAmount}
         onCancel={clearCheckout}
         onSave={handleSaveAddon}
       />

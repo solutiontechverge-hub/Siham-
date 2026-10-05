@@ -1,33 +1,27 @@
 "use client";
 
-import { mollureBodySx, mollureLabelSx } from "../../../theme/mollureHierarchy";
+import { mollureBodySx } from "../../../theme/mollureHierarchy";
 
 import * as React from "react";
 import { Box, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import type {
-  TransactionDocumentParty,
   TransactionRow,
 } from "../../../app/professionals/fixed-location/finance/data/transactions";
 import type { ProfileResponse } from "../../../store/services/profileApi";
 import AppDrawer from "../AppDrawer";
-import MollureFormField from "../MollureFormField";
 import { BodyText } from "../../ui/typography";
 import FinanceInvoicePreview from "./FinanceInvoicePreview";
 import FinanceReceiptPreview, {
   resolveReceiptTotalLabel,
 } from "./FinanceReceiptPreview";
 import { buildPreviewLineItems, getIssuedDocument, getIssuedDocumentSnapshot, hasStoredDocumentSnapshot, resolveInvoiceTemplateType } from "./financeDocumentUtils";
-import {
-  canEditFinanceInvoiceClient,
-  isMollureFinanceClient,
-} from "./financeClientAccess";
+import { isMollureFinanceClient } from "./financeClientAccess";
 import type { FinanceProfessionalBusinessOverride } from "./financeDocumentTypes";
 import type {
   FinanceInvoiceSettings,
   FinanceInvoiceTemplateType,
 } from "./useFinanceInvoiceSettings";
-import { mollureWhiteFieldInputSx } from "../mollureFormSx";
 
 export type { FinanceProfessionalBusinessOverride };
 
@@ -88,33 +82,8 @@ export default function FinanceDocumentPreviewDrawer({
     [lineItems, row],
   );
   const titleLabel = documentType === "receipt" ? "Receipt" : "Invoice";
-  const canEditClient =
-    !frozenDocument && documentType === "invoice" && canEditFinanceInvoiceClient(row);
   const isMollureClient =
     !frozenDocument && documentType === "invoice" && isMollureFinanceClient(row);
-
-  const [clientDraft, setClientDraft] =
-    React.useState<TransactionDocumentParty>(() => ({
-      legalName: "",
-      email: "",
-      address: "",
-      vatNumber: "",
-      cocNumber: "",
-    }));
-
-  React.useEffect(() => {
-    if (!open || documentType !== "invoice") return;
-    const base = row?.document?.client;
-    setClientDraft({
-      legalName: base?.legalName ?? row?.clientName ?? "",
-      email: base?.email ?? row?.clientEmail ?? "",
-      address: base?.address ?? "",
-      vatNumber: base?.vatNumber ?? "",
-      cocNumber: base?.cocNumber ?? "",
-    });
-  }, [documentType, open, row]);
-
-  const fieldSx = mollureWhiteFieldInputSx;
 
   return (
     <AppDrawer
@@ -156,96 +125,13 @@ export default function FinanceDocumentPreviewDrawer({
               </Box>
             ) : null}
 
-            {canEditClient ? (
-              <Box
-                sx={{
-                  p: 1.75,
-                  borderRadius: "10px",
-                  bgcolor: alpha(m.navy, 0.02),
-                  border: `1px solid ${alpha(m.navy, 0.08)}`,
-                }}
-              >
-                <BodyText sx={mollureLabelSx(m.navy, { mb: 1.25 })}>
-                  {resolvedInvoiceType === "company"
-                    ? "Edit company client details"
-                    : "Edit client details"}
-                </BodyText>
-                <Stack spacing={1.25}>
-                  <MollureFormField
-                    label="Legal name"
-                    value={clientDraft.legalName}
-                    onChange={(e) =>
-                      setClientDraft((prev) => ({
-                        ...prev,
-                        legalName: e.target.value,
-                      }))
-                    }
-                    fullWidth
-                    sx={fieldSx}
-                  />
-                  <MollureFormField
-                    label="Email"
-                    value={clientDraft.email ?? ""}
-                    onChange={(e) =>
-                      setClientDraft((prev) => ({
-                        ...prev,
-                        email: e.target.value,
-                      }))
-                    }
-                    fullWidth
-                    sx={fieldSx}
-                  />
-                  <MollureFormField
-                    label="Address"
-                    value={clientDraft.address ?? ""}
-                    onChange={(e) =>
-                      setClientDraft((prev) => ({
-                        ...prev,
-                        address: e.target.value,
-                      }))
-                    }
-                    fullWidth
-                    sx={fieldSx}
-                  />
-                  {resolvedInvoiceType === "company" ? (
-                    <>
-                      <MollureFormField
-                        label="VAT number"
-                        value={clientDraft.vatNumber ?? ""}
-                        onChange={(e) =>
-                          setClientDraft((prev) => ({
-                            ...prev,
-                            vatNumber: e.target.value,
-                          }))
-                        }
-                        fullWidth
-                        sx={fieldSx}
-                      />
-                      <MollureFormField
-                        label="COC number"
-                        value={clientDraft.cocNumber ?? ""}
-                        onChange={(e) =>
-                          setClientDraft((prev) => ({
-                            ...prev,
-                            cocNumber: e.target.value,
-                          }))
-                        }
-                        fullWidth
-                        sx={fieldSx}
-                      />
-                    </>
-                  ) : null}
-                </Stack>
-              </Box>
-            ) : null}
-
             <FinanceInvoicePreview
               row={renderRow}
               settings={settings}
               invoiceType={resolvedInvoiceType}
               profileData={frozenDocument ? null : profileData}
               professionalBusinessOverride={frozenDocument ? issuedBusinessOverride : professionalBusinessOverride}
-              clientPartyOverride={frozenDocument ? null : canEditClient ? clientDraft : null}
+              clientPartyOverride={null}
             />
           </>
         )}

@@ -13,7 +13,6 @@ import { useFinanceTransactionOptions } from "../../../../../components/common/f
 import {
   DEFAULT_PRODUCT_DRAFT,
   DEFAULT_SERVICE_DRAFT,
-  SERVICE_OPTIONS,
 } from "./setting.data";
 import type {
   ProductDraft,
@@ -43,6 +42,7 @@ export function useStripeSettingsSection() {
     hydrated,
     subscriptionActive,
     paymentsConnected,
+    connectStatus,
     activateSubscription,
     deactivateSubscription,
     markPaymentsConnected,
@@ -96,6 +96,7 @@ export function useStripeSettingsSection() {
     hydrated,
     subscriptionActive,
     paymentsConnected,
+    connectStatus,
     showOnboardingBanner,
     showDisconnectedBanner,
     handleSubscriptionClick,
@@ -188,8 +189,8 @@ export function useInvoiceSettingsSection() {
     const name = addProductDraft.productName.trim();
     if (!name) return;
     const vat = addProductDraft.vat.trim() || "0%";
-    const priceRaw = addProductDraft.price.trim();
-    const price = priceRaw ? `${priceRaw}EUR` : "0EUR";
+    const parsedPrice = Number(addProductDraft.price.replace(",", "."));
+    const price = Number.isFinite(parsedPrice) && parsedPrice >= 0 ? parsedPrice : 0;
 
     if (editingProductId) {
       setSettings((prev) => ({
@@ -226,8 +227,7 @@ export function useInvoiceSettingsSection() {
     const service = addServiceDraft.service.trim();
     if (!service) return;
     const vat = addServiceDraft.vat.trim() || "0%";
-    const match = SERVICE_OPTIONS.find((s) => s.label === service);
-    const category = match?.category ?? "Other";
+    const category = settings.services.find((item) => item.service === service)?.category ?? "Other";
 
     if (editingServiceId) {
       setSettings((prev) => ({
@@ -273,7 +273,7 @@ export function useInvoiceSettingsSection() {
     setAddProductDraft({
       productName: p.name,
       vat: p.vat,
-      price: p.price.replace(/EUR$/i, ""),
+      price: String(p.price),
     });
     setAddProductOpen(true);
   };

@@ -124,8 +124,13 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerFooter({
     slotDrawerTab,
   } = bag;
 
-  return bookingCheckoutOpen || activityDetailItem || !selectedSlot ? null : selectedSlot &&
-    slotDrawerTab === "booking" ? (
+  // Sales/Activity screens own their checkout/action footer. Rendering the
+  // persistent booking Checkout button here creates a second action button
+  // over the SalesAddOnCheckout flow.
+  if (bookingCheckoutOpen || activityDetailItem || !selectedSlot) return null;
+  if (slotDrawerTab !== "booking") return null;
+
+  return selectedSlot && slotDrawerTab === "booking" ? (
     <Box
       sx={{
         px: 2.5,
@@ -143,10 +148,5 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerFooter({
         <ProfessionalFixedLocationCalendarBookingDrawerFooterActions bag={bag} />
       </Stack>
     </Box>
-  ) : (
-    <ProfessionalFixedLocationCalendarBookingDrawerFooterActions
-      bag={bag}
-      standaloneCheckout
-    />
-  );
+  ) : null;
 }

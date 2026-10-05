@@ -102,6 +102,11 @@ export function buildProfessionalBusinessOverride(input: {
     input.setup?.professional_legal_name?.trim() ||
     input.profile?.legal_name?.trim() ||
     "";
+  const legalName =
+    input.listing?.legalName?.trim() ||
+    input.setup?.professional_legal_name?.trim() ||
+    input.profile?.legal_name?.trim() ||
+    shopName;
   const phone =
     input.phone?.trim() ||
     input.listing?.phone?.trim() ||
@@ -127,7 +132,7 @@ export function buildProfessionalBusinessOverride(input: {
     undefined;
 
   return {
-    legalName: shopName,
+    legalName,
     shopName,
     phone,
     address,

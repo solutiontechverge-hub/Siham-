@@ -147,7 +147,10 @@ export default function ProfessionalFixedLocationCalendarBookingDrawer({
                   .join(" ")
                   .trim() || undefined
               }
-              prepaidAmount={isDrawerPrepaymentPaid ? prepaymentAmount : 0}
+              // Show the configured prepayment amount during testing as well.
+              // `isDrawerPrepaymentPaid` controls payment status only; it must
+              // not hide the amount from the checkout/details breakdown.
+              prepaidAmount={prepaymentAmount}
               onCancel={() => setBookingCheckoutOpen(false)}
               onSave={handleBookingCheckoutSave}
             />

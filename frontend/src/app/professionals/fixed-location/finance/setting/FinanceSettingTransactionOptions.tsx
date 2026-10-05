@@ -96,8 +96,8 @@ export default function FinanceSettingTransactionOptions() {
               alignItems="center"
             >
               <Checkbox
-                checked={draft[item.key]}
-                disabled={!editing}
+                checked={item.key === "onlineImmediate" ? true : draft[item.key]}
+                disabled={!editing || item.key === "onlineImmediate"}
                 onChange={(e) =>
                   setDraft((p) => ({ ...p, [item.key]: e.target.checked }))
                 }

@@ -237,7 +237,7 @@ export default function SalesEditCheckout({
             ? {
                 ...product,
                 name: option.label,
-                price: `${option.unitPrice}EUR`,
+                price: option.unitPrice,
                 vat: option.vat?.trim() || product.vat,
               }
             : product,

@@ -80,6 +80,7 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderNot
   Vm,
   | "businessResponseWindowInput"
   | "handleRestartResponseTime"
+  | "handleDiscardBr"
   | "m"
   | "openActivityComparison"
   | "responseTimeConfigured"
@@ -99,6 +100,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
   const {
     businessResponseWindowInput,
     handleRestartResponseTime,
+    handleDiscardBr,
     m,
     openActivityComparison,
     responseTimeConfigured,
@@ -149,6 +151,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
       {showExpiredResponseBanner ? (
         <BookingResponseExpiryBanner
           onRestart={() => void handleRestartResponseTime()}
+          onDiscard={() => void handleDiscardBr()}
         />
       ) : null}
 

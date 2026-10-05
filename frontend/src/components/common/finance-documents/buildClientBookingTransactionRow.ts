@@ -38,6 +38,13 @@ function resolveVatForLabel(
   return match?.vat ?? "0%";
 }
 
+function vatRateFromText(vat: string): number | null {
+  const match = String(vat).match(/-?\d+(?:\.\d+)?/);
+  if (!match) return null;
+  const value = Number(match[0]);
+  return Number.isFinite(value) ? value : null;
+}
+
 function addDaysIso(isoDate: string, days: number): string {
   const base = new Date(`${isoDate}T00:00:00`);
   if (Number.isNaN(base.getTime())) return isoDate;
@@ -92,25 +99,31 @@ export function buildClientBookingTransactionRow({
         ? documentAmount
         : 0;
 
-  const serviceLineItems = draft.services.map((service) => ({
+  const serviceLineItems = draft.services.map((service) => {
+    const vat = resolveVatForLabel(service.name, financeSettings, "service");
+    return {
     description: service.name,
-    quantity: "1",
-    vat: resolveVatForLabel(service.name, financeSettings, "service"),
-    pricePerUnit: formatCurrencyEur(service.price),
-    totalPrice: formatCurrencyEur(service.price),
-  }));
+    quantity: 1,
+    vat,
+    vatRate: vatRateFromText(vat),
+    pricePerUnit: service.price,
+    totalPrice: service.price,
+    };
+  });
 
   const productLineItems = (draft.products ?? []).map((product) => {
     const quantity = Math.max(1, Number(product.quantity) || 1);
     const unitPrice =
       product.unitPrice ??
       (quantity > 0 ? product.price / quantity : product.price);
+    const vat = resolveVatForLabel(product.name, financeSettings, "product");
     return {
       description: product.name,
-      quantity: String(quantity),
-      vat: resolveVatForLabel(product.name, financeSettings, "product"),
-      pricePerUnit: formatCurrencyEur(unitPrice),
-      totalPrice: formatCurrencyEur(product.price),
+      quantity,
+      vat,
+      vatRate: vatRateFromText(vat),
+      pricePerUnit: unitPrice,
+      totalPrice: product.price,
     };
   });
 
@@ -120,10 +133,11 @@ export function buildClientBookingTransactionRow({
       ? [
           {
             description: "Prepayment",
-            quantity: "1",
+            quantity: 1,
             vat: "0%",
-            pricePerUnit: prepaidLabel,
-            totalPrice: prepaidLabel,
+            vatRate: 0,
+            pricePerUnit: prepaidValue,
+            totalPrice: prepaidValue,
           },
         ]
       : [...serviceLineItems, ...productLineItems];
@@ -146,12 +160,9 @@ export function buildClientBookingTransactionRow({
     draft.services.reduce((sum, s) => sum + s.price, 0) +
     (draft.products ?? []).reduce((sum, product) => sum + product.price, 0);
   const totalAmount = documentAmount ?? draft.total ?? totalFromServices;
-  const totalPriceLabel = formatCurrencyEur(totalAmount);
-  const receiptNumber = `${bookingRef.replace(/[^a-zA-Z0-9]/g, "")}${String(Date.now()).slice(-4)}`;
-
   const document: TransactionDocument = {
-    documentNumber: bookingRef,
-    receiptNumber,
+    // Invoice/receipt numbers are server-issued only. Keep these absent until
+    // the persisted finance transaction returns its document snapshot.
     serviceDate,
     serviceTime,
     invoiceDate,
@@ -168,8 +179,8 @@ export function buildClientBookingTransactionRow({
     },
     bookingItems,
     lineItems,
-    totalPrice: totalPriceLabel,
-    ...(prepaidValue > 0 ? { prepaymentAmount: prepaidLabel } : {}),
+    totalPrice: totalAmount,
+    ...(prepaidValue > 0 ? { prepaymentAmount: prepaidValue } : {}),
   };
 
   return {
@@ -182,7 +193,7 @@ export function buildClientBookingTransactionRow({
     clientName: requesterName,
     clientEmail: requesterEmail ?? "",
     clientType,
-    netAmount: totalPriceLabel,
+    netAmount: totalAmount,
     methodTitle,
     methodDetail,
     status: "Paid",

@@ -12,6 +12,7 @@ import {
   sendFinanceClientEmail,
 } from "./financeEmail.service.js";
 import { dispatchInvoiceReissuedNotification } from "./bookingNotification.service.js";
+import { roundMoney as roundParsedMoney } from "../utils/money.js";
 
 const formatEuro = (value) => {
   const n = Number(value);
@@ -23,7 +24,7 @@ const formatEuro = (value) => {
   return `€${text}`;
 };
 
-const roundMoney = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+const roundMoney = roundParsedMoney;
 
 const toIsoDate = (value) => toIsoDateOnly(value);
 
@@ -119,6 +120,7 @@ async function getBookingContext(bookingId) {
   const result = await query(
     `SELECT b.*,
             bs.professional_profile_id,
+            bs.no_show_fee_percentage,
             u.email AS customer_email,
             COALESCE(ip.display_name, ip.first_name || ' ' || ip.last_name, u.email) AS customer_name,
             s.title AS service_title
@@ -161,7 +163,9 @@ function resolveMethod(booking, paymentMethod = "onlineDirect") {
   if (isOffline || paymentMethod === "offlineDirect") {
     return { methodTitle: "Offline – direct", methodDetail: "" };
   }
-  return { methodTitle: "Online – direct", methodDetail: "iDeal" };
+  const gatewayMethod = [booking.gateway_payment_method, booking.payment_method, booking.payment_method_type, booking.card_brand]
+    .find((value) => String(value ?? "").trim());
+  return { methodTitle: "Online – direct", methodDetail: gatewayMethod ? String(gatewayMethod).trim() : "" };
 }
 
 function isPlanningPerson(person) {
@@ -216,8 +220,9 @@ function resolveSplitPayers(booking, meta) {
         sourceType: "serviceId",
         quantity: "1",
         vat: "21%",
-        pricePerUnit: formatEuro(service.price),
-        totalPrice: formatEuro(service.price),
+        vatRate: 21,
+        pricePerUnit: roundMoney(service.price),
+        totalPrice: roundMoney(service.price),
         amount: roundMoney(Number(service.price) || 0),
       });
       groups.set(assigneeId, prev);
@@ -290,8 +295,9 @@ function resolveSplitPayers(booking, meta) {
           sourceType: "serviceId",
           quantity: "1",
           vat: "21%",
-          pricePerUnit: formatEuro(s.price),
-          totalPrice: formatEuro(s.price),
+          vatRate: 21,
+          pricePerUnit: roundMoney(s.price),
+          totalPrice: roundMoney(s.price),
           amount: roundMoney(Number(s.price) || 0),
         })),
         ...guestProducts.map((p) => ({
@@ -300,8 +306,9 @@ function resolveSplitPayers(booking, meta) {
           sourceType: "productId",
           quantity: String(p.quantity || 1),
           vat: "21%",
-          pricePerUnit: formatEuro(p.unitPrice ?? p.price),
-          totalPrice: formatEuro(p.price),
+          vatRate: 21,
+          pricePerUnit: roundMoney(p.unitPrice ?? p.price),
+          totalPrice: roundMoney(p.price),
           amount: roundMoney(Number(p.price) || 0),
         })),
       ].filter((line) => Boolean(line.sourceReference));
@@ -342,8 +349,9 @@ function resolveSplitPayers(booking, meta) {
             description: booking.service_title || "Professional Service",
             quantity: "1",
             vat: "0%",
-            pricePerUnit: formatEuro(mainSubtotal),
-            totalPrice: formatEuro(mainSubtotal),
+            vatRate: 0,
+            pricePerUnit: roundMoney(mainSubtotal),
+            totalPrice: roundMoney(mainSubtotal),
           },
         ],
     });
@@ -366,8 +374,9 @@ function resolveSplitPayers(booking, meta) {
             description: booking.service_title || "Professional Service",
             quantity: "1",
             vat: "0%",
-            pricePerUnit: formatEuro(total),
-            totalPrice: formatEuro(total),
+            vatRate: 0,
+            pricePerUnit: roundMoney(total),
+            totalPrice: roundMoney(total),
           },
         ],
       },
@@ -497,10 +506,13 @@ async function insertFinanceTransaction({
       ? resolveOriginalDueDate(invoiceDate, invoiceSettings.paymentTerms)
       : toIsoDate(booking.booking_date);
 
+  const isPrepaymentDocument = paymentPhase === "prepay";
   const document = {
     documentNumber: docNumber,
     receiptNumber:
-      status === "Paid" || status === "Prepaid" ? `RCP-${booking.unique_code}${docSuffix || ""}` : undefined,
+      ["Paid", "Prepaid", "Refunded"].includes(status)
+        ? `RCP-${booking.unique_code}${docSuffix || ""}`
+        : undefined,
     serviceDate: toIsoDate(booking.booking_date),
     invoiceDate,
     dueDate,
@@ -513,18 +525,17 @@ async function insertFinanceTransaction({
       legalName: clientName,
       email: clientEmail || "",
     },
-    lineItems: lineItems?.length
-      ? lineItems
-      : [
-          {
-            description: booking.service_title || "Professional Service",
-            quantity: "1",
-            vat: "0%",
-            pricePerUnit: formatEuro(gross),
-            totalPrice: formatEuro(gross),
-          },
-        ],
-    totalPrice: formatEuro(gross),
+    // Keep the snapshot authoritative: an absent line list stays absent. The
+    // frontend may display a generic summary, but it must not be persisted as
+    // an orphan item without a sold-item reference.
+    // A prepayment document still represents the complete booking. The paid
+    // amount is kept separately so invoice remaining balance is not zeroed.
+    lineItems: Array.isArray(lineItems) ? lineItems : [],
+    totalPrice: roundMoney(
+      isPrepaymentDocument ? Number(booking.total_price ?? gross) : gross,
+    ),
+    ...(isPrepaymentDocument ? { prepaymentAmount: roundMoney(gross) } : {}),
+    paidAmount: roundMoney(gross),
     issuedSnapshot: {
       templateType: invoiceSettings.defaultInvoiceType,
       layout: invoiceSettings.defaultInvoiceType === "company" ? "itemized" : "simplified",
@@ -535,21 +546,24 @@ async function insertFinanceTransaction({
 
   const inserted = await query(
     `INSERT INTO finance_transactions (
-      professional_profile_id, entry_type, entry_id, transaction_date, entry_label,
+      professional_profile_id, entry_type, entry_id, transaction_date, payment_deadline, entry_label,
       client_name, client_email, client_type,
       gross_amount, stripe_fee, mollure_fee, net_amount,
-      method_title, method_detail, status, status_detail, booking_id, document, issued_document, issued_at
+      method_title, method_detail, status, status_detail, booking_id, document, issued_document, issued_at,
+      prepayment_amount, paid_amount
     ) VALUES (
-      $1, $2, $3, $4::date, $5,
-      $6, $7, $8,
-      $9, $10, $11, $12,
-      $13, $14, $15, $16, $17, $18::jsonb, $18::jsonb, NOW()
+      $1, $2, $3, $4::date, $5::date, $6,
+      $7, $8, $9,
+      $10, $11, $12, $13,
+      $14, $15, $16, $17, $18, $19::jsonb, $19::jsonb, NOW(),
+      $20, $21
     ) RETURNING id`,
     [
       booking.professional_profile_id,
       booking.booking_type === "offline" ? "offlineBooking" : "onlineBooking",
       entryId,
       toIsoDate(booking.booking_date),
+      dueDate,
       entryLabel || null,
       clientName,
       clientEmail ?? "",
@@ -564,10 +578,26 @@ async function insertFinanceTransaction({
       paymentPhase === "prepay" ? "Pay within 15 min" : payerRole === "guest" || payerRole === "model" ? `${payerLabel}: ${clientName}` : null,
       booking.unique_code,
       JSON.stringify(document),
+      isPrepaymentDocument ? gross : 0,
+      isSettledFinanceStatus(status) ? gross : 0,
     ],
   );
 
-  return inserted.rows[0]?.id ?? null;
+  // Replacement is lineage-preserving: the new checkout snapshot is the only
+  // live record, while the superseded row remains auditable and its link is off.
+  const newId = inserted.rows[0]?.id ?? null;
+  if (newId && supersededOpenId) {
+    await query(
+      `UPDATE finance_transactions
+          SET superseded_by = $2,
+              payment_link_active = FALSE,
+              updated_at = NOW()
+        WHERE id = $1`,
+      [supersededOpenId, newId],
+    );
+  }
+
+  return newId;
 }
 
 export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
@@ -585,6 +615,45 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
   const { prepaidAmount, payers } = resolveSplitPayers(booking, meta);
   const prepayStatus = String(booking.prepayment_status ?? "").toLowerCase();
   const isCompleted = String(booking.status ?? "").toLowerCase() === "completed";
+  const fallbackBookingLineItems = booking.service_id
+    ? [{
+        description: booking.service_title || "Professional Service",
+        sourceReference: String(booking.service_id),
+        sourceType: "serviceId",
+        quantity: "1",
+        vat: "21%",
+        vatRate: 21,
+        pricePerUnit: roundMoney(Number(booking.total_price ?? 0)),
+        totalPrice: roundMoney(Number(booking.total_price ?? 0)),
+      }]
+    : [];
+
+  if (String(booking.status ?? "").toLowerCase() === "no_show") {
+    const rate = Math.max(0, Math.min(100, Number(booking.no_show_fee_percentage) || 0));
+    const grossFee = roundMoney(Number(booking.total_price ?? 0) * rate / 100);
+    const dueFee = roundMoney(
+      Number.isFinite(Number(booking.no_show_fee_due))
+        ? Math.max(0, Number(booking.no_show_fee_due))
+        : Math.max(0, grossFee - prepaidAmount),
+    );
+    if (dueFee <= 0) return null;
+    return insertFinanceTransaction({
+      booking,
+      paymentPhase: "full",
+      paymentMethod,
+      amount: dueFee,
+      status: "Payment due",
+      clientName: booking.customer_name,
+      clientEmail: booking.customer_email,
+      clientType: resolveClientType(booking.customer_email),
+      payerKey: "main-client",
+      payerRole: "main_client",
+      payerLabel: booking.customer_name,
+      lineItems: [{ description: "No-show fee", sourceType: "uniqueItemCode", sourceReference: "no-show-fee", quantity: 1, vat: "0%", vatRate: 0, pricePerUnit: roundMoney(dueFee), totalPrice: roundMoney(dueFee) }],
+      docSuffix: "-NS",
+      entryLabel: "No-show fee",
+    });
+  }
 
   // Explicit single-phase sync (legacy callers / amount override)
   if (requestedPhase === "prepay" || (amountOverride != null && requestedPhase !== "full")) {
@@ -612,6 +681,7 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
 
   // Prepayment always from main client (full booking %)
   if (prepayStatus === "paid" && prepaidAmount > 0) {
+    const mainPayer = payers.find((payer) => payer.role === "main_client");
     const id = await insertFinanceTransaction({
       booking,
       paymentPhase: "prepay",
@@ -624,7 +694,8 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
       payerKey: "main-client",
       payerRole: "main_client",
       payerLabel: booking.customer_name,
-      lineItems: [],
+      lineItems:
+        mainPayer?.lineItems?.length ? mainPayer.lineItems : fallbackBookingLineItems,
       docSuffix: "-PRE",
       entryLabel: "Prepayment",
     });
@@ -692,7 +763,12 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
       payerKey: "main-client",
       payerRole: "main_client",
       payerLabel: booking.customer_name,
-      lineItems: [],
+      lineItems:
+        phase === "prepay"
+          ? payers.find((payer) => payer.role === "main_client")?.lineItems?.length
+            ? payers.find((payer) => payer.role === "main_client").lineItems
+            : fallbackBookingLineItems
+          : [],
       docSuffix: phase === "prepay" ? "-PRE" : "",
       entryLabel: phase === "prepay" ? "Prepayment" : null,
     });
@@ -706,7 +782,7 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
  * Apply one automatic reissue step to an overdue unpaid invoice using
  * professional payment-term settings (updates in place, like manual reissue).
  */
-async function applySettingsBasedReissue(row, paymentTerms, level) {
+async function applySettingsBasedReissue(row, paymentTerms, level, options = {}) {
   const terms = paymentTerms ?? {};
   const prefix = level === 1 ? "first" : "second";
   const trigger = terms[`${prefix}ReissueTrigger`];
@@ -736,7 +812,7 @@ async function applySettingsBasedReissue(row, paymentTerms, level) {
     documentNumber: reissueNumber,
     invoiceDate: toIsoDate(new Date()),
     dueDate,
-    totalPrice: formatEuro(nextAmount),
+    totalPrice: roundMoney(nextAmount),
     reissuedAt: new Date().toISOString(),
     reissueLevel: level,
     ...(penaltyAmount > 0 ? { penaltyAmount } : {}),
@@ -751,16 +827,19 @@ async function applySettingsBasedReissue(row, paymentTerms, level) {
          issued_at = NOW(),
          gross_amount = $4,
          net_amount = $4,
+         payment_deadline = $5::date,
          updated_at = NOW()
      WHERE id = $1`,
-    [row.id, `Reissue of ${prevNumber}`, JSON.stringify(nextDoc), nextAmount],
+    [row.id, `Reissue of ${prevNumber}`, JSON.stringify(nextDoc), nextAmount, dueDate],
   );
 
   const dueDateLabel = dueDate.split("-").reverse().join("/");
-  await dispatchInvoiceReissuedNotification(row.id, dueDateLabel);
-  await sendFinanceClientEmail(row.id, FINANCE_EMAIL_TYPES.INVOICE_REISSUED, {
-    forceKey: dueDate,
-  });
+  if (options.notify !== false) {
+    await dispatchInvoiceReissuedNotification(row.id, dueDateLabel);
+    await sendFinanceClientEmail(row.id, FINANCE_EMAIL_TYPES.INVOICE_REISSUED, {
+      forceKey: dueDate,
+    });
+  }
 
   return { applied: true, transactionId: row.id, dueDate, level };
 }
@@ -771,21 +850,21 @@ async function applySettingsBasedReissue(row, paymentTerms, level) {
  */
 export async function processOverdueInvoiceReissues(professionalProfileId) {
   const settings = await loadInvoiceSettingsForProfessional(professionalProfileId);
-  const paymentTerms = settings.paymentTerms;
 
   const overdue = await query(
     `SELECT *
      FROM finance_transactions
      WHERE professional_profile_id = $1
        AND status IN ('Payment due', 'Overdue')
-       AND NULLIF(document->>'dueDate', '') IS NOT NULL
-       AND (document->>'dueDate')::date < CURRENT_DATE`,
+       AND COALESCE(payment_deadline, NULLIF(document->>'dueDate', '')::date) IS NOT NULL
+       AND COALESCE(payment_deadline, NULLIF(document->>'dueDate', '')::date) < CURRENT_DATE`,
     [professionalProfileId],
   );
 
   let created = 0;
   for (const row of overdue.rows) {
     const doc = row.document ?? {};
+    const paymentTerms = doc.issuedSnapshot?.invoiceSettings?.paymentTerms ?? settings.paymentTerms;
     const level = Number(doc.reissueLevel) || 0;
     if (level >= 2) continue;
 
@@ -805,13 +884,13 @@ export async function processAutomaticInvoiceReissues() {
   const overdue = await query(
     `SELECT
        ft.*,
-       COALESCE(pfs.invoice_settings, '{}'::jsonb) AS invoice_settings
+       COALESCE(ft.document->'issuedSnapshot'->'invoiceSettings', pfs.invoice_settings, '{}'::jsonb) AS invoice_settings
      FROM finance_transactions ft
      LEFT JOIN professional_finance_settings pfs
        ON pfs.professional_profile_id = ft.professional_profile_id
      WHERE ft.status IN ('Payment due', 'Overdue')
-       AND NULLIF(ft.document->>'dueDate', '') IS NOT NULL
-       AND (ft.document->>'dueDate')::date < CURRENT_DATE`,
+       AND COALESCE(ft.payment_deadline, NULLIF(ft.document->>'dueDate', '')::date) IS NOT NULL
+       AND COALESCE(ft.payment_deadline, NULLIF(ft.document->>'dueDate', '')::date) < CURRENT_DATE`,
   );
 
   const outcomes = [];
@@ -822,7 +901,7 @@ export async function processAutomaticInvoiceReissues() {
     if (level >= 2) continue;
 
     const nextLevel = level + 1;
-    const result = await applySettingsBasedReissue(row, settings.paymentTerms, nextLevel);
+    const result = await applySettingsBasedReissue(row, settings.paymentTerms, nextLevel, { notify: false });
     outcomes.push(result);
   }
 

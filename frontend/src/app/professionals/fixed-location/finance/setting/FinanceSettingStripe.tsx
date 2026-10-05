@@ -52,6 +52,7 @@ export default function FinanceSettingStripe() {
     hydrated,
     subscriptionActive,
     paymentsConnected,
+    connectStatus,
     showOnboardingBanner,
     showDisconnectedBanner,
     handleSubscriptionClick,
@@ -198,7 +199,11 @@ export default function FinanceSettingStripe() {
                 fontWeight: 800,
               }}
             >
-              {paymentsConnected ? "Connected" : "Not Connected"}
+              {paymentsConnected
+                ? "Connected"
+                : connectStatus === "onboarding"
+                  ? "Started — incomplete"
+                  : "Not connected"}
             </Box>
           </BodyText>
 
@@ -210,10 +215,10 @@ export default function FinanceSettingStripe() {
               onClick={handlePaymentsClick}
             >
               {paymentsConnected
-                ? "Stripe Mollure Dashboard"
-                : subscriptionActive
-                  ? "Complete Onboarding"
-                  : "Start Onboarding"}
+                ? "Stripe dashboard"
+                : connectStatus === "onboarding"
+                  ? "Complete onboarding"
+                  : "Start onboarding"}
             </AppButton>
           </Box>
 

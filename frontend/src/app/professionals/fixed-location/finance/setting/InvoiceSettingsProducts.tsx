@@ -21,7 +21,7 @@ import { BodyText, SubHeading } from "../../../../../components/ui/typography";
 import AppButton from "../../../../../components/common/AppButton";
 import type { InvoiceSettingsSx } from "./invoiceSettings.styles";
 
-type Product = { id: string; name: string; price: string; vat: string };
+type Product = { id: string; name: string; price: number; vat: string };
 type Service = { id: string; category: string; service: string; vat: string };
 
 export function InvoiceSettingsProducts(props: {
@@ -148,7 +148,7 @@ export function InvoiceSettingsProducts(props: {
                                   {p.name}
                                 </TableCell>
                                 <TableCell sx={tableBodyCellSx}>
-                                  {p.price}
+                                  {`EUR ${p.price.toFixed(2)}`}
                                 </TableCell>
                                 <TableCell sx={tableBodyCellSx}>
                                   {p.vat}

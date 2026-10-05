@@ -30,6 +30,7 @@ import {
   mergeInvoiceSettings,
 } from "../helpers/financeInvoiceSettings.js";
 import { sendCaughtError } from "../utils/httpError.js";
+import { normalizeMoneyJson, parseMoney } from "../utils/money.js";
 
 const DEFAULT_TRANSACTION_OPTIONS = {
   onlineImmediate: true,
@@ -57,6 +58,11 @@ const formatEuro = (value) => {
   return `€${text}`;
 };
 
+const moneyNumber = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.round(parsed * 100) / 100 : 0;
+};
+
 const toIsoDate = (value) => {
   if (!value) return null;
   if (value instanceof Date) {
@@ -70,28 +76,45 @@ const toIsoDate = (value) => {
   return wallClock ? wallClock[1] : text.length >= 10 ? text.slice(0, 10) : text;
 };
 
+const normalizeFinanceClientType = (value, document) => {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (["mollure", "platform", "m"].includes(raw)) return "mollure";
+  if (["business", "business_client", "company", "bc", "cc"].includes(raw)) return "business";
+  if (["nonmollure", "non_mollure", "individual", "ic"].includes(raw)) return "nonMollure";
+  // Legacy rows sometimes omitted the type but retained company identifiers.
+  const client = document?.client;
+  if (client?.cocNumber || client?.vatNumber) return "business";
+  return "guest";
+};
+
 const mapTransactionRow = (row) => ({
   id: row.id,
   entryType: row.entry_type,
   entryId: row.entry_id,
-  date: toIsoDate(row.transaction_date),
+  date: ["Paid", "Prepaid", "Refunded"].includes(row.status)
+    ? toIsoDate(row.transaction_date)
+    : null,
+  paymentDeadline: toIsoDate(row.payment_deadline),
   entryLabel: row.entry_label ?? undefined,
   clientName: row.client_name,
   clientEmail: row.client_email ?? "",
-  clientType: row.client_type,
-  grossAmount: formatEuro(row.gross_amount),
-  stripeFee: formatEuro(row.stripe_fee),
-  mollureFee: formatEuro(row.mollure_fee),
-  netAmount: formatEuro(row.net_amount) ?? "€0",
+  clientType: normalizeFinanceClientType(row.client_type, row.document),
+  grossAmount: parseMoney(row.gross_amount),
+  stripeFee: parseMoney(row.stripe_fee),
+  mollureFee: parseMoney(row.mollure_fee),
+  netAmount: parseMoney(row.net_amount) ?? 0,
   methodTitle: row.method_title,
   methodDetail: row.method_detail ?? "",
   status: row.status,
+  statusChangedAt: row.status_changed_at ? new Date(row.status_changed_at).toISOString() : undefined,
   statusDetail: row.status_detail ?? undefined,
   note: row.note ?? undefined,
+  // booking_id is always the canonical UUID/code resolved during sync; never
+  // substitute entry_id or a display reference here.
   bookingId: row.booking_id ?? undefined,
   createdAt: row.created_at ? new Date(row.created_at).toISOString() : undefined,
-  document: row.document ?? undefined,
-  issuedDocument: row.issued_document ?? row.document ?? undefined,
+  document: normalizeMoneyJson(row.document) ?? undefined,
+  issuedDocument: normalizeMoneyJson(row.issued_document ?? row.document) ?? undefined,
   issuedAt: row.issued_at ? new Date(row.issued_at).toISOString() : undefined,
 });
 
@@ -269,7 +292,7 @@ export const listSalesCardMetadata = async (req, res) => {
     const profile = await requireProfessional(req, res);
     if (!profile) return;
     const result = await query(
-      `SELECT card_id, booking_id, card_kind, metadata
+      `SELECT card_id, booking_id, card_kind, metadata, finance_transaction_id
        FROM sales_card_metadata
        WHERE professional_profile_id = $1
        ORDER BY updated_at DESC`,
@@ -283,6 +306,7 @@ export const listSalesCardMetadata = async (req, res) => {
         cardId: row.card_id,
         bookingId: row.booking_id,
         cardKind: row.card_kind,
+        financeTransactionId: row.finance_transaction_id ?? undefined,
       })),
     });
   } catch (error) {
@@ -299,20 +323,37 @@ export const upsertSalesCardMetadata = async (req, res) => {
       return res.status(400).json({ success: false, message: "cardId, bookingId and cardKind are required.", data: null });
     }
     const { cardId, bookingId, cardKind, ...metadata } = body;
+    const linkedTransaction = await query(
+      `SELECT id FROM finance_transactions
+       WHERE professional_profile_id = $1
+         AND booking_id = $2
+         AND (document->>'paymentPhase' = CASE
+           WHEN $3 = 'prepayment' THEN 'prepay'
+           WHEN $3 = 'after_treatment' THEN 'full'
+           WHEN $3 = 'addon' THEN 'addon'
+           ELSE document->>'paymentPhase' END
+           OR $3 NOT IN ('prepayment', 'after_treatment', 'addon'))
+       ORDER BY updated_at DESC NULLS LAST
+       LIMIT 1`,
+      [profile.id, String(bookingId), String(cardKind)],
+    );
+    const financeTransactionId = linkedTransaction.rows[0]?.id ?? null;
     const result = await query(
-      `INSERT INTO sales_card_metadata (professional_profile_id, card_id, booking_id, card_kind, metadata)
-       VALUES ($1, $2, $3, $4, $5::jsonb)
+      `INSERT INTO sales_card_metadata (professional_profile_id, card_id, booking_id, card_kind, metadata, finance_transaction_id)
+       VALUES ($1, $2, $3, $4, $5::jsonb, $6)
        ON CONFLICT (professional_profile_id, card_id)
        DO UPDATE SET booking_id = EXCLUDED.booking_id,
                      card_kind = EXCLUDED.card_kind,
                      metadata = sales_card_metadata.metadata || EXCLUDED.metadata,
+                     finance_transaction_id = COALESCE(EXCLUDED.finance_transaction_id, sales_card_metadata.finance_transaction_id),
                      updated_at = NOW()
-       RETURNING card_id, booking_id, card_kind, metadata`,
-      [profile.id, String(cardId), String(bookingId), String(cardKind), JSON.stringify(metadata)],
+       RETURNING card_id, booking_id, card_kind, metadata, finance_transaction_id`,
+      [profile.id, String(cardId), String(bookingId), String(cardKind), JSON.stringify(metadata), financeTransactionId],
     );
     const row = result.rows[0];
     return res.status(200).json({ success: true, message: "Sales card metadata saved.", data: {
       ...row.metadata, cardId: row.card_id, bookingId: row.booking_id, cardKind: row.card_kind,
+      financeTransactionId: row.finance_transaction_id ?? undefined,
     }});
   } catch (error) {
     return sendCaughtError(res, error, { fallbackMessage: "Failed to save sales card metadata." });
@@ -331,7 +372,7 @@ export const listSalesAddons = async (req, res) => {
 const mapSalesAddonRow = (row) => ({
   id: row.id, bookingId: row.booking_id, bookingCode: row.booking_code,
   clientName: row.client_name, clientEmail: row.client_email ?? undefined,
-  lines: row.lines ?? [], discount: row.discount ?? null,
+  lines: normalizeMoneyJson(row.lines) ?? [], discount: normalizeMoneyJson(row.discount) ?? null,
   discountAmount: Number(row.discount_amount ?? 0), totalPrice: Number(row.total_price ?? 0),
   paymentMethod: row.payment_method, createdAt: row.created_at?.toISOString?.() ?? row.created_at,
   note: row.note ?? undefined, voided: row.voided, refunded: row.refunded,
@@ -400,7 +441,7 @@ export const updateFinanceTransactionOptions = async (req, res) => {
     if (!profile) return;
 
     await ensureFinanceSettings(profile.id);
-    const options = { ...DEFAULT_TRANSACTION_OPTIONS, ...(req.body ?? {}) };
+    const options = { ...DEFAULT_TRANSACTION_OPTIONS, ...(req.body ?? {}), onlineImmediate: true };
 
     const result = await query(
       `UPDATE professional_finance_settings
@@ -484,6 +525,8 @@ export const listFinanceTransactions = async (req, res) => {
     const where = conditions.length
       ? `AND ${conditions.join(" AND ")}`
       : "";
+    const completeRowGuard = `AND NULLIF(TRIM(COALESCE(entry_id, '')), '') IS NOT NULL
+      AND NULLIF(TRIM(COALESCE(client_name, '')), '') IS NOT NULL`;
 
     const pagination = parseListPagination(req.query, {
       defaultLimit: 100,
@@ -495,7 +538,7 @@ export const listFinanceTransactions = async (req, res) => {
     const result = await query(
       `SELECT * FROM finance_transactions
        WHERE professional_profile_id = $1
-       ${where}
+       ${where} ${completeRowGuard}
        ORDER BY COALESCE(transaction_date, created_at::date) DESC, created_at DESC
        ${limitClause}`,
       withPaginationParams([profile.id, ...values], pagination),
@@ -503,7 +546,7 @@ export const listFinanceTransactions = async (req, res) => {
 
     const countResult = await query(
       `SELECT COUNT(*)::int AS total FROM finance_transactions
-       WHERE professional_profile_id = $1 ${where}`,
+       WHERE professional_profile_id = $1 ${where} ${completeRowGuard}`,
       [profile.id, ...values],
     );
     const total = countResult.rows[0]?.total ?? 0;
@@ -533,6 +576,7 @@ export const createFinanceTransaction = async (req, res) => {
     if (!profile) return;
 
     const body = req.body ?? {};
+    const clientType = normalizeFinanceClientType(body.clientType, null);
     const isOnline = body.paymentMethod === "onlineDirect";
     const gross = Number(body.totalPrice) || 0;
     const stripeFee = isOnline ? Math.round(gross * 0.029 * 100) / 100 : null;
@@ -551,7 +595,11 @@ export const createFinanceTransaction = async (req, res) => {
       (isAddon ? `addon-${Date.now()}` : null);
 
     const submittedLines = Array.isArray(body.lines) ? body.lines : [];
-    if (submittedLines.some((line) => !line.sourceReference || !line.sourceType)) {
+    const validSourceTypes = new Set(["serviceId", "productId", "uniqueItemCode"]);
+    if (submittedLines.some((line) => {
+      const reference = typeof line?.sourceReference === "string" ? line.sourceReference.trim() : "";
+      return !reference || !validSourceTypes.has(line?.sourceType);
+    })) {
       return res.status(400).json({ success: false, message: "Each line must include a valid source reference.", data: null });
     }
     const lineItems = submittedLines.length
@@ -561,29 +609,15 @@ export const createFinanceTransaction = async (req, res) => {
           sourceType: line.sourceType,
           quantity: String(line.quantity ?? 1),
           vat: "21%",
-          pricePerUnit: formatEuro(line.unitPrice),
-          totalPrice: formatEuro((line.quantity ?? 1) * (line.unitPrice ?? 0)),
+          vatRate: 21,
+          pricePerUnit: moneyNumber(line.unitPrice),
+          totalPrice: moneyNumber((line.quantity ?? 1) * (line.unitPrice ?? 0)),
         }))
       : [];
 
-    if (body.discountAmount > 0) {
-      lineItems.push({
-        description: "Discount",
-        quantity: "1",
-        vat: "0%",
-        pricePerUnit: formatEuro(-body.discountAmount),
-        totalPrice: formatEuro(-body.discountAmount),
-      });
-    }
-    if (!lineItems.length) {
-      lineItems.push({
-        description: "Professional Service",
-        quantity: "1",
-        vat: "0%",
-        pricePerUnit: formatEuro(gross),
-        totalPrice: formatEuro(gross),
-      });
-    }
+    // Discounts and empty submissions are represented by transaction totals,
+    // not orphan document lines. Every persisted line above maps to a sold
+    // service/product/unique item through sourceReference + sourceType.
 
     let bookingUuid = null;
     if (bookingRef) {
@@ -608,7 +642,14 @@ export const createFinanceTransaction = async (req, res) => {
       ? body.entryType === "offlineBooking"
         ? "offlineBooking"
         : "onlineBooking"
-      : "manualEntry";
+        : "manualEntry";
+    if (!bookingRef && submittedLines.some((line) => line?.sourceType === "serviceId")) {
+      return res.status(400).json({
+        success: false,
+        message: "Manual transactions may contain products or unique items only.",
+        data: null,
+      });
+    }
     const entryLabel = isAddon
       ? "Add-ons"
       : bookingRef
@@ -632,11 +673,13 @@ export const createFinanceTransaction = async (req, res) => {
       invoiceDate: today,
       dueDate: today,
       client: {
-        legalName: body.clientName ?? "Guest",
-        email: body.clientEmail || undefined,
+          legalName: body.clientName ?? "Guest",
+          email: body.clientEmail || undefined,
+          vatNumber: body.vatNumber || undefined,
+          cocNumber: body.cocNumber || undefined,
       },
       lineItems,
-      totalPrice: formatEuro(gross),
+      totalPrice: moneyNumber(gross),
       ...(paymentPhase ? { paymentPhase } : {}),
       ...(addonId ? { addonId, payerKey: addonId } : {}),
       issuedSnapshot: {
@@ -649,35 +692,44 @@ export const createFinanceTransaction = async (req, res) => {
 
     const result = await query(
       `INSERT INTO finance_transactions (
-        professional_profile_id, entry_type, entry_id, transaction_date, entry_label,
+        professional_profile_id, entry_type, entry_id, transaction_date, payment_deadline, entry_label,
         client_name, client_email, client_type,
         gross_amount, stripe_fee, mollure_fee, net_amount,
-        method_title, method_detail, status, status_detail, booking_id, document, issued_document, issued_at
+        method_title, method_detail, status, status_detail, booking_id, document,
+        discount_amount, prepayment_amount, paid_amount
       ) VALUES (
-        $1, $2, $3, $4::date, $5,
-        $6, $7, $8,
-        $9, $10, $11, $12,
-        $13, $14, $15, $16, $17, $18::jsonb, $18::jsonb, NOW()
+        $1, $2, $3, $4::date, $5::date, $6,
+        $7, $8, $9,
+        $10, $11, $12, $13,
+        $14, $15, $16, $17, $18, $19::jsonb,
+        $20, $21, $22
       ) RETURNING *`,
       [
         profile.id,
         entryType,
         entryNum,
         today,
+        today,
         entryLabel,
         body.clientName ?? "Guest",
         body.clientEmail ?? "",
-        body.clientType ?? "guest",
+        clientType,
         gross,
         stripeFee,
         mollureFee,
         net,
         isOnline ? "Online – direct" : "Offline – direct",
-        isOnline ? "iDeal" : "",
+        "",
         status,
         isOnline ? "Pay within 15 min" : null,
-        body.bookingRef || bookingRef,
+        // booking_id is a UUID column. `bookingRef` may be the human-readable
+        // booking code, so persist the resolved UUID while keeping the code in
+        // the document/entry metadata above.
+        bookingUuid || null,
         JSON.stringify(document),
+        moneyNumber(body.discountAmount),
+        moneyNumber(body.prepaymentAmount),
+        isOnline ? 0 : moneyNumber(gross),
       ],
     );
 
@@ -697,7 +749,12 @@ export const createFinanceTransaction = async (req, res) => {
       data: mapTransactionRow(result.rows[0]),
     });
   } catch (error) {
-    return sendCaughtError(res, error, { fallbackMessage: "Request failed." });
+    console.error("createFinanceTransaction failed:", error);
+    return res.status(500).json({
+      success: false,
+      message: error?.detail || error?.message || error?.code || "Request failed.",
+      data: null,
+    });
   }
 };
 
@@ -711,7 +768,7 @@ export const updateFinanceTransaction = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid transaction id.", data: null });
     }
 
-    const { status, note } = req.body ?? {};
+    const { status, note, transactionDate } = req.body ?? {};
 
     const existing = await query(
       `SELECT id, status, gross_amount FROM finance_transactions
@@ -751,6 +808,14 @@ export const updateFinanceTransaction = async (req, res) => {
     if (note !== undefined) {
       fields.push(`note = $${idx}`);
       values.push(note);
+      idx += 1;
+    }
+    if (transactionDate !== undefined) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(transactionDate))) {
+        return res.status(400).json({ success: false, message: "transactionDate must be YYYY-MM-DD.", data: null });
+      }
+      fields.push(`transaction_date = $${idx}::date`);
+      values.push(String(transactionDate));
       idx += 1;
     }
 
@@ -841,18 +906,19 @@ export const bulkFinanceTransactionAction = async (req, res) => {
           ...doc,
           creditNoteNumber,
           receiptNumber: creditNoteNumber,
-          refundAmount: formatEuro(row.net_amount),
+          refundAmount: moneyNumber(row.net_amount),
           refundedAt: new Date().toISOString().slice(0, 10),
         };
         await query(
           `UPDATE finance_transactions
            SET status = 'Refunded',
+               refund_amount = $4,
                document = $3::jsonb,
                issued_document = $3::jsonb,
                issued_at = NOW(),
                updated_at = NOW()
            WHERE id = $1 AND professional_profile_id = $2`,
-          [row.id, profile.id, JSON.stringify(creditDocument)],
+          [row.id, profile.id, JSON.stringify(creditDocument), moneyNumber(row.net_amount)],
         );
 
         if (row.booking_id) {
@@ -873,16 +939,56 @@ export const bulkFinanceTransactionAction = async (req, res) => {
     const statusMap = {
       void: "Voided",
       cancel: "Voided",
+      unpaid: "Unpaid",
+      markUnpaid: "Unpaid",
+      paid: "Paid",
+      markPaid: "Paid",
     };
     const nextStatus = statusMap[action];
     if (!nextStatus) {
       return res.status(400).json({ success: false, message: "Invalid action.", data: null });
     }
 
+    const currentRows = await query(
+      `SELECT id, entry_type, status, document
+         FROM finance_transactions
+        WHERE professional_profile_id = $1 AND id = ANY($2::uuid[])`,
+      [profile.id, parsedIds],
+    );
+    const allowed = currentRows.rows.every((row) => {
+      if (action === "cancel") return row.status === "Pending";
+      if (action === "unpaid" || action === "markUnpaid") {
+        return ["Payment due", "Overdue"].includes(row.status) && row.entry_type === "manualEntry" &&
+          Number(row.document?.reissueLevel ?? 0) >= 2;
+      }
+      if (action === "paid" || action === "markPaid") {
+        return ["Unpaid", "Pending", "Payment due", "Overdue"].includes(row.status) && row.entry_type === "manualEntry";
+      }
+      if (action === "void") {
+        return ["Paid", "Prepaid", "Payment due", "Overdue", "Unpaid"].includes(row.status);
+      }
+      return false;
+    });
+    if (!allowed) {
+      return res.status(400).json({
+        success: false,
+        message: "This action is not allowed for one or more selected transaction statuses.",
+        data: null,
+      });
+    }
+
     const result = await query(
       `UPDATE finance_transactions
-       SET status = $3, updated_at = NOW()
+       SET status = $3,
+           document = CASE WHEN $3 = 'Voided'
+             THEN jsonb_set(COALESCE(document, '{}'::jsonb), '{status}', '"Voided"'::jsonb, true)
+             ELSE document END,
+           issued_document = CASE WHEN $3 = 'Voided'
+             THEN jsonb_set(COALESCE(issued_document, document, '{}'::jsonb), '{status}', '"Voided"'::jsonb, true)
+             ELSE issued_document END,
+           updated_at = NOW()
        WHERE professional_profile_id = $1 AND id = ANY($2::uuid[])
+         AND ( $3 <> 'Unpaid' OR entry_type = 'manualEntry' )
        RETURNING id`,
       [profile.id, parsedIds, nextStatus],
     );
@@ -978,12 +1084,12 @@ export const replaceFinanceTransaction = async (req, res) => {
 
     const result = await query(
       `INSERT INTO finance_transactions (
-        professional_profile_id, entry_type, entry_id, transaction_date, entry_label,
+        professional_profile_id, entry_type, entry_id, transaction_date, payment_deadline, entry_label,
         client_name, client_email, client_type,
         gross_amount, stripe_fee, mollure_fee, net_amount,
         method_title, method_detail, status, document, issued_document, issued_at
       ) VALUES (
-        $1, 'manualEntry', $2, $3::date, 'Manual entry (replaced)',
+        $1, 'manualEntry', $2, $3::date, $3::date, 'Manual entry (replaced)',
         $4, $5, $6,
         $7, $8, $9, $10,
         $11, $12, $13, $14::jsonb, $14::jsonb, NOW()
@@ -1000,7 +1106,7 @@ export const replaceFinanceTransaction = async (req, res) => {
         mollureFee,
         net,
         isOnline ? "Online – direct" : "Offline – direct",
-        isOnline ? "iDeal" : "",
+        "",
         isOnline ? "Pending" : "Paid",
         JSON.stringify({
           documentNumber: `INV-RPL-${entryNum}`,
@@ -1010,9 +1116,11 @@ export const replaceFinanceTransaction = async (req, res) => {
           client: {
             legalName: body.clientName ?? "Guest",
             email: body.clientEmail ?? "",
+            vatNumber: body.vatNumber || undefined,
+            cocNumber: body.cocNumber || undefined,
           },
           lineItems,
-          totalPrice: formatEuro(gross),
+          totalPrice: moneyNumber(gross),
           replacedTransactionId: id,
           issuedSnapshot: {
             templateType: issuedInvoiceSettings.defaultInvoiceType,
@@ -1180,7 +1288,7 @@ export const reissueFinanceInvoiceForBooking = async (req, res) => {
       documentNumber: reissueNumber,
       invoiceDate: toIsoDate(new Date()),
       dueDate,
-      totalPrice: formatEuro(nextAmount),
+      totalPrice: moneyNumber(nextAmount),
       reissuedAt: new Date().toISOString(),
       ...(penaltyAmount > 0 ? { penaltyAmount } : {}),
     };
@@ -1205,6 +1313,7 @@ export const reissueFinanceInvoiceForBooking = async (req, res) => {
            issued_at = NOW(),
            gross_amount = $4,
            net_amount = $4,
+           payment_deadline = $7::date,
            client_email = CASE WHEN $5 = '' THEN client_email ELSE $5 END,
            client_name = CASE WHEN $6 = '' THEN client_name ELSE $6 END,
            updated_at = NOW()
@@ -1217,6 +1326,7 @@ export const reissueFinanceInvoiceForBooking = async (req, res) => {
         nextAmount,
         clientEmail,
         clientName,
+        dueDate,
       ],
     );
 

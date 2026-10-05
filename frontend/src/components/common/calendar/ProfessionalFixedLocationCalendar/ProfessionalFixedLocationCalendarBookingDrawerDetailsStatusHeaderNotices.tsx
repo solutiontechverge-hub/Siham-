@@ -18,6 +18,7 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderNot
   Vm,
   | "businessResponseWindowInput"
   | "handleRestartResponseTime"
+  | "handleDiscardBr"
   | "m"
   | "openActivityComparison"
   | "postBookingPendingPayment"

@@ -130,7 +130,12 @@ export function mainDrawerServicesFromClientSnapshot(
   if (!services?.length) return undefined;
 
   const requesterIds = requesterPersonIds(snapshot);
-  const mainServices = filterMainClientAssignedLines(services, requesterIds);
+  // Older and fixed-location client requests may not include a requester
+  // person record. In that case the guestId cannot be used to decide scope;
+  // keep every line rather than silently losing services from the pro drawer.
+  const mainServices = requesterIds.size
+    ? filterMainClientAssignedLines(services, requesterIds)
+    : [...services];
 
   if (!mainServices.length) return undefined;
 

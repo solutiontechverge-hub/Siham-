@@ -142,6 +142,29 @@ export const uuidArrayBody = (field, { max = 200 } = {}) =>
     .withMessage(`${field} entries must be valid UUIDs.`);
 
 /**
+ * Strict JSON number validation for money/quantity fields. Numeric strings,
+ * currency symbols, NaN and Infinity are rejected at the API boundary.
+ */
+export const numericBody = (
+  field,
+  { optional = false, min, max, label } = {},
+) => {
+  const name = label || field;
+  const chain = body(field);
+  if (optional) chain.optional({ nullable: true });
+  return chain
+    .custom((value) => {
+      if (typeof value !== "number" || !Number.isFinite(value)) return false;
+      if (min != null && value < min) return false;
+      if (max != null && value > max) return false;
+      return true;
+    })
+    .withMessage(
+      `${name} must be a${min === 0 ? " non-negative" : " finite"} number.`,
+    );
+};
+
+/**
  * Messaging thread ids: real UUID or draft:UUID / draft:setup-UUID.
  */
 export const messagingThreadIdParam = (field = "threadId") =>

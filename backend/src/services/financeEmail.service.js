@@ -187,7 +187,7 @@ export const processInvoiceReminders = async () => {
     `SELECT
        ft.id,
        ft.document->>'dueDate' AS due_date,
-       COALESCE(pfs.invoice_settings, '{}'::jsonb) AS invoice_settings
+       COALESCE(ft.document->'issuedSnapshot'->'invoiceSettings', pfs.invoice_settings, '{}'::jsonb) AS invoice_settings
      FROM finance_transactions ft
      LEFT JOIN professional_finance_settings pfs
        ON pfs.professional_profile_id = ft.professional_profile_id

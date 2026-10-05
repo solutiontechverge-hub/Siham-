@@ -52,8 +52,9 @@ export function isTeamSharedBooking(
     "resourceId" | "details" | "teamShared" | "sharedTeamMemberNames"
   >,
 ): boolean {
-  if (event.teamShared) return true;
-  if ((event.sharedTeamMemberNames?.length ?? 0) > 1) return true;
+  // The persisted service assignments are authoritative. Do not trust a
+  // stale teamShared flag/name list to create split cards for a booking whose
+  // services all belong to one member.
   return collectEventTeamMemberIds(event).length > 1;
 }
 

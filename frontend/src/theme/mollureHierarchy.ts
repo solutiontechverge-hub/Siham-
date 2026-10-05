@@ -16,13 +16,14 @@ import { alpha } from "@mui/material/styles";
 export const MOLLURE_UI = {
   pageTitle: {
     fontSize: 20,
-    fontWeight: 900 as const,
+    fontFamily: 'Georgia, "Times New Roman", serif',
+    fontWeight: 700 as const,
     opacity: 0.9,
     lineHeight: 1.15,
     letterSpacing: "-0.01em",
   },
   pageSubtitle: { fontSize: 13, fontWeight: 600 as const, opacity: 0.6 },
-  sectionTitle: { fontSize: 15, fontWeight: 900 as const, opacity: 0.88 },
+  sectionTitle: { fontSize: 20, fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 700 as const, opacity: 0.88 },
   label: { fontSize: 12.5, fontWeight: 800 as const, opacity: 0.78 },
   body: { fontSize: 12.5, fontWeight: 700 as const, opacity: 0.72 },
   bodyMuted: { fontSize: 12.5, fontWeight: 600 as const, opacity: 0.55 },

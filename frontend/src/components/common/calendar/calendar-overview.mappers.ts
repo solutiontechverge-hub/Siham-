@@ -215,10 +215,10 @@ export function mapCalendarBookingToEvent(
   const snapshotMainServices = mainDrawerServicesFromClientSnapshot(mergedClientSnapshot);
   const ebrServices = pendingEbr?.suggestedServices?.length
     ? pendingEbr.suggestedServices
-    : parsedNotes?.services?.length
-      ? parsedNotes.services
-      : snapshotMainServices?.length
-        ? snapshotMainServices
+    : snapshotMainServices?.length
+      ? snapshotMainServices
+      : parsedNotes?.services?.length
+        ? parsedNotes.services
         : null;
   const guestOnlyNames = (parsedNotes?.guests ?? []).flatMap((guest) =>
     (guest.services ?? []).map((service) => service.name),
@@ -253,6 +253,15 @@ export function mapCalendarBookingToEvent(
   const apiPrepay = String(booking.prepayment_status ?? "").toLowerCase();
   const mappedPrepayStatus = mapApiPrepaymentStatus(booking.prepayment_status);
   const showPrepaymentFromApi = apiPrepay === "paid" || apiPrepay === "required" || apiPrepay === "pending";
+  // The booking row is the authoritative source for persisted prepayment
+  // configuration. Notes are legacy data and may not contain the percentage.
+  const apiPrepaymentPercent = String(
+    booking.prepayment_percentage ?? "",
+  ).trim();
+  const notesPrepaymentPercent = String(
+    parsedNotes?.prepaymentPercent ?? "",
+  ).trim();
+  const resolvedPrepaymentPercent = apiPrepaymentPercent || notesPrepaymentPercent;
   const isRequestBooking =
     isRequested || booking.booking_type === "request" || booking.status?.toLowerCase() === "requested";
   const teamMemberId =
@@ -515,11 +524,11 @@ export function mapCalendarBookingToEvent(
       showPrepayment:
         showPrepaymentFromApi ||
         Boolean(parsedNotes?.showPrepayment) ||
-        (Number(parsedNotes?.prepaymentPercent) || 0) > 0,
+        (Number(resolvedPrepaymentPercent) || 0) > 0,
       ...(mappedPrepayStatus ? { prepaymentStatus: mappedPrepayStatus } : {}),
-      ...((Number(parsedNotes?.prepaymentPercent) || 0) > 0
+      ...((Number(resolvedPrepaymentPercent) || 0) > 0
         ? {
-            prepaymentPercent: String(parsedNotes!.prepaymentPercent).trim(),
+            prepaymentPercent: resolvedPrepaymentPercent,
           }
         : {}),
       ...(displayClientNote ? { clientNote: displayClientNote } : {}),

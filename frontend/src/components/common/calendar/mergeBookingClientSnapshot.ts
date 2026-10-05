@@ -58,12 +58,30 @@ function mergeServices(
     const owner = guest && extraIds.has(guest) ? guest : "";
     return `${owner}::${row.id}`;
   };
-  const seen = new Set(merged.map(keyOf));
+  const indexByKey = new Map(merged.map((row, index) => [keyOf(row), index]));
   for (const row of fallback ?? []) {
     const key = keyOf(row);
-    if (seen.has(key)) continue;
+    const existingIndex = indexByKey.get(key);
+    if (existingIndex != null) {
+      const existing = merged[existingIndex];
+      // Notes are usually the newest source, but location_details is the
+      // durable full snapshot. Fill any missing assignment/detail fields from
+      // it instead of discarding the duplicate service line outright.
+      merged[existingIndex] = {
+        ...row,
+        ...existing,
+        teamMemberId: existing.teamMemberId ?? row.teamMemberId,
+        teamMemberName: existing.teamMemberName ?? row.teamMemberName,
+        startTime: existing.startTime ?? row.startTime,
+        endTime: existing.endTime ?? row.endTime,
+        guestId: existing.guestId ?? row.guestId,
+        originalPrice: existing.originalPrice ?? row.originalPrice,
+        discount: existing.discount ?? row.discount,
+      };
+      continue;
+    }
     merged.push(row);
-    seen.add(key);
+    indexByKey.set(key, merged.length - 1);
   }
   return merged.length ? merged : undefined;
 }

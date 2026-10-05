@@ -127,15 +127,15 @@ export function buildSalesOverviewCards(input: BuildSalesOverviewInput): SalesOv
   return withAddons
     .filter((card) => !card.canceled)
     .sort((a, b) => {
-      const at = new Date(a.occurredAt).getTime();
-      const bt = new Date(b.occurredAt).getTime();
-      if (bt !== at) return bt - at;
       const kindRank = (card: SalesOverviewCardData) => {
         if (card.kind === "prepayment") return 0;
         if (card.kind === "after_treatment") return 1;
-        if (card.kind === "reissued_invoice") return 2;
-        return 3;
+        if (card.kind === "addon") return 2;
+        if (card.kind === "reissued_invoice") return 3;
+        return 4;
       };
-      return kindRank(a) - kindRank(b);
+      const rankDiff = kindRank(a) - kindRank(b);
+      if (rankDiff !== 0) return rankDiff;
+      return new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime();
     });
 }

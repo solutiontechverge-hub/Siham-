@@ -2,7 +2,7 @@ import {
   TRANSACTION_EXPORT_HEADERS,
   transactionRowToExportRow,
 } from "./exportTransactionsExcel";
-import type { TransactionRow } from "../../../app/professionals/fixed-location/finance/data/transactions";
+import { formatNetAmountEur, type TransactionRow } from "../../../app/professionals/fixed-location/finance/data/transactions";
 
 export async function exportTransactionsToPdf(
   rows: readonly TransactionRow[],
@@ -41,14 +41,15 @@ export async function exportTransactionsToPdf(
     });
   };
 
-  const drawRow = (cells: string[], y: number) => {
+  const drawRow = (cells: Array<string | number>, y: number) => {
     doc.setDrawColor(235);
     doc.rect(left, y, usableWidth, rowHeight);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.5);
     doc.setTextColor(60);
     cells.forEach((cell, index) => {
-      const lines = doc.splitTextToSize(String(cell ?? ""), colWidth - 10);
+      const displayCell = index === 3 && typeof cell === "number" ? formatNetAmountEur(cell) : String(cell ?? "");
+      const lines = doc.splitTextToSize(displayCell, colWidth - 10);
       const clipped = lines.slice(0, 2);
       clipped.forEach((line: string, lineIndex: number) => {
         doc.text(line, left + index * colWidth + 6, y + 12 + lineIndex * lineHeight, {

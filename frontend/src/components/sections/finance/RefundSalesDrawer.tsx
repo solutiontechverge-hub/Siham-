@@ -29,7 +29,14 @@ export type RefundSalesDrawerProps = {
   open: boolean;
   onClose: () => void;
   transactions: readonly TransactionRow[];
-  onSave?: () => void;
+  fallbackItems?: RefundSalesItem[];
+  onSave?: (payload: {
+    mode: RefundTab;
+    itemIds: string[];
+    amount: number;
+    method?: string;
+    reason?: string;
+  }) => void | Promise<void>;
 };
 
 type RefundTab = "item" | "amount";
@@ -97,6 +104,7 @@ export default function RefundSalesDrawer({
   open,
   onClose,
   transactions,
+  fallbackItems = [],
   onSave,
 }: RefundSalesDrawerProps) {
   const m = useTheme().palette.mollure;
@@ -109,20 +117,23 @@ export default function RefundSalesDrawer({
   const [amountReason, setAmountReason] = React.useState("");
   const [customReason, setCustomReason] = React.useState("");
   const [openSelectId, setOpenSelectId] = React.useState<string | null>(null);
+  const [completed, setCompleted] = React.useState(false);
 
   React.useEffect(() => {
     if (!open) return;
     const nextItems = refundItemsFromTransactions(transactions);
+    const resolvedItems = nextItems.length ? nextItems : fallbackItems;
     setTab("item");
-    setItems(nextItems);
-    setSelectedItemIds(nextItems.length ? [nextItems[0].id] : []);
+    setItems(resolvedItems);
+    setSelectedItemIds(resolvedItems.length ? [resolvedItems[0].id] : []);
     setItemReason("");
     setRefundMethod("");
     setRefundAmount("");
     setAmountReason("");
     setCustomReason("");
     setOpenSelectId(null);
-  }, [open, transactions]);
+    setCompleted(false);
+  }, [fallbackItems, open, transactions]);
 
   const allItemsSelected =
     items.length > 0 && selectedItemIds.length === items.length;
@@ -148,15 +159,38 @@ export default function RefundSalesDrawer({
       footer={
         <FinanceDrawerActionsFooter
           onCancel={onClose}
-          primaryLabel="Save"
-          onPrimary={() => {
-            onSave?.();
-            onClose();
+          primaryLabel={completed ? "Close" : "Refund"}
+          onPrimary={async () => {
+            if (completed) {
+              onClose();
+              return;
+            }
+            const amount = tab === "amount"
+              ? Number(refundAmount) || 0
+              : selectedItemIds.reduce(
+                  (sum, id) => sum + Number((items.find((item) => item.id === id) as RefundSalesItem & { amount?: number })?.amount ?? 0),
+                  0,
+                );
+            await onSave?.({
+              mode: tab,
+              itemIds: selectedItemIds,
+              amount,
+              method: refundMethod,
+              reason: tab === "amount" ? amountReason : itemReason,
+            });
+            setCompleted(true);
           }}
         />
       }
     >
-      <Stack spacing={2}>
+      {completed ? (
+        <Stack alignItems="center" justifyContent="center" spacing={2} sx={{ minHeight: 420 }}>
+          <Typography sx={{ fontSize: 28, color: m.teal }}>✓</Typography>
+          <Typography sx={{ fontSize: 22, fontWeight: 800, color: m.navy }}>
+            Refund Completed
+          </Typography>
+        </Stack>
+      ) : <Stack spacing={2}>
         <AppSegmentTabs
           tabs={[
             { id: "item", label: "Refund by Item" },
@@ -209,6 +243,14 @@ export default function RefundSalesDrawer({
                   onToggle={() => toggleItem(item.id)}
                 />
               ))}
+            </Stack>
+
+            <Stack direction="row" justifyContent="space-between">
+              <Typography sx={{ fontSize: 13, fontWeight: 700 }}>Total</Typography>
+              <Typography sx={{ fontSize: 13, fontWeight: 800 }}>
+                €{items.filter((item) => selectedItemIds.includes(item.id))
+                  .reduce((sum, item) => sum + (item.amount ?? 0), 0).toFixed(2)}
+              </Typography>
             </Stack>
 
             <RefundSalesSelectField
@@ -302,7 +344,7 @@ export default function RefundSalesDrawer({
             ) : null}
           </Stack>
         )}
-      </Stack>
+      </Stack>}
     </AppDrawer>
   );
 }

@@ -11,10 +11,13 @@ export type BookingPriceInput = {
   extrasAmount?: number;
   showLateCancellation?: boolean;
   lateCancellationFeePercent?: number | string;
+  lateCancellationFeePercentCeiling?: number | string;
   showLateRescheduling?: boolean;
   lateRescheduleFeePercent?: number | string;
+  lateRescheduleFeePercentCeiling?: number | string;
   showNoShowFee?: boolean;
   noShowFeePercent?: number | string;
+  noShowFeePercentCeiling?: number | string;
   showPrepayment?: boolean;
   prepaymentPercent?: number | string;
   /** When true, prepaid amount is deducted from the payable total. */
@@ -346,14 +349,19 @@ export function computeBookingPrice(
     Math.max(0, baseBeforeDiscount - discountAmount),
   );
 
+  const cappedPercent = (value: number | string | undefined, ceiling: number | string | undefined) => {
+    const requested = Math.max(0, Number(value) || 0);
+    const max = Number(ceiling);
+    return Number.isFinite(max) && max >= 0 ? Math.min(requested, max) : requested;
+  };
   const lateCancellationFeeAmount = input.showLateCancellation
-    ? percentOf(afterDiscount, input.lateCancellationFeePercent)
+    ? percentOf(afterDiscount, cappedPercent(input.lateCancellationFeePercent, input.lateCancellationFeePercentCeiling))
     : 0;
   const lateRescheduleFeeAmount = input.showLateRescheduling
-    ? percentOf(afterDiscount, input.lateRescheduleFeePercent)
+    ? percentOf(afterDiscount, cappedPercent(input.lateRescheduleFeePercent, input.lateRescheduleFeePercentCeiling))
     : 0;
   const noShowFeeAmount = input.showNoShowFee
-    ? percentOf(afterDiscount, input.noShowFeePercent)
+    ? percentOf(afterDiscount, cappedPercent(input.noShowFeePercent, input.noShowFeePercentCeiling))
     : 0;
   const feesTotal = roundMoney(
     lateCancellationFeeAmount + lateRescheduleFeeAmount + noShowFeeAmount,

@@ -34,6 +34,7 @@ import {
   buildPreviewLineItems,
   formatDocumentDate,
   formatDocumentDateTime,
+  formatCurrencyDisplay,
   formatCurrencyValue,
   getInvoiceLineItemCellValue,
   getInvoiceLineItemColumns,
@@ -91,8 +92,10 @@ export default function FinanceInvoicePreview({
   );
   const lineItemLayout = resolveInvoiceLineItemLayout(invoiceType);
   const displayLineItems = React.useMemo(
-    () => toInvoiceDisplayLineItems(lineItems, invoiceType, frozenDocument),
-    [frozenDocument, invoiceType, lineItems],
+    // Stored document lines are already authoritative. Keep every row and its
+    // original values; aggregation is only appropriate for derived data.
+    () => toInvoiceDisplayLineItems(lineItems, invoiceType, true),
+    [invoiceType, lineItems],
   );
   const lineItemColumns = React.useMemo(
     () => getInvoiceLineItemColumns(lineItemLayout),
@@ -108,14 +111,14 @@ export default function FinanceInvoicePreview({
     formatDocumentDate(document?.serviceDate || row?.date) ||
     serviceDate;
   const dueDate = frozenDocument
-    ? formatDocumentDate(document?.dueDate)
-    : formatDocumentDate(document?.dueDate) || addDuration(
+    ? formatDocumentDate(document?.dueDate || row?.paymentDeadline)
+    : formatDocumentDate(document?.dueDate || row?.paymentDeadline) || addDuration(
         row?.date || "",
         settings.paymentTerms.originalDueValue,
         settings.paymentTerms.originalDueUnit,
       );
   const documentNumber =
-    document?.documentNumber || row?.entryId || row?.id || "";
+    document?.documentNumber || "";
   const totalAmount = displayLineItems.reduce(
     (sum, item) => sum + parseCurrencyValue(item.totalPrice),
     0,
@@ -180,7 +183,7 @@ export default function FinanceInvoicePreview({
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10.5);
       doc.text(`Service Date: ${serviceDate}`, left, top + 18);
-      doc.text(`Due Date: ${dueDate}`, left, top + 34);
+      if (invoiceType === "company") doc.text(`Due Date: ${dueDate}`, left, top + 34);
       doc.text(
         `Invoice Date: ${invoiceDate}`,
         left + usableWidth - 150,
@@ -236,15 +239,13 @@ export default function FinanceInvoicePreview({
       };
 
       drawBlock("Professional's Business Info", professionalLines);
-      drawBlock(clientInfoTitle, [
-        ...clientLines,
-        ...(invoiceType === "company"
-          ? [
-              `Client VAT No: ${clientParty?.vatNumber || "-"}`,
-              `Client COC No: ${clientParty?.cocNumber || "-"}`,
-            ]
-          : []),
-      ]);
+      if (invoiceType === "company") {
+        drawBlock(clientInfoTitle, [
+          ...clientLines,
+          `Client VAT No: ${clientParty?.vatNumber || "-"}`,
+          `Client COC No: ${clientParty?.cocNumber || "-"}`,
+        ]);
+      }
 
       const tableTop = y + 10;
       const cols = lineItemColumns;
@@ -268,7 +269,7 @@ export default function FinanceInvoicePreview({
         const rowY = tableTop + 26 + index * 18;
         cols.forEach((col) => {
           const cell = getInvoiceLineItemCellValue(item, col.key);
-          doc.text(cell, col.align === "right" ? cursorX + col.pdfWidth : cursorX, rowY, {
+          doc.text(String(cell), col.align === "right" ? cursorX + col.pdfWidth : cursorX, rowY, {
             align: col.align === "right" ? "right" : "left",
           });
           cursorX += col.pdfWidth;
@@ -276,15 +277,15 @@ export default function FinanceInvoicePreview({
       });
       doc.setFont("helvetica", "bold");
       let totalsY = tableTop + 26 + displayLineItems.length * 18 + 22;
-      doc.text("Total (incl. VAT)", left, totalsY);
-      doc.text(totalPriceLabel, left + usableWidth - 20, totalsY, {
+      doc.text("Total (VAT included)", left, totalsY);
+      doc.text(formatCurrencyDisplay(totalPriceLabel), left + usableWidth - 20, totalsY, {
         align: "right",
       });
       if (prepaidAmountLabel && prepaidAmountValue > 0) {
         totalsY += 18;
         doc.setFont("helvetica", "normal");
         doc.text("Prepayment", left, totalsY);
-        doc.text(prepaidAmountLabel, left + usableWidth - 20, totalsY, {
+        doc.text(formatCurrencyDisplay(prepaidAmountLabel), left + usableWidth - 20, totalsY, {
           align: "right",
         });
         if (remainingAfterPrepayment) {
@@ -350,7 +351,7 @@ export default function FinanceInvoicePreview({
           <BodyText
             sx={financeMutedTextSx(m.navy, { mt: 0.2 })}
           >
-            Due Date: {dueDate}
+            {invoiceType === "company" ? `Due Date: ${dueDate}` : null}
           </BodyText>
         </Box>
         <Box
@@ -387,15 +388,13 @@ export default function FinanceInvoicePreview({
         </Box>
       </Box>
 
-      <BodyText sx={financeMutedTextSx(m.navy, { mt: 1.4 })}>
-        {penaltySummary}
-      </BodyText>
+      {invoiceType === "company" && penaltySummary ? <BodyText sx={financeMutedTextSx(m.navy, { mt: 1.4 })}>{penaltySummary}</BodyText> : null}
 
       <Stack spacing={1.25} sx={{ mt: 2 }}>
         <FinanceInfoBlock title="Professional's Business Info">
           <FinanceMutedLines lines={professionalLines} navy={m.navy} />
         </FinanceInfoBlock>
-        <FinanceInfoBlock title={clientInfoTitle}>
+        {invoiceType === "company" ? <FinanceInfoBlock title={clientInfoTitle}>
           <FinanceMutedLines lines={clientLines} navy={m.navy} />
           {invoiceType === "company" ? (
             <>
@@ -407,7 +406,7 @@ export default function FinanceInvoicePreview({
               </BodyText>
             </>
           ) : null}
-        </FinanceInfoBlock>
+        </FinanceInfoBlock> : null}
       </Stack>
 
       <Box sx={{ mt: 2 }}>
@@ -449,32 +448,32 @@ export default function FinanceInvoicePreview({
         <Stack spacing={0.75} sx={{ mt: 1.5 }}>
           <Stack direction="row" justifyContent="space-between">
             <BodyText sx={mollureBodyMutedSx(m.navy, { color: alpha(m.navy, 0.65) })}>
-              Total (incl. VAT)
+              Total (VAT included)
             </BodyText>
             <BodyText
               sx={{
                 ...mollureLabelSx(m.navy),
               }}
             >
-              {totalPriceLabel}
+              {formatCurrencyDisplay(totalPriceLabel)}
             </BodyText>
           </Stack>
           {row?.grossAmount ? (
             <Stack direction="row" justifyContent="space-between">
               <BodyText sx={mollureBodyMutedSx(m.navy, { color: alpha(m.navy, 0.65) })}>Gross amount</BodyText>
-              <BodyText sx={mollureLabelSx(m.navy)}>{row.grossAmount}</BodyText>
+              <BodyText sx={mollureLabelSx(m.navy)}>{formatCurrencyDisplay(row.grossAmount)}</BodyText>
             </Stack>
           ) : null}
           {row?.stripeFee ? (
             <Stack direction="row" justifyContent="space-between">
               <BodyText sx={mollureBodyMutedSx(m.navy, { color: alpha(m.navy, 0.65) })}>Stripe fee</BodyText>
-              <BodyText sx={mollureLabelSx(m.navy)}>{row.stripeFee}</BodyText>
+              <BodyText sx={mollureLabelSx(m.navy)}>{formatCurrencyDisplay(row.stripeFee)}</BodyText>
             </Stack>
           ) : null}
           {row?.mollureFee ? (
             <Stack direction="row" justifyContent="space-between">
               <BodyText sx={mollureBodyMutedSx(m.navy, { color: alpha(m.navy, 0.65) })}>Mollure fee</BodyText>
-              <BodyText sx={mollureLabelSx(m.navy)}>{row.mollureFee}</BodyText>
+              <BodyText sx={mollureLabelSx(m.navy)}>{formatCurrencyDisplay(row.mollureFee)}</BodyText>
             </Stack>
           ) : null}
           {prepaidAmountLabel && prepaidAmountValue > 0 ? (
@@ -488,7 +487,7 @@ export default function FinanceInvoicePreview({
                     ...mollureLabelSx(m.navy),
                   }}
                 >
-                  {prepaidAmountLabel}
+                  {formatCurrencyDisplay(prepaidAmountLabel)}
                 </BodyText>
               </Stack>
               {remainingAfterPrepayment ? (

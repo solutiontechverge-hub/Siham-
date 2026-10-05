@@ -32,6 +32,7 @@ import {
   buildUniqueItemLine,
   emptyBookingUniqueItemDraft,
   getUniqueItemDraftErrors,
+  normalizeVatRate,
   type BookingUniqueItemDraft,
 } from "../../../data/bookingUniqueItem.data";
 import {
@@ -93,7 +94,7 @@ function buildDraftFromOption(
     price: String(option.unitPrice),
     unit: Math.max(1, option.unit ?? 1),
     discountType: option.discountType ?? "fixed",
-    discountAmount: option.discountAmount ?? "0",
+    discountAmount: String(option.discountAmount ?? 0),
   };
 }
 
@@ -107,10 +108,10 @@ function buildOptionFromDraft(
     id,
     label: draft.productName.trim(),
     unitPrice: line.unitPrice,
-    vat: draft.vat.trim() || undefined,
+    vat: normalizeVatRate(draft.vat),
     unit: line.quantity,
     discountType: draft.discountType,
-    discountAmount: draft.discountAmount,
+    discountAmount: Number(draft.discountAmount) || 0,
   };
 }
 
@@ -289,10 +290,10 @@ export default function ManualEntryCatalogDrawer({
       id: line.id,
       label: uniqueItemDraft.productName.trim(),
       unitPrice: line.unitPrice,
-      vat: uniqueItemDraft.vat.trim() || undefined,
+      vat: normalizeVatRate(uniqueItemDraft.vat),
       unit: line.quantity,
       discountType: uniqueItemDraft.discountType,
-      discountAmount: uniqueItemDraft.discountAmount,
+      discountAmount: Number(uniqueItemDraft.discountAmount) || 0,
     };
 
     setCustomOptions((prev) => [...prev, customOption]);

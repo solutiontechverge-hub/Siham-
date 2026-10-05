@@ -56,6 +56,7 @@ export async function processOverdueResponseStatusUpdates() {
        b.notes,
        b.created_at,
        b.updated_at,
+       b.response_deadline_at,
        b.unique_code,
        b.customer_id,
        b.business_setup_id,
@@ -79,7 +80,10 @@ export async function processOverdueResponseStatusUpdates() {
       row.response_time_hours,
       row.response_time_minutes,
     );
-    const dueMs = resolveEffectiveRespondByMs(meta, windowMinutes);
+    const calculatedDueMs = resolveEffectiveRespondByMs(meta, windowMinutes);
+    const dueMs = row.response_deadline_at
+      ? new Date(row.response_deadline_at).getTime()
+      : calculatedDueMs;
     if (dueMs == null) continue;
 
     const isOverdue = now > dueMs;
@@ -117,11 +121,12 @@ export async function processOverdueResponseStatusUpdates() {
     const updated = await query(
       `UPDATE bookings
        SET notes = $1,
+           response_deadline_at = COALESCE(response_deadline_at, $3::timestamptz),
            updated_at = NOW()
        WHERE id = $2
          AND LOWER(COALESCE(status, '')) IN ('requested', 'confirmed')
        RETURNING *`,
-      [nextNotes, row.id],
+      [nextNotes, row.id, new Date(dueMs).toISOString()],
     );
 
     const booking = updated.rows[0];
