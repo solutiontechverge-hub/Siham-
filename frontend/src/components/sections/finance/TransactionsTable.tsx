@@ -528,7 +528,7 @@ export default function TransactionsTable({
                           component="span"
                           sx={{ fontSize: 11.5, color: alpha(m.navy, 0.35) }}
                         >
-                          —
+                          N/A
                         </BodyText>
                       ) : null}
                     </Stack>

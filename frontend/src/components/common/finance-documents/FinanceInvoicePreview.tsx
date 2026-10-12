@@ -140,8 +140,7 @@ export default function FinanceInvoicePreview({
         settings.paymentTerms.originalDueValue,
         settings.paymentTerms.originalDueUnit,
       );
-  const documentNumber =
-    document?.documentNumber || "";
+  const documentNumber = document?.documentNumber || "N/A";
   const totalAmount = displayLineItems.reduce(
     (sum, item) => sum + parseCurrencyValue(item.totalPrice),
     0,

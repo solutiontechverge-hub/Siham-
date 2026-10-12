@@ -259,6 +259,76 @@ function snapshotServiceSubtotal(meta, booking) {
   return roundMoney(Number(booking.total_price ?? 0));
 }
 
+/**
+ * Catalog-backed document lines from booking notes — prefer full snapshot/guest
+ * arrays over collapsing to a single booking.service_id row.
+ */
+function buildFallbackLineItems(booking, meta) {
+  const snapshotServices = Array.isArray(meta?.clientSnapshot?.services)
+    ? meta.clientSnapshot.services
+    : [];
+  if (snapshotServices.length) {
+    return snapshotServices
+      .filter((service) => service?.id || service?.serviceId)
+      .map((service) => ({
+        description: service.name || "Service",
+        sourceReference: String(service.id || service.serviceId),
+        sourceType: "serviceId",
+        quantity: "1",
+        vat: "21%",
+        vatRate: 21,
+        pricePerUnit: roundMoney(service.price),
+        totalPrice: roundMoney(service.price),
+      }));
+  }
+
+  const guests = Array.isArray(meta?.guests) ? meta.guests : [];
+  const fromGuests = [];
+  for (const guest of guests) {
+    for (const service of guest.services ?? []) {
+      if (!service?.id && !service?.serviceId) continue;
+      fromGuests.push({
+        description: service.name || "Service",
+        sourceReference: String(service.id || service.serviceId),
+        sourceType: "serviceId",
+        quantity: "1",
+        vat: "21%",
+        vatRate: 21,
+        pricePerUnit: roundMoney(service.price),
+        totalPrice: roundMoney(service.price),
+      });
+    }
+    for (const product of guest.products ?? []) {
+      if (!product?.id && !product?.productId) continue;
+      fromGuests.push({
+        description: product.name || "Product",
+        sourceReference: String(product.id || product.productId),
+        sourceType: "productId",
+        quantity: String(product.quantity || 1),
+        vat: "21%",
+        vatRate: 21,
+        pricePerUnit: roundMoney(product.unitPrice ?? product.price),
+        totalPrice: roundMoney(product.price),
+      });
+    }
+  }
+  if (fromGuests.length) return fromGuests;
+
+  if (booking.service_id) {
+    return [{
+      description: booking.service_title || "Professional Service",
+      sourceReference: String(booking.service_id),
+      sourceType: "serviceId",
+      quantity: "1",
+      vat: "21%",
+      vatRate: 21,
+      pricePerUnit: roundMoney(booking.total_price),
+      totalPrice: roundMoney(booking.total_price),
+    }];
+  }
+  return [];
+}
+
 function formatProtectiveFeeBase(baseAmount) {
   const base = Number.isFinite(baseAmount) ? Math.max(0, baseAmount) : 0;
   // Design: "10% Of €230" (no trailing .00 for whole euros).
@@ -283,6 +353,104 @@ function isProtectiveFeeEntryLabel(label) {
     value === "Late Rescheduling Fee" ||
     value === "No-show fee"
   );
+}
+
+/** Map finance paymentPhase → sales_card_metadata.card_kind (frontend Sales Overview). */
+export function salesCardKindForPaymentPhase(paymentPhase) {
+  switch (String(paymentPhase ?? "")) {
+    case "prepay":
+      return "prepayment";
+    case "full":
+      return "after_treatment";
+    case "addon":
+      return "addon";
+    default:
+      return null;
+  }
+}
+
+/**
+ * Card ids must match frontend buildSalesOverviewCards / bookingCheckout conventions
+ * so Sales Overview meta and finance rows stay one row per sale.
+ */
+export function resolveSalesCardId({
+  bookingId,
+  paymentPhase,
+  payerKey = "",
+  payerRole = "main_client",
+  entryLabel = "",
+}) {
+  const id = String(bookingId ?? "").trim();
+  if (!id) return null;
+  const label = String(entryLabel ?? "").trim();
+  if (label === "Late Cancellation Booking Fee") return `late-cancellation-${id}`;
+  if (label === "No-show fee") return `no-show-${id}`;
+  if (label === "Late Rescheduling Fee") return `late-reschedule-${id}`;
+
+  const kind = salesCardKindForPaymentPhase(paymentPhase);
+  if (kind === "prepayment") return `${id}-prepayment`;
+  if (kind === "after_treatment") {
+    const isMain =
+      payerRole === "main_client" ||
+      !payerKey ||
+      payerKey === "main-client";
+    return isMain ? `${id}-after-treatment` : `${id}-after-treatment-sub-${payerKey}`;
+  }
+  return null;
+}
+
+/** Persist sales_card_metadata linking booking UUID ↔ finance_transactions.id. */
+export async function ensureSalesCardMetadataForFinanceRow({
+  professionalProfileId,
+  bookingId,
+  paymentPhase,
+  payerKey = "main-client",
+  payerRole = "main_client",
+  entryLabel = "",
+  financeTransactionId,
+  metadata = {},
+}) {
+  if (!professionalProfileId || !bookingId || !financeTransactionId) return null;
+  const cardKind =
+    salesCardKindForPaymentPhase(paymentPhase) ||
+    (isProtectiveFeeEntryLabel(entryLabel) ? "after_treatment" : null);
+  if (!cardKind || cardKind === "addon") return null;
+  const cardId = resolveSalesCardId({
+    bookingId,
+    paymentPhase: paymentPhase || "full",
+    payerKey,
+    payerRole,
+    entryLabel,
+  });
+  if (!cardId) return null;
+  const result = await query(
+    `INSERT INTO sales_card_metadata (
+       professional_profile_id, card_id, booking_id, card_kind, metadata, finance_transaction_id
+     ) VALUES ($1, $2, $3, $4, $5::jsonb, $6)
+     ON CONFLICT (professional_profile_id, card_id)
+     DO UPDATE SET booking_id = EXCLUDED.booking_id,
+                   card_kind = EXCLUDED.card_kind,
+                   metadata = sales_card_metadata.metadata || EXCLUDED.metadata,
+                   finance_transaction_id = COALESCE(
+                     EXCLUDED.finance_transaction_id,
+                     sales_card_metadata.finance_transaction_id
+                   ),
+                   updated_at = NOW()
+     RETURNING card_id, booking_id, card_kind, finance_transaction_id`,
+    [
+      professionalProfileId,
+      cardId,
+      String(bookingId),
+      cardKind,
+      JSON.stringify({
+        paymentPhase: paymentPhase || null,
+        payerKey: payerKey || "main-client",
+        ...metadata,
+      }),
+      financeTransactionId,
+    ],
+  );
+  return result.rows[0] ?? null;
 }
 
 function isPlanningPerson(person) {
@@ -506,6 +674,24 @@ function resolveSplitPayers(booking, meta) {
   };
 }
 
+async function linkSalesCardForInsertedTx(booking, fields, financeTransactionId) {
+  if (!financeTransactionId || !booking?.id) return financeTransactionId;
+  try {
+    await ensureSalesCardMetadataForFinanceRow({
+      professionalProfileId: booking.professional_profile_id,
+      bookingId: booking.id,
+      paymentPhase: fields.paymentPhase,
+      payerKey: fields.payerKey || "main-client",
+      payerRole: fields.payerRole || "main_client",
+      entryLabel: fields.entryLabel || "",
+      financeTransactionId,
+    });
+  } catch {
+    // sales card link is best-effort; finance row remains authoritative
+  }
+  return financeTransactionId;
+}
+
 async function insertFinanceTransaction({
   booking,
   paymentPhase,
@@ -524,6 +710,7 @@ async function insertFinanceTransaction({
 }) {
   const gross = roundMoney(amount);
   const labelKey = entryLabel || "";
+  const salesCardFields = { paymentPhase, payerKey, payerRole, entryLabel };
   // Open (unresolved) invoice for this booking/phase — replace when amount changes
   // so pre-resolution edits do not leave a stale payment link / prepayment row.
   // Protective fee inserts still void any open same-phase sale (service → LCF).
@@ -554,7 +741,7 @@ async function insertFinanceTransaction({
       prevGross === gross &&
       String(openRow.status) === String(status)
     ) {
-      return openRow.id;
+      return linkSalesCardForInsertedTx(booking, salesCardFields, openRow.id);
     }
     // Amount/label drift → void old (Cancel Sales / deactivate link) then insert fresh.
     supersededOpenId = openRow.id;
@@ -584,7 +771,9 @@ async function insertFinanceTransaction({
         labelKey,
       ],
     );
-    if (exact.rows[0]) return exact.rows[0].id;
+    if (exact.rows[0]) {
+      return linkSalesCardForInsertedTx(booking, salesCardFields, exact.rows[0].id);
+    }
   }
 
   // Stale Stripe / payment-link race: Cancel Sales already Voided this phase, but payment still landed.
@@ -616,7 +805,7 @@ async function insertFinanceTransaction({
         intendedStatus: status,
         amount: gross,
       });
-      return priorVoidedId;
+      return linkSalesCardForInsertedTx(booking, salesCardFields, priorVoidedId);
     }
   }
 
@@ -740,7 +929,7 @@ async function insertFinanceTransaction({
     );
   }
 
-  return newId;
+  return linkSalesCardForInsertedTx(booking, salesCardFields, newId);
 }
 
 export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
@@ -758,18 +947,7 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
   const { prepaidAmount, payers } = resolveSplitPayers(booking, meta);
   const prepayStatus = String(booking.prepayment_status ?? "").toLowerCase();
   const isCompleted = String(booking.status ?? "").toLowerCase() === "completed";
-  const fallbackBookingLineItems = booking.service_id
-    ? [{
-        description: booking.service_title || "Professional Service",
-        sourceReference: String(booking.service_id),
-        sourceType: "serviceId",
-        quantity: "1",
-        vat: "21%",
-        vatRate: 21,
-        pricePerUnit: roundMoney(booking.total_price),
-        totalPrice: roundMoney(booking.total_price),
-      }]
-    : [];
+  const fallbackBookingLineItems = buildFallbackLineItems(booking, meta);
 
   const withLateRescheduleFeeLine = (lines) => {
     if (!meta.showLateRescheduling) return lines;
@@ -948,6 +1126,9 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
   if (requestedPhase === "prepay" || (amountOverride != null && requestedPhase !== "full")) {
     const phase = requestedPhase || "prepay";
     const status = statusOverride ?? resolveTransactionStatus(booking, phase);
+    const mainLines = payers.find((payer) => payer.role === "main_client")?.lineItems?.length
+      ? payers.find((payer) => payer.role === "main_client").lineItems
+      : fallbackBookingLineItems;
     return insertFinanceTransaction({
       booking,
       paymentPhase: phase,
@@ -960,7 +1141,7 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
       payerKey: "main-client",
       payerRole: "main_client",
       payerLabel: booking.customer_name,
-      lineItems: [],
+      lineItems: mainLines,
       docSuffix: phase === "prepay" ? "-PRE" : "",
       entryLabel: phase === "prepay" ? "Prepayment" : null,
     });

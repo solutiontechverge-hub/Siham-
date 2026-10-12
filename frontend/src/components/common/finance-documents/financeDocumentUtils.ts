@@ -462,7 +462,7 @@ export function receiptNumberLabelForStatus(_status?: TransactionRow["status"]) 
   return "Receipt number";
 }
 
-/** Receipt number shown in UI: only Prepaid|Paid|Refunded mint; Voided → "voided". */
+/** Receipt number shown in UI: only Prepaid|Paid|Refunded from stored doc; Voided → "voided". */
 export function displayReceiptNumber(
   status?: TransactionRow["status"] | null,
   document?: {

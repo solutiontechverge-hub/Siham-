@@ -34,6 +34,8 @@ export type SalesPenaltyPrompt = "automatic" | "manual" | "none";
 
 /** Finance row overlay used to auto-settle Pending → Paid and terminal statuses. */
 export type SalesFinanceHint = {
+  /** finance_transactions.id — preferred match key when meta.financeTransactionId is set */
+  transactionId?: string;
   bookingId?: string;
   bookingCode?: string;
   phase?: "prepay" | "full" | "addon" | string;
@@ -47,6 +49,11 @@ export type SalesFinanceHint = {
   /** Finance `entry_label` — used to heal protective-fee Sales cards. */
   entryLabel?: string;
   amount?: number;
+  /**
+   * Stored `document.lineItems` / issued snapshot — single source for Sales Card
+   * line count when a finance row is matched.
+   */
+  lineItems?: SalesLineItem[];
 };
 
 export type SalesPaymentTermsInput = {
@@ -136,6 +143,8 @@ export type SalesOverviewCardData = {
   limitedMenu?: boolean;
   penaltyAmount?: number;
   invoiceSeq?: number;
+  /** Set when matched to finance_transactions.id — status/docs use that row. */
+  financeTransactionId?: string;
 };
 
 export type SalesAddonRecord = {
@@ -159,6 +168,8 @@ export type SalesCardMetaRecord = {
   bookingId: string;
   cardKind: SalesCardKind;
   cardId: string;
+  /** Durable 1:1 link to finance_transactions.id when present */
+  financeTransactionId?: string;
   note?: string;
   voided?: boolean;
   refunded?: boolean;
@@ -222,5 +233,45 @@ export function salesPaymentBadge(
       return "!Overdue";
     case "unpaid":
       return "Unpaid";
+  }
+}
+
+/**
+ * Map finance_transactions.status → Sales card payment state.
+ * When a card is matched to a finance row, this is the single source of truth.
+ * Returns null for unknown statuses (caller falls back to booking-derived state).
+ */
+export function financeStatusToSalesPaymentState(
+  status: string | null | undefined,
+  kind?: SalesCardKind,
+): SalesPaymentState | null {
+  const s = String(status ?? "")
+    .trim()
+    .toLowerCase();
+  switch (s) {
+    case "paid":
+      return "paid";
+    case "prepaid":
+      return "prepaid";
+    case "refunded":
+      return "refunded";
+    case "voided":
+    case "void":
+      return "voided";
+    case "failed":
+      return "failed";
+    case "pending":
+      return "pending";
+    case "unpaid":
+      return "unpaid";
+    case "payment due":
+    case "prepayment due":
+      return "payment_due";
+    case "overdue":
+      return kind === "prepayment" ? "overdue" : "overdue_invoice";
+    case "overdue response":
+      return "overdue";
+    default:
+      return null;
   }
 }

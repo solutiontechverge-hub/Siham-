@@ -12,9 +12,11 @@ import {
 } from "./buildSalesOverviewCards.helpers";
 import { buildSalesOverviewCards } from "./buildSalesOverviewCards";
 import {
+  financeStatusToSalesPaymentState,
   salesPaymentBadge,
   type SalesAddonRecord,
   type SalesOverviewCardData,
+  type SalesPaymentState,
 } from "./salesOverview.types";
 
 assert.equal(
@@ -24,6 +26,30 @@ assert.equal(
 assert.equal(salesPaymentBadge("payment_due", "after_treatment"), "Payment Due");
 assert.equal(salesPaymentBadge("payment_due"), "Payment Due");
 assert.equal(salesPaymentBadge("voided"), "Voided");
+
+// Finance status → Sales payment state (exact finance casing).
+const financeStatusCases: Array<[string, SalesPaymentState | null, string?]> = [
+  ["Paid", "paid"],
+  ["Prepaid", "prepaid"],
+  ["Pending", "pending"],
+  ["Payment due", "payment_due"],
+  ["Prepayment due", "payment_due"],
+  ["Overdue", "overdue_invoice"],
+  ["Overdue", "overdue", "prepayment"],
+  ["Voided", "voided"],
+  ["Void", "voided"],
+  ["Refunded", "refunded"],
+  ["Failed", "failed"],
+  ["Unpaid", "unpaid"],
+  ["unknown-xyz", null],
+];
+for (const [status, expected, kind] of financeStatusCases) {
+  assert.equal(
+    financeStatusToSalesPaymentState(status, kind as never),
+    expected,
+    `financeStatusToSalesPaymentState(${status})`,
+  );
+}
 
 // Cancel Sales → voided addon stays visible with Voided badge (not hidden).
 const voidedAddon = mergeAddonRecordsIntoCards(
@@ -600,6 +626,137 @@ assert.equal(after[1]?.payerLabel, "Guest");
 assert.ok(
   after.every((c) => (c.highlightedLineIds?.length ?? 0) > 0),
   "dashed payer grouping via highlightedLineIds",
+);
+
+// Finance document.lineItems override calendar-derived lines (count sync).
+const financeLineEvent = {
+  id: "fin-sync-1",
+  title: "Cut",
+  date: "2026-07-25",
+  start: "10:00",
+  end: "11:00",
+  status: "Completed",
+  bookingCode: "BK-FIN",
+  showClientName: "Ada",
+  details: {
+    paymentMethod: "onlineDirect",
+    services: [
+      { id: "s1", name: "Cut", price: 40 },
+      { id: "s2", name: "Blow", price: 30 },
+      { id: "s3", name: "Tone", price: 20 },
+    ],
+  },
+} as unknown as CalendarEvent;
+
+const calendarOnly = buildCardsForEvent({
+  event: financeLineEvent,
+  clientName: "Ada",
+  ctx: { financeHints: [] },
+});
+const afterCalendar = calendarOnly.find((c) => c.kind === "after_treatment");
+assert.equal(afterCalendar?.lines.length, 3, "calendar builds 3 service lines");
+
+const financeSynced = buildCardsForEvent({
+  event: financeLineEvent,
+  clientName: "Ada",
+  ctx: {
+    financeHints: [
+      {
+        bookingId: "fin-sync-1",
+        bookingCode: "BK-FIN",
+        phase: "full",
+        payerKey: "main-client",
+        status: "Paid",
+        lineItems: [
+          { id: "s1", label: "Cut", amount: 40 },
+          { id: "s2", label: "Blow", amount: 30 },
+        ],
+      },
+    ],
+  },
+});
+const afterFinance = financeSynced.find((c) => c.kind === "after_treatment");
+assert.equal(
+  afterFinance?.lines.length,
+  2,
+  "matched finance document.lineItems replace calendar lines",
+);
+assert.deepEqual(
+  afterFinance?.lines.map((line) => line.id),
+  ["s1", "s2"],
+);
+
+// Linked finance row is SSOT for status: booking would derive Payment Due /
+// Pending, but matched finance statuses must win on the card badge.
+const statusSyncEvent = {
+  id: "status-sync-1",
+  title: "Cut",
+  date: "2026-07-25",
+  start: "10:00",
+  end: "11:00",
+  status: "Completed",
+  bookingCode: "BK-STATUS",
+  showClientName: "Bea",
+  details: {
+    paymentMethod: "onlineDirect",
+    bookingType: "online",
+    services: [{ id: "s1", name: "Cut", price: 40 }],
+  },
+} as unknown as CalendarEvent;
+
+const financeStatuses: Array<{
+  status: string;
+  badge: string;
+  state: SalesPaymentState;
+}> = [
+  { status: "Paid", badge: "Paid", state: "paid" },
+  { status: "Pending", badge: "Pending", state: "pending" },
+  { status: "Payment due", badge: "Payment Due", state: "payment_due" },
+  { status: "Overdue", badge: "!Overdue", state: "overdue_invoice" },
+  { status: "Voided", badge: "Voided", state: "voided" },
+  { status: "Refunded", badge: "Refunded", state: "refunded" },
+];
+
+const cardStatusCounts: Record<string, number> = {};
+const financeStatusCounts: Record<string, number> = {};
+
+for (const row of financeStatuses) {
+  const cards = buildCardsForEvent({
+    event: statusSyncEvent,
+    clientName: "Bea",
+    ctx: {
+      financeHints: [
+        {
+          transactionId: `tx-${row.status}`,
+          bookingId: "status-sync-1",
+          bookingCode: "BK-STATUS",
+          phase: "full",
+          status: row.status,
+          lineItems: [{ id: "s1", label: "Cut", amount: 40 }],
+        },
+      ],
+    },
+  });
+  const after = cards.find((c) => c.kind === "after_treatment");
+  assert.equal(after?.statusBadge, row.badge, `badge for finance ${row.status}`);
+  assert.equal(after?.paymentState, row.state, `state for finance ${row.status}`);
+  assert.equal(
+    after?.financeTransactionId,
+    `tx-${row.status}`,
+    `financeTransactionId stamped for ${row.status}`,
+  );
+  cardStatusCounts[row.badge] = (cardStatusCounts[row.badge] ?? 0) + 1;
+  financeStatusCounts[row.status] = (financeStatusCounts[row.status] ?? 0) + 1;
+}
+
+assert.equal(
+  Object.values(cardStatusCounts).reduce((a, b) => a + b, 0),
+  Object.values(financeStatusCounts).reduce((a, b) => a + b, 0),
+  "card badge count matches finance row count for linked pairs",
+);
+assert.deepEqual(
+  Object.keys(cardStatusCounts).sort(),
+  ["!Overdue", "Paid", "Payment Due", "Pending", "Refunded", "Voided"],
 );
 
 console.log("buildSalesOverviewCards.helpers.test.ts: all assertions passed");

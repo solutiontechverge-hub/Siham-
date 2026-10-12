@@ -68,6 +68,7 @@ export type SalesCardMetadata = Record<string, unknown> & {
   cardId: string;
   bookingId: string;
   cardKind: string;
+  financeTransactionId?: string;
 };
 export type SalesAddonRecord = Record<string, unknown> & { id: string; bookingId: string; bookingCode: string };
 

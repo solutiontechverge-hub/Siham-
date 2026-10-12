@@ -1,7 +1,9 @@
 import type { TransactionRow } from "../../../app/professionals/fixed-location/finance/data/transactions";
+import { roundBookingMoney as roundMoney } from "../../../data/bookingLinePricing";
 import type { ClientBookingDraft } from "../client-booking/types";
 import type {
   SalesFinanceHint,
+  SalesLineItem,
   SalesOverviewCardData,
 } from "./salesOverview.types";
 import {
@@ -18,6 +20,24 @@ export function allowedBookingStatus(
   return (
     ALLOWED_BOOKING_STATUSES.find((value) => value === normalized) ?? "confirmed"
   );
+}
+
+/** Map stored finance document lines → Sales Card lines (count must match DB). */
+export function financeDocumentLinesToSalesLines(
+  row: TransactionRow,
+): SalesLineItem[] {
+  const doc = row.issuedDocument ?? row.document;
+  const raw = Array.isArray(doc?.lineItems) ? doc.lineItems : [];
+  return raw
+    .filter((item) => item && typeof item === "object")
+    .map((item, index) => {
+      const amount = Number(item.totalPrice ?? item.pricePerUnit);
+      return {
+        id: String(item.sourceReference ?? `fin-line-${index}`),
+        label: String(item.description ?? "Item"),
+        amount: roundMoney(Number.isFinite(amount) ? amount : 0),
+      };
+    });
 }
 
 export function toFinanceHints(rows: TransactionRow[]): SalesFinanceHint[] {
@@ -38,7 +58,9 @@ export function toFinanceHints(rows: TransactionRow[]): SalesFinanceHint[] {
           : null
         : null;
     const amount = Number(row.grossAmount ?? row.netAmount);
+    const lineItems = financeDocumentLinesToSalesLines(row);
     return {
+      transactionId: row.id,
       bookingId: row.bookingId,
       bookingCode: row.entryId || row.bookingId,
       phase: doc?.paymentPhase,
@@ -50,6 +72,7 @@ export function toFinanceHints(rows: TransactionRow[]): SalesFinanceHint[] {
       penaltyAmount: doc?.penaltyAmount,
       entryLabel: row.entryLabel,
       amount: Number.isFinite(amount) ? amount : undefined,
+      ...(lineItems.length ? { lineItems } : {}),
     };
   });
 }

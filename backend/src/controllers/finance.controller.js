@@ -21,6 +21,7 @@ import {
   isSettledFinanceStatus,
   mintReceiptNumber,
   processOverdueInvoiceReissues,
+  ensureSalesCardMetadataForFinanceRow,
   syncBookingToFinanceTransaction,
 } from "../services/finance-sync.service.js";
 import {
@@ -454,6 +455,50 @@ export const listSalesCardMetadata = async (req, res) => {
   try {
     const profile = await requireProfessional(req, res);
     if (!profile) return;
+    // Heal null FKs: cards store booking UUID; sync finance rows store unique_code.
+    await query(
+      `UPDATE sales_card_metadata scm
+          SET finance_transaction_id = matched.tx_id,
+              updated_at = NOW()
+         FROM (
+           SELECT DISTINCT ON (scm2.id)
+                  scm2.id AS card_id,
+                  ft.id AS tx_id
+             FROM sales_card_metadata scm2
+             JOIN bookings b
+               ON b.id::text = scm2.booking_id OR b.unique_code = scm2.booking_id
+             JOIN finance_transactions ft
+               ON ft.professional_profile_id = scm2.professional_profile_id
+              AND (
+                ft.booking_id = scm2.booking_id
+                OR ft.booking_id = b.unique_code
+                OR ft.booking_id = b.id::text
+              )
+              AND (
+                (scm2.card_kind = 'prepayment' AND ft.document->>'paymentPhase' = 'prepay')
+                OR (scm2.card_kind = 'after_treatment'
+                    AND COALESCE(ft.document->>'paymentPhase', 'full') IN ('full', ''))
+                OR (scm2.card_kind = 'addon' AND ft.document->>'paymentPhase' = 'addon')
+                OR (scm2.card_kind = 'reissued_invoice'
+                    AND (
+                      (scm2.card_id LIKE '%-prepayment%' AND ft.document->>'paymentPhase' = 'prepay')
+                      OR (scm2.card_id NOT LIKE '%-prepayment%'
+                          AND COALESCE(ft.document->>'paymentPhase', 'full') IN ('full', ''))
+                    ))
+              )
+              AND NOT EXISTS (
+                SELECT 1 FROM sales_card_metadata taken
+                 WHERE taken.finance_transaction_id = ft.id
+                   AND taken.id <> scm2.id
+              )
+            WHERE scm2.professional_profile_id = $1
+              AND scm2.finance_transaction_id IS NULL
+            ORDER BY scm2.id, ft.updated_at DESC NULLS LAST
+         ) matched
+        WHERE scm.id = matched.card_id
+          AND scm.finance_transaction_id IS NULL`,
+      [profile.id],
+    );
     const result = await query(
       `SELECT card_id, booking_id, card_kind, metadata, finance_transaction_id
        FROM sales_card_metadata
@@ -485,22 +530,42 @@ export const upsertSalesCardMetadata = async (req, res) => {
     if (!body.cardId || !body.bookingId || !body.cardKind) {
       return res.status(400).json({ success: false, message: "cardId, bookingId and cardKind are required.", data: null });
     }
-    const { cardId, bookingId, cardKind, ...metadata } = body;
+    const { cardId, bookingId, cardKind, financeTransactionId: bodyTxId, ...metadata } = body;
+    // finance_transactions.booking_id may be unique_code (sync) or UUID (manual create).
     const linkedTransaction = await query(
       `SELECT id FROM finance_transactions
        WHERE professional_profile_id = $1
-         AND booking_id = $2
-         AND (document->>'paymentPhase' = CASE
-           WHEN $3 = 'prepayment' THEN 'prepay'
-           WHEN $3 = 'after_treatment' THEN 'full'
-           WHEN $3 = 'addon' THEN 'addon'
-           ELSE document->>'paymentPhase' END
-           OR $3 NOT IN ('prepayment', 'after_treatment', 'addon'))
+         AND (
+           booking_id = $2
+           OR booking_id IN (
+             SELECT b.unique_code FROM bookings b
+             WHERE b.id::text = $2 OR b.unique_code = $2
+             UNION
+             SELECT b.id::text FROM bookings b
+             WHERE b.id::text = $2 OR b.unique_code = $2
+           )
+         )
+         AND (
+           ($3 = 'prepayment' AND document->>'paymentPhase' = 'prepay')
+           OR ($3 = 'after_treatment' AND COALESCE(document->>'paymentPhase', 'full') IN ('full', ''))
+           OR ($3 = 'addon' AND document->>'paymentPhase' = 'addon')
+           OR ($3 = 'reissued_invoice' AND (
+             ($4 LIKE '%-prepayment%' AND document->>'paymentPhase' = 'prepay')
+             OR ($4 NOT LIKE '%-prepayment%'
+                 AND COALESCE(document->>'paymentPhase', 'full') IN ('full', ''))
+           ))
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM sales_card_metadata taken
+            WHERE taken.finance_transaction_id = finance_transactions.id
+              AND taken.professional_profile_id = $1
+              AND taken.card_id <> $4
+         )
        ORDER BY updated_at DESC NULLS LAST
        LIMIT 1`,
-      [profile.id, String(bookingId), String(cardKind)],
+      [profile.id, String(bookingId), String(cardKind), String(cardId)],
     );
-    const financeTransactionId = linkedTransaction.rows[0]?.id ?? null;
+    const financeTransactionId = bodyTxId ?? linkedTransaction.rows[0]?.id ?? null;
     const result = await query(
       `INSERT INTO sales_card_metadata (professional_profile_id, card_id, booking_id, card_kind, metadata, finance_transaction_id)
        VALUES ($1, $2, $3, $4, $5::jsonb, $6)
@@ -1111,10 +1176,27 @@ export const createFinanceTransaction = async (req, res) => {
       });
     }
 
+    const createdTx = result.rows[0];
+    if (createdTx?.id && bookingUuid && paymentPhase && paymentPhase !== "addon") {
+      try {
+        await ensureSalesCardMetadataForFinanceRow({
+          professionalProfileId: profile.id,
+          bookingId: bookingUuid,
+          paymentPhase,
+          payerKey: document.payerKey || body.payerKey || "main-client",
+          payerRole: body.payerRole || "main_client",
+          entryLabel,
+          financeTransactionId: createdTx.id,
+        });
+      } catch {
+        // sales card link is best-effort
+      }
+    }
+
     return res.status(201).json({
       success: true,
       message: isAddon ? "Add-on sale created." : "Transaction created.",
-      data: mapTransactionRow(result.rows[0]),
+      data: mapTransactionRow(createdTx),
     });
   } catch (error) {
     console.error("createFinanceTransaction failed:", error);

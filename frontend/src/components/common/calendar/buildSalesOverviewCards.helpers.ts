@@ -25,6 +25,7 @@ import type {
   SalesPenaltyPrompt,
   SalesSubCardData,
 } from "./salesOverview.types";
+import { financeStatusToSalesPaymentState } from "./salesOverview.types";
 import { buildSplitPaymentAmounts, parseSplitBillState, resolveSalesPayerShares } from "./salesSplitBill";
 import {
   formatFinanceDueDate,
@@ -379,6 +380,7 @@ function resolveOpenState(input: {
   return { state: "payment_due", dueDate: dueDate || deriveDueDate(input.occurredAt, input.paymentTerms) };
 }
 
+/** @returns true when status came from a matched finance row (skip booking re-derive). */
 function applyFinanceAndMetaState(
   next: SalesOverviewCardData | SalesSubCardData,
   meta: SalesCardMetaRecord | null,
@@ -392,7 +394,7 @@ function applyFinanceAndMetaState(
     occurredAt: string;
     isAfterTreatment?: boolean;
   },
-) {
+): boolean {
   const finance = matchFinanceHint(
     {
       id: next.id,
@@ -400,29 +402,84 @@ function applyFinanceAndMetaState(
       bookingCode: next.bookingCode,
       kind,
       payerKey: "payerKey" in next ? next.payerKey : undefined,
+      financeTransactionId: meta?.financeTransactionId,
     },
     ctx.financeHints,
   );
-  const financeStatus = String(finance?.status ?? "").toLowerCase();
+  // Prefer stored finance document.lineItems over calendar-derived lines so
+  // Sales Card count matches finance_transactions (editedLines still win).
+  if (
+    finance?.lineItems?.length &&
+    !meta?.editedLines?.length &&
+    Array.isArray(next.lines)
+  ) {
+    next.lines = finance.lineItems.map((line) => ({ ...line }));
+    if ("highlightedLineIds" in next) next.highlightedLineIds = undefined;
+  }
+
+  const paymentMethod =
+    meta?.paymentMethod ||
+    ("paymentMethod" in next ? next.paymentMethod : undefined) ||
+    finance?.paymentMethod;
+  const paidAt = meta?.paidAt || finance?.paidAt || extras.occurredAt;
+  const dueDate = meta?.dueDate || finance?.dueDate || next.dueDate;
+
+  const linkedTxId = finance?.transactionId || meta?.financeTransactionId;
+  if (linkedTxId) {
+    (next as { financeTransactionId?: string }).financeTransactionId =
+      String(linkedTxId);
+  }
+
+  // Linked finance row is SSOT for display status (do not re-derive from booking).
+  const financeState = finance
+    ? financeStatusToSalesPaymentState(finance.status, kind)
+    : null;
+  if (finance && financeState) {
+    if (financeState === "refunded" && "refunded" in next) next.refunded = true;
+    if (financeState === "voided") {
+      if ("voided" in next) next.voided = true;
+      if ("highlightLabel" in next) next.highlightLabel = "Payment";
+    }
+    applyVisualState(next, financeState, {
+      method: paymentMethod,
+      dueDate,
+      paidAt,
+      occurredAt: extras.occurredAt,
+      kind,
+    });
+    next.markedUnpaid = Boolean(meta?.markedUnpaid) && financeState === "unpaid";
+    next.paidAt =
+      financeState === "paid" || financeState === "prepaid"
+        ? paidAt ?? null
+        : null;
+    if (
+      meta?.reissuedAt &&
+      (financeState === "payment_due" || financeState === "overdue_invoice")
+    ) {
+      if ("title" in next && typeof next.title === "string") {
+        next.title = "Reissued Invoice Summary";
+      }
+      if ("kind" in next) next.kind = "reissued_invoice";
+      next.limitedMenu = true;
+    }
+    next.penaltyPrompt = resolvePenaltyPrompt(
+      financeState,
+      ctx.paymentTerms,
+      Boolean(meta?.reissuedAt),
+    );
+    return true;
+  }
+
+  // Unlinked (or unknown finance status): booking/meta-derived path.
   const refunded =
-    Boolean(meta?.refunded) ||
-    Boolean("refunded" in next && next.refunded) ||
-    financeStatus === "refunded";
+    Boolean(meta?.refunded) || Boolean("refunded" in next && next.refunded);
   const voided =
-    Boolean(meta?.voided) ||
-    Boolean("voided" in next && next.voided) ||
-    financeStatus === "voided" ||
-    financeStatus === "void";
-  const failed = Boolean(extras.isFailed) || financeStatus === "failed";
+    Boolean(meta?.voided) || Boolean("voided" in next && next.voided);
+  const failed = Boolean(extras.isFailed);
   const paidHint =
     Boolean(extras.paidHint) ||
     Boolean(meta?.paidAt) ||
-    Boolean(meta?.paid) ||
-    financeStatus === "paid" ||
-    financeStatus === "prepaid";
-  const paidAt = meta?.paidAt || finance?.paidAt || extras.occurredAt;
-  const dueDate = meta?.dueDate || finance?.dueDate || next.dueDate;
-  const paymentMethod = meta?.paymentMethod || ("paymentMethod" in next ? next.paymentMethod : undefined) || finance?.paymentMethod;
+    Boolean(meta?.paid);
 
   if (refunded) {
     if ("refunded" in next) next.refunded = true;
@@ -431,7 +488,7 @@ function applyFinanceAndMetaState(
       occurredAt: extras.occurredAt,
       kind,
     });
-    return;
+    return false;
   }
   if (voided) {
     if ("voided" in next) next.voided = true;
@@ -441,7 +498,7 @@ function applyFinanceAndMetaState(
       occurredAt: extras.occurredAt,
       kind,
     });
-    return;
+    return false;
   }
   if (failed) {
     applyVisualState(next, "failed", {
@@ -449,7 +506,7 @@ function applyFinanceAndMetaState(
       occurredAt: extras.occurredAt,
       kind,
     });
-    return;
+    return false;
   }
 
   const open = resolveOpenState({
@@ -460,7 +517,7 @@ function applyFinanceAndMetaState(
     markedUnpaid: Boolean(meta?.markedUnpaid),
     paidHint,
     paidAt,
-    isPrepayPaid: extras.isPrepayPaid || financeStatus === "prepaid",
+    isPrepayPaid: extras.isPrepayPaid,
     occurredAt: extras.occurredAt,
     paymentTerms: ctx.paymentTerms,
     isAfterTreatment: extras.isAfterTreatment,
@@ -483,6 +540,7 @@ function applyFinanceAndMetaState(
     next.limitedMenu = true;
   }
   next.penaltyPrompt = resolvePenaltyPrompt(open.state, ctx.paymentTerms, Boolean(meta?.reissuedAt));
+  return false;
 }
 
 function applySubMeta(
@@ -512,14 +570,20 @@ function applySubMeta(
     next.methodDateLine = paymentMethodLabel(meta.paymentMethod);
   }
 
-  applyFinanceAndMetaState(next, meta, ctx, "after_treatment", {
+  const usedFinance = applyFinanceAndMetaState(next, meta, ctx, "after_treatment", {
     isOnlineBooking: extras.isOnlineBooking,
     paidHint: extras.paidHint,
     occurredAt: extras.occurredAt,
     isAfterTreatment: extras.isAfterTreatment ?? true,
   });
 
-  if ((meta?.dueDate || next.dueDate) && next.paymentState !== "paid" && next.paymentState !== "refunded") {
+  // Linked finance status is SSOT — do not re-badge from due-date heuristics.
+  if (
+    !usedFinance &&
+    (meta?.dueDate || next.dueDate) &&
+    next.paymentState !== "paid" &&
+    next.paymentState !== "refunded"
+  ) {
     applyDueDateMeta(next, {
       dueDate: meta?.dueDate ?? next.dueDate,
       paymentMethod: meta?.paymentMethod,
@@ -568,7 +632,7 @@ function applyMeta(
     }
   }
 
-  applyFinanceAndMetaState(next, meta, ctx, next.kind, {
+  const usedFinance = applyFinanceAndMetaState(next, meta, ctx, next.kind, {
     isOnlineBooking: extras.isOnlineBooking,
     isPrepayPaid: extras.isPrepayPaid,
     isFailed: extras.isFailed,
@@ -578,7 +642,7 @@ function applyMeta(
   });
 
   if (meta) {
-    applyDueDateMeta(next, meta, next.kind);
+    if (!usedFinance) applyDueDateMeta(next, meta, next.kind);
     applyPenaltyAmount(next, meta.penaltyAmount);
     if (meta.canceled) {
       next.canceled = true;

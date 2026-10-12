@@ -58,8 +58,16 @@ export function findIssuedFinanceTransaction(
     bookingCode?: string | null;
     phase?: FinanceDocPaymentPhase | string | null;
     addonId?: string | null;
+    /** Prefer exact finance_transactions.id when Sales card is linked. */
+    transactionId?: string | null;
   },
 ): TransactionRow | null {
+  if (opts.transactionId) {
+    const byId = rows.find(
+      (row) => String(row.id) === String(opts.transactionId),
+    );
+    if (byId) return byId;
+  }
   const phase = opts.phase ?? null;
   const addonId = opts.addonId ? String(opts.addonId) : "";
   const candidates = rows.filter((row) => {

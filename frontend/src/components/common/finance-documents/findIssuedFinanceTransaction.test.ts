@@ -123,4 +123,12 @@ const feeInvoice = findIssuedFinanceTransaction(feeRows, {
 });
 assert.equal(feeInvoice?.id, "tx-late-cancel-fee");
 
+// Linked card: financeTransactionId wins over phase heuristics.
+const byTx = findIssuedFinanceTransaction(rows, {
+  bookingId: "booking-uuid",
+  phase: "full",
+  transactionId: "tx-prepay",
+});
+assert.equal(byTx?.id, "tx-prepay", "transactionId preferred over phase");
+
 console.log("findIssuedFinanceTransaction.test.ts: ok");

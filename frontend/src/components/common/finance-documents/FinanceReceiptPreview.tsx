@@ -59,8 +59,8 @@ export default function FinanceReceiptPreview({
   const amountLabel = isRefund
     ? "Total Amount (VAT included)"
     : "Amount (VAT included)";
-  const invoiceNumber = document?.documentNumber || "—";
-  const receiptNumber = displayReceiptNumber(row?.status, document) || "—";
+  const invoiceNumber = document?.documentNumber || "N/A";
+  const receiptNumber = displayReceiptNumber(row?.status, document) || "N/A";
   const date =
     formatDocumentDate(
       document?.refundedAt ||

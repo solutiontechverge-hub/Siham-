@@ -71,6 +71,7 @@ import {
   cardToDraft,
   toFinanceHints,
 } from "./useSalesOverview.helpers";
+import { auditSalesCardFinanceReconcile } from "./auditSalesCardFinanceReconcile";
 
 export type SalesDocumentType = "invoice" | "receipt";
 
@@ -151,10 +152,11 @@ export function useSalesOverview({
     bookings[0]?.id ||
     bookings[0]?.unique_code ||
     "";
-  const { data: financeResponse } = useGetFinanceTransactionsQuery(
-    { bookingId: String(financeBookingId), limit: 50 },
-    { skip: !financeBookingId },
-  );
+  const { data: financeResponse, isError: financeQueryError } =
+    useGetFinanceTransactionsQuery(
+      { bookingId: String(financeBookingId), limit: 50 },
+      { skip: !financeBookingId },
+    );
   const financeHints = React.useMemo(
     () => toFinanceHints(financeResponse?.data?.rows ?? []),
     [financeResponse?.data?.rows],
@@ -235,6 +237,44 @@ export function useSalesOverview({
       node.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [focusCardId, cards]);
+
+  // Dev-only: after bookings + finance + card meta settle, log card↔row reconcile.
+  const lastReconcileKeyRef = React.useRef("");
+  React.useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
+    if (!bookings.length && !currentEvent) return;
+    if (financeBookingId && financeResponse === undefined && !financeQueryError) {
+      return;
+    }
+    if (salesMetadataResponse === undefined) return;
+
+    const timer = window.setTimeout(() => {
+      const stats = auditSalesCardFinanceReconcile(cards, financeHints);
+      const key = [
+        stats.cards,
+        stats.matchedByFk,
+        stats.matchedByPhase,
+        stats.unmatched,
+        stats.financeRows,
+        stats.statusMismatches,
+      ].join("|");
+      if (lastReconcileKeyRef.current === key) return;
+      lastReconcileKeyRef.current = key;
+      console.info(
+        `[SalesOverview reconcile] cards=${stats.cards} matchedByFk=${stats.matchedByFk} matchedByPhase=${stats.matchedByPhase} unmatched=${stats.unmatched} financeRows=${stats.financeRows} statusMismatches=${stats.statusMismatches}`,
+      );
+    }, 50);
+    return () => window.clearTimeout(timer);
+  }, [
+    bookings.length,
+    cards,
+    currentEvent,
+    financeBookingId,
+    financeHints,
+    financeQueryError,
+    financeResponse,
+    salesMetadataResponse,
+  ]);
 
   const subToCard = React.useCallback(
     (
@@ -357,6 +397,7 @@ export function useSalesOverview({
         bookingCode: card.bookingCode,
         phase,
         addonId,
+        transactionId: card.financeTransactionId,
       };
       const cached = findIssuedFinanceTransaction(
         financeResponse?.data?.rows ?? [],

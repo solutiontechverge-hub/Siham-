@@ -10,6 +10,7 @@
     "migrate": "node src/migrate-once.js",
     "audit:sales-card-lines": "node src/scripts/audit-sales-card-line-items.js",
     "reconcile:sales-cards": "node src/scripts/reconcile-sales-card-finance-rows.js",
+    "audit:sales-finance-orphans": "node src/scripts/audit-sales-finance-orphans.js",
     "audit:matched-invoice-failures": "node src/scripts/audit-matched-invoice-failures.js",
     "compare:calendar-finance": "node src/scripts/compare-calendar-sales-finance.js",
     "audit:finance-deadlines": "node src/scripts/audit-finance-deadlines.js",

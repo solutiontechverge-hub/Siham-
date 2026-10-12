@@ -122,19 +122,35 @@ export function resolvePenaltyPrompt(
 }
 
 export function matchFinanceHint(
-  card: { id: string; bookingId: string; bookingCode: string; kind: SalesOverviewCardData["kind"]; payerKey?: string },
+  card: {
+    id: string;
+    bookingId: string;
+    bookingCode: string;
+    kind: SalesOverviewCardData["kind"];
+    payerKey?: string;
+    financeTransactionId?: string;
+  },
   hints: SalesFinanceHint[],
 ): SalesFinanceHint | undefined {
-  const isProtectiveFeeCard = /protective-fee|no-show/.test(card.id);
+  if (card.financeTransactionId) {
+    const byFk = hints.find(
+      (hint) =>
+        hint.transactionId &&
+        String(hint.transactionId) === String(card.financeTransactionId),
+    );
+    if (byFk) return byFk;
+  }
+  const isProtectiveFeeCard = /protective-fee|no-show|late-cancellation|late-reschedule/.test(
+    card.id,
+  );
   const matches = hints.filter((hint) => {
     const bookingMatch =
       (hint.bookingId && String(hint.bookingId) === String(card.bookingId)) ||
       (hint.bookingCode && String(hint.bookingCode) === String(card.bookingCode)) ||
-      (hint.bookingId && String(hint.bookingId) === String(card.bookingCode));
+      (hint.bookingId && String(hint.bookingId) === String(card.bookingCode)) ||
+      (hint.bookingCode && String(hint.bookingCode) === String(card.bookingId));
     if (!bookingMatch) return false;
     const phase = String(hint.phase ?? "").toLowerCase();
-    const status = String(hint.status ?? "").toLowerCase();
-    if (status === "voided" || status === "void" || status === "refunded") return false;
     if (card.kind === "prepayment") return phase === "prepay" || !phase;
     if (card.kind === "addon") {
       const addonId = card.id.replace(/^addon-/, "");
@@ -144,6 +160,13 @@ export function matchFinanceHint(
     if (hint.payerKey && card.payerKey && hint.payerKey !== card.payerKey) return false;
     return true;
   });
+  // Prefer live rows; fall back to voided/refunded when that is the only match.
+  const isTerminal = (hint: SalesFinanceHint) => {
+    const s = String(hint.status ?? "").toLowerCase();
+    return s === "voided" || s === "void" || s === "refunded";
+  };
+  const live = matches.filter((hint) => !isTerminal(hint));
+  const pool = live.length ? live : matches;
   const feeLabel = (label?: string | null) => {
     const value = String(label ?? "").trim();
     return (
@@ -157,13 +180,14 @@ export function matchFinanceHint(
     // Fee Summary cards must bind to LCF/NS rows, not a sibling full service sale.
     const feeBoost =
       isProtectiveFeeCard && feeLabel(hint.entryLabel) ? -10 : 0;
-    if (s === "refunded") return 0 + feeBoost;
+    // Higher = preferred among live rows (paid before open).
+    if (s === "paid" || s === "prepaid") return 4 + feeBoost;
+    if (s === "failed") return 3 + feeBoost;
+    if (s === "refunded") return 2 + feeBoost;
     if (s === "voided" || s === "void") return 1 + feeBoost;
-    if (s === "failed") return 2 + feeBoost;
-    if (s === "paid" || s === "prepaid") return 3 + feeBoost;
-    return 4 + feeBoost;
+    return 5 + feeBoost;
   };
-  return [...matches].sort((a, b) => rank(a) - rank(b))[0];
+  return [...pool].sort((a, b) => rank(b) - rank(a))[0];
 }
 
 export function applyVisualState<T extends {
