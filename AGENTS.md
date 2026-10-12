@@ -2,7 +2,7 @@
 
 ## Ponytail (lazy senior-dev mode)
 
-Active by default (full). Off only on "stop ponytail" / "normal mode".
+**Always on first** for every coding command (via `.cursor/rules/ponytail.mdc` with `alwaysApply: true`). Default intensity: full. Off only on "stop ponytail" / "normal mode". Do not wait for the user to say "ponytail".
 
 Before writing code, understand the change, then stop at the first rung that holds:
 
