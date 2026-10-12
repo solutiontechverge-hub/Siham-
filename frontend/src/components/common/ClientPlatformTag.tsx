@@ -9,7 +9,7 @@ type ClientKind = "individual" | "company";
 
 export type ClientPlatformTagState = "guest" | "mollure" | "ic" | "cc" | null;
 
-/** Guest → navy; M / IC / BC → teal. Reuse anywhere client-type chips appear. */
+/** Guest → navy; M / BC → teal. Reuse anywhere client-type chips appear. */
 export type ClientPlatformTagTone = "navy" | "teal";
 
 export type ClientPlatformTagInput = {
@@ -25,7 +25,7 @@ type MollurePalette = Theme["palette"]["mollure"];
 /**
  * Shared pill colors for client platform/type tags.
  * - navy: Guest
- * - teal: IC / BC (and legacy M pill if any remain)
+ * - teal: M / BC
  */
 export function clientPlatformTagToneColors(
   m: MollurePalette,
@@ -43,10 +43,9 @@ export function clientPlatformTagToneColors(
 /**
  * Client tags:
  * - Guest overlay → "Guest"
- * - Mollure platform → compact logo mark (when isMollure)
- * - Individual → no type tag
+ * - Mollure platform → "M" (when isMollure); can sit beside BC
+ * - Individual non-Mollure → no type tag
  * - Company → "BC" (legacy state key remains "cc")
- * Logo can sit beside BC; individuals get logo only when Mollure.
  */
 export function resolveClientPlatformTag(
   input: ClientPlatformTagInput,
@@ -164,7 +163,7 @@ export default function ClientPlatformTag({
     );
   }
 
-  // Individuals: no type pill — Mollure logo only when isMollure.
+  // Non-Mollure individuals: no pill. Mollure → "M"; company → "BC" (both allowed).
   const typeLabel = clientKind === "company" ? companyLabel : null;
 
   if (!isMollure && !typeLabel) return null;
@@ -180,7 +179,11 @@ export default function ClientPlatformTag({
         lineHeight: 0,
       }}
     >
-      {isMollure ? <MollureLogoMark size={16} /> : null}
+      {isMollure ? (
+        <Box component="span" aria-label="Mollure client">
+          <TagPill label="M" tone="teal" />
+        </Box>
+      ) : null}
       {typeLabel ? (
         <Box component="span" aria-label="Company Client">
           <TagPill label={typeLabel} tone="teal" />

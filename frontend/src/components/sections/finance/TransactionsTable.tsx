@@ -326,7 +326,8 @@ export default function TransactionsTable({
                           isGuest={row.clientType === "guest"}
                           isMollure={
                             row.clientType === "mollure" ||
-                            Boolean(row.document?.client?.isMollure)
+                            Boolean(row.document?.client?.isMollure) ||
+                            Boolean(row.document?.client?.customerId)
                           }
                           clientKind={
                             row.clientType === "business" ? "company" : null

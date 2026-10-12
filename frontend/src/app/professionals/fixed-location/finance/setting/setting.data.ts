@@ -1,3 +1,4 @@
+import { emptyBookingUniqueItemDraft } from "../../../../../data/bookingUniqueItem.data";
 import type {
   ExpectItemDef,
   ProductDraft,
@@ -75,17 +76,7 @@ export const TRANSACTION_OPTION_ITEMS: TransactionOptionItem[] = [
   },
 ];
 
-export const PRODUCT_NAME_OPTIONS = [
-  "Hair Protein",
-  "Shampoo",
-  "Eye Lashes",
-] as const;
-
-export const DEFAULT_PRODUCT_DRAFT: ProductDraft = {
-  productName: "",
-  vat: "21%",
-  price: "",
-};
+export const DEFAULT_PRODUCT_DRAFT: ProductDraft = emptyBookingUniqueItemDraft();
 
 export const DEFAULT_SERVICE_DRAFT: ServiceDraft = {
   service: "",

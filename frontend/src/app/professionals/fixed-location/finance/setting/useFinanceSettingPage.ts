@@ -7,9 +7,19 @@ import {
   useFinanceInvoiceSettings,
   type FinanceInvoiceSettings,
 } from "../../../../../components/sections/finance/useFinanceInvoiceSettings";
+import {
+  removeFinanceProduct,
+  toFinanceCatalogProduct,
+  upsertFinanceProduct,
+} from "../../../../../components/sections/finance/financeCatalogPersist";
 import { useGetProfileQuery } from "../../../../../store/services/profileApi";
 import { useProfessionalStripeStatus } from "../useProfessionalStripeStatus";
 import { useFinanceTransactionOptions } from "../../../../../components/common/finance-documents/useFinanceTransactionOptions";
+import {
+  buildCatalogProductFromUniqueItemDraft,
+  buildUniqueItemDraftFromProduct,
+  getUniqueItemDraftErrors,
+} from "../../../../../data/bookingUniqueItem.data";
 import {
   DEFAULT_PRODUCT_DRAFT,
   DEFAULT_SERVICE_DRAFT,
@@ -43,28 +53,77 @@ export function useStripeSettingsSection() {
     subscriptionActive,
     paymentsConnected,
     connectStatus,
+    autoPay,
+    subscriptionRenewsAt,
     activateSubscription,
     deactivateSubscription,
+    setAutoPay,
+    confirmManualPayment,
     markPaymentsConnected,
+    isUpdating,
   } = useProfessionalStripeStatus();
 
-  const handleSubscriptionClick = () => {
-    if (subscriptionActive) {
-      deactivateSubscription();
+  const handleSubscriptionClick = async () => {
+    try {
+      if (subscriptionActive) {
+        const result = await deactivateSubscription();
+        showSnackbar({
+          severity: "error",
+          message: result?.message ?? "Mollure subscription deactivated.",
+        });
+        return;
+      }
+      const result = await activateSubscription();
       showSnackbar({
-        severity: "info",
-        message: "Mollure subscription deactivated.",
+        severity: "success",
+        message:
+          result?.message ??
+          "Mollure subscription activated — new billing period started.",
       });
-      return;
+    } catch {
+      showSnackbar({
+        severity: "error",
+        message:
+          "Could not activate subscription. Check your card or try again.",
+      });
     }
-    activateSubscription();
-    showSnackbar({
-      severity: "success",
-      message: "Mollure subscription is now active.",
-    });
   };
 
-  const handlePaymentsClick = () => {
+  const handleAutoPayToggle = async () => {
+    try {
+      const next = !autoPay;
+      await setAutoPay(next);
+      showSnackbar({
+        severity: "success",
+        message: next
+          ? "Auto-pay on — card will be charged on your renewal date."
+          : "Auto-pay off — pay manually before the renewal date or your subscription deactivates.",
+      });
+    } catch {
+      showSnackbar({
+        severity: "error",
+        message: "Could not update auto-pay. Please try again.",
+      });
+    }
+  };
+
+  const handleManualPaymentClick = async () => {
+    try {
+      await confirmManualPayment();
+      showSnackbar({
+        severity: "success",
+        message: "Payment recorded. Renewal date extended one month.",
+      });
+    } catch {
+      showSnackbar({
+        severity: "error",
+        message:
+          "Manual payment failed. Activate your subscription first, then pay before the renewal date.",
+      });
+    }
+  };
+
+  const handlePaymentsClick = async () => {
     if (!subscriptionActive) {
       showSnackbar({
         severity: "warning",
@@ -73,6 +132,7 @@ export function useStripeSettingsSection() {
       });
       return;
     }
+    // Already connected → dashboard only; never restart onboarding.
     if (paymentsConnected) {
       window.open(
         "https://dashboard.stripe.com/",
@@ -81,15 +141,39 @@ export function useStripeSettingsSection() {
       );
       return;
     }
-    markPaymentsConnected();
-    showSnackbar({
-      severity: "success",
-      message: "Stripe account connected.",
-    });
+    try {
+      const result = await markPaymentsConnected();
+      if (result.redirected) return;
+      if ("alreadyConnected" in result && result.alreadyConnected) {
+        showSnackbar({
+          severity: "success",
+          message: "Stripe account already connected.",
+        });
+        return;
+      }
+      const next = result.stripeConnectStatus ?? connectStatus;
+      showSnackbar({
+        severity: next === "connected" ? "success" : "info",
+        message:
+          next === "connected"
+            ? "Stripe account connected."
+            : "Stripe onboarding started. Complete the steps to accept online payments.",
+      });
+    } catch {
+      showSnackbar({
+        severity: "error",
+        message: "Could not start Stripe onboarding. Please try again.",
+      });
+    }
   };
 
-  const showOnboardingBanner = subscriptionActive && !paymentsConnected;
-  const showDisconnectedBanner = !subscriptionActive && !paymentsConnected;
+  // Banners derive from persisted GET /settings fields only. Never when connected.
+  const showOnboardingBanner =
+    connectStatus !== "connected" &&
+    (connectStatus === "onboarding" ||
+      (subscriptionActive && connectStatus === "not_connected"));
+  const showDisconnectedBanner =
+    !subscriptionActive && connectStatus === "not_connected";
 
   return {
     m,
@@ -97,10 +181,15 @@ export function useStripeSettingsSection() {
     subscriptionActive,
     paymentsConnected,
     connectStatus,
+    autoPay,
+    subscriptionRenewsAt,
     showOnboardingBanner,
     showDisconnectedBanner,
     handleSubscriptionClick,
+    handleAutoPayToggle,
+    handleManualPaymentClick,
     handlePaymentsClick,
+    isUpdating,
   };
 }
 
@@ -153,6 +242,7 @@ export function useInvoiceSettingsSection() {
   );
   const [addProductDraft, setAddProductDraft] =
     React.useState<ProductDraft>(DEFAULT_PRODUCT_DRAFT);
+  const [addProductAttempted, setAddProductAttempted] = React.useState(false);
   const [addServiceOpen, setAddServiceOpen] = React.useState(false);
   const [editingServiceId, setEditingServiceId] = React.useState<string | null>(
     null,
@@ -164,10 +254,7 @@ export function useInvoiceSettingsSection() {
   const [invoiceDrawerOpen, setInvoiceDrawerOpen] = React.useState(false);
 
   const handleDeleteProduct = (id: string) => {
-    setSettings((prev) => ({
-      ...prev,
-      products: prev.products.filter((product) => product.id !== id),
-    }));
+    setSettings((prev) => removeFinanceProduct(prev, id));
     showSnackbar({
       severity: "error",
       message: "Product deleted successfully.",
@@ -185,42 +272,32 @@ export function useInvoiceSettingsSection() {
     });
   };
 
-  const handleAddProductSaveOrUpdate = () => {
-    const name = addProductDraft.productName.trim();
-    if (!name) return;
-    const vat = addProductDraft.vat.trim() || "0%";
-    const parsedPrice = Number(addProductDraft.price.replace(",", "."));
-    const price = Number.isFinite(parsedPrice) && parsedPrice >= 0 ? parsedPrice : 0;
+  const addProductErrors = addProductAttempted
+    ? getUniqueItemDraftErrors(addProductDraft)
+    : {};
 
-    if (editingProductId) {
-      setSettings((prev) => ({
-        ...prev,
-        products: prev.products.map((product) =>
-          product.id === editingProductId
-            ? { ...product, name, price, vat }
-            : product,
-        ),
-      }));
-      showSnackbar({
-        severity: "success",
-        message: "Product updated successfully.",
-      });
-    } else {
-      setSettings((prev) => ({
-        ...prev,
-        products: [
-          { id: `p-${Date.now()}`, name, price, vat },
-          ...prev.products,
-        ],
-      }));
-      showSnackbar({
-        severity: "success",
-        message: "Successfully added product.",
-      });
-    }
+  const handleAddProductSaveOrUpdate = () => {
+    setAddProductAttempted(true);
+    const catalog = buildCatalogProductFromUniqueItemDraft(
+      addProductDraft,
+      editingProductId ?? `p-${Date.now()}`,
+    );
+    if (!catalog) return;
+
+    // Same upsert path as calendar drawer catalog (`PUT /api/finance/settings/invoice`).
+    setSettings((prev) =>
+      upsertFinanceProduct(prev, toFinanceCatalogProduct(catalog)),
+    );
+    showSnackbar({
+      severity: "success",
+      message: editingProductId
+        ? "Product updated successfully."
+        : "Successfully added product.",
+    });
 
     setAddProductOpen(false);
     setEditingProductId(null);
+    setAddProductAttempted(false);
   };
 
   const handleAddServiceSaveOrUpdate = () => {
@@ -263,6 +340,7 @@ export function useInvoiceSettingsSection() {
   const openAddProduct = () => {
     setEditingProductId(null);
     setAddProductDraft({ ...DEFAULT_PRODUCT_DRAFT });
+    setAddProductAttempted(false);
     setAddProductOpen(true);
   };
 
@@ -270,11 +348,18 @@ export function useInvoiceSettingsSection() {
     const p = settings.products.find((x) => x.id === id);
     if (!p) return;
     setEditingProductId(id);
-    setAddProductDraft({
-      productName: p.name,
-      vat: p.vat,
-      price: String(p.price),
-    });
+    setAddProductDraft(
+      buildUniqueItemDraftFromProduct({
+        name: p.name,
+        price: p.price,
+        vat: p.vat,
+        unit: p.unit,
+        discountType: p.discountType,
+        discountAmount:
+          p.discountAmount == null ? undefined : String(p.discountAmount),
+      }),
+    );
+    setAddProductAttempted(false);
     setAddProductOpen(true);
   };
 
@@ -378,6 +463,7 @@ export function useInvoiceSettingsSection() {
     setEditingProductId,
     addProductDraft,
     setAddProductDraft,
+    addProductErrors,
     addServiceOpen,
     setAddServiceOpen,
     editingServiceId,

@@ -7,7 +7,7 @@ import FactCheckRoundedIcon from "@mui/icons-material/FactCheckRounded";
 import PublicRoundedIcon from "@mui/icons-material/PublicRounded";
 import AccountBalanceRoundedIcon from "@mui/icons-material/AccountBalanceRounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
-import { Box, Paper, Stack } from "@mui/material";
+import { Box, FormControlLabel, Paper, Stack, Switch } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
   mollureBodyMutedSx,
@@ -53,11 +53,24 @@ export default function FinanceSettingStripe() {
     subscriptionActive,
     paymentsConnected,
     connectStatus,
+    autoPay,
+    subscriptionRenewsAt,
     showOnboardingBanner,
     showDisconnectedBanner,
     handleSubscriptionClick,
+    handleAutoPayToggle,
+    handleManualPaymentClick,
     handlePaymentsClick,
+    isUpdating,
   } = useStripeSettingsSection();
+
+  const renewLabel = subscriptionRenewsAt
+    ? new Date(subscriptionRenewsAt).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    : null;
 
   const cardSx = mollureDensePaperSx(m.navy, { borderAlpha: 0.1 });
 
@@ -165,18 +178,59 @@ export default function FinanceSettingStripe() {
             Your 15 EUR/month is billed securely via Stripe Billing. A valid
             credit card is required
           </BodyText>
-          <Box sx={{ mt: 1.25 }}>
+          {subscriptionActive && renewLabel ? (
+            <BodyText sx={mollureBodyMutedSx(m.navy, { mt: 0.45 })}>
+              Next renewal: {renewLabel}
+            </BodyText>
+          ) : null}
+          {subscriptionActive ? (
+            <FormControlLabel
+              sx={{ mt: 1, ml: 0, alignItems: "center" }}
+              control={
+                <Switch
+                  size="small"
+                  checked={autoPay}
+                  disabled={isUpdating}
+                  onChange={() => void handleAutoPayToggle()}
+                />
+              }
+              label={
+                <BodyText sx={mollureBodySx(m.navy, { fontSize: 12 })}>
+                  Auto-pay {autoPay ? "on" : "off"}
+                </BodyText>
+              }
+            />
+          ) : null}
+          {!autoPay && subscriptionActive ? (
+            <BodyText sx={mollureBodyMutedSx(m.navy, { mt: 0.35 })}>
+              Pay manually before the renewal date or your subscription will be
+              deactivated.
+            </BodyText>
+          ) : null}
+          <Stack direction="row" spacing={1} sx={{ mt: 1.25 }} flexWrap="wrap" useFlexGap>
             <AppButton
               variant="contained"
               disableElevation
               sx={actionBtnSx}
+              disabled={isUpdating}
               onClick={handleSubscriptionClick}
             >
               {subscriptionActive
                 ? "Deactivate Subscription"
                 : "Activate Subscription"}
             </AppButton>
-          </Box>
+            {subscriptionActive && !autoPay ? (
+              <AppButton
+                variant="contained"
+                disableElevation
+                sx={actionBtnSx}
+                disabled={isUpdating}
+                onClick={() => void handleManualPaymentClick()}
+              >
+                Record manual payment
+              </AppButton>
+            ) : null}
+          </Stack>
         </Box>
       </Paper>
 
@@ -212,6 +266,7 @@ export default function FinanceSettingStripe() {
               variant="contained"
               disableElevation
               sx={actionBtnSx}
+              disabled={isUpdating || !subscriptionActive}
               onClick={handlePaymentsClick}
             >
               {paymentsConnected

@@ -108,7 +108,7 @@ export function useBookingPaymentDueMeta(event: {
       bookingCode: event.bookingCode,
       eventId: event.id,
     });
-    // revision intentionally included so localStorage meta updates re-resolve
+    // revision intentionally included so in-memory sales meta updates re-resolve
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [event?.id, event?.bookingCode, revision]);
 }

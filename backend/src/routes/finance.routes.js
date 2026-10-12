@@ -87,6 +87,7 @@ router.put(
     textBody("action", { optional: true, max: 64, label: "action" }),
     textBody("subscriptionStatus", { optional: true, max: 64 }),
     textBody("stripeConnectStatus", { optional: true, max: 64 }),
+    body("autoPay").optional().isBoolean().withMessage("autoPay must be a boolean."),
   ],
   validateRequest,
   updateFinanceStripeStatus,

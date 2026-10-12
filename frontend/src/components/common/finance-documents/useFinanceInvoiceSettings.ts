@@ -90,6 +90,7 @@ export const defaultFinanceInvoiceSettings: FinanceInvoiceSettings = {
   },
 };
 
+/** Defaults only — live data comes from `useFinanceInvoiceSettings` → GET /api/finance/settings. */
 export function readFinanceInvoiceSettings(): FinanceInvoiceSettings {
   return defaultFinanceInvoiceSettings;
 }

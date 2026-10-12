@@ -30,6 +30,7 @@ export default function InvoiceSettings() {
     setEditingProductId,
     addProductDraft,
     setAddProductDraft,
+    addProductErrors,
     addServiceOpen,
     setAddServiceOpen,
     editingServiceId,
@@ -108,6 +109,7 @@ export default function InvoiceSettings() {
         setEditingProductId={setEditingProductId}
         addProductDraft={addProductDraft}
         setAddProductDraft={setAddProductDraft}
+        addProductErrors={addProductErrors}
         handleAddProductSaveOrUpdate={handleAddProductSaveOrUpdate}
         addServiceOpen={addServiceOpen}
         setAddServiceOpen={setAddServiceOpen}

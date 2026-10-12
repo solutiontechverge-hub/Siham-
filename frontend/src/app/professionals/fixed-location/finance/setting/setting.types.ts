@@ -1,10 +1,9 @@
+import type { BookingUniqueItemDraft } from "../../../../../data/bookingUniqueItem.data";
+
 export type SettingsTab = "stripe" | "transaction" | "invoice";
 
-export type ProductDraft = {
-  productName: string;
-  vat: string;
-  price: string;
-};
+/** Same draft shape as calendar drawer Add/Edit Product. */
+export type ProductDraft = BookingUniqueItemDraft;
 
 export type ServiceDraft = {
   service: string;

@@ -9,6 +9,7 @@ import { startBookingAutoInProgressJob } from "./jobs/bookingAutoInProgress.job.
 import { startBookingAutoCompleteJob } from "./jobs/bookingAutoComplete.job.js";
 import { startEmailReminderJob } from "./jobs/emailReminder.job.js";
 import { startMessagingRetentionJob } from "./jobs/messagingRetention.job.js";
+import { startSubscriptionRenewalJob } from "./jobs/subscriptionRenewal.job.js";
 import { initEmailTransport } from "./helpers/email.helper.js";
 
 const port = Number(process.env.PORT) || 5000;
@@ -80,6 +81,7 @@ const startServer = async () => {
       startBookingAutoCompleteJob();
       startEmailReminderJob();
       startMessagingRetentionJob();
+      startSubscriptionRenewalJob();
     });
   } catch (error) {
     console.error("Failed to start server:", error?.message || error);

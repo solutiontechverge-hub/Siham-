@@ -6,7 +6,7 @@ import { resolveClientPlatformTag } from "./ClientPlatformTag";
 import { getTransactionClientTypeLabel } from "../../app/professionals/fixed-location/finance/data/transactions";
 import { bookingClientTypeTag } from "./calendar/BookingClientTags";
 
-// Individuals: no type tag (logo-only when Mollure)
+// Individuals: no type tag; Mollure individuals resolve to "mollure" (UI shows "M")
 assert.equal(resolveClientPlatformTag({ clientKind: "individual" }), null);
 assert.equal(
   resolveClientPlatformTag({ clientKind: "individual", isMollure: true }),
@@ -15,7 +15,8 @@ assert.equal(
 assert.equal(getTransactionClientTypeLabel("nonMollure"), null);
 assert.equal(bookingClientTypeTag("individual"), null);
 
-// Business: BC (internal state key remains "cc")
+// Business: BC (internal state key remains "cc"); Mollure+company still "cc"
+// (UI renders both "M" and "BC" from isMollure + clientKind)
 assert.equal(resolveClientPlatformTag({ clientKind: "company" }), "cc");
 assert.equal(
   resolveClientPlatformTag({ clientKind: "company", isMollure: true }),

@@ -18,6 +18,11 @@ export type FinanceSubscriptionStatus = "inactive" | "active";
 export type FinanceSettings = {
   subscriptionStatus: FinanceSubscriptionStatus;
   stripeConnectStatus: FinanceStripeConnectStatus;
+  /** Charge saved card on renewal anniversary when true. */
+  autoPay?: boolean;
+  subscriptionActivatedAt?: string | null;
+  subscriptionRenewsAt?: string | null;
+  subscriptionLastPaymentAt?: string | null;
   transactionOptions: FinanceTransactionOptions;
   invoiceSettings: FinanceInvoiceSettings;
 };
@@ -116,9 +121,16 @@ export type BulkFinanceTransactionAction = {
 };
 
 export type UpdateFinanceStripeRequest = {
-  action?: "activate_subscription" | "deactivate_subscription" | "connect_payments";
+  action?:
+    | "activate_subscription"
+    | "deactivate_subscription"
+    | "set_auto_pay"
+    | "confirm_manual_payment"
+    | "connect_payments"
+    | "start_onboarding";
   subscriptionStatus?: FinanceSubscriptionStatus;
   stripeConnectStatus?: FinanceStripeConnectStatus;
+  autoPay?: boolean;
 };
 
 const financeApi = baseApi.injectEndpoints({
@@ -322,7 +334,13 @@ const financeApi = baseApi.injectEndpoints({
     }),
 
     createStripeConnectLink: builder.mutation<
-      ApiEnvelope<{ url: string | null; simulated?: boolean; accountId?: string }>,
+      ApiEnvelope<{
+        url: string | null;
+        simulated?: boolean;
+        alreadyConnected?: boolean;
+        accountId?: string;
+        stripeConnectStatus?: FinanceStripeConnectStatus;
+      }>,
       { refreshUrl?: string; returnUrl?: string; accountId?: string } | void
     >({
       query: (body) => ({

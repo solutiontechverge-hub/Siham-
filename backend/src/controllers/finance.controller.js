@@ -37,6 +37,13 @@ import {
   aggregateFinanceAnalytics,
   FINANCE_ANALYTICS_MAX_ROWS,
 } from "../services/finance-analytics.service.js";
+import {
+  activateSubscription,
+  applyRenewalIfDue,
+  confirmManualPayment,
+  deactivateSubscription,
+  setAutoPay,
+} from "../services/subscription-lifecycle.service.js";
 
 const DEFAULT_TRANSACTION_OPTIONS = {
   onlineImmediate: true,
@@ -276,6 +283,16 @@ const resolveFinanceClientParty = async ({
 const mapSettingsRow = (row) => ({
   subscriptionStatus: row.subscription_status,
   stripeConnectStatus: row.stripe_connect_status,
+  autoPay: row.auto_pay !== false,
+  subscriptionActivatedAt: row.subscription_activated_at
+    ? new Date(row.subscription_activated_at).toISOString()
+    : null,
+  subscriptionRenewsAt: row.subscription_renews_at
+    ? new Date(row.subscription_renews_at).toISOString()
+    : null,
+  subscriptionLastPaymentAt: row.subscription_last_payment_at
+    ? new Date(row.subscription_last_payment_at).toISOString()
+    : null,
   transactionOptions: {
     ...DEFAULT_TRANSACTION_OPTIONS,
     ...(row.transaction_options ?? {}),
@@ -413,7 +430,16 @@ export const getFinanceSettings = async (req, res) => {
     const profile = await requireProfessional(req, res);
     if (!profile) return;
 
-    const row = await ensureFinanceSettings(profile.id);
+    let row = await ensureFinanceSettings(profile.id);
+    // Check-on-load: deactivate or renew if past anniversary without payment.
+    const next = await applyRenewalIfDue(row);
+    if (next && next !== row) {
+      row = next;
+      emitBusinessChangedForProfile(profile.id, {
+        action: "updated",
+        scope: "finance",
+      });
+    }
     return res.status(200).json({
       success: true,
       message: "Finance settings loaded.",
@@ -609,34 +635,93 @@ export const updateFinanceStripeStatus = async (req, res) => {
     if (!profile) return;
 
     await ensureFinanceSettings(profile.id);
-    const { subscriptionStatus, stripeConnectStatus, action } = req.body ?? {};
+    const { subscriptionStatus, stripeConnectStatus, action, autoPay } =
+      req.body ?? {};
 
-    let nextSubscription;
-    let nextConnect;
+    let row;
+    let message = "Stripe status updated.";
 
+    // Subscription and Connect are independent columns; only touch what the action means.
     if (action === "activate_subscription") {
-      nextSubscription = "active";
-      nextConnect = "onboarding";
+      const outcome = await activateSubscription(profile.id, {
+        autoPay: typeof autoPay === "boolean" ? autoPay : undefined,
+      });
+      row = outcome.row;
+      if (!outcome.activated) {
+        return res.status(402).json({
+          success: false,
+          message:
+            "Subscription payment failed. Update your card or try again.",
+          data: mapSettingsRow(row),
+        });
+      }
+      // Distinct copy for mid-period free reactivate vs new paid period.
+      message =
+        outcome.mode === "reactivate_within_period"
+          ? "Mollure subscription reactivated — no charge until your renewal date."
+          : "Mollure subscription activated — new billing period started.";
     } else if (action === "deactivate_subscription") {
-      nextSubscription = "inactive";
-      nextConnect = "not_connected";
+      // leave stripe_connect_status unchanged (do not wipe a real Connect account)
+      row = (await deactivateSubscription(profile.id)).row;
+      message = "Mollure subscription deactivated.";
+    } else if (action === "set_auto_pay") {
+      if (typeof autoPay !== "boolean") {
+        return res.status(400).json({
+          success: false,
+          message: "autoPay boolean is required.",
+          data: null,
+        });
+      }
+      row = await setAutoPay(profile.id, autoPay);
+      message = autoPay ? "Auto-pay enabled." : "Auto-pay disabled.";
+    } else if (action === "confirm_manual_payment") {
+      // ponytail: stub for Stripe Checkout success callback; upgrade to webhook-confirmed payment.
+      const outcome = await confirmManualPayment(profile.id);
+      row = outcome.row;
+      if (!outcome.ok) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Manual payment requires an active subscription. Activate first, then pay before the renewal date.",
+          data: row ? mapSettingsRow(row) : null,
+        });
+      }
+      message = "Manual payment recorded; renewal extended one month.";
     } else if (action === "connect_payments") {
-      nextSubscription = "active";
-      nextConnect = "connected";
+      // Explicit mark-connected (test/manual). Prefer onboarding link + webhooks in production.
+      const result = await query(
+        `UPDATE professional_finance_settings
+         SET stripe_connect_status = 'connected', updated_at = NOW()
+         WHERE professional_profile_id = $1
+         RETURNING *`,
+        [profile.id],
+      );
+      row = result.rows[0];
+    } else if (action === "start_onboarding") {
+      const result = await query(
+        `UPDATE professional_finance_settings
+         SET stripe_connect_status = 'onboarding', updated_at = NOW()
+         WHERE professional_profile_id = $1
+         RETURNING *`,
+        [profile.id],
+      );
+      row = result.rows[0];
     } else {
-      nextSubscription = subscriptionStatus ?? undefined;
-      nextConnect = stripeConnectStatus ?? undefined;
+      const result = await query(
+        `UPDATE professional_finance_settings
+         SET subscription_status = COALESCE($2, subscription_status),
+             stripe_connect_status = COALESCE($3, stripe_connect_status),
+             updated_at = NOW()
+         WHERE professional_profile_id = $1
+         RETURNING *`,
+        [
+          profile.id,
+          subscriptionStatus ?? null,
+          stripeConnectStatus ?? null,
+        ],
+      );
+      row = result.rows[0];
     }
-
-    const result = await query(
-      `UPDATE professional_finance_settings
-       SET subscription_status = COALESCE($2, subscription_status),
-           stripe_connect_status = COALESCE($3, stripe_connect_status),
-           updated_at = NOW()
-       WHERE professional_profile_id = $1
-       RETURNING *`,
-      [profile.id, nextSubscription ?? null, nextConnect ?? null],
-    );
 
     emitBusinessChangedForProfile(profile.id, {
       action: "updated",
@@ -645,8 +730,8 @@ export const updateFinanceStripeStatus = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Stripe status updated.",
-      data: mapSettingsRow(result.rows[0]),
+      message,
+      data: mapSettingsRow(row),
     });
   } catch (error) {
     return sendCaughtError(res, error, { fallbackMessage: "Request failed." });
@@ -1772,20 +1857,50 @@ export const createStripeConnectOnboardingLink = async (req, res) => {
     const profile = await requireProfessional(req, res);
     if (!profile) return;
 
-    await ensureFinanceSettings(profile.id);
+    const settings = await ensureFinanceSettings(profile.id);
+
+    // Already completed Connect — never force Start onboarding again.
+    if (settings.stripe_connect_status === "connected") {
+      return res.status(200).json({
+        success: true,
+        message: "Stripe Connect already completed.",
+        data: {
+          url: null,
+          alreadyConnected: true,
+          simulated: false,
+          stripeConnectStatus: "connected",
+        },
+      });
+    }
 
     const stripeKey = process.env.STRIPE_SECRET_KEY;
     if (!stripeKey) {
-      await query(
+      // ponytail: no Stripe keys — persist honest status only. First click → onboarding;
+      // second click while already onboarding → connected (test ladder). Wire real Connect + webhooks for prod.
+      const nextConnect =
+        settings.stripe_connect_status === "onboarding" ? "connected" : "onboarding";
+      const result = await query(
         `UPDATE professional_finance_settings
-         SET stripe_connect_status = 'connected', subscription_status = 'active', updated_at = NOW()
-         WHERE professional_profile_id = $1`,
-        [profile.id],
+         SET stripe_connect_status = $2, updated_at = NOW()
+         WHERE professional_profile_id = $1
+         RETURNING *`,
+        [profile.id, nextConnect],
       );
+      emitBusinessChangedForProfile(profile.id, {
+        action: "updated",
+        scope: "finance",
+      });
       return res.status(200).json({
         success: true,
-        message: "Stripe simulated (no STRIPE_SECRET_KEY). Marked as connected.",
-        data: { url: null, simulated: true },
+        message:
+          nextConnect === "connected"
+            ? "Stripe simulated (no STRIPE_SECRET_KEY). Marked as connected."
+            : "Stripe simulated (no STRIPE_SECRET_KEY). Marked as onboarding.",
+        data: {
+          url: null,
+          simulated: true,
+          stripeConnectStatus: result.rows[0].stripe_connect_status,
+        },
       });
     }
 
@@ -1812,10 +1927,15 @@ export const createStripeConnectOnboardingLink = async (req, res) => {
 
     await query(
       `UPDATE professional_finance_settings
-       SET stripe_connect_status = 'onboarding', subscription_status = 'active', updated_at = NOW()
+       SET stripe_connect_status = 'onboarding', updated_at = NOW()
        WHERE professional_profile_id = $1`,
       [profile.id],
     );
+
+    emitBusinessChangedForProfile(profile.id, {
+      action: "updated",
+      scope: "finance",
+    });
 
     return res.status(200).json({
       success: true,

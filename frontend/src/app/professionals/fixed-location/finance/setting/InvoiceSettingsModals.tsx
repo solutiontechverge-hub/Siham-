@@ -1,17 +1,19 @@
 "use client";
 
 import * as React from "react";
-import { Box, InputAdornment, Stack } from "@mui/material";
+import { Box, Stack } from "@mui/material";
 import {
   mollureLabelSx,
 } from "../../../../../theme/mollureHierarchy";
 import { BodyText } from "../../../../../components/ui/typography";
 import AppButton from "../../../../../components/common/AppButton";
+import AppTextField from "../../../../../components/common/AppTextField";
 import MollureFormField from "../../../../../components/common/MollureFormField";
 import AppModal from "../../../../../components/common/AppModal";
+import BookingCatalogItemFields from "../../../../../components/common/calendar/BookingCatalogItemFields";
 import FinanceDocumentPreviewDrawer from "../../../../../components/sections/finance/FinanceDocumentPreviewDrawer";
-import { PRODUCT_NAME_OPTIONS } from "./setting.data";
 import { useGetBusinessSetupQuery } from "../../../../../store/services/businessApi";
+import type { ProductDraft } from "./setting.types";
 
 export function InvoiceSettingsModals(props: {
   m: { navy: string };
@@ -19,10 +21,9 @@ export function InvoiceSettingsModals(props: {
   setAddProductOpen: (v: boolean) => void;
   editingProductId: string | null;
   setEditingProductId: (v: string | null) => void;
-  addProductDraft: { productName: string; vat: string; price: string };
-  setAddProductDraft: React.Dispatch<
-    React.SetStateAction<{ productName: string; vat: string; price: string }>
-  >;
+  addProductDraft: ProductDraft;
+  setAddProductDraft: React.Dispatch<React.SetStateAction<ProductDraft>>;
+  addProductErrors: Partial<Record<"productName" | "price", string>>;
   handleAddProductSaveOrUpdate: () => void;
   addServiceOpen: boolean;
   setAddServiceOpen: (v: boolean) => void;
@@ -47,6 +48,7 @@ export function InvoiceSettingsModals(props: {
     setEditingProductId,
     addProductDraft,
     setAddProductDraft,
+    addProductErrors,
     handleAddProductSaveOrUpdate,
     addServiceOpen,
     setAddServiceOpen,
@@ -80,6 +82,10 @@ export function InvoiceSettingsModals(props: {
       ...items,
     ]);
   }, [businessSetupResponse?.data?.service_categories]);
+
+  const patchProductDraft = (patch: Partial<ProductDraft>) => {
+    setAddProductDraft((prev) => ({ ...prev, ...patch }));
+  };
 
   return (
     <>
@@ -122,68 +128,23 @@ export function InvoiceSettingsModals(props: {
         }
       >
         <Box sx={{ px: 2.5, py: 2 }}>
-          <Stack spacing={1.5}>
-            <Box>
-              <BodyText
-                sx={mollureLabelSx(m.navy, { mb: 0.5 })}
-              >
-                Product Name
-              </BodyText>
-              <MollureFormField
-                select
-                value={addProductDraft.productName}
-                onChange={(e) =>
-                  setAddProductDraft((p) => ({
-                    ...p,
-                    productName: String(e.target.value),
-                  }))
-                }
-                SelectProps={{ native: true }}
-              >
-                {PRODUCT_NAME_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </MollureFormField>
-            </Box>
-
-            <Box>
-              <BodyText
-                title="Every service uses 21% VAT by default. Only add a service here if it has a different VAT rate — these are the exceptions."
-                sx={mollureLabelSx(m.navy, { mb: 0.5 })}
-              >
-                VAT
-              </BodyText>
-              <MollureFormField
-                value={addProductDraft.vat}
-                onChange={(e) =>
-                  setAddProductDraft((p) => ({ ...p, vat: e.target.value }))
-                }
-              />
-            </Box>
-
-            <Box>
-              <BodyText
-                sx={mollureLabelSx(m.navy, { mb: 0.5 })}
-              >
-                Price
-              </BodyText>
-              <MollureFormField
-                value={addProductDraft.price}
-                onChange={(e) =>
-                  setAddProductDraft((p) => ({ ...p, price: e.target.value }))
-                }
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">€</InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">EUR</InputAdornment>
-                  ),
-                }}
-              />
-            </Box>
+          {/* Same field set as calendar drawer BookingAddUniqueItemScreen. */}
+          <Stack spacing={1.6}>
+            <AppTextField
+              label="Product Name"
+              placeholder="Enter product name"
+              value={addProductDraft.productName}
+              onChange={(e) => patchProductDraft({ productName: e.target.value })}
+              fullWidth
+              error={Boolean(addProductErrors.productName)}
+              helperText={addProductErrors.productName}
+            />
+            <BookingCatalogItemFields
+              draft={addProductDraft}
+              errors={addProductErrors}
+              onChange={patchProductDraft}
+              showUnit
+            />
           </Stack>
         </Box>
       </AppModal>
