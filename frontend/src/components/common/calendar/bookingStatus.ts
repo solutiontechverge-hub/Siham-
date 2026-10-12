@@ -1,4 +1,4 @@
-import { alpha, type SxProps, type Theme } from "@mui/material/styles";
+import { type SxProps, type Theme } from "@mui/material/styles";
 
 const withAlpha = (hex: string, opacity: number) => {
   const normalized = hex.replace("#", "");
@@ -120,68 +120,68 @@ type StatusTheme = {
 
 export const BOOKING_STATUS_THEME: Record<CalendarBookingStatus, StatusTheme> = {
   Requested: {
-    accent: "#F97316",
-    cardBg: "rgba(255, 247, 237, 0.75)",
-    cardBorder: "#F97316",
-    chipBg: "#F97316",
-    chipColor: "#FFFFFF",
-    chipBorder: "#F97316",
+    accent: "#D97706",
+    cardBg: "rgba(254, 243, 199, 0.75)",
+    cardBorder: "#D97706",
+    chipBg: "#FEF3C7",
+    chipColor: "#D97706",
+    chipBorder: "#FEF3C7",
   },
   "BR Accepted": {
     accent: "#22B573",
     cardBg: "#ECFFF4",
     cardBorder: "#75D9A6",
-    chipBg: "#FFFFFF",
+    chipBg: "#ECFDF3",
     chipColor: "#22B573",
-    chipBorder: "#75D9A6",
+    chipBorder: "#ECFDF3",
   },
   Confirmed: {
     accent: "#22B573",
     cardBg: "#ECFFF4",
     cardBorder: "#75D9A6",
-    chipBg: "#FFFFFF",
+    chipBg: "#ECFDF3",
     chipColor: "#22B573",
-    chipBorder: "#75D9A6",
+    chipBorder: "#ECFDF3",
   },
   "In Progress": {
-    accent: "#30B5C0",
-    cardBg: "#E8F8FA",
-    cardBorder: alpha("#30B5C0", 0.35),
-    chipBg: "#E8F8FA",
-    chipColor: "#30B5C0",
-    chipBorder: alpha("#30B5C0", 0.35),
+    accent: "#23B4C1",
+    cardBg: "#E7F7F8",
+    cardBorder: "#7DD4DC",
+    chipBg: "#EAF8F9",
+    chipColor: "#23B4C1",
+    chipBorder: "#EAF8F9",
   },
   Completed: {
-    accent: "#98A2B3",
-    cardBg: "#F9FAFB",
+    accent: "#4B5563",
+    cardBg: "#F3F4F6",
     cardBorder: "#D0D5DD",
-    chipBg: "#F9FAFB",
-    chipColor: "#98A2B3",
-    chipBorder: "#D0D5DD",
+    chipBg: "#F3F4F6",
+    chipColor: "#4B5563",
+    chipBorder: "#F3F4F6",
   },
   Cancelled: {
-    accent: "#E85D5D",
-    cardBg: "#FFF1F1",
+    accent: "#DC2626",
+    cardBg: "#FEE2E2",
     cardBorder: "#F4A3A3",
-    chipBg: alpha("#E85D5D", 0.1),
-    chipColor: "#D94545",
-    chipBorder: alpha("#E85D5D", 0.45),
+    chipBg: "#FEE2E2",
+    chipColor: "#DC2626",
+    chipBorder: "#FEE2E2",
   },
   "No Show": {
     accent: "#4B5563",
-    cardBg: "#E5E7EB",
-    cardBorder: "#9CA3AF",
-    chipBg: "#D1D5DB",
+    cardBg: "#F3F4F6",
+    cardBorder: "#D0D5DD",
+    chipBg: "#F3F4F6",
     chipColor: "#4B5563",
-    chipBorder: "#9CA3AF",
+    chipBorder: "#F3F4F6",
   },
   Invalid: {
-    accent: "#EF4444",
-    cardBg: "#FFF1F1",
+    accent: "#DC2626",
+    cardBg: "#FEE2E2",
     cardBorder: "#F4A3A3",
-    chipBg: alpha("#EF4444", 0.12),
+    chipBg: "#FEE2E2",
     chipColor: "#DC2626",
-    chipBorder: alpha("#EF4444", 0.45),
+    chipBorder: "#FEE2E2",
   },
 };
 
@@ -199,7 +199,10 @@ export function statusChipSx(status: CalendarBookingStatus): SxProps<Theme> {
   return {
     bgcolor: theme.chipBg,
     color: theme.chipColor,
-    borderColor: theme.chipBorder,
+    border: "none",
+    borderWidth: 0,
+    borderColor: "transparent",
+    fontWeight: 600,
   };
 }
 
@@ -220,11 +223,13 @@ export function statusChipSxWithOverride(
   customAccent?: string,
 ): SxProps<Theme> {
   if (!customAccent) return statusChipSx(status);
-  const onSolid = status === "Requested";
   return {
-    bgcolor: onSolid ? customAccent : withAlpha(customAccent, 0.12),
-    color: onSolid ? "#FFFFFF" : customAccent,
-    borderColor: customAccent,
+    bgcolor: withAlpha(customAccent, 0.12),
+    color: customAccent,
+    border: "none",
+    borderWidth: 0,
+    borderColor: "transparent",
+    fontWeight: 600,
   };
 }
 

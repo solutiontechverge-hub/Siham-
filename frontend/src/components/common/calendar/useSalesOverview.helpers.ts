@@ -22,7 +22,7 @@ export function allowedBookingStatus(
 
 export function toFinanceHints(rows: TransactionRow[]): SalesFinanceHint[] {
   return rows.map((row) => {
-    const doc = row.document as
+    const doc = (row.issuedDocument ?? row.document) as
       | {
           paymentPhase?: string;
           addonId?: string;
@@ -37,6 +37,7 @@ export function toFinanceHints(rows: TransactionRow[]): SalesFinanceHint[] {
           ? `${row.date}T12:00:00`
           : null
         : null;
+    const amount = Number(row.grossAmount ?? row.netAmount);
     return {
       bookingId: row.bookingId,
       bookingCode: row.entryId || row.bookingId,
@@ -47,6 +48,8 @@ export function toFinanceHints(rows: TransactionRow[]): SalesFinanceHint[] {
       paidAt: paid,
       dueDate: doc?.dueDate || row.document?.dueDate || null,
       penaltyAmount: doc?.penaltyAmount,
+      entryLabel: row.entryLabel,
+      amount: Number.isFinite(amount) ? amount : undefined,
     };
   });
 }

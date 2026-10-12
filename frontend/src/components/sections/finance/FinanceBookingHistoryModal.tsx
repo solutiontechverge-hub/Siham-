@@ -4,7 +4,7 @@ import * as React from "react";
 import { Dialog, DialogContent, DialogTitle, IconButton, Stack, Typography } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { useGetBookingActivityQuery } from "../../../store/services/businessApi";
-import { formatNetAmountEur, type TransactionRow } from "../../../app/professionals/fixed-location/finance/data/transactions";
+import { formatNetAmountEur, formatEntryIdDisplay, type TransactionRow } from "../../../app/professionals/fixed-location/finance/data/transactions";
 
 export default function FinanceBookingHistoryModal({
   row,
@@ -19,6 +19,9 @@ export default function FinanceBookingHistoryModal({
     { skip: !open },
   );
   const items = data?.data ?? [];
+  const entryDisplay = row
+    ? formatEntryIdDisplay(row.entryType, row.entryId, row.entryLabel)
+    : "";
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
@@ -32,7 +35,7 @@ export default function FinanceBookingHistoryModal({
         {row ? (
           <Stack spacing={0.25} sx={{ mb: 2 }}>
             <Typography fontWeight={600}>Transaction details</Typography>
-            <Typography>Entry: {row.entryId ?? row.id}</Typography>
+            <Typography>Entry: {entryDisplay || row.id}</Typography>
             <Typography>Amount: {formatNetAmountEur(row.grossAmount ?? row.netAmount)}</Typography>
             <Typography>Status: {row.status}</Typography>
           </Stack>

@@ -49,15 +49,33 @@ export function resolveSalesPayerShares(input: {
   const snapshotServices = snapshot?.services ?? [];
 
   const serviceLineById = new Map(allLines.map((line) => [String(line.id), line]));
+  const usedLineIds = new Set<string>();
 
-  const lineFromService = (service: {
-    id: string;
-    name: string;
-    price: number;
-  }): SalesLineItem => {
-    const existing = serviceLineById.get(String(service.id));
-    if (existing) return existing;
-    return { id: String(service.id), label: service.name, amount: roundMoney(service.price) };
+  const lineFromService = (
+    service: { id: string; name: string; price: number; guestId?: string | null },
+    index = 0,
+  ): SalesLineItem => {
+    const guestKey = String(service.guestId ?? "");
+    const compositeId = `${service.id}::${guestKey}::${index}`;
+    const exact = serviceLineById.get(compositeId);
+    if (exact) {
+      usedLineIds.add(String(exact.id));
+      return exact;
+    }
+    for (const line of allLines) {
+      const id = String(line.id);
+      if (usedLineIds.has(id)) continue;
+      if (id.startsWith(`${service.id}::${guestKey}::`)) {
+        usedLineIds.add(id);
+        return line;
+      }
+    }
+    const plain = serviceLineById.get(String(service.id));
+    if (plain && !String(plain.id).includes("::") && !usedLineIds.has(String(plain.id))) {
+      usedLineIds.add(String(plain.id));
+      return plain;
+    }
+    return { id: compositeId, label: service.name, amount: roundMoney(service.price) };
   };
 
   if (people.length && snapshotServices.length) {
@@ -66,7 +84,7 @@ export function resolveSalesPayerShares(input: {
     const peopleById = new Map(people.map((p) => [String(p.id), p]));
     const groups = new Map<string, SalesLineItem[]>();
 
-    for (const service of snapshotServices) {
+    snapshotServices.forEach((service, index) => {
       const rawGuestId =
         service.guestId != null && String(service.guestId).trim() !== ""
           ? String(service.guestId).trim()
@@ -75,14 +93,12 @@ export function resolveSalesPayerShares(input: {
       // never fold those lines into the main client.
       const assigneeId = rawGuestId || requesterId;
       const prev = groups.get(assigneeId) ?? [];
-      prev.push(lineFromService(service));
+      prev.push(lineFromService(service, index));
       groups.set(assigneeId, prev);
-    }
+    });
 
-    // Products stay on main client
-    const productLines = allLines.filter(
-      (line) => !snapshotServices.some((s) => String(s.id) === String(line.id)),
-    );
+    // Products stay on main client (anything not claimed by snapshot service lines).
+    const productLines = allLines.filter((line) => !usedLineIds.has(String(line.id)));
     if (productLines.length) {
       groups.set(requesterId, [...(groups.get(requesterId) ?? []), ...productLines]);
     }
@@ -183,12 +199,21 @@ export function resolveSalesPayerShares(input: {
       const guestId = String(guest.id);
       if (usedKeys.has(guestId)) continue;
       const lines: SalesLineItem[] = [
-        ...(guest.services ?? []).map((s) => lineFromService(s)),
-        ...(guest.products ?? []).map((p) => ({
-          id: String(p.id),
-          label: p.quantity > 1 ? `${p.name} ×${p.quantity}` : p.name,
-          amount: roundMoney(p.price),
-        })),
+        ...(guest.services ?? []).map((s, index) =>
+          lineFromService({ ...s, guestId }, index),
+        ),
+        ...(guest.products ?? []).map((p, index) => {
+          const compositeId = `${p.id}::${guestId}::${index}`;
+          const existing =
+            serviceLineById.get(compositeId) ?? serviceLineById.get(String(p.id));
+          return (
+            existing ?? {
+              id: compositeId,
+              label: p.quantity > 1 ? `${p.name} ×${p.quantity}` : p.name,
+              amount: roundMoney(p.price),
+            }
+          );
+        }),
       ];
       if (!lines.length) continue;
 
@@ -240,13 +265,24 @@ export function resolveSalesPayerShares(input: {
     let guestOrdinal = 0;
 
     for (const guest of guests) {
+      const guestId = String(guest.id);
       const lines: SalesLineItem[] = [
-        ...(guest.services ?? []).map((s) => lineFromService(s)),
-        ...(guest.products ?? []).map((p) => ({
-          id: String(p.id),
-          label: p.quantity > 1 ? `${p.name} ×${p.quantity}` : p.name,
-          amount: roundMoney(p.price),
-        })),
+        ...(guest.services ?? []).map((s, index) =>
+          lineFromService({ ...s, guestId }, index),
+        ),
+        ...(guest.products ?? []).map((p, index) => {
+          const compositeId = `${p.id}::${guestId}::${index}`;
+          const existing =
+            serviceLineById.get(compositeId) ?? serviceLineById.get(String(p.id));
+          const line =
+            existing ??
+            ({
+              id: compositeId,
+              label: p.quantity > 1 ? `${p.name} ×${p.quantity}` : p.name,
+              amount: roundMoney(p.price),
+            } satisfies SalesLineItem);
+          return line;
+        }),
       ];
       for (const line of lines) assignedIds.add(String(line.id));
       if (!lines.length) continue;
@@ -257,7 +293,7 @@ export function resolveSalesPayerShares(input: {
       else guestOrdinal += 1;
 
       guestShares.push({
-        key: String(guest.id),
+        key: guestId,
         role: isModel ? "model" : "guest",
         label: isModel ? "Model" : "Guest",
         displayName: isModel
@@ -305,10 +341,10 @@ export function resolveSalesPayerShares(input: {
 
     for (const person of snapshotGuestPeople) {
       const personId = String(person.id);
-      const personServices = services.filter((s) => String(s.guestId ?? "") === personId);
-      const lines = personServices.length
-        ? personServices.map((s) => lineFromService(s))
-        : [];
+      const lines = services
+        .map((s, index) => ({ s, index }))
+        .filter(({ s }) => String(s.guestId ?? "") === personId)
+        .map(({ s, index }) => lineFromService(s, index));
       if (!lines.length) continue;
       for (const line of lines) assignedIds.add(String(line.id));
 

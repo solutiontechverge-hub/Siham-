@@ -8,6 +8,7 @@ import { formatManualEntryDiscountLabel } from "../../sections/finance/manualEnt
 import type { ManualEntryDiscount } from "../../sections/finance/manualEntry.data";
 import PrepaymentStatusIcon from "../calendar/PrepaymentStatusIcon";
 import type { BookingPriceBreakdownRow } from "./bookingFinance.types";
+import { financePriceTextSx } from "../finance-documents/financeDocumentUtils";
 import {
   formatFinanceEuro,
   prepaidBreakdownLabel,
@@ -81,6 +82,7 @@ function FinanceRow({
           <BodyText
             component="span"
             sx={{
+              ...financePriceTextSx,
               m: 0,
               fontSize: emphasize ? 16 : 13,
               fontWeight: 950,
@@ -148,6 +150,7 @@ export default function BookingPriceBreakdown({
               <BodyText
                 component="span"
                 sx={{
+                  ...financePriceTextSx,
                   m: 0,
                   fontSize: 13,
                   fontWeight: 800,
@@ -161,6 +164,7 @@ export default function BookingPriceBreakdown({
             <BodyText
               component="span"
               sx={{
+                ...financePriceTextSx,
                 m: 0,
                 fontSize: 16,
                 fontWeight: 950,

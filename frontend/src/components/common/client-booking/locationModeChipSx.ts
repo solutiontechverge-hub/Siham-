@@ -7,7 +7,8 @@ export const locationModeChipSx = {
   opacity: 1,
   bgcolor: "#E9F8F9",
   color: "#21B8BF",
-  fontFamily: '"Plus Jakarta Sans", inherit',
+  // ponytail: inherit shared Poppins body stack (Plus Jakarta was never loaded)
+  fontFamily: "inherit",
   fontWeight: 600,
   fontSize: 12,
   lineHeight: "20px",

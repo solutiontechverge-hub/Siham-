@@ -33,7 +33,7 @@ function TabButton({
         px: 1.1,
         borderRadius: "7px",
         textTransform: "none",
-        fontWeight: 800,
+        fontWeight: 600,
         fontSize: 12,
         bgcolor: active ? m.teal : alpha(m.navy, 0.02),
         color: active ? "#fff" : alpha(m.navy, 0.58),

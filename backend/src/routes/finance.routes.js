@@ -142,7 +142,8 @@ router.get(
 );
 
 router.get("/analytics", requireProfessional, getFinanceAnalytics);
-router.get("/transactions", requireProfessional, listFinanceTransactions);
+// Controller allows clients only when bookingId scopes to their own booking.
+router.get("/transactions", listFinanceTransactions);
 
 router.post(
   "/transactions",

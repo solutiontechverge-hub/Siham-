@@ -97,15 +97,12 @@ function LineRow({ line }: { line: SalesLineItem }) {
   const m = useTheme().palette.mollure;
   return (
     <Stack direction="row" justifyContent="space-between" spacing={1.5}>
-      <Typography
-        sx={mollureBodySx(m.navy)}
-      >
-        {line.label}
-      </Typography>
+      <Typography sx={mollureBodySx(m.navy)}>{line.label}</Typography>
       <Typography
         sx={mollureLabelSx(m.navy, {
           color: line.amount < 0 ? alpha(m.navy, 0.55) : alpha(m.navy, 0.82),
           flexShrink: 0,
+          textAlign: "right",
         })}
       >
         {formatCompactEuro(line.amount)}
@@ -140,6 +137,7 @@ function statusBadgeSx(
   }
   if (
     value === "payment due" ||
+    value === "prepayment due" ||
     value === "pending" ||
     value === "failed" ||
     value === "overdue" ||
@@ -181,6 +179,7 @@ function useActionsMenu(onAction?: (action: SalesCardMenuAction) => void) {
 function SalesActionsMenu({
   isAddon,
   limitedMenu,
+  downloadNoteOnly,
   showRefund,
   showMarkUnpaid,
   menuAnchor,
@@ -191,6 +190,8 @@ function SalesActionsMenu({
 }: {
   isAddon?: boolean;
   limitedMenu?: boolean;
+  /** Unpaid prepayment: Download Invoice + Add note only (Sales mock). */
+  downloadNoteOnly?: boolean;
   /** Show Refund when the sale has received money and is not already muted. */
   showRefund?: boolean;
   showMarkUnpaid?: boolean;
@@ -204,22 +205,29 @@ function SalesActionsMenu({
   const items: Array<{
     id: SalesCardMenuAction | "downloadInvoice";
     label: string;
-  }> = limitedMenu
+  }> = downloadNoteOnly
     ? [
-        { id: "editSales", label: "Edit Sales" },
-        { id: "cancelSales", label: "Void sale" },
-        ...(showRefund ? [{ id: "refundSales" as const, label: "Refund" }] : []),
         { id: "downloadInvoice", label: "Download Invoice" },
         { id: "addNote", label: "Add note" },
       ]
-    : [
-        { id: "editSales", label: "Edit Sales" },
-        { id: "cancelSales", label: "Void sale" },
-        ...(showMarkUnpaid ? [{ id: "markUnpaid" as const, label: "Mark as Unpaid" }] : []),
-        ...(showRefund ? [{ id: "refundSales" as const, label: "Refund" }] : []),
-        { id: "downloadInvoice", label: "Download Invoice" },
-        { id: "addNote", label: "Add note" },
-      ];
+    : limitedMenu
+      ? [
+          { id: "editSales", label: "Edit Sales" },
+          { id: "cancelSales", label: "Cancel Sales" },
+          ...(showRefund ? [{ id: "refundSales" as const, label: "Refund" }] : []),
+          { id: "downloadInvoice", label: "Download Invoice" },
+          { id: "addNote", label: "Add note" },
+        ]
+      : [
+          { id: "editSales", label: "Edit Sales" },
+          { id: "cancelSales", label: "Cancel Sales" },
+          ...(showMarkUnpaid
+            ? [{ id: "markUnpaid" as const, label: "Mark as Unpaid" }]
+            : []),
+          ...(showRefund ? [{ id: "refundSales" as const, label: "Refund" }] : []),
+          { id: "downloadInvoice", label: "Download Invoice" },
+          { id: "addNote", label: "Add note" },
+        ];
 
   return (
     <>
@@ -356,7 +364,8 @@ function SubSummaryCard({
     closeAll,
     run,
   } = useActionsMenu(onMenuAction);
-  const showReceipt = sub.paymentState === "paid";
+  const showReceipt =
+    sub.paymentState === "paid" || sub.paymentState === "voided";
 
   return (
     <Box
@@ -392,7 +401,7 @@ function SubSummaryCard({
         </Box>
         {sub.statusBadge ? (
           <Box sx={{ px: 0.85, py: 0.25, borderRadius: "999px", ...badge }}>
-            <Typography sx={{ fontSize: 10.5, fontWeight: 800 }}>
+            <Typography sx={{ fontSize: 10.5, fontWeight: 800, color: "inherit" }}>
               {sub.statusBadge}
             </Typography>
           </Box>
@@ -548,15 +557,73 @@ export default function SalesOverviewCard({
 
   const isGuestOrModel =
     card.payerRole === "guest" || card.payerRole === "model";
+  // Guest/model split cards: one teal Total Amount (no Payment row duplicate).
+  const guestTotalOnly =
+    isGuestOrModel && !(card.secondaryRows?.length) && !card.subCards?.length;
+  const isFeeSummary =
+    card.title === "Fee Summary" || card.title === "No-Show Fee Invoice";
   const badge = statusBadgeSx(card.statusBadge, m, card.paymentState);
+  // Individuals: no type badge. Business: BC only.
   const clientBadge =
-    card.clientKind === "company"
-      ? "BC Client"
-      : card.clientKind === "individual"
-        ? "IC Client"
-        : null;
+    !isGuestOrModel && card.clientKind === "company" ? "BC Client" : null;
+  const payerHeading = isGuestOrModel
+    ? card.payerLabel || card.clientName
+    : card.clientName;
   const showReceipt =
-    card.paymentState === "prepaid" || card.paymentState === "paid";
+    card.paymentState === "prepaid" ||
+    card.paymentState === "paid" ||
+    card.paymentState === "voided";
+  const downloadNoteOnly =
+    card.kind === "prepayment" &&
+    card.paymentState !== "prepaid" &&
+    card.paymentState !== "paid" &&
+    card.paymentState !== "refunded" &&
+    card.paymentState !== "voided";
+
+  const clientHeader = (
+    <>
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={0.75}
+        sx={{ mb: 0.15, flexWrap: "wrap" }}
+      >
+        <Typography
+          sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.82) }}
+        >
+          {payerHeading}
+        </Typography>
+        {clientBadge ? (
+          <Box
+            sx={{
+              px: 0.7,
+              py: 0.15,
+              borderRadius: "999px",
+              ...clientPlatformTagToneColors(m, "teal"),
+            }}
+          >
+            <Typography sx={{ fontSize: 10.5, fontWeight: 800 }}>
+              {clientBadge}
+            </Typography>
+          </Box>
+        ) : null}
+      </Stack>
+      {isGuestOrModel &&
+      card.clientName &&
+      card.clientName !== card.payerLabel ? (
+        <Typography
+          sx={{
+            fontSize: 12,
+            fontWeight: 700,
+            color: alpha(m.navy, 0.55),
+            mb: 0.35,
+          }}
+        >
+          {card.clientName}
+        </Typography>
+      ) : null}
+    </>
+  );
 
   return (
     <Box
@@ -582,70 +649,35 @@ export default function SalesOverviewCard({
         >
           {card.title}
         </Typography>
-        {card.statusBadge ? (
+        {card.statusBadge && !isFeeSummary ? (
           <Box sx={{ px: 1, py: 0.3, borderRadius: "999px", ...badge }}>
-            <Typography sx={{ fontSize: 11, fontWeight: 800 }}>
+            <Typography sx={{ fontSize: 11, fontWeight: 800, color: "inherit" }}>
               {card.statusBadge}
             </Typography>
           </Box>
         ) : null}
       </Stack>
 
-      <Stack
-        direction="row"
-        alignItems="center"
-        spacing={0.75}
-        sx={{ mb: 0.15, flexWrap: "wrap" }}
-      >
-        <Typography
-          sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.82) }}
-        >
-          {isGuestOrModel
-            ? card.payerLabel || card.clientName
-            : card.clientName}
-        </Typography>
-        {clientBadge ? (
-          <Box
-            sx={{
-              px: 0.7,
-              py: 0.15,
-              borderRadius: "999px",
-              ...clientPlatformTagToneColors(m, "teal"),
-            }}
-          >
-            <Typography sx={{ fontSize: 10.5, fontWeight: 800 }}>
-              {clientBadge}
+      {!useHighlightBox ? (
+        <>
+          {clientHeader}
+          {card.clientEmail ? (
+            <Typography
+              sx={{
+                fontSize: 11.5,
+                fontWeight: 600,
+                color: alpha(m.navy, 0.5),
+                mb: 1.15,
+              }}
+            >
+              {card.clientEmail}
             </Typography>
-          </Box>
-        ) : null}
-      </Stack>
-
-      {isGuestOrModel && card.clientName ? (
-        <Typography
-          sx={{
-            fontSize: 12,
-            fontWeight: 700,
-            color: alpha(m.navy, 0.55),
-            mb: 0.35,
-          }}
-        >
-          {card.clientName}
-        </Typography>
-      ) : null}
-
-      {card.clientEmail ? (
-        <Typography
-          sx={{
-            fontSize: 11.5,
-            fontWeight: 600,
-            color: alpha(m.navy, 0.5),
-            mb: 1.15,
-          }}
-        >
-          {card.clientEmail}
-        </Typography>
+          ) : (
+            <Box sx={{ mb: 1.15 }} />
+          )}
+        </>
       ) : (
-        <Box sx={{ mb: 1.15 }} />
+        <Box sx={{ mb: 0.35 }} />
       )}
 
       <Stack spacing={0.85} sx={{ mb: 1.15 }}>
@@ -659,6 +691,7 @@ export default function SalesOverviewCard({
               py: 0.85,
             }}
           >
+            <Box sx={{ mb: 0.65 }}>{clientHeader}</Box>
             <Stack spacing={0.65}>
               {highlightedLines.map((line) => (
                 <LineRow key={line.id} line={line} />
@@ -687,19 +720,29 @@ export default function SalesOverviewCard({
 
       <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.85 }}>
         <Typography
-          sx={{ fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.82) }}
+          sx={{
+            fontSize: guestTotalOnly ? 12 : 13,
+            fontWeight: guestTotalOnly ? 700 : 900,
+            color: alpha(m.navy, guestTotalOnly ? 0.55 : 0.82),
+          }}
         >
           {card.totalLabel || "Total"}
         </Typography>
         <Typography
           sx={{
-            fontSize: card.kind === "reissued_invoice" ? 22 : 13,
+            fontSize:
+              guestTotalOnly || card.kind === "reissued_invoice" ? 22 : 13,
             fontWeight: 900,
             color:
-              card.kind === "reissued_invoice" ? m.teal : alpha(m.navy, 0.88),
+              guestTotalOnly || card.kind === "reissued_invoice"
+                ? m.teal
+                : alpha(m.navy, 0.88),
+            lineHeight: 1.1,
+            textAlign: "right",
+            flexShrink: 0,
           }}
         >
-          {formatCompactEuro(card.total)}
+          {formatCompactEuro(guestTotalOnly ? card.highlightAmount : card.total)}
         </Typography>
       </Stack>
 
@@ -711,40 +754,118 @@ export default function SalesOverviewCard({
           sx={{ mb: 0.55 }}
         >
           <Typography
-            sx={mollureBodySx(m.navy)}
+            sx={{
+              fontSize: 12.5,
+              fontWeight: 600,
+              color: alpha(m.navy, 0.45),
+            }}
           >
             {row.label}
           </Typography>
           <Typography
-            sx={mollureLabelSx(m.navy)}
+            sx={{
+              fontSize: 12.5,
+              fontWeight: 700,
+              color: alpha(m.navy, 0.45),
+              textAlign: "right",
+              flexShrink: 0,
+            }}
           >
             {formatCompactEuro(row.amount)}
           </Typography>
         </Stack>
       ))}
 
-      <Box sx={{ mt: 0.75, mb: 0.85 }}>
-        <Typography
-          sx={{
-            fontSize: 12,
-            fontWeight: 700,
-            color: alpha(m.navy, 0.55),
-            mb: 0.2,
-          }}
-        >
-          {card.highlightLabel}
-        </Typography>
-        <Typography
-          sx={{ fontSize: 28, fontWeight: 900, color: m.teal, lineHeight: 1.1 }}
-        >
-          {formatCompactEuro(card.highlightAmount)}
-        </Typography>
-      </Box>
+      {!guestTotalOnly ? (
+        isFeeSummary ? (
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="baseline"
+            sx={{ mt: 0.75, mb: 0.85 }}
+          >
+            <Typography
+              sx={{
+                fontSize: 13,
+                fontWeight: 900,
+                color: alpha(m.navy, 0.82),
+              }}
+            >
+              {card.highlightLabel}
+            </Typography>
+            <Typography
+              sx={{
+                fontSize: 28,
+                fontWeight: 900,
+                color: m.teal,
+                lineHeight: 1.1,
+                textAlign: "right",
+                flexShrink: 0,
+              }}
+            >
+              {formatCompactEuro(card.highlightAmount)}
+            </Typography>
+          </Stack>
+        ) : (
+          <Box sx={{ mt: 0.75, mb: 0.85 }}>
+            <Typography
+              sx={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.55),
+                mb: 0.2,
+              }}
+            >
+              {card.highlightLabel}
+            </Typography>
+            <Typography
+              sx={{
+                fontSize: 28,
+                fontWeight: 900,
+                color: m.teal,
+                lineHeight: 1.1,
+              }}
+            >
+              {formatCompactEuro(card.highlightAmount)}
+            </Typography>
+          </Box>
+        )
+      ) : null}
 
-      {card.methodDateLine || card.dueDate ? (
+      {isFeeSummary ? (
+        <Stack spacing={0.2} sx={{ mb: 0.85 }}>
+          {card.statusBadge ? (
+            <Typography
+              sx={{
+                fontSize: 11.5,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.55),
+              }}
+            >
+              {card.statusBadge}
+            </Typography>
+          ) : null}
+          {(card.paymentMethodLabel || card.methodDateLine) && (
+            <Typography
+              sx={{
+                fontSize: 11.5,
+                fontWeight: 650,
+                color: alpha(m.navy, 0.5),
+              }}
+            >
+              {card.paymentMethodLabel || card.methodDateLine}
+            </Typography>
+          )}
+        </Stack>
+      ) : card.methodDateLine || card.dueDate ? (
         <MethodDateLine
           methodDateLine={card.methodDateLine}
-          dueDate={card.dueDate}
+          // Prepayment Due: source label only (no calendar / due-date suffix).
+          dueDate={
+            card.kind === "prepayment" && card.paymentState === "payment_due"
+              ? null
+              : card.dueDate
+          }
           paymentMethodLabel={card.paymentMethodLabel}
         />
       ) : null}
@@ -845,6 +966,7 @@ export default function SalesOverviewCard({
       <SalesActionsMenu
         isAddon={card.kind === "addon"}
         limitedMenu={card.limitedMenu}
+        downloadNoteOnly={downloadNoteOnly}
         showRefund={
           card.paymentState === "paid" || card.paymentState === "prepaid"
         }

@@ -3,6 +3,7 @@
 import * as React from "react";
 import type { CalendarBooking } from "../../../store/services/businessApi";
 import {
+  useGetBusinessSetupQuery,
   useGetProfessionalClientsQuery,
   useUpdateBookingStatusMutation,
 } from "../../../store/services/businessApi";
@@ -19,6 +20,7 @@ import {
   useUpsertSalesAddonMutation,
 } from "../../../store/services/financeApi";
 import {
+  parseApiCalendarEventId,
   parseStoredEbrFromNotes,
   parseStoredErFromNotes,
   serializeCalendarEntryNotes,
@@ -30,6 +32,9 @@ import type { TransactionRow } from "../../../app/professionals/fixed-location/f
 import { useSnackbar } from "../AppSnackbar";
 import {
   buildClientBookingTransactionRow,
+  findIssuedFinanceTransaction,
+  hasStoredDocumentSnapshot,
+  salesCardKindToPaymentPhase,
   useProfessionalBusinessOverride,
 } from "../finance-documents";
 import {
@@ -94,6 +99,13 @@ export function useSalesOverview({
   const { showSnackbar } = useSnackbar();
   const { settings: financeSettings } = useFinanceInvoiceSettings();
   const professionalBusinessOverride = useProfessionalBusinessOverride();
+  const { data: businessSetupResponse } = useGetBusinessSetupQuery({
+    includeDraft: false,
+  });
+  const lateCancellationFeePercentDefault =
+    businessSetupResponse?.data?.late_cancellation_fee_percentage != null
+      ? String(businessSetupResponse.data.late_cancellation_fee_percentage)
+      : undefined;
   const { data: clientsResponse } = useGetProfessionalClientsQuery();
   const [updateBookingStatus, { isLoading: cancelling }] =
     useUpdateBookingStatusMutation();
@@ -129,10 +141,19 @@ export function useSalesOverview({
     return () => configureSalesAddonPersistence(null);
   }, [saveSalesAddon]);
 
-  const financeQuery = currentEvent?.bookingCode || bookings[0]?.unique_code || bookings[0]?.id || "";
+  // Prefer the drawer booking so Fee Summary heal / View Invoice hit the right LCF row.
+  const parsedCurrentId = currentEvent
+    ? parseApiCalendarEventId(currentEvent.id)
+    : null;
+  const financeBookingId =
+    (parsedCurrentId?.kind === "booking" ? parsedCurrentId.id : null) ||
+    currentEvent?.bookingCode ||
+    bookings[0]?.id ||
+    bookings[0]?.unique_code ||
+    "";
   const { data: financeResponse } = useGetFinanceTransactionsQuery(
-    { q: String(financeQuery), limit: 50 },
-    { skip: !financeQuery },
+    { bookingId: String(financeBookingId), limit: 50 },
+    { skip: !financeBookingId },
   );
   const financeHints = React.useMemo(
     () => toFinanceHints(financeResponse?.data?.rows ?? []),
@@ -186,6 +207,7 @@ export function useSalesOverview({
         fallbackResourceId,
         financeHints,
         paymentTerms: financeSettings.paymentTerms,
+        lateCancellationFeePercentDefault,
       }),
     // revision forces rebuild after backend-backed sales mutations
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -199,6 +221,7 @@ export function useSalesOverview({
       fallbackResourceId,
       financeHints,
       financeSettings.paymentTerms,
+      lateCancellationFeePercentDefault,
       revision,
     ],
   );
@@ -319,8 +342,50 @@ export function useSalesOverview({
     subToCard,
   ]);
 
+  const resolveIssuedFinanceRow = React.useCallback(
+    async (card: SalesOverviewCardData, type: SalesDocumentType) => {
+      const phase =
+        type === "receipt" && card.kind === "prepayment"
+          ? "prepay"
+          : salesCardKindToPaymentPhase(card.kind);
+      const addonId =
+        card.kind === "addon"
+          ? card.id.replace(/^addon-/, "").replace(/-v\d+$/, "")
+          : undefined;
+      const matchOpts = {
+        bookingId: card.bookingId,
+        bookingCode: card.bookingCode,
+        phase,
+        addonId,
+      };
+      const cached = findIssuedFinanceTransaction(
+        financeResponse?.data?.rows ?? [],
+        matchOpts,
+      );
+      if (cached && hasStoredDocumentSnapshot(cached)) return cached;
+      try {
+        const result = await fetchFinanceTransactions({
+          bookingId: card.bookingId || card.bookingCode,
+          limit: 50,
+        }).unwrap();
+        return findIssuedFinanceTransaction(result.data?.rows ?? [], matchOpts);
+      } catch {
+        return cached;
+      }
+    },
+    [fetchFinanceTransactions, financeResponse?.data?.rows],
+  );
+
   const openDocument = React.useCallback(
-    (card: SalesOverviewCardData, type: SalesDocumentType) => {
+    async (card: SalesOverviewCardData, type: SalesDocumentType) => {
+      const issued = await resolveIssuedFinanceRow(card, type);
+      if (issued && hasStoredDocumentSnapshot(issued)) {
+        setDocRow(issued);
+        setDocType(type);
+        setDocOpen(true);
+        return;
+      }
+
       const draft = cardToDraft(card);
       if (!draft.services.length) {
         showSnackbar({
@@ -348,6 +413,9 @@ export function useSalesOverview({
         financeSettings,
         documentAmount: card.documentAmount,
         prepaymentAmount: isPrepayCard ? card.documentAmount : undefined,
+        prepaymentPaid: isPrepayCard
+          ? card.paymentState === "prepaid" || card.paymentState === "paid"
+          : undefined,
         asPrepaymentReceipt: type === "receipt" && isPrepayCard,
         methodTitle: checkoutPaymentMethodTitle(methodKey),
         methodDetail: checkoutPaymentMethodDetail(methodKey),
@@ -363,7 +431,7 @@ export function useSalesOverview({
       setDocType(type);
       setDocOpen(true);
     },
-    [clientsResponse?.data, financeSettings, showSnackbar],
+    [clientsResponse?.data, financeSettings, resolveIssuedFinanceRow, showSnackbar],
   );
 
   const bump = () => setRevision((n) => n + 1);
@@ -397,8 +465,9 @@ export function useSalesOverview({
   const handleDownload = React.useCallback(
     async (card: SalesOverviewCardData, format: "pdf" | "excel") => {
       try {
-        if (format === "pdf") await downloadSalesInvoicePdf(card);
-        else await downloadSalesInvoiceExcel(card);
+        const issued = await resolveIssuedFinanceRow(card, "invoice");
+        if (format === "pdf") await downloadSalesInvoicePdf(card, issued);
+        else await downloadSalesInvoiceExcel(card, issued);
         showSnackbar({
           severity: "success",
           message: SALES_OVERVIEW_COPY.downloadSuccess(format),
@@ -410,7 +479,7 @@ export function useSalesOverview({
         });
       }
     },
-    [showSnackbar],
+    [resolveIssuedFinanceRow, showSnackbar],
   );
 
   const handleRefundSales = async (card: SalesOverviewCardData) => {
@@ -649,19 +718,20 @@ export function useSalesOverview({
       }
 
       if (cancelCard.kind === "addon") {
-        listSalesAddons(cancelCard.bookingId)
-          .filter((addon) => !addon.refunded && !addon.voided)
-          .forEach((addon) => updateSalesAddon(addon.id, { voided: true }));
+        const addonId = cancelCard.id.startsWith("addon-")
+          ? cancelCard.id.slice("addon-".length)
+          : cancelCard.id;
+        updateSalesAddon(addonId, { voided: true });
       }
 
-      const seqMatch = cancelCard.id.match(/-v(\d+)$/);
+      // Void in place (grey Voided badge). Clear canceled so supersede-hide does not win on merge.
       upsertSalesCardMeta({
         bookingId: cancelCard.bookingId,
         cardKind: cancelCard.kind,
         cardId: cancelCard.id,
         note: cancelCard.note,
-        canceled: true,
-        invoiceSeq: seqMatch ? Number(seqMatch[1]) : 0,
+        voided: true,
+        canceled: false,
         paymentMethod: cancelCard.paymentMethod,
         dueDate: cancelCard.dueDate,
       });

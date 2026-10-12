@@ -1,5 +1,8 @@
 import type { TransactionRow } from "../../../app/professionals/fixed-location/finance/data/transactions";
-import { formatCurrencyDisplay } from "../../common/finance-documents/financeDocumentUtils";
+import {
+  formatCurrencyDisplay,
+  parseCurrencyValue,
+} from "../../common/finance-documents/financeDocumentUtils";
 
 export type RefundSalesItem = {
   id: string;
@@ -7,11 +10,6 @@ export type RefundSalesItem = {
   meta: string;
   amount?: number;
 };
-
-function moneyAmount(value: unknown): number {
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  return Number(String(value ?? "").replace(/[^\d.]/g, "")) || 0;
-}
 
 export const DEFAULT_REFUND_ITEMS: RefundSalesItem[] = [
   { id: "buzz-cut", name: "Buzz Cut", meta: "45 Mins • €25" },
@@ -46,28 +44,22 @@ export function refundItemsFromTransactions(rows: readonly TransactionRow[]): Re
   const primary = rows[0];
   const bookingItems = primary?.document?.bookingItems;
   if (bookingItems?.length) {
-    return bookingItems.map((item, index) => {
-      const amount = moneyAmount(item.value);
-      return {
-        id: `booking-${index}`,
-        name: item.label,
-        meta: formatCurrencyDisplay(amount),
-        amount,
-      };
-    });
+    return bookingItems.map((item, index) => ({
+      id: `booking-${index}`,
+      name: item.label,
+      meta: formatCurrencyDisplay(item.value),
+      amount: parseCurrencyValue(item.value),
+    }));
   }
 
   const lineItems = primary?.document?.lineItems;
   if (lineItems?.length) {
-    return lineItems.map((item, index) => {
-      const amount = moneyAmount(item.totalPrice);
-      return {
-        id: `line-${index}`,
-        name: item.description,
-        meta: formatCurrencyDisplay(amount),
-        amount,
-      };
-    });
+    return lineItems.map((item, index) => ({
+      id: `line-${index}`,
+      name: item.description,
+      meta: formatCurrencyDisplay(item.totalPrice),
+      amount: parseCurrencyValue(item.totalPrice),
+    }));
   }
 
   return [];

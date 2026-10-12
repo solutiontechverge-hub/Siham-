@@ -24,7 +24,7 @@ type PrepaymentStatusIconProps = {
 /** Maps legacy prepayment variants onto product guideline PNGs. */
 export default function PrepaymentStatusIcon({
   variant,
-  size = 16,
+  size = 24,
 }: PrepaymentStatusIconProps) {
   if (variant === "pending") {
     return <BookingGuidelineIcon variant="waiting_for_prepayment" size={size} />;

@@ -54,22 +54,37 @@ export function formatTransactionStatusLabel(status: TransactionStatus): string 
   }
 }
 
+/**
+ * Display Entry ID to match stored booking codes:
+ * - onlineBooking → digits only (strip `ol` / letters)
+ * - offlineBooking → `OF` + code body (preserve alphanumeric after `of`)
+ * - manualEntry → `M` + code body
+ */
 export function formatEntryIdDisplay(
   entryType: TransactionEntryType,
   entryId: string | null,
   entryLabel?: string,
 ): string {
-  if (entryId !== null && entryId !== undefined && entryId !== "") {
-    const raw = String(entryId).trim();
-    const digits = raw.replace(/\D/g, "");
-    if (digits) {
-      if (entryType === "offlineBooking") return `OF${digits}`;
-      if (entryType === "manualEntry" || entryLabel?.toLowerCase().includes("manual")) return `M${digits}`;
-      return digits;
-    }
-    return raw;
+  if (entryId === null || entryId === undefined || entryId === "") {
+    return entryLabel ?? "";
   }
-  return entryLabel ?? "";
+  const raw = String(entryId).trim();
+  if (!raw) return entryLabel ?? "";
+
+  const isManual =
+    entryType === "manualEntry" ||
+    Boolean(entryLabel?.toLowerCase().includes("manual"));
+
+  if (entryType === "offlineBooking") {
+    return `OF${raw.replace(/^of/i, "")}`;
+  }
+  if (isManual) {
+    return `M${raw.replace(/^m/i, "")}`;
+  }
+  // onlineBooking: numbers only
+  const body = raw.replace(/^ol/i, "");
+  const digits = body.replace(/\D/g, "");
+  return digits || body;
 }
 
 export function formatTransactionDate(isoDate: string | null): string {
@@ -183,6 +198,7 @@ export function buildManualEntryTransactionRow(input: ManualEntryTransactionInpu
   const stripeFee = isOnline ? Math.round(gross * 0.029 * 100) / 100 : 0;
   const mollureFee = isOnline ? Math.round(gross * 0.01 * 100) / 100 : 0;
   const net = gross - stripeFee - mollureFee;
+  const status = isOnline ? "Pending" : "Paid";
 
   return {
     id: `t-manual-${Date.now()}`,
@@ -199,11 +215,14 @@ export function buildManualEntryTransactionRow(input: ManualEntryTransactionInpu
     netAmount: net,
     methodTitle: isOnline ? "Online – direct" : "Offline – direct",
     methodDetail: "",
-    status: isOnline ? "Pending" : "Paid",
+    status,
     statusDetail: isOnline ? "Pay within 15 min" : undefined,
     document: {
       documentNumber: `INV-G${entryNum}`,
-      receiptNumber: isOnline ? undefined : `RCP-G${entryNum}`,
+      receiptNumber:
+        status === "Paid" || status === "Prepaid" || status === "Refunded"
+          ? `RCP-G${entryNum}`
+          : undefined,
       serviceDate: today,
       invoiceDate: today,
       dueDate: today,
@@ -223,10 +242,9 @@ export function getTransactionClientTypeLabel(type?: TransactionClientType): str
   switch (type) {
     case "mollure":
       return "M";
-    case "nonMollure":
-      return "IC";
     case "business":
       return "BC";
+    // Individuals (nonMollure): no type tag — Mollure logo handled separately.
     default:
       return null;
   }
@@ -257,6 +275,12 @@ export type TransactionDocumentParty = {
   address?: string;
   vatNumber?: string;
   cocNumber?: string;
+  /** Platform user id when the payer is a Mollure account. */
+  customerId?: string;
+  /** professional_clients.id when linked to the client list. */
+  clientId?: string;
+  /** True when payer is a Mollure platform client (may also be business). */
+  isMollure?: boolean;
 };
 
 export type TransactionDocumentLineItem = {
@@ -273,7 +297,8 @@ export type TransactionDocumentLineItem = {
 
 export type TransactionDocumentBookingItem = {
   label: string;
-  value: number;
+  /** Numeric amount; legacy snapshots may still carry a formatted display string. */
+  value: number | string;
 };
 
 export type TransactionDocument = {

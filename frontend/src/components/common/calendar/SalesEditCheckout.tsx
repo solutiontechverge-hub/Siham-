@@ -98,7 +98,7 @@ function collectPeople(card: SalesOverviewCardData): PersonChip[] {
   const people: PersonChip[] = [
     {
       id: card.payerKey || "main",
-      label: card.clientKind === "company" ? "BC Client" : "IC Client",
+      label: card.clientKind === "company" ? "BC Client" : "Client",
       name: card.clientName,
       role: "main_client",
     },
@@ -157,7 +157,7 @@ export default function SalesEditCheckout({
   const kindBadge =
     clientKind === "company" || card.clientKind === "company"
       ? "BC Client"
-      : "IC Client";
+      : null;
 
   const { productOptions, itemOptions, uniqueItemOptions } = React.useMemo(
     () =>
@@ -408,18 +408,20 @@ export default function SalesEditCheckout({
                 >
                   {card.clientName}
                 </Typography>
-                <Box
-                  sx={{
-                    px: 0.7,
-                    py: 0.15,
-                    borderRadius: "999px",
-                    ...clientPlatformTagToneColors(m, "teal"),
-                  }}
-                >
-                  <Typography sx={{ fontSize: 10.5, fontWeight: 800 }}>
-                    {kindBadge}
-                  </Typography>
-                </Box>
+                {kindBadge ? (
+                  <Box
+                    sx={{
+                      px: 0.7,
+                      py: 0.15,
+                      borderRadius: "999px",
+                      ...clientPlatformTagToneColors(m, "teal"),
+                    }}
+                  >
+                    <Typography sx={{ fontSize: 10.5, fontWeight: 800 }}>
+                      {kindBadge}
+                    </Typography>
+                  </Box>
+                ) : null}
               </Stack>
           {checkoutEmail.trim() || card.clientEmail ? (
             <Typography

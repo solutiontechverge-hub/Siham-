@@ -142,12 +142,17 @@ export default function BookingRequestBadge({
         sx={[
           isCompact
             ? {
-                height: 20,
-                borderRadius: "999px",
-                border: `1px solid ${alpha(m.navy, 0.25)}`,
-                bgcolor: alpha("#fff", 0.72),
-                color: alpha(m.navy, 0.78),
-                px: 0.65,
+                // Calendar cards stay dense; status rows override via bookingSecondaryStatusBadgeSx.
+                height: 16,
+                minHeight: 16,
+                maxHeight: 16,
+                boxSizing: "border-box",
+                borderRadius: "4px",
+                border: "none",
+                borderWidth: 0,
+                bgcolor: "#F2F4F7",
+                color: alpha(m.navy, 0.62),
+                px: 0.55,
                 flexShrink: 0,
                 pointerEvents: "auto",
               }
@@ -158,8 +163,9 @@ export default function BookingRequestBadge({
                 px: 1.25,
                 py: 0.65,
                 borderRadius: "10px",
-                bgcolor: alpha(m.navy, 0.04),
-                border: `1px solid ${alpha(m.navy, 0.08)}`,
+                bgcolor: "#F2F4F7",
+                border: "none",
+                borderWidth: 0,
               },
           ...(Array.isArray(sx) ? sx : [sx]),
         ]}

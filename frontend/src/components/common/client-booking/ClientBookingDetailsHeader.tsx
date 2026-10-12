@@ -19,6 +19,7 @@ import {
   mollureLabelSx,
   mollurePageTitleSx,
 } from "../../../theme/mollureHierarchy";
+import { MOLLURE_FONT_BODY } from "../../../theme/typography";
 import { BodyText } from "../../ui/typography";
 import { useSnackbar } from "../AppSnackbar";
 import { getApiErrorMessage } from "../../../lib/api-error";
@@ -285,7 +286,16 @@ export default function ClientBookingDetailsHeader({
               )}
             >
               Booking Details{" "}
-              <Box component="span" sx={{ color: m.teal }}>
+              <Box
+                component="span"
+                sx={{
+                  color: m.teal,
+                  fontFamily: MOLLURE_FONT_BODY,
+                  fontWeight: 700,
+                  fontVariantNumeric: "lining-nums tabular-nums",
+                  whiteSpace: "nowrap",
+                }}
+              >
                 #{bookingRef}
               </Box>
             </BodyText>
@@ -297,19 +307,19 @@ export default function ClientBookingDetailsHeader({
                 sx={{ mt: 0.65 }}
               >
                 <BodyText
-                  sx={mollureBodyMutedSx(m.navy, { m: 0 })}
+                  sx={mollureBodyMutedSx(m.navy, { m: 0, fontWeight: 400 })}
                 >
                   Booked on{" "}
                   <Box
                     component="span"
-                    sx={{ fontWeight: 900, color: alpha(m.navy, 0.88) }}
+                    sx={{ fontWeight: 400, color: alpha(m.navy, 0.88) }}
                   >
                     {bookedDateLabel}
                   </Box>
                   {bookedTimeLabel ? (
                     <Box
                       component="span"
-                      sx={{ fontWeight: 700, color: alpha(m.navy, 0.55) }}
+                      sx={{ fontWeight: 400, color: alpha(m.navy, 0.55) }}
                     >
                       {" "}
                       ({bookedTimeLabel})

@@ -172,16 +172,23 @@ export default function CalendarTeamMemberBookingsPopover({
                 </Box>
                 <Chip
                   size="small"
-                  variant="outlined"
                   label={statusLabel}
                   sx={{
                     ...statusChipSx(professionalCalendarDisplayStatus(booking)),
-                    height: 20,
+                    height: 24,
+                    minHeight: 24,
+                    maxHeight: 24,
+                    boxSizing: "border-box",
                     flexShrink: 0,
+                    fontWeight: 600,
+                    border: "none",
+                    borderWidth: 0,
                     "& .MuiChip-label": {
-                      px: 0.75,
-                      fontSize: 10,
-                      fontWeight: 800,
+                      px: 1.1,
+                      py: 0,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      lineHeight: "24px",
                     },
                   }}
                 />

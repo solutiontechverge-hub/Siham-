@@ -1,7 +1,14 @@
 import * as React from "react";
 import type { BookingServiceLineItem } from "../../../../data/bookingServiceEdit.data";
+import type { BookingProductLineItem } from "../../../../data/bookingProductCatalog.data";
+import type { BookingUniqueItemLine } from "../../../../data/bookingUniqueItem.data";
 import type { CalendarEvent } from "../../../../app/professionals/fixed-location/calendar/calendar.data";
 import { calendarEventIsGuest } from "../../../../app/professionals/fixed-location/calendar/calendar.data";
+import { useGetFinanceTransactionsQuery } from "../../../../store/services/financeApi";
+import {
+  findIssuedFinanceTransaction,
+  hasStoredDocumentSnapshot,
+} from "../../finance-documents";
 import { resolvePostBookingPendingPayment } from "../bookingCheckout";
 import {
   computeBookingPrice,
@@ -29,6 +36,8 @@ export type UseProfessionalFixedLocationCalendarDrawerPaymentDocsArgs = {
   paymentMethod: "online" | "offline";
   setPaymentMethod: React.Dispatch<React.SetStateAction<"online" | "offline">>;
   selectedServices: BookingServiceLineItem[];
+  selectedProducts: BookingProductLineItem[];
+  bookingUniqueItems: BookingUniqueItemLine[];
   selectedSlot: SelectedSlot | null;
   editingEventId: string | null;
   setEvents: React.Dispatch<React.SetStateAction<readonly CalendarEvent[]>>;
@@ -56,6 +65,8 @@ export function useProfessionalFixedLocationCalendarDrawerPaymentDocs({
   paymentMethod,
   setPaymentMethod,
   selectedServices,
+  selectedProducts,
+  bookingUniqueItems,
   selectedSlot,
   editingEventId,
   setEvents,
@@ -163,16 +174,31 @@ export function useProfessionalFixedLocationCalendarDrawerPaymentDocs({
     }
   }, [paymentMethod, paymentMethodPolicy, setPaymentMethod, viewingBookingEvent]);
 
+  // Calendar event ids are `b-<uuid>`; finance booking_id stores uuid or unique_code.
+  const drawerBookingKey =
+    viewingBookingEvent?.bookingCode ||
+    (viewingBookingEvent?.id || editingEventId || "").replace(/^b-/, "") ||
+    "";
+  const { data: drawerFinanceResponse } = useGetFinanceTransactionsQuery(
+    { bookingId: String(drawerBookingKey), limit: 50 },
+    { skip: !drawerBookingKey },
+  );
+  const drawerFinanceRows = drawerFinanceResponse?.data?.rows ?? [];
+
   const drawerDocumentDraft = React.useMemo(
     () =>
       buildDrawerDocumentDraft({
         selectedServices,
+        selectedProducts,
+        bookingUniqueItems,
         viewingBookingEvent,
         selectedSlot,
         bookingTotalForSave,
       }),
     [
       bookingTotalForSave,
+      bookingUniqueItems,
+      selectedProducts,
       selectedServices,
       selectedSlot?.date,
       selectedSlot?.start,
@@ -181,57 +207,71 @@ export function useProfessionalFixedLocationCalendarDrawerPaymentDocs({
     ],
   );
 
-  const drawerInvoiceRow = React.useMemo(
-    () =>
-      buildDrawerInvoiceRow({
-        drawerDocumentDraft,
-        viewingBookingEvent,
-        editingEventId,
-        selectedClient,
-        financeSettings,
-        showPrepayment,
-        prepaymentAmount,
-        drawerPaymentMethod,
-      }),
-    [
+  const drawerInvoiceRow = React.useMemo(() => {
+    const issued = findIssuedFinanceTransaction(drawerFinanceRows, {
+      bookingId: drawerBookingKey,
+      bookingCode: viewingBookingEvent?.bookingCode,
+      phase: "full",
+    });
+    if (issued && hasStoredDocumentSnapshot(issued)) return issued;
+    return buildDrawerInvoiceRow({
       drawerDocumentDraft,
-      drawerPaymentMethod,
+      viewingBookingEvent,
       editingEventId,
+      selectedClient,
       financeSettings,
-      prepaymentAmount,
-      selectedClient?.email,
-      selectedClient?.name,
       showPrepayment,
-      viewingBookingEvent?.bookingCode,
-    ],
-  );
-
-  const drawerReceiptRow = React.useMemo(
-    () =>
-      buildDrawerReceiptRow({
-        drawerDocumentDraft,
-        prepaymentAmount,
-        isDrawerPrepaymentPaid,
-        drawerPaymentIsOffline,
-        viewingBookingEvent,
-        editingEventId,
-        selectedClient,
-        financeSettings,
-        drawerPaymentMethod,
-      }),
-    [
-      drawerDocumentDraft,
-      drawerPaymentIsOffline,
-      drawerPaymentMethod,
-      editingEventId,
-      financeSettings,
-      isDrawerPrepaymentPaid,
       prepaymentAmount,
-      selectedClient?.email,
-      selectedClient?.name,
-      viewingBookingEvent?.bookingCode,
-    ],
-  );
+      isDrawerPrepaymentPaid,
+      drawerPaymentMethod,
+    });
+  }, [
+    drawerBookingKey,
+    drawerDocumentDraft,
+    drawerFinanceRows,
+    drawerPaymentMethod,
+    editingEventId,
+    financeSettings,
+    isDrawerPrepaymentPaid,
+    prepaymentAmount,
+    selectedClient?.email,
+    selectedClient?.name,
+    showPrepayment,
+    viewingBookingEvent,
+  ]);
+
+  const drawerReceiptRow = React.useMemo(() => {
+    const issued = findIssuedFinanceTransaction(drawerFinanceRows, {
+      bookingId: drawerBookingKey,
+      bookingCode: viewingBookingEvent?.bookingCode,
+      phase: "prepay",
+    });
+    if (issued && hasStoredDocumentSnapshot(issued)) return issued;
+    return buildDrawerReceiptRow({
+      drawerDocumentDraft,
+      prepaymentAmount,
+      isDrawerPrepaymentPaid,
+      drawerPaymentIsOffline,
+      viewingBookingEvent,
+      editingEventId,
+      selectedClient,
+      financeSettings,
+      drawerPaymentMethod,
+    });
+  }, [
+    drawerBookingKey,
+    drawerDocumentDraft,
+    drawerFinanceRows,
+    drawerPaymentIsOffline,
+    drawerPaymentMethod,
+    editingEventId,
+    financeSettings,
+    isDrawerPrepaymentPaid,
+    prepaymentAmount,
+    selectedClient?.email,
+    selectedClient?.name,
+    viewingBookingEvent,
+  ]);
 
   return {
     postBookingPendingPayment,

@@ -3,6 +3,7 @@
 import { Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { formatBookingEur } from "../../../data/bookingLinePricing";
+import { financePriceTextSx } from "../finance-documents/financeDocumentUtils";
 import { BodyText } from "../../ui/typography";
 
 type BookingLineAmountProps = {
@@ -27,12 +28,14 @@ export default function BookingLineAmount({
       {showOriginal ? (
         <BodyText
           sx={{
+            ...financePriceTextSx,
             m: 0,
             fontSize: 11,
             fontWeight: 800,
             color: alpha(m.navy, 0.38),
             textDecoration: "line-through",
             lineHeight: 1.1,
+            whiteSpace: "nowrap",
           }}
         >
           €{formatBookingEur(originalAmount)}
@@ -40,11 +43,13 @@ export default function BookingLineAmount({
       ) : null}
       <BodyText
         sx={{
+          ...financePriceTextSx,
           m: 0,
           fontSize: 13,
           fontWeight: 900,
           color: alpha(m.navy, 0.82),
           lineHeight: 1.15,
+          whiteSpace: "nowrap",
         }}
       >
         €{formatBookingEur(amount)}

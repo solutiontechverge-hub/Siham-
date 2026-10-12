@@ -84,7 +84,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
                 flexShrink: 0,
               }}
             >
-              <PaymentDueIcon size={18} />
+              <PaymentDueIcon size={24} />
             </Box>
             <Box sx={{ minWidth: 0 }}>
               <BodyText
@@ -156,7 +156,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
                 flexShrink: 0,
               }}
             >
-              <PaymentDueIcon size={18} />
+              <PaymentDueIcon size={24} />
             </Box>
             <BodyText
               sx={{

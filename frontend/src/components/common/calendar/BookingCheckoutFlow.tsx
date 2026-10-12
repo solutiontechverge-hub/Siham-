@@ -89,8 +89,8 @@ export default function BookingCheckoutFlow({
   const allShares = React.useMemo(() => {
     const snapshotServices = event.details?.clientSnapshot?.services ?? [];
     const allLines: SalesLineItem[] = snapshotServices.length
-      ? snapshotServices.map((service) => ({
-          id: service.id,
+      ? snapshotServices.map((service, index) => ({
+          id: `${service.id}::${String(service.guestId ?? "")}::${index}`,
           label: service.name,
           amount: Math.round((service.price + Number.EPSILON) * 100) / 100,
         }))
@@ -100,6 +100,21 @@ export default function BookingCheckoutFlow({
             label: service.name,
             amount: Math.round((service.price + Number.EPSILON) * 100) / 100,
           })),
+          ...(event.details?.guests ?? []).flatMap((guest) => [
+            ...(guest.services ?? []).map((service, index) => ({
+              id: `${service.id}::${String(guest.id)}::${index}`,
+              label: service.name,
+              amount: Math.round((service.price + Number.EPSILON) * 100) / 100,
+            })),
+            ...(guest.products ?? []).map((product, index) => ({
+              id: `${product.id}::${String(guest.id)}::${index}`,
+              label:
+                product.quantity > 1
+                  ? `${product.name} ×${product.quantity}`
+                  : product.name,
+              amount: Math.round((product.price + Number.EPSILON) * 100) / 100,
+            })),
+          ]),
           ...(event.details?.products ?? []).map((product) => ({
             id: product.id,
             label:

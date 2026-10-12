@@ -10,31 +10,24 @@ import type { ProfileResponse } from "../../../store/services/profileApi";
 import { useSnackbar } from "../AppSnackbar";
 import { BodyText, SubHeading } from "../../ui/typography";
 import {
+  mollureBodyMutedSx,
   mollurePageTitleSx,
-  mollureSectionTitleSx,
 } from "../../../theme/mollureHierarchy";
 import {
-  formatDocumentDateTime,
-  formatPaymentMethod,
+  formatDocumentDate,
   getIssuedDocument,
-  getProfessionalProfile,
   hasStoredDocumentSnapshot,
   parseCurrencyValue,
-  professionalBusinessInfoLines,
-  receiptItemsTitleForStatus,
   receiptNumberLabelForStatus,
   receiptTitleForStatus,
-  resolveProfessionalBusinessDisplay,
+  receiptItemsTitleForStatus,
+  displayReceiptNumber,
   financePreviewCardSx,
   formatCurrencyDisplay,
-  toInvoiceDisplayLineItems,
+  formatPaymentMethod,
   type PreviewLineItem,
 } from "./financeDocumentUtils";
-import FinanceInfoBlock from "./FinanceInfoBlock";
-import {
-  FinanceMutedLines,
-  FinancePreviewLabelValueRow,
-} from "./FinancePreviewRows";
+import { FinancePreviewLabelValueRow } from "./FinancePreviewRows";
 import type { FinanceProfessionalBusinessOverride } from "./financeDocumentTypes";
 import type { FinanceInvoiceTemplateType } from "./useFinanceInvoiceSettings";
 
@@ -52,57 +45,33 @@ export default function FinanceReceiptPreview({
   row,
   lineItems,
   totalPriceLabel,
-  invoiceType = "individual",
-  profileData = null,
-  professionalBusinessOverride = null,
   onDownload,
 }: Props) {
   const m = useTheme().palette.mollure;
   const { showSnackbar } = useSnackbar();
   const frozenDocument = hasStoredDocumentSnapshot(row);
   const document = getIssuedDocument(row);
-  const professionalProfile = frozenDocument ? null : getProfessionalProfile(profileData);
-  const professionalDisplay = resolveProfessionalBusinessDisplay(
-    professionalBusinessOverride,
-    professionalProfile,
-  );
-  const professionalLines = professionalBusinessInfoLines(
-    professionalDisplay,
-    invoiceType,
-  );
-  const displayLineItems = React.useMemo(
-    // Receipts must preserve stored transaction rows exactly as invoices do.
-    () => toInvoiceDisplayLineItems(lineItems, invoiceType, true),
-    [invoiceType, lineItems],
-  );
 
+  const isRefund = row?.status === "Refunded";
   const receiptTitle = receiptTitleForStatus(row?.status);
-  const itemsTitle = receiptItemsTitleForStatus(row?.status);
   const receiptNumberLabel = receiptNumberLabelForStatus(row?.status);
-  const invoiceNumber =
-    document?.documentNumber || "—";
-  const receiptNumber =
-    document?.creditNoteNumber ||
-    document?.receiptNumber ||
-    "—";
+  const itemsTitle = receiptItemsTitleForStatus(row?.status);
+  const amountLabel = isRefund
+    ? "Total Amount (VAT included)"
+    : "Amount (VAT included)";
+  const invoiceNumber = document?.documentNumber || "—";
+  const receiptNumber = displayReceiptNumber(row?.status, document) || "—";
   const date =
-    formatDocumentDateTime(
+    formatDocumentDate(
       document?.refundedAt ||
         document?.serviceDate ||
         document?.invoiceDate ||
         row?.date,
-        document?.serviceTime,
     ) || "";
   const paymentMethod = frozenDocument
     ? [row?.methodTitle, row?.methodDetail].filter(Boolean).join(" ")
     : formatPaymentMethod(row);
   const paymentStatus = row?.status ?? "Paid";
-  const refundAmount = document?.refundAmount;
-  const isRefund = row?.status === "Refunded";
-  const prepaidAmountLabel = document?.prepaymentAmount;
-  const prepaymentDateTime = row?.issuedAt
-    ? new Date(row.issuedAt).toLocaleString()
-    : row?.date;
 
   const downloadReceiptPdf = React.useCallback(async () => {
     if (onDownload) {
@@ -127,57 +96,58 @@ export default function FinanceReceiptPreview({
       const metaRows = [
         ["Invoice Number", invoiceNumber],
         [receiptNumberLabel, receiptNumber],
-        ["Date and time", date],
-        ...(isRefund && refundAmount
-          ? [["Refund Amount", refundAmount] as const]
-          : []),
+        ["Date", date],
         ["Payment Method", paymentMethod],
         ["Payment Status", paymentStatus],
       ] as const;
       metaRows.forEach(([label, value]) => {
         doc.setFont("helvetica", "normal");
         doc.text(label, left, y);
-        doc.text(formatCurrencyDisplay(value), left + usableWidth, y, { align: "right" });
+        doc.text(formatCurrencyDisplay(value), left + usableWidth, y, {
+          align: "right",
+        });
         y += 20;
       });
 
-      y += 10;
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(11);
-      doc.text("Professional's Business Info", left, y);
-      y += 16;
-      doc.setFont("helvetica", "normal");
-      professionalLines.forEach((line) => {
-        doc.text(line, left, y);
+      if (isRefund && lineItems.length > 0) {
         y += 16;
-      });
-
-      y += 12;
-      doc.setFont("helvetica", "bold");
-      doc.text(itemsTitle, left, y);
-      y += 18;
-      doc.setFont("helvetica", "normal");
-      displayLineItems.forEach((item) => {
-        doc.text(item.displayDescription, left, y);
-        doc.text(formatCurrencyDisplay(item.totalPrice), left + usableWidth, y, { align: "right" });
-        y += 18;
-      });
-      if (
-        !frozenDocument && prepaidAmountLabel &&
-        !displayLineItems.some((item) => item.description.toLowerCase() === "prepayment")
-      ) {
-        doc.text("Prepayment", left, y);
-        doc.text(formatCurrencyDisplay(prepaidAmountLabel), left + usableWidth, y, { align: "right" });
-        y += 18;
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(120);
+        doc.text(itemsTitle, left, y);
+        doc.setTextColor(0);
+        y += 16;
+        lineItems.forEach((item, index) => {
+          if (index > 0) {
+            doc.setDrawColor(220);
+            doc.line(left, y, left + usableWidth, y);
+            y += 16;
+          }
+          doc.setFont("helvetica", "normal");
+          doc.text(item.description || "—", left, y);
+          doc.setFont("helvetica", "bold");
+          doc.text(
+            formatCurrencyDisplay(item.totalPrice),
+            left + usableWidth,
+            y,
+            { align: "right" },
+          );
+          y += 18;
+        });
       }
 
-      y += 8;
+      y += 12;
       doc.setDrawColor(220);
       doc.line(left, y, left + usableWidth, y);
       y += 20;
       doc.setFont("helvetica", "bold");
-      doc.text("Total Amount (VAT included)", left, y);
-      doc.text(formatCurrencyDisplay(totalPriceLabel), left + usableWidth, y, { align: "right" });
+      doc.setTextColor(0);
+      doc.text(amountLabel, left, y);
+      doc.text(formatCurrencyDisplay(totalPriceLabel), left + usableWidth, y, {
+        align: "right",
+      });
+      y += 14;
+      doc.setDrawColor(220);
+      doc.line(left, y, left + usableWidth, y);
 
       doc.save(`receipt-${receiptNumber}.pdf`);
       showSnackbar({
@@ -191,20 +161,18 @@ export default function FinanceReceiptPreview({
       });
     }
   }, [
+    amountLabel,
     date,
     invoiceNumber,
     isRefund,
     itemsTitle,
-    displayLineItems,
+    lineItems,
     onDownload,
     paymentMethod,
     paymentStatus,
-    prepaidAmountLabel,
-    professionalLines,
     receiptNumber,
     receiptNumberLabel,
     receiptTitle,
-    refundAmount,
     showSnackbar,
     totalPriceLabel,
   ]);
@@ -221,13 +189,7 @@ export default function FinanceReceiptPreview({
           label={receiptNumberLabel}
           value={receiptNumber}
         />
-        <FinancePreviewLabelValueRow label="Date and time" value={date} />
-        {isRefund && refundAmount ? (
-          <FinancePreviewLabelValueRow
-            label="Refund Amount"
-            value={formatCurrencyDisplay(refundAmount)}
-          />
-        ) : null}
+        <FinancePreviewLabelValueRow label="Date" value={date} />
         <FinancePreviewLabelValueRow
           label="Payment Method"
           value={paymentMethod}
@@ -238,44 +200,35 @@ export default function FinanceReceiptPreview({
         />
       </Stack>
 
-      <FinanceInfoBlock title="Professional's Business Info" sx={{ mt: 2 }}>
-        <FinanceMutedLines lines={professionalLines} navy={m.navy} />
-      </FinanceInfoBlock>
-
-      <BodyText sx={mollureSectionTitleSx(m.navy, { mt: 2.25, mb: 1.1 })}>
-        {itemsTitle}
-      </BodyText>
-
-      <Stack spacing={0.85}>
-        {displayLineItems.map((item, index) => (
-          <FinancePreviewLabelValueRow
-            key={`${item.displayDescription}-${index}`}
-            label={item.displayDescription}
-            value={formatCurrencyDisplay(item.totalPrice)}
-            variant="line"
-          />
-        ))}
-        {!frozenDocument && prepaidAmountLabel &&
-        !displayLineItems.some(
-          (item) => item.description.toLowerCase() === "prepayment",
-        ) ? (
-          <FinancePreviewLabelValueRow
-            label={prepaymentDateTime ? `Prepayment · ${prepaymentDateTime}` : "Prepayment"}
-            value={formatCurrencyDisplay(prepaidAmountLabel)}
-            variant="line"
-          />
-        ) : null}
-      </Stack>
+      {isRefund && lineItems.length > 0 ? (
+        <Stack spacing={1.15} sx={{ mt: 2.25 }}>
+          <BodyText sx={mollureBodyMutedSx(m.navy)}>{itemsTitle}</BodyText>
+          {lineItems.map((item, index) => (
+            <React.Fragment key={`${item.description}-${index}`}>
+              {index > 0 ? (
+                <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
+              ) : null}
+              <FinancePreviewLabelValueRow
+                label={item.description || "—"}
+                value={formatCurrencyDisplay(item.totalPrice)}
+                variant="line"
+              />
+            </React.Fragment>
+          ))}
+        </Stack>
+      ) : null}
 
       <Divider sx={{ my: 1.75, borderColor: alpha(m.navy, 0.1) }} />
 
       <FinancePreviewLabelValueRow
-        label="Total Amount (VAT included)"
+        label={amountLabel}
         value={formatCurrencyDisplay(totalPriceLabel)}
         variant="total"
       />
 
-      <Stack direction="row" justifyContent="center" sx={{ mt: 2.5 }}>
+      <Divider sx={{ my: 1.75, borderColor: alpha(m.navy, 0.1) }} />
+
+      <Stack direction="row" justifyContent="center" sx={{ mt: 0.5 }}>
         <AppButton
           variant="outlined"
           startIcon={<FileDownloadOutlinedIcon sx={{ fontSize: 18 }} />}
@@ -293,7 +246,7 @@ export default function FinanceReceiptPreview({
             },
           }}
         >
-          Download {isRefund ? "Credit Note" : "Receipt"}
+          Download Receipt
         </AppButton>
       </Stack>
     </Box>
@@ -305,6 +258,9 @@ export function resolveReceiptTotalLabel(
   lineItems: PreviewLineItem[],
 ) {
   const document = getIssuedDocument(row);
+  if (row?.status === "Refunded" && document?.refundAmount != null) {
+    return document.refundAmount;
+  }
   if (document?.paidAmount) return document.paidAmount;
   if (document?.totalPrice) return document.totalPrice;
   if (hasStoredDocumentSnapshot(row)) return row?.grossAmount || row?.netAmount || "€0.00";

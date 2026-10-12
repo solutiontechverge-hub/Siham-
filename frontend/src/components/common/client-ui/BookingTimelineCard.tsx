@@ -247,12 +247,16 @@ function renderScenarioBadge(
         spacing={0.35}
         sx={[
           {
-            height: 20,
-            borderRadius: "999px",
-            border: `1px solid ${alpha(m.navy, 0.25)}`,
-            bgcolor: alpha("#fff", 0.72),
-            color: alpha(m.navy, 0.78),
-            px: 0.65,
+            height: 16,
+            minHeight: 16,
+            maxHeight: 16,
+            boxSizing: "border-box",
+            borderRadius: "4px",
+            border: "none",
+            borderWidth: 0,
+            bgcolor: "#F2F4F7",
+            color: alpha(m.navy, 0.62),
+            px: 0.55,
             pointerEvents: "auto",
             flexShrink: 0,
           },
@@ -557,7 +561,7 @@ export default function BookingTimelineCard({
                   borderRadius: "4px",
                   fontSize: 7.5,
                   fontWeight: 600,
-                  border: "1px solid",
+                  border: "none",
                   "& .MuiChip-label": { px: 0.55, py: 0, lineHeight: 1.15 },
                 },
                 ...(Array.isArray(status.sx) ? status.sx : [status.sx]),
@@ -581,15 +585,19 @@ export default function BookingTimelineCard({
                     : undefined
                 }
                 sx={{
-                  height: 18,
-                  borderRadius: "5px",
-                  fontSize: 8.5,
+                  height: 16,
+                  minHeight: 16,
+                  maxHeight: 16,
+                  boxSizing: "border-box",
+                  borderRadius: "4px",
+                  fontSize: 7.5,
                   fontWeight: 800,
-                  border: `1px solid ${alpha(m.teal, 0.4)}`,
-                  bgcolor: alpha(m.teal, 0.12),
-                  color: m.teal,
+                  border: "none",
+                  borderWidth: 0,
+                  bgcolor: "#F2F4F7",
+                  color: alpha(m.navy, 0.62),
                   cursor: onUpdatedClick ? "pointer" : "default",
-                  "& .MuiChip-label": { px: 0.85 },
+                  "& .MuiChip-label": { px: 0.55, py: 0, lineHeight: "16px" },
                 }}
               />
             </Tooltip>

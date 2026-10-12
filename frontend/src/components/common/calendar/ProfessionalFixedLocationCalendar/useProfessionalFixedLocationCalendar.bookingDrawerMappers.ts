@@ -34,17 +34,38 @@ export function bookingEventLiveKey(ev: CalendarEvent) {
 
 export function buildDrawerDocumentDraft(input: {
   selectedServices: readonly BookingServiceLineItem[];
+  selectedProducts?: readonly BookingProductLineItem[];
+  bookingUniqueItems?: readonly BookingUniqueItemLine[];
   viewingBookingEvent: CalendarEvent | null;
   selectedSlot: SelectedSlot | null;
   bookingTotalForSave: number;
 }) {
   const {
     selectedServices,
+    selectedProducts = [],
+    bookingUniqueItems = [],
     viewingBookingEvent,
     selectedSlot,
     bookingTotalForSave,
   } = input;
-  if (!selectedServices.length) return null;
+  const products = [
+    ...selectedProducts.map((product) => ({
+      id: product.id,
+      name: product.name,
+      price: Number(product.price) || 0,
+      quantity: Math.max(1, Number(product.quantity) || 1),
+      unitPrice: Number(product.unitPrice) || Number(product.price) || 0,
+    })),
+    ...bookingUniqueItems.map((item) => ({
+      id: item.id,
+      name: item.name,
+      price: Number(item.price) || 0,
+      quantity: Math.max(1, Number(item.quantity) || 1),
+      unitPrice: Number(item.unitPrice) || Number(item.price) || 0,
+    })),
+  ];
+  // Product-only drafts are valid — do not null out when services are empty.
+  if (!selectedServices.length && !products.length) return null;
   return {
     selectedDateISO: viewingBookingEvent?.date ?? selectedSlot?.date ?? "",
     selectedTime: viewingBookingEvent?.start ?? selectedSlot?.start ?? "",
@@ -55,6 +76,7 @@ export function buildDrawerDocumentDraft(input: {
       price: Number(service.price) || 0,
       durationMins: Number(service.durationMins) || 30,
     })),
+    products,
     total: bookingTotalForSave,
   };
 }
@@ -73,6 +95,7 @@ export function buildDrawerInvoiceRow(input: {
   >[0]["financeSettings"];
   showPrepayment: boolean;
   prepaymentAmount: number;
+  isDrawerPrepaymentPaid: boolean;
   drawerPaymentMethod: string;
 }) {
   const {
@@ -83,19 +106,21 @@ export function buildDrawerInvoiceRow(input: {
     financeSettings,
     showPrepayment,
     prepaymentAmount,
+    isDrawerPrepaymentPaid,
     drawerPaymentMethod,
   } = input;
   if (!drawerDocumentDraft) return null;
   const bookingRef =
     viewingBookingEvent?.bookingCode ?? editingEventId ?? "booking";
+  const showPrepaidRow = showPrepayment && prepaymentAmount > 0;
   return buildClientBookingTransactionRow({
     bookingRef,
     draft: drawerDocumentDraft,
     requesterName: selectedClient?.name ?? "Client",
     requesterEmail: selectedClient?.email,
     financeSettings,
-    prepaymentAmount:
-      showPrepayment && prepaymentAmount > 0 ? prepaymentAmount : undefined,
+    prepaymentAmount: showPrepaidRow ? prepaymentAmount : undefined,
+    prepaymentPaid: showPrepaidRow ? isDrawerPrepaymentPaid : undefined,
     methodTitle: checkoutPaymentMethodTitle(drawerPaymentMethod),
     methodDetail: checkoutPaymentMethodDetail(drawerPaymentMethod),
   });

@@ -17,7 +17,46 @@ import {
 import { upsertSalesCardMeta } from "../salesOverview.storage";
 import type { SalesCheckoutPaymentMethod } from "../salesOverview.types";
 import type { CalendarEvent } from "../../../../app/professionals/fixed-location/calendar/calendar.data";
+import {
+  isProtectiveFeeLineDescription,
+  LATE_CANCELLATION_BOOKING_FEE,
+  LATE_RESCHEDULING_FEE,
+} from "../../finance-documents/protectiveFeeInvoice";
 import type { UseProfessionalFixedLocationCalendarBookingPersistArgs } from "./useProfessionalFixedLocationCalendar.bookingPersist";
+
+function resolveCheckoutEntryLabel(input: {
+  mode: string;
+  payerLabel?: string;
+  status?: string | null;
+  lines: Array<{ id?: string; label?: string }>;
+}): string {
+  if (input.mode === "split" && input.payerLabel) return input.payerLabel;
+  const lines = input.lines ?? [];
+  if (!lines.length) return "After treatment";
+  const allFee = lines.every((line) => {
+    const ref = String(line.id ?? "");
+    return (
+      ref.startsWith("late-cancellation") ||
+      ref.startsWith("late-reschedule") ||
+      ref.startsWith("no-show") ||
+      isProtectiveFeeLineDescription(line.label)
+    );
+  });
+  if (!allFee) return "After treatment";
+  const status = String(input.status ?? "").toLowerCase();
+  if (
+    status === "cancelled" ||
+    status === "canceled" ||
+    lines.some((line) => String(line.id ?? "").startsWith("late-cancellation"))
+  ) {
+    return LATE_CANCELLATION_BOOKING_FEE;
+  }
+  if (lines.some((line) => String(line.id ?? "").startsWith("late-reschedule"))) {
+    return LATE_RESCHEDULING_FEE;
+  }
+  if (status === "no show" || status === "no_show") return "No-show fee";
+  return LATE_CANCELLATION_BOOKING_FEE;
+}
 
 export function useProfessionalFixedLocationCalendarBookingPersistCheckout(
   args: UseProfessionalFixedLocationCalendarBookingPersistArgs,
@@ -42,8 +81,8 @@ export function useProfessionalFixedLocationCalendarBookingPersistCheckout(
       const current = viewingBookingEvent;
       const prepaidApplied = isDrawerPrepaymentPaid ? prepaymentAmount : 0;
       const allLines = (current.details?.clientSnapshot?.services ?? []).map(
-        (service) => ({
-          id: service.id,
+        (service, index) => ({
+          id: `${service.id}::${String(service.guestId ?? "")}::${index}`,
           label: service.name,
           amount: Number(service.price) || 0,
         }),
@@ -150,34 +189,69 @@ export function useProfessionalFixedLocationCalendarBookingPersistCheckout(
         });
       }
 
-      if (isDirect) {
-        try {
-          await createFinanceTransaction({
-            clientName: result.payerName || selectedClient?.name || "Client",
-            clientEmail:
-              result.clientEmail || selectedClient?.email || "",
-            clientType:
-              selectedClient?.clientKind === "company" ? "company" : "individual",
-            paymentMethod: result.paymentMethod as "onlineDirect" | "offlineDirect",
-            totalPrice: result.amount,
-            lines: result.lines.map((line) => ({
+      try {
+        const details = current.details;
+        const productIds = new Set([
+          ...(details?.products ?? []).map((product) => String(product.id)),
+          ...(details?.guests ?? []).flatMap((guest) =>
+            (guest.products ?? []).map((product) => String(product.id)),
+          ),
+        ]);
+        const serviceIds = new Set([
+          ...(details?.clientSnapshot?.services ?? []).map((service) =>
+            String(service.id),
+          ),
+          ...(details?.services ?? []).map((service) => String(service.id)),
+          ...(details?.guests ?? []).flatMap((guest) =>
+            (guest.services ?? []).map((service) => String(service.id)),
+          ),
+        ]);
+        await createFinanceTransaction({
+          clientName: result.payerName || selectedClient?.name || "Client",
+          clientEmail: result.clientEmail || selectedClient?.email || "",
+          clientType:
+            selectedClient?.clientKind === "company" ? "company" : "individual",
+          paymentMethod: result.paymentMethod,
+          totalPrice: result.amount,
+          dueDate: result.dueDate,
+          lines: result.lines.map((line) => {
+            const sourceReference = String(line.id).split("::")[0];
+            const sourceType =
+              productIds.has(sourceReference)
+                ? "productId"
+                : serviceIds.has(sourceReference)
+                  ? "serviceId"
+                  : sourceReference.startsWith("unique-") ||
+                      sourceReference === "kilometer-allowance" ||
+                      sourceReference.startsWith("late-reschedule") ||
+                      sourceReference.startsWith("late-cancellation") ||
+                      sourceReference.startsWith("no-show") ||
+                      sourceReference === "discount"
+                    ? "uniqueItemCode"
+                    : "serviceId";
+            return {
               name: line.label,
               quantity: 1,
               unitPrice: line.amount,
-              sourceReference: line.id,
-              sourceType: "serviceId",
-            })),
-            bookingId,
-            bookingRef: current.bookingCode,
-            paymentPhase: "full",
-            entryLabel: result.mode === "split" ? result.payerLabel : "After treatment",
-          }).unwrap();
-        } catch {
-          showSnackbar({
-            severity: "warning",
-            message: "Payment saved on the booking, but finance sync failed.",
-          });
-        }
+              sourceReference,
+              sourceType,
+            };
+          }),
+          bookingId,
+          bookingRef: current.bookingCode,
+          paymentPhase: "full",
+          entryLabel: resolveCheckoutEntryLabel({
+            mode: result.mode,
+            payerLabel: result.payerLabel,
+            status: current.status,
+            lines: result.lines,
+          }),
+        }).unwrap();
+      } catch {
+        showSnackbar({
+          severity: "warning",
+          message: "Payment saved on the booking, but finance sync failed.",
+        });
       }
 
       if (allSettled) {

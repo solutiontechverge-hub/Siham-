@@ -353,6 +353,7 @@ export function useClientBookingDetails({
     requesterUserType,
     draft,
     bookingRef,
+    bookingId: apiBookingId,
     requesterName,
     requesterEmail: user?.email,
     requesterAddress,

@@ -197,17 +197,22 @@ export function manualEntryClientFields(
       clientEmail: client.email,
       vatNumber: client.vat,
       cocNumber: client.coc,
-      clientType: client.tags.includes("Mollure")
-        ? "mollure"
-        : client.kind === "company"
-          ? "business"
+      // Company wins for BC tag; Mollure logo comes from document.client.isMollure.
+      clientType: client.kind === "company"
+        ? "business"
+        : client.tags.includes("Mollure")
+          ? "mollure"
           : "nonMollure",
     };
   }
   return {
     clientName: selection.client.name,
     clientEmail: selection.client.email,
-    clientType: "mollure",
+    clientType:
+      (selection.client as MollureDirectoryRow & { user_type?: string }).user_type ===
+      "company"
+        ? "business"
+        : "mollure",
     vatNumber: (selection.client as MollureDirectoryRow & { vat?: string }).vat,
     cocNumber: (selection.client as MollureDirectoryRow & { coc?: string }).coc,
   };

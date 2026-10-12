@@ -166,7 +166,7 @@ export default function SalesOverview({
                 flexShrink: 0,
               }}
             >
-              <PaymentDueIcon size={18} />
+              <PaymentDueIcon size={24} />
             </Box>
             <Box sx={{ minWidth: 0 }}>
               <Typography

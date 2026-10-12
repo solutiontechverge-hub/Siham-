@@ -1,12 +1,13 @@
 "use client";
 
 import { Box, Chip, Stack, Tooltip } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
 import type {
   BookingRequestDirection,
   ClientBookingStatus,
 } from "../../../app/clients/booking/clientBookingRecords";
 import {
+  bookingSecondaryStatusBadgeSx,
+  bookingSecondaryStatusChipSx,
   bookingStatusChipColors,
   bookingStatusLabel,
 } from "../../../app/clients/booking/clientBookingStatus";
@@ -16,6 +17,15 @@ import BookingRequestReceivedIcon from "../calendar/BookingRequestReceivedIcon";
 import BookingIndicatorIcon from "../calendar/BookingIndicatorIcon";
 import PrepaymentStatusIcon from "../calendar/PrepaymentStatusIcon";
 import EditRequestIndicatorIcon from "./EditRequestIndicatorIcon";
+
+const STATUS_ICON_BOX = {
+  display: "grid",
+  placeItems: "center",
+  width: 24,
+  height: 24,
+  lineHeight: 0,
+  flexShrink: 0,
+} as const;
 
 export type BookingRequestRowMode =
   | "default"
@@ -64,7 +74,6 @@ function ScenarioPill({
   title?: string;
   onClick?: () => void;
 }) {
-  const m = useTheme().palette.mollure;
   const chip = (
     <Chip
       size="small"
@@ -76,15 +85,8 @@ function ScenarioPill({
       }
       onClick={onClick}
       sx={{
-        height: 18,
-        fontWeight: 800,
-        fontSize: 9,
-        borderRadius: "6px",
-        bgcolor: alpha(m.navy, 0.06),
-        color: alpha(m.navy, 0.62),
-        border: `1px solid ${alpha(m.navy, 0.14)}`,
+        ...bookingSecondaryStatusChipSx,
         cursor: onClick ? "pointer" : "default",
-        "& .MuiChip-label": { px: 0.7, py: 0, lineHeight: 1.2 },
       }}
     />
   );
@@ -116,7 +118,6 @@ export default function BookingRequestStatusRow({
   onErClick,
   onWaitingForPrepaymentClick,
 }: Props) {
-  const m = useTheme().palette.mollure;
   const isEbrIncoming = rowMode === "professional_suggested";
   const isEbrRejected =
     rowMode === "professional_rejected" &&
@@ -170,38 +171,41 @@ export default function BookingRequestStatusRow({
         ? bookingRequestSent
         : bookingRequestSent || bookingStatus === "requested"));
 
+  const waitingForResponse =
+    !responseOverdue &&
+    !isTerminal &&
+    !isCompleted &&
+    ((showBrPill && !showBrAcceptedPill) || showErPill || isEbrIncoming);
+
   return (
     <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
       <Chip
         label={chipLabel}
         size="small"
         sx={{
-          height: 18,
-          fontWeight: 800,
-          fontSize: 9,
+          height: 24,
+          minHeight: 24,
+          maxHeight: 24,
+          boxSizing: "border-box",
+          fontWeight: 600,
+          fontSize: 11,
           borderRadius: "6px",
           bgcolor: chipColors.bgcolor,
           color: chipColors.color,
           border: chipColors.border,
-          "& .MuiChip-label": { px: 0.7, py: 0, lineHeight: 1.2 },
+          borderWidth: chipColors.border === "none" ? 0 : undefined,
+          "& .MuiChip-label": {
+            px: 1.1,
+            py: 0,
+            lineHeight: "24px",
+            display: "flex",
+            alignItems: "center",
+          },
         }}
       />
 
       {showUpdated && !isEbrIncoming && !showErPill ? (
-        <Chip
-          label="Updated"
-          size="small"
-          sx={{
-            height: 18,
-            fontWeight: 800,
-            fontSize: 9,
-            borderRadius: "6px",
-            bgcolor: alpha(m.teal, 0.12),
-            color: m.teal,
-            border: `1px solid ${alpha(m.teal, 0.4)}`,
-            "& .MuiChip-label": { px: 0.7, py: 0, lineHeight: 1.2 },
-          }}
-        />
+        <Chip label="Updated" size="small" sx={bookingSecondaryStatusChipSx} />
       ) : null}
 
       {showEditScenario &&
@@ -242,16 +246,27 @@ export default function BookingRequestStatusRow({
           iconSize={12}
           state={showBrAcceptedPill ? "accepted" : "sent"}
           direction={bookingRequestDirection}
+          sx={bookingSecondaryStatusBadgeSx}
         />
+      ) : null}
+
+      {waitingForResponse ? (
+        <Box
+          title="Waiting for response"
+          aria-label="Waiting for response"
+          sx={STATUS_ICON_BOX}
+        >
+          <BookingIndicatorIcon variant="response_time_active" size={24} />
+        </Box>
       ) : null}
 
       {responseOverdue && !isTerminal && !isCompleted ? (
         <Box
           title="Overdue response"
           aria-label="Overdue response"
-          sx={{ display: "grid", placeItems: "center" }}
+          sx={STATUS_ICON_BOX}
         >
-          <BookingIndicatorIcon variant="overdue_response" size={16} />
+          <BookingIndicatorIcon variant="overdue_response" size={24} />
         </Box>
       ) : null}
 
@@ -263,27 +278,26 @@ export default function BookingRequestStatusRow({
           aria-label="Waiting for prepayment — pay now"
           onClick={onWaitingForPrepaymentClick}
           sx={{
-            display: "grid",
-            placeItems: "center",
-            border: 0,
+            ...STATUS_ICON_BOX,
+            border: "none",
             padding: 0,
             bgcolor: "transparent",
             cursor: onWaitingForPrepaymentClick ? "pointer" : "default",
-            borderRadius: "6px",
+            borderRadius: "8px",
             "&:hover": onWaitingForPrepaymentClick
-              ? { bgcolor: alpha(m.navy, 0.06) }
+              ? { opacity: 0.88 }
               : undefined,
           }}
         >
-          <PrepaymentStatusIcon variant="pending" size={18} />
+          <PrepaymentStatusIcon variant="pending" size={24} />
         </Box>
       ) : requiresPrepayment && prepaymentPaid && !isTerminal ? (
         <Box
           title="Prepayment received"
           aria-label="Prepayment received"
-          sx={{ display: "grid", placeItems: "center" }}
+          sx={STATUS_ICON_BOX}
         >
-          <PrepaymentStatusIcon variant="confirmed" size={18} />
+          <PrepaymentStatusIcon variant="confirmed" size={24} />
         </Box>
       ) : null}
 
@@ -291,9 +305,9 @@ export default function BookingRequestStatusRow({
         <Box
           title="Waiting for payment"
           aria-label="Waiting for payment"
-          sx={{ display: "grid", placeItems: "center" }}
+          sx={STATUS_ICON_BOX}
         >
-          <BookingIndicatorIcon variant="waiting_for_payment" size={16} />
+          <BookingIndicatorIcon variant="waiting_for_payment" size={24} />
         </Box>
       ) : null}
 
@@ -301,9 +315,9 @@ export default function BookingRequestStatusRow({
         <Box
           title="Overdue payment"
           aria-label="Overdue payment"
-          sx={{ display: "grid", placeItems: "center" }}
+          sx={STATUS_ICON_BOX}
         >
-          <BookingIndicatorIcon variant="overdue_payment" size={16} />
+          <BookingIndicatorIcon variant="overdue_payment" size={24} />
         </Box>
       ) : null}
     </Stack>

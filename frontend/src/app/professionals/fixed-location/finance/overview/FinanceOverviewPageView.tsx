@@ -227,11 +227,12 @@ export default function FinanceOverviewPageView() {
         }
         onOpenNote={(row) => openNoteModal(row.id)}
         onEntryClick={(row) => {
-          if (row.bookingId) {
-            router.push(
-              `/professionals/calendar?booking=${encodeURIComponent(row.bookingId)}${row.date ? `&date=${encodeURIComponent(row.date)}` : ""}`,
-            );
-          }
+          if (!row.bookingId) return;
+          // Prefer unique_code (entryId) for bookingCode match; bookingId covers UUID / b-<uuid>.
+          const ref = row.entryId || row.bookingId;
+          router.push(
+            `/professionals/calendar?booking=${encodeURIComponent(ref)}${row.date ? `&date=${encodeURIComponent(row.date)}` : ""}`,
+          );
         }}
         onClientClick={(row) => {
           const params = new URLSearchParams();

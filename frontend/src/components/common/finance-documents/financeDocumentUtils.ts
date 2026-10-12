@@ -1,5 +1,6 @@
 import { alpha } from "@mui/material/styles";
 import { mollureBodyMutedSx } from "../../../theme/mollureHierarchy";
+import { MOLLURE_FONT_BODY } from "../../../theme/typography";
 import type {
   TransactionDocumentBookingItem,
   TransactionDocumentLineItem,
@@ -10,7 +11,15 @@ import type {
   ProfileResponse,
 } from "../../../store/services/profileApi";
 import type { FinanceProfessionalBusinessOverride } from "./financeDocumentTypes";
+import { ensureProtectiveFeeLineDescription } from "./protectiveFeeInvoice";
 import type { FinanceInvoiceSettings, FinanceInvoiceTemplateType } from "./useFinanceInvoiceSettings";
+
+/** Poppins lining figures — price digits stay on one baseline (no old-style serif numerals). */
+export const financePriceTextSx = {
+  fontFamily: MOLLURE_FONT_BODY,
+  fontVariantNumeric: "lining-nums tabular-nums",
+  textAlign: "right",
+} as const;
 
 /** Shared muted meta/line copy on invoice + receipt previews. */
 export function financeMutedTextSx(
@@ -148,20 +157,32 @@ export function professionalBusinessInfoLines(
   invoiceType: FinanceInvoiceTemplateType,
 ) {
   if (invoiceType !== "company") return [`Professional: ${display.shopName}`];
-  const lines = [
+  return [
     `Legal Name: ${display.legalName}`,
-    `COC No: ${display.coc}`,
-    `VAT No: ${display.vat}`,
-    `Address: ${display.location}`,
+    `Professional Address: ${display.location}`,
+    `Professional VAT No: ${display.vat}`,
+    `Professional COC No: ${display.coc}`,
   ];
-  return lines;
 }
 
 export function parseCurrencyValue(input?: number | string | null) {
   if (typeof input === "number") return Number.isFinite(input) ? input : 0;
   if (!input) return 0;
-  const normalized = input.replace(/[^0-9.,-]/g, "").replace(/,/g, "");
-  const parsed = Number(normalized);
+  let cleaned = input.replace(/[^0-9,.-]/g, "");
+  if (!cleaned || cleaned === "-") return 0;
+  const hasComma = cleaned.includes(",");
+  const hasDot = cleaned.includes(".");
+  if (hasComma && hasDot) {
+    cleaned =
+      cleaned.lastIndexOf(",") > cleaned.lastIndexOf(".")
+        ? cleaned.replace(/\./g, "").replace(",", ".")
+        : cleaned.replace(/,/g, "");
+  } else if (hasComma) {
+    cleaned = /,\d{1,2}$/.test(cleaned)
+      ? cleaned.replace(",", ".")
+      : cleaned.replace(/,/g, "");
+  }
+  const parsed = Number(cleaned);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
@@ -177,7 +198,12 @@ export function formatCurrencyValue(amount: number) {
 /** Format numeric API values only when rendering; also supports legacy string snapshots. */
 export function formatCurrencyDisplay(value?: number | string | null) {
   if (typeof value === "number") return formatCurrencyValue(value);
-  return value || formatCurrencyValue(0);
+  if (value == null || value === "") return formatCurrencyValue(0);
+  // Legacy formatted snapshots stay as stored; bare numeric strings get formatted.
+  if (/^-?\d+(?:[.,]\d+)?$/.test(String(value).trim())) {
+    return formatCurrencyValue(parseCurrencyValue(value));
+  }
+  return String(value);
 }
 
 export function isBusinessInvoiceTemplate(
@@ -224,14 +250,15 @@ export function getInvoiceLineItemColumns(
   if (layout === "simplified") {
     return [
       { key: "description", label: "Description", pdfWidth: 360 },
-      { key: "totalPrice", label: "Total", pdfWidth: 130, align: "right" },
+      { key: "totalPrice", label: "Price (Incl. VAT)", pdfWidth: 130, align: "right" },
     ];
   }
   return [
-    { key: "description", label: "Description", pdfWidth: 190 },
-    { key: "vat", label: "VAT", pdfWidth: 60 },
-    { key: "pricePerUnit", label: "Price per unit", pdfWidth: 110, align: "right" },
-    { key: "totalPrice", label: "Total", pdfWidth: 90, align: "right" },
+    { key: "description", label: "Description", pdfWidth: 150 },
+    { key: "unit", label: "Quantity", pdfWidth: 55 },
+    { key: "vat", label: "VAT %", pdfWidth: 55 },
+    { key: "pricePerUnit", label: "Price Per Unit", pdfWidth: 110, align: "right" },
+    { key: "totalPrice", label: "Total Price", pdfWidth: 90, align: "right" },
   ];
 }
 
@@ -385,20 +412,23 @@ export function buildPreviewLineItems(_settings: FinanceInvoiceSettings, row?: T
     ? document.lineItems.filter((item) => item && typeof item === "object")
     : [];
   if (storedLineItems.length) {
-    return normalizePreviewLineItems(storedLineItems);
+    return normalizePreviewLineItems(storedLineItems).map((item) => {
+      const feeMeta = item as PreviewLineItem & {
+        feePercent?: number;
+        feeBaseAmount?: number;
+      };
+      const enriched = ensureProtectiveFeeLineDescription(item.description, {
+        entryLabel: row?.entryLabel,
+        percent: feeMeta.feePercent,
+        baseAmount: feeMeta.feeBaseAmount,
+      });
+      return enriched === item.description
+        ? item
+        : { ...item, description: enriched };
+    });
   }
-
-  // Never reconstruct missing historical lines from today's catalog/settings.
-  const totalAmount = parseCurrencyValue(document?.totalPrice) || parseCurrencyValue(row?.grossAmount) || parseCurrencyValue(row?.netAmount) || 0;
-  if (hasStoredDocumentSnapshot(row) && !totalAmount) return [];
-  if (!document && !row) return [];
-  return [{
-    description: "Professional Service",
-    quantity: 1,
-    vat: "0%",
-    pricePerUnit: totalAmount,
-    totalPrice: totalAmount,
-  }];
+  // Never invent filler lines when stored document lines are empty.
+  return [];
 }
 
 export function buildBookingItems(row: TransactionRow | null, lineItems: PreviewLineItem[]): TransactionDocumentBookingItem[] {
@@ -409,7 +439,7 @@ export function buildBookingItems(row: TransactionRow | null, lineItems: Preview
   if (hasStoredDocumentSnapshot(row)) return [];
   return lineItems.map((item) => ({
     label: item.description,
-    value: typeof item.totalPrice === "number" ? item.totalPrice : 0,
+    value: parseCurrencyValue(item.totalPrice),
   }));
 }
 
@@ -421,13 +451,51 @@ export function formatPaymentMethod(row?: TransactionRow | null) {
 }
 
 export function receiptTitleForStatus(status?: TransactionRow["status"]) {
-  return status === "Refunded" ? "Credit Note" : "Receipt";
+  return status === "Refunded" ? "Refund Receipt" : "Receipt";
 }
 
 export function receiptItemsTitleForStatus(status?: TransactionRow["status"]) {
   return status === "Refunded" ? "Refunded Items" : "Paid Items";
 }
 
-export function receiptNumberLabelForStatus(status?: TransactionRow["status"]) {
-  return status === "Refunded" ? "Credit note number" : "Receipt number";
+export function receiptNumberLabelForStatus(_status?: TransactionRow["status"]) {
+  return "Receipt number";
+}
+
+/** Receipt number shown in UI: only Prepaid|Paid|Refunded mint; Voided → "voided". */
+export function displayReceiptNumber(
+  status?: TransactionRow["status"] | null,
+  document?: {
+    creditNoteNumber?: string;
+    receiptNumber?: string;
+  } | null,
+): string | undefined {
+  if (status === "Voided") return "voided";
+  if (status !== "Paid" && status !== "Prepaid" && status !== "Refunded") {
+    return undefined;
+  }
+  return document?.creditNoteNumber || document?.receiptNumber || undefined;
+}
+
+/** Confirmed / prepaid status green (matches booking Confirmed accent). */
+export const INVOICE_PREPAID_GREEN = "#22B573";
+
+/** True when the invoice prepayment row should read "Prepaid" (collected), not "Prepayment" (due). */
+export function isInvoicePrepaymentCollected(
+  status?: TransactionRow["status"] | null,
+): boolean {
+  if (!status) return false;
+  return (
+    status !== "Prepayment due" &&
+    status !== "Pending" &&
+    status !== "Failed"
+  );
+}
+
+export function formatInvoicePrepaymentLabel(
+  status?: TransactionRow["status"] | null,
+  dateTime?: string | null,
+): string {
+  const word = isInvoicePrepaymentCollected(status) ? "Prepaid" : "Prepayment";
+  return dateTime ? `${word} · ${dateTime}` : word;
 }

@@ -27,29 +27,15 @@ import {
   formatNetAmountEur,
   formatTransactionDate,
   formatTransactionStatusLabel,
-  getTransactionClientTypeLabel,
   getTransactionStatusTone,
   isTransactionClientClickable,
   shouldShowTransactionClientEmail,
-  type TransactionClientType,
   type TransactionRow,
   type TransactionStatus,
 } from "../../../app/professionals/fixed-location/finance/data/transactions";
-import {
-  MollureLogoMark,
-  clientPlatformTagToneColors,
-} from "../../common/ClientPlatformTag";
+import ClientPlatformTag from "../../common/ClientPlatformTag";
 import { BodyText } from "../../ui/typography";
-
-function clientTypeChipSx(theme: Theme, clientType?: TransactionClientType) {
-  // Guest stays navy; IC / BC use the shared teal hierarchy.
-  const tone = clientType === "guest" ? "navy" : "teal";
-  const { color, bgcolor, border } = clientPlatformTagToneColors(
-    theme.palette.mollure,
-    tone,
-  );
-  return { bgcolor, color, border };
-}
+import { displayReceiptNumber } from "../../common/finance-documents/financeDocumentUtils";
 
 function statusChipSx(status: TransactionStatus, theme: Theme) {
   const tone = getTransactionStatusTone(status);
@@ -149,19 +135,23 @@ export default function TransactionsTable({
                   sx={{ p: 0.5 }}
                 />
               </TableCell>
-              {[
-                "Entry ID",
-                "Transaction date",
-                "Client name",
-                "Net amount",
-                "Trans. type",
-                "Trans. status",
-                "Invoice and receipts",
-              ].map((h) => (
+              {(
+                [
+                  ["Entry ID", 100],
+                  ["Transaction date", 130],
+                  ["Client name", 160],
+                  ["Net amount", 100],
+                  ["Trans. type", 120],
+                  ["Trans. status", 110],
+                  ["Invoice and receipts", 150],
+                ] as const
+              ).map(([h, minWidth]) => (
                 <TableCell
                   key={h}
                   sx={{
                     py: 1.2,
+                    minWidth,
+                    whiteSpace: "nowrap",
                     borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
                   }}
                 >
@@ -177,9 +167,6 @@ export default function TransactionsTable({
           </TableHead>
           <TableBody>
             {rows.map((row) => {
-              const clientTypeLabel = getTransactionClientTypeLabel(
-                row.clientType,
-              );
               const showClientEmail = shouldShowTransactionClientEmail(row);
               const entryDisplay = formatEntryIdDisplay(
                 row.entryType,
@@ -189,7 +176,10 @@ export default function TransactionsTable({
               const dateDisplay = formatTransactionDate(row.date);
               const tooltip = netAmountTooltip(row);
               const invoiceNo = row.document?.documentNumber;
-              const receiptNo = row.document?.receiptNumber;
+              const receiptNo = displayReceiptNumber(row.status, {
+                creditNoteNumber: row.document?.creditNoteNumber,
+                receiptNumber: row.document?.receiptNumber,
+              });
               const clientClickable = isTransactionClientClickable(
                 row.clientType,
               );
@@ -201,6 +191,7 @@ export default function TransactionsTable({
                   sx={{
                     "& td": {
                       borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
+                      verticalAlign: "middle",
                     },
                   }}
                 >
@@ -212,35 +203,53 @@ export default function TransactionsTable({
                       sx={{ p: 0.5 }}
                     />
                   </TableCell>
-                  <TableCell sx={{ verticalAlign: "top" }}>
-                    {row.bookingId && onEntryClick ? (
-                      <MuiLink
-                        component="button"
-                        type="button"
-                        underline="hover"
-                        onClick={() => onEntryClick(row)}
-                        sx={mollureLabelSx(theme.palette.mollure.navy, {
-                          color: theme.palette.primary.main,
-                          border: 0,
-                          bgcolor: "transparent",
-                          p: 0,
-                          cursor: "pointer",
-                          fontFamily: "inherit",
-                          textAlign: "left",
-                        })}
-                      >
-                        {entryDisplay}
-                      </MuiLink>
-                    ) : (
-                      <BodyText
-                        component="span"
-                        sx={mollureLabelSx(m.navy)}
-                      >
-                        {entryDisplay}
-                      </BodyText>
-                    )}
+                  <TableCell>
+                    <Stack spacing={0.25}>
+                      {row.bookingId && onEntryClick ? (
+                        <MuiLink
+                          component="button"
+                          type="button"
+                          underline="hover"
+                          onClick={() => onEntryClick(row)}
+                          sx={mollureLabelSx(theme.palette.mollure.navy, {
+                            color: theme.palette.primary.main,
+                            border: 0,
+                            bgcolor: "transparent",
+                            p: 0,
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                            textAlign: "left",
+                          })}
+                        >
+                          {entryDisplay}
+                        </MuiLink>
+                      ) : (
+                        <BodyText
+                          component="span"
+                          sx={mollureLabelSx(m.navy)}
+                        >
+                          {entryDisplay}
+                        </BodyText>
+                      )}
+                      {/* Same booking Entry ID across PRE/AT/fees — phase label distinguishes rows. */}
+                      {row.entryLabel &&
+                      entryDisplay &&
+                      row.entryLabel !== entryDisplay ? (
+                        <BodyText
+                          component="span"
+                          sx={{
+                            fontSize: 10.5,
+                            fontWeight: 600,
+                            color: alpha(m.navy, 0.48),
+                            maxWidth: 140,
+                          }}
+                        >
+                          {row.entryLabel}
+                        </BodyText>
+                      ) : null}
+                    </Stack>
                   </TableCell>
-                  <TableCell sx={{ verticalAlign: "top" }}>
+                  <TableCell>
                     <Stack spacing={0.35}>
                       <BodyText
                         component="span"
@@ -272,7 +281,7 @@ export default function TransactionsTable({
                       ) : null}
                     </Stack>
                   </TableCell>
-                  <TableCell sx={{ verticalAlign: "top", minWidth: 160 }}>
+                  <TableCell sx={{ minWidth: 160 }}>
                     <Stack spacing={0.35}>
                       <Stack
                         direction="row"
@@ -313,27 +322,16 @@ export default function TransactionsTable({
                             {row.clientName}
                           </BodyText>
                         )}
-                        {row.clientType === "mollure" ? (
-                          <MollureLogoMark size={14} />
-                        ) : clientTypeLabel ? (
-                          <Chip
-                            label={clientTypeLabel}
-                            size="small"
-                            sx={{
-                              height: 16,
-                              borderRadius: "999px",
-                              fontWeight: 700,
-                              textTransform: "none",
-                              "& .MuiChip-label": {
-                                fontSize: 9,
-                                px: 0.65,
-                                py: 0,
-                                lineHeight: 1.2,
-                              },
-                              ...clientTypeChipSx(theme, row.clientType),
-                            }}
-                          />
-                        ) : null}
+                        <ClientPlatformTag
+                          isGuest={row.clientType === "guest"}
+                          isMollure={
+                            row.clientType === "mollure" ||
+                            Boolean(row.document?.client?.isMollure)
+                          }
+                          clientKind={
+                            row.clientType === "business" ? "company" : null
+                          }
+                        />
                       </Stack>
                       {showClientEmail ? (
                         <BodyText
@@ -349,7 +347,7 @@ export default function TransactionsTable({
                       ) : null}
                     </Stack>
                   </TableCell>
-                  <TableCell sx={{ verticalAlign: "top" }}>
+                  <TableCell>
                     {tooltip ? (
                       <Tooltip
                         title={
@@ -378,11 +376,12 @@ export default function TransactionsTable({
                       </BodyText>
                     )}
                   </TableCell>
-                  <TableCell sx={{ verticalAlign: "top", maxWidth: 200 }}>
+                  <TableCell sx={{ minWidth: 120 }}>
                     <BodyText
                       component="div"
                       sx={mollureLabelSx(m.navy, {
                         color: alpha(m.navy, 0.82),
+                        whiteSpace: "nowrap",
                       })}
                     >
                       {row.methodTitle}
@@ -401,16 +400,18 @@ export default function TransactionsTable({
                       </BodyText>
                     ) : null}
                   </TableCell>
-                  <TableCell sx={{ verticalAlign: "top" }}>
+                  <TableCell>
                     <Stack spacing={0.35}>
                       <Chip
                         label={formatTransactionStatusLabel(row.status)}
                         size="small"
+                        variant="filled"
                         sx={{
                           height: 18,
                           borderRadius: "6px",
                           fontWeight: 700,
                           width: "fit-content",
+                          border: 0,
                           "& .MuiChip-label": {
                             fontSize: 10,
                             px: 0.75,
@@ -449,7 +450,7 @@ export default function TransactionsTable({
                       ) : null}
                     </Stack>
                   </TableCell>
-                  <TableCell sx={{ verticalAlign: "top" }}>
+                  <TableCell>
                     <Stack spacing={0.35}>
                       {invoiceNo ? (
                         <MuiLink
@@ -480,7 +481,19 @@ export default function TransactionsTable({
                           {invoiceNo}
                         </MuiLink>
                       ) : null}
-                      {receiptNo ? (
+                      {receiptNo === "voided" ? (
+                        <BodyText
+                          component="span"
+                          sx={{
+                            fontSize: 11.5,
+                            fontWeight: 700,
+                            color: alpha(m.navy, 0.55),
+                            display: "block",
+                          }}
+                        >
+                          voided
+                        </BodyText>
+                      ) : receiptNo ? (
                         <MuiLink
                           component="button"
                           type="button"

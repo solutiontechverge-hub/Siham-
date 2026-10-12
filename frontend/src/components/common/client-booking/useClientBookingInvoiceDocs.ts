@@ -4,8 +4,11 @@ import * as React from "react";
 import {
   buildClientBookingTransactionRow,
   buildProfessionalBusinessOverride,
+  findIssuedFinanceTransaction,
+  hasStoredDocumentSnapshot,
 } from "../finance-documents";
 import type { FinanceInvoiceTemplateType } from "../finance-documents/useFinanceInvoiceSettings";
+import { useGetFinanceTransactionsQuery } from "../../../store/services/financeApi";
 import {
   checkoutPaymentMethodDetail,
   checkoutPaymentMethodTitle,
@@ -32,6 +35,8 @@ export function useClientBookingInvoiceDocs(input: {
   requesterUserType?: string | null;
   draft: ClientBookingDraft | null;
   bookingRef: string;
+  /** Canonical booking UUID when known — used to load issued finance docs. */
+  bookingId?: string | null;
   requesterName: string;
   requesterEmail?: string | null;
   requesterAddress?: string | null;
@@ -46,6 +51,13 @@ export function useClientBookingInvoiceDocs(input: {
 }) {
   const [activeDocument, setActiveDocument] =
     React.useState<ClientBookingDetailsActiveDocument>(null);
+
+  const financeBookingKey = input.bookingId || input.bookingRef || "";
+  const { data: financeResponse } = useGetFinanceTransactionsQuery(
+    { bookingId: String(financeBookingKey), limit: 50 },
+    { skip: !financeBookingKey },
+  );
+  const financeRows = financeResponse?.data?.rows ?? [];
 
   const professionalBusinessOverride = React.useMemo(
     () =>
@@ -75,6 +87,13 @@ export function useClientBookingInvoiceDocs(input: {
   ) as FinanceInvoiceTemplateType;
 
   const bookingTransactionRow = React.useMemo(() => {
+    const issued = findIssuedFinanceTransaction(financeRows, {
+      bookingId: input.bookingId,
+      bookingCode: input.bookingRef,
+      phase: "full",
+    });
+    if (issued && hasStoredDocumentSnapshot(issued)) return issued;
+
     if (!input.draft?.services?.length) return null;
     return buildClientBookingTransactionRow({
       bookingRef: input.bookingRef,
@@ -89,6 +108,7 @@ export function useClientBookingInvoiceDocs(input: {
         input.prepaidAmount > 0
           ? input.prepaidAmount
           : undefined,
+      prepaymentPaid: input.isPrepaymentPaid,
       clientParty: {
         legalName: input.requesterName,
         email: input.requesterEmail ?? undefined,
@@ -98,6 +118,8 @@ export function useClientBookingInvoiceDocs(input: {
       },
     });
   }, [
+    financeRows,
+    input.bookingId,
     input.bookingRef,
     input.draft,
     input.financeSettings,
@@ -113,6 +135,13 @@ export function useClientBookingInvoiceDocs(input: {
   ]);
 
   const prepaymentReceiptRow = React.useMemo(() => {
+    const issued = findIssuedFinanceTransaction(financeRows, {
+      bookingId: input.bookingId,
+      bookingCode: input.bookingRef,
+      phase: "prepay",
+    });
+    if (issued && hasStoredDocumentSnapshot(issued)) return issued;
+
     if (!input.draft?.services?.length) return null;
     if (!input.isPrepaymentPaid && !input.isOfflinePay) return null;
     if (!(input.prepaidAmount > 0)) return null;
@@ -136,6 +165,8 @@ export function useClientBookingInvoiceDocs(input: {
       },
     });
   }, [
+    financeRows,
+    input.bookingId,
     input.bookingRef,
     input.draft,
     input.financeSettings,
