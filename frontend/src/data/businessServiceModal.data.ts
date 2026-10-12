@@ -132,8 +132,8 @@ export const createEmptyBusinessServiceFormDraft = (): BusinessServiceFormDraft 
 export function parseEuroAmountString(s: string): number | null {
   const raw = String(s ?? "")
     .trim()
-    .replace(",", ".")
-    .replace(/\s/g, "");
+    .replace(/[^0-9.,-]/g, "")
+    .replace(",", ".");
   if (raw === "") return null;
   const n = Number.parseFloat(raw);
   return Number.isFinite(n) && n >= 0 ? n : null;

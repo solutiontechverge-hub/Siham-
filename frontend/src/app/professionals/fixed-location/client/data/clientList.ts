@@ -27,7 +27,7 @@ export type ClientRecord = {
   residentialAddress?: string;
   bookingsCompleted: number;
   averageBookingValue: string;
-  recentServices: { name: string; price: string }[];
+  recentServices: { name: string; price: number }[];
   bookingHistory: { period: string; bookings: number }[];
   /** Label for the Platform Statistics “Last booking” card */
   statsLastBooking?: string;
@@ -64,9 +64,9 @@ export const mockClientRecords: ClientRecord[] = [
     averageBookingValue: "€50",
     statsLastBooking: "Dec 15 2022",
     recentServices: [
-      { name: "Hair Styling", price: "€85" },
-      { name: "Manicure", price: "€45" },
-      { name: "Facial Treatment", price: "€45" },
+      { name: "Hair Styling", price: 85 },
+      { name: "Manicure", price: 45 },
+      { name: "Facial Treatment", price: 45 },
     ],
     bookingHistory: [
       { period: "December 2024", bookings: 3 },
@@ -89,8 +89,8 @@ export const mockClientRecords: ClientRecord[] = [
     bookingsCompleted: 9,
     averageBookingValue: "€78",
     recentServices: [
-      { name: "Beard trim", price: "€35" },
-      { name: "Haircut", price: "€55" },
+      { name: "Beard trim", price: 35 },
+      { name: "Haircut", price: 55 },
     ],
     bookingHistory: [
       { period: "April 2025", bookings: 2 },
@@ -113,7 +113,7 @@ export const mockClientRecords: ClientRecord[] = [
     residentialAddress: "12 Keizersgracht, Utrecht",
     bookingsCompleted: 6,
     averageBookingValue: "€62",
-    recentServices: [{ name: "Color treatment", price: "€120" }],
+    recentServices: [{ name: "Color treatment", price: 120 }],
     bookingHistory: [{ period: "June 2025", bookings: 2 }],
     isBlocked: true,
   },
@@ -137,8 +137,8 @@ export const mockClientRecords: ClientRecord[] = [
     bookingsCompleted: 4,
     averageBookingValue: "€88",
     recentServices: [
-      { name: "Team workshop", price: "€400" },
-      { name: "Chair massage", price: "€60" },
+      { name: "Team workshop", price: 400 },
+      { name: "Chair massage", price: 60 },
     ],
     bookingHistory: [{ period: "June 2025", bookings: 1 }],
   },
@@ -158,8 +158,8 @@ export const mockClientRecords: ClientRecord[] = [
     bookingsCompleted: 22,
     averageBookingValue: "€95",
     recentServices: [
-      { name: "Bridal package", price: "€320" },
-      { name: "Spa day", price: "€180" },
+      { name: "Bridal package", price: 320 },
+      { name: "Spa day", price: 180 },
     ],
     bookingHistory: [
       { period: "June 2025", bookings: 6 },
@@ -181,7 +181,7 @@ export const mockClientRecords: ClientRecord[] = [
     residentialAddress: "3 Bondi Ave, Sydney",
     bookingsCompleted: 14,
     averageBookingValue: "€54",
-    recentServices: [{ name: "Sports massage", price: "€70" }],
+    recentServices: [{ name: "Sports massage", price: 70 }],
     bookingHistory: [{ period: "August 2025", bookings: 3 }],
   },
   {
@@ -200,8 +200,8 @@ export const mockClientRecords: ClientRecord[] = [
     bookingsCompleted: 5,
     averageBookingValue: "€110",
     recentServices: [
-      { name: "Keratin", price: "€140" },
-      { name: "Nails", price: "€55" },
+      { name: "Keratin", price: 140 },
+      { name: "Nails", price: 55 },
     ],
     bookingHistory: [{ period: "September 2025", bookings: 2 }],
   },
@@ -225,8 +225,8 @@ export const mockClientRecords: ClientRecord[] = [
     bookingsCompleted: 31,
     averageBookingValue: "€72",
     recentServices: [
-      { name: "Corporate day", price: "€900" },
-      { name: "Cut & style", price: "€48" },
+      { name: "Corporate day", price: 900 },
+      { name: "Cut & style", price: 48 },
     ],
     bookingHistory: [
       { period: "September 2025", bookings: 8 },

@@ -28,6 +28,7 @@ import BookingAddUniqueItemScreen from "../../common/calendar/BookingAddUniqueIt
 import BookingEditCatalogItemScreen from "../../common/calendar/BookingEditCatalogItemScreen";
 import CatalogItemDeleteDialog from "../../common/calendar/CatalogItemDeleteDialog";
 import { BodyText } from "../../ui/typography";
+import { roundMoney } from "../../../utils/money";
 import {
   buildUniqueItemLine,
   emptyBookingUniqueItemDraft,
@@ -111,7 +112,7 @@ function buildOptionFromDraft(
     vat: normalizeVatRate(draft.vat),
     unit: line.quantity,
     discountType: draft.discountType,
-    discountAmount: Number(draft.discountAmount) || 0,
+    discountAmount: roundMoney(draft.discountAmount),
   };
 }
 
@@ -293,7 +294,7 @@ export default function ManualEntryCatalogDrawer({
       vat: normalizeVatRate(uniqueItemDraft.vat),
       unit: line.quantity,
       discountType: uniqueItemDraft.discountType,
-      discountAmount: Number(uniqueItemDraft.discountAmount) || 0,
+      discountAmount: roundMoney(uniqueItemDraft.discountAmount),
     };
 
     setCustomOptions((prev) => [...prev, customOption]);

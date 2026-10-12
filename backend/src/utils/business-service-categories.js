@@ -1,4 +1,5 @@
 import { entityIdKey, normalizeEntityId, parseJsonArray } from "./business-setup-parsers.js";
+import { parseMoney } from "./money.js";
 
 /**
  * Service pricing and duration live on business_setups.service_categories (JSONB).
@@ -10,7 +11,7 @@ const toFiniteNumber = (value) => {
     return null;
   }
 
-  const parsed = Number(value);
+  const parsed = parseMoney(value, Number.NaN);
   return Number.isFinite(parsed) ? parsed : null;
 };
 

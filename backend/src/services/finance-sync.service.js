@@ -12,19 +12,7 @@ import {
   sendFinanceClientEmail,
 } from "./financeEmail.service.js";
 import { dispatchInvoiceReissuedNotification } from "./bookingNotification.service.js";
-import { roundMoney as roundParsedMoney } from "../utils/money.js";
-
-const formatEuro = (value) => {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return "€0";
-  const rounded = Math.round(n * 100) / 100;
-  const text = Number.isInteger(rounded)
-    ? rounded.toLocaleString("en-US")
-    : rounded.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return `€${text}`;
-};
-
-const roundMoney = roundParsedMoney;
+import { roundMoney } from "../utils/money.js";
 
 const toIsoDate = (value) => toIsoDateOnly(value);
 
@@ -177,7 +165,7 @@ function isPlanningPerson(person) {
  * Prepayment is always charged to the main client against the full booking total %.
  */
 function resolveSplitPayers(booking, meta) {
-  const total = roundMoney(Number(booking.total_price ?? 0));
+  const total = roundMoney(booking.total_price);
   const prepaymentPercent = Number(meta.prepaymentPercent ?? meta.prepayment_percentage ?? 0);
   const showPrepayment = Boolean(meta.showPrepayment) || String(booking.prepayment_status ?? "").toLowerCase() === "paid";
   const prepaidAmount =
@@ -189,14 +177,14 @@ function resolveSplitPayers(booking, meta) {
 
   if (meta.splitBill?.payers?.length) {
     return {
-      prepaidAmount: roundMoney(Number(meta.splitBill.prepaidAmount ?? prepaidAmount)),
+      prepaidAmount: roundMoney(meta.splitBill.prepaidAmount ?? prepaidAmount),
       payers: meta.splitBill.payers.map((p) => ({
         key: String(p.key),
         role: p.role || "guest",
         label: p.label || (p.role === "model" ? "Model" : p.role === "main_client" ? booking.customer_name : "Guest"),
         displayName: p.displayName || p.label || "Guest",
-        subtotal: roundMoney(Number(p.subtotal ?? 0)),
-        paymentAmount: roundMoney(Number(p.paymentAmount ?? 0)),
+        subtotal: roundMoney(p.subtotal),
+        paymentAmount: roundMoney(p.paymentAmount),
         lineItems: Array.isArray(p.lineItems) ? p.lineItems : [],
       })),
     };
@@ -223,7 +211,7 @@ function resolveSplitPayers(booking, meta) {
         vatRate: 21,
         pricePerUnit: roundMoney(service.price),
         totalPrice: roundMoney(service.price),
-        amount: roundMoney(Number(service.price) || 0),
+        amount: roundMoney(service.price),
       });
       groups.set(assigneeId, prev);
     }
@@ -298,7 +286,7 @@ function resolveSplitPayers(booking, meta) {
           vatRate: 21,
           pricePerUnit: roundMoney(s.price),
           totalPrice: roundMoney(s.price),
-          amount: roundMoney(Number(s.price) || 0),
+          amount: roundMoney(s.price),
         })),
         ...guestProducts.map((p) => ({
           description: p.name || "Product",
@@ -309,7 +297,7 @@ function resolveSplitPayers(booking, meta) {
           vatRate: 21,
           pricePerUnit: roundMoney(p.unitPrice ?? p.price),
           totalPrice: roundMoney(p.price),
-          amount: roundMoney(Number(p.price) || 0),
+          amount: roundMoney(p.price),
         })),
       ].filter((line) => Boolean(line.sourceReference));
       if (!lines.length) continue;
@@ -532,7 +520,7 @@ async function insertFinanceTransaction({
     // amount is kept separately so invoice remaining balance is not zeroed.
     lineItems: Array.isArray(lineItems) ? lineItems : [],
     totalPrice: roundMoney(
-      isPrepaymentDocument ? Number(booking.total_price ?? gross) : gross,
+      isPrepaymentDocument ? roundMoney(booking.total_price ?? gross) : gross,
     ),
     ...(isPrepaymentDocument ? { prepaymentAmount: roundMoney(gross) } : {}),
     paidAmount: roundMoney(gross),
@@ -623,17 +611,17 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
         quantity: "1",
         vat: "21%",
         vatRate: 21,
-        pricePerUnit: roundMoney(Number(booking.total_price ?? 0)),
-        totalPrice: roundMoney(Number(booking.total_price ?? 0)),
+        pricePerUnit: roundMoney(booking.total_price),
+        totalPrice: roundMoney(booking.total_price),
       }]
     : [];
 
   if (String(booking.status ?? "").toLowerCase() === "no_show") {
     const rate = Math.max(0, Math.min(100, Number(booking.no_show_fee_percentage) || 0));
-    const grossFee = roundMoney(Number(booking.total_price ?? 0) * rate / 100);
+    const grossFee = roundMoney(roundMoney(booking.total_price) * rate / 100);
     const dueFee = roundMoney(
       Number.isFinite(Number(booking.no_show_fee_due))
-        ? Math.max(0, Number(booking.no_show_fee_due))
+        ? Math.max(0, roundMoney(booking.no_show_fee_due))
         : Math.max(0, grossFee - prepaidAmount),
     );
     if (dueFee <= 0) return null;
@@ -663,7 +651,7 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
       booking,
       paymentPhase: phase,
       paymentMethod,
-      amount: amountOverride ?? (phase === "prepay" ? prepaidAmount : Number(booking.total_price ?? 0)),
+      amount: amountOverride ?? (phase === "prepay" ? prepaidAmount : roundMoney(booking.total_price)),
       status,
       clientName: booking.customer_name,
       clientEmail: booking.customer_email,
@@ -755,7 +743,7 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
       booking,
       paymentPhase: phase,
       paymentMethod,
-      amount: amountOverride ?? (phase === "prepay" ? prepaidAmount : Number(booking.total_price ?? 0)),
+      amount: amountOverride ?? (phase === "prepay" ? prepaidAmount : roundMoney(booking.total_price)),
       status,
       clientName: booking.customer_name,
       clientEmail: booking.customer_email,
@@ -793,7 +781,7 @@ async function applySettingsBasedReissue(row, paymentTerms, level, options = {})
   const dueDays =
     durationToDays(terms[`${prefix}ReissueDueValue`], terms[`${prefix}ReissueDueUnit`]) ?? 14;
   const dueDate = addDaysIso(toIsoDate(new Date()), dueDays);
-  const baseAmount = Number(row.net_amount ?? row.gross_amount ?? 0) || 0;
+  const baseAmount = roundMoney(row.net_amount ?? row.gross_amount);
   const penaltyAmount = computePenaltyAmount(
     baseAmount,
     terms[`${prefix}ReissuePenaltyValue`],

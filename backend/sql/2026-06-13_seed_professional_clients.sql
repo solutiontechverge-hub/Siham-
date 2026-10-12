@@ -55,7 +55,7 @@ INSERT INTO professional_clients (
 )
 SELECT pp.id, mu.id, 'company', true, 'Beauty & Wellness corp', 'sarajohnson@gmail.com', '+31 612345849',
   'Prefers morning slots.', 25450, '2022-12-15', 18, 50,
-  '[{"name":"Hair Styling","price":"€85"},{"name":"Manicure","price":"€45"}]'::jsonb,
+  '[{"name":"Hair Styling","price":85},{"name":"Manicure","price":45}]'::jsonb,
   '[{"period":"December 2024","bookings":3},{"period":"January 2025","bookings":5}]'::jsonb,
   'Beauty & Wellness corp', '134543', '134504', 'sana', 'Female', '123 business street',
   'sanajohnson@gmail.com', '2023-07-20'::timestamptz
@@ -72,7 +72,7 @@ INSERT INTO professional_clients (
 )
 SELECT pp.id, mu.id, 'individual', true, 'Alex Client', 'alexmartin@gmail.com', '+44 20 7946 0958',
   true, 3400, '2025-05-13', 9, 78,
-  '[{"name":"Beard trim","price":"€35"},{"name":"Haircut","price":"€55"}]'::jsonb,
+  '[{"name":"Beard trim","price":35},{"name":"Haircut","price":55}]'::jsonb,
   '[{"period":"April 2025","bookings":2},{"period":"May 2025","bookings":4}]'::jsonb,
   'Alex', 'Client', 'Male', '1990-12-04', '45 Canal St, Amsterdam', '2024-03-02'::timestamptz
 FROM users pro
@@ -88,7 +88,7 @@ INSERT INTO professional_clients (
 )
 SELECT pp.id, 'individual', false, 'Emma van Dijk', 'emma.vd@gmail.com', '+971 50 123 4567', true,
   2150, '2025-06-05', 6, 62,
-  '[{"name":"Color treatment","price":"€120"}]'::jsonb,
+  '[{"name":"Color treatment","price":120}]'::jsonb,
   '[{"period":"June 2025","bookings":2}]'::jsonb,
   'Emma', 'van Dijk', 'Female', '1995-08-22', '12 Keizersgracht, Utrecht', '2025-01-09'::timestamptz
 FROM users pro
@@ -104,7 +104,7 @@ INSERT INTO professional_clients (
 )
 SELECT pp.id, 'company', false, 'Northwind Trading BV', 'billing@northwind.nl', '+92 333 1122334',
   'Corporate account — invoice monthly.', 950, '2025-06-21', 4, 88,
-  '[{"name":"Team workshop","price":"€400"},{"name":"Chair massage","price":"€60"}]'::jsonb,
+  '[{"name":"Team workshop","price":400},{"name":"Chair massage","price":60}]'::jsonb,
   '[{"period":"June 2025","bookings":1}]'::jsonb,
   'Northwind Trading BV', '882211', 'NL009988776', 'Imran Khan', 'Male', '88 Harbor Rd, Rotterdam',
   'ops@northwind.nl', '2024-11-05'::timestamptz
@@ -120,7 +120,7 @@ INSERT INTO professional_clients (
 )
 SELECT pp.id, mu.id, 'individual', true, 'Priya Sharma', 'priya.s@gmail.com', '+91 98765 43210',
   5600, '2025-07-15', 22, 95,
-  '[{"name":"Bridal package","price":"€320"},{"name":"Spa day","price":"€180"}]'::jsonb,
+  '[{"name":"Bridal package","price":320},{"name":"Spa day","price":180}]'::jsonb,
   '[{"period":"June 2025","bookings":6},{"period":"July 2025","bookings":4}]'::jsonb,
   'Priya', 'Sharma', 'Female', '1988-01-01', '9 MG Road, Bengaluru', '2023-02-14'::timestamptz
 FROM users pro
@@ -137,7 +137,7 @@ INSERT INTO professional_clients (
 )
 SELECT pp.id, mu.id, 'company', true, 'Mollure Demo Company BV', 'company@mollure.dev', '+31 611112222',
   4800, '2025-08-08', 14, 54,
-  '[{"name":"Sports massage","price":"€70"}]'::jsonb,
+  '[{"name":"Sports massage","price":70}]'::jsonb,
   '[{"period":"August 2025","bookings":3}]'::jsonb,
   'Mollure Demo Company BV', '87654321', 'NL987654321B01', 'Jamie Company', 'Keizersgracht 100, Amsterdam',
   'company@mollure.dev', '2024-08-01'::timestamptz

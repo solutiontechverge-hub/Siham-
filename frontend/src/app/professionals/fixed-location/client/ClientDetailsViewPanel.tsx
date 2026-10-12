@@ -23,6 +23,7 @@ import { mollureWhiteFieldInputSx } from "../../../../components/common/mollureF
 import type { ClientRecord } from "./data/clientList";
 import { isClientBlocked } from "./data/clientList";
 import ClientPlatformTag from "../../../../components/common/ClientPlatformTag";
+import { formatCurrencyDisplay } from "../../../../components/common/finance-documents/financeDocumentUtils";
 
 type InfoField = { label: string; value: string };
 
@@ -372,7 +373,7 @@ export default function ClientDetailsViewPanel({
                           flexShrink: 0,
                         }}
                       >
-                        {service.price}
+                        {formatCurrencyDisplay(service.price)}
                       </Typography>
                     </Stack>
                   ))

@@ -1,5 +1,7 @@
 import type { CalendarBooking, BusinessSetup } from "../../../../store/services/businessApi";
+import type { FinanceAnalyticsSalesVolume } from "../../../../store/services/financeApi";
 import type { ReviewItem, ReviewStats } from "../../../../store/services/reviewsApi";
+import { roundMoney } from "../../../../utils/money";
 import type { TransactionRow } from "../finance/data/transactions";
 import {
   professionalFixedLocationAnalyticsData,
@@ -17,8 +19,7 @@ import type {
 } from "./ratingReviewAnalytics.data";
 
 function numericAmount(value: unknown): number {
-  const amount = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(amount) ? amount : 0;
+  return roundMoney(value);
 }
 
 function pct(part: number, total: number): number {
@@ -47,6 +48,25 @@ function locationBucket(booking: CalendarBooking): "fl" | "dl" | "project" {
   if (String(booking.booking_type || "").toLowerCase() === "project") return "project";
   if (booking.location_type === "desired") return "dl";
   return "fl";
+}
+
+function parseClockMinutes(value: string | null | undefined): number | null {
+  const raw = String(value ?? "").trim();
+  const match = raw.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+  return hours * 60 + minutes;
+}
+
+/** Prefer real booking duration; fall back to 1.5h only when times are missing. */
+function hoursFromBooking(booking: CalendarBooking): number {
+  const start = parseClockMinutes(booking.start_time);
+  const end = parseClockMinutes(booking.end_time);
+  if (start == null || end == null) return 1.5;
+  const diff = end >= start ? end - start : end + 24 * 60 - start;
+  return Math.max(0.25, diff / 60);
 }
 
 function relativeTime(iso: string | null): string {
@@ -247,7 +267,13 @@ function buildSalesVolume(
         sales: prev.sales + lineSales,
       });
 
-      const category = "Services";
+      const sourceType = String(line.sourceType || "").toLowerCase();
+      const category =
+        sourceType === "productid" || sourceType === "product"
+          ? "Products"
+          : sourceType === "uniqueitemcode" || sourceType === "uniqueitem"
+            ? "Unique items"
+            : "Services";
       if (!categoryMap.has(category)) categoryMap.set(category, new Map());
       const serviceMap = categoryMap.get(category)!;
       const servicePrev = serviceMap.get(name) || { count: 0, sales: 0 };
@@ -340,6 +366,13 @@ function buildSalesVolume(
     };
   });
 
+  const legend = categoryBars.map((bar) => ({
+    category: bar.category,
+    items: bar.segments.map((segment, index) => ({
+      label: segment.service,
+      colorIndex: index,
+    })),
+  }));
 
   return {
     ...template,
@@ -352,6 +385,7 @@ function buildSalesVolume(
       ...template.salesByCategoriesAndServices,
       rows: categoryRows,
       categoryBars,
+      legend,
       chartMaxEur: Math.max(...categoryBars.map((bar) => bar.totalSalesEur), 1),
     },
     refundsAndAdjustments: {
@@ -437,7 +471,10 @@ function buildPerformance(
         ? memberReviews.reduce((sum, review) => sum + (review.rating || 0), 0) /
           memberReviews.length
         : Number(member.rating) || 0;
-    const hoursWorked = Math.max(1, memberBookings.length * 1.5);
+    const hoursWorked = Math.max(
+      0.1,
+      memberBookings.reduce((sum, booking) => sum + hoursFromBooking(booking), 0),
+    );
 
     return {
       teamMember: member.full_name || "Team member",
@@ -446,7 +483,18 @@ function buildPerformance(
       revenueEur: Math.round(revenue * 100) / 100,
       productivityEurPerHr: Math.round((revenue / hoursWorked) * 10) / 10,
       efficiencyPct: memberBookings.length
-        ? Math.min(100, Math.round((memberBookings.length / Math.max(memberBookings.length, 1)) * 100))
+        ? Math.min(
+            100,
+            Math.round(
+              (memberBookings.length /
+                Math.max(memberBookings.length + bookings.filter(
+                  (booking) =>
+                    String(booking.team_member_id || "") === String(member.id) &&
+                    ["Cancelled", "No Show"].includes(normalizeStatus(booking.status)),
+                ).length, 1)) *
+                100,
+            ),
+          )
         : 0,
       averageRating: Math.round(avgRating * 10) / 10,
       reviews: memberReviews.length || Number(member.total_reviews) || 0,
@@ -586,16 +634,65 @@ function buildRatingReview(
   };
 }
 
+function applyBackendSalesVolume(
+  template: ProfessionalFixedLocationSalesVolumeAnalyticsData,
+  backend: FinanceAnalyticsSalesVolume,
+): ProfessionalFixedLocationSalesVolumeAnalyticsData {
+  return {
+    ...template,
+    productSales: {
+      ...template.productSales,
+      rows: backend.productSales.rows as ProfessionalFixedLocationSalesVolumeAnalyticsData["productSales"]["rows"],
+      chartMaxEur: backend.productSales.chartMaxEur,
+    },
+    salesByCategoriesAndServices: {
+      ...template.salesByCategoriesAndServices,
+      rows: backend.salesByCategoriesAndServices
+        .rows as ProfessionalFixedLocationSalesVolumeAnalyticsData["salesByCategoriesAndServices"]["rows"],
+      categoryBars: backend.salesByCategoriesAndServices
+        .categoryBars as ProfessionalFixedLocationSalesVolumeAnalyticsData["salesByCategoriesAndServices"]["categoryBars"],
+      legend: backend.salesByCategoriesAndServices
+        .legend as ProfessionalFixedLocationSalesVolumeAnalyticsData["salesByCategoriesAndServices"]["legend"],
+      chartMaxEur: backend.salesByCategoriesAndServices.chartMaxEur,
+    },
+    refundsAndAdjustments: {
+      ...template.refundsAndAdjustments,
+      rows: backend.refundsAndAdjustments
+        .rows as ProfessionalFixedLocationSalesVolumeAnalyticsData["refundsAndAdjustments"]["rows"],
+    },
+    unpaidInvoicesAndFeeCompliance: {
+      ...template.unpaidInvoicesAndFeeCompliance,
+      rows: backend.unpaidInvoicesAndFeeCompliance
+        .rows as ProfessionalFixedLocationSalesVolumeAnalyticsData["unpaidInvoicesAndFeeCompliance"]["rows"],
+    },
+    netSalesOverview: {
+      ...template.netSalesOverview,
+      rows: backend.netSalesOverview
+        .rows as ProfessionalFixedLocationSalesVolumeAnalyticsData["netSalesOverview"]["rows"],
+    },
+    salesByBookingOrigin: {
+      ...template.salesByBookingOrigin,
+      rows: backend.salesByBookingOrigin
+        .rows as ProfessionalFixedLocationSalesVolumeAnalyticsData["salesByBookingOrigin"]["rows"],
+    },
+  };
+}
+
 export function mapProfessionalAnalytics(input: {
   bookings: CalendarBooking[];
   transactions: TransactionRow[];
+  financeSalesVolume?: FinanceAnalyticsSalesVolume | null;
+  financeTransactionSummary?: FinanceAnalyticsSalesVolume["transactionSummary"] | null;
   reviews: ReviewItem[];
   stats: ReviewStats | null;
   setup: BusinessSetup | null;
 }): ProfessionalFixedLocationAnalyticsData {
   const template = professionalFixedLocationAnalyticsData;
   const { originRows, statusRows, noShowRows } = buildBookingSections(input.bookings);
-  const transactionRows = buildTransactionSummary(input.transactions);
+  const transactionRows =
+    input.financeTransactionSummary?.rows?.length
+      ? (input.financeTransactionSummary.rows as TransactionSummaryRow[])
+      : buildTransactionSummary(input.transactions);
 
   return {
     ...template,
@@ -617,7 +714,9 @@ export function mapProfessionalAnalytics(input: {
         rows: transactionRows,
       },
     },
-    salesVolume: buildSalesVolume(input.transactions, template.salesVolume),
+    salesVolume: input.financeSalesVolume
+      ? applyBackendSalesVolume(template.salesVolume, input.financeSalesVolume)
+      : buildSalesVolume(input.transactions, template.salesVolume),
     performance: buildPerformance(
       input.bookings,
       input.setup,

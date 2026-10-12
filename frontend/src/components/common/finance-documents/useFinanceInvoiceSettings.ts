@@ -5,6 +5,7 @@ import {
   useGetFinanceSettingsQuery,
   useUpdateFinanceInvoiceSettingsMutation,
 } from "../../../store/services/financeApi";
+import { roundMoney } from "../../../utils/money";
 
 export type FinanceInvoiceTemplateType = "individual" | "company";
 
@@ -93,31 +94,13 @@ export function readFinanceInvoiceSettings(): FinanceInvoiceSettings {
   return defaultFinanceInvoiceSettings;
 }
 
-function moneyNumber(value: unknown): number {
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  const raw = String(value ?? "").replace(/[^0-9.,-]/g, "");
-  const lastComma = raw.lastIndexOf(",");
-  const lastDot = raw.lastIndexOf(".");
-  const separator = lastComma >= 0 || lastDot >= 0
-    ? (lastComma > lastDot ? "," : ".")
-    : "";
-  const occurrences = separator ? raw.split(separator).length - 1 : 0;
-  const decimalDigits = separator ? raw.length - raw.lastIndexOf(separator) - 1 : 0;
-  const isDecimal = separator && (occurrences === 1 ? decimalDigits !== 3 : decimalDigits <= 2);
-  const normalized = isDecimal
-    ? `${raw.slice(0, raw.lastIndexOf(separator)).replace(/[.,]/g, "")}.${raw.slice(raw.lastIndexOf(separator) + 1)}`
-    : raw.replace(/[.,]/g, "");
-  const parsed = Number.parseFloat(normalized);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
 function normalizeProducts(products: readonly FinanceInvoiceProduct[] | undefined) {
   return (products ?? []).map((product) => ({
     ...product,
-    price: moneyNumber(product.price),
+    price: roundMoney(product.price),
     ...(product.discountAmount == null
       ? {}
-      : { discountAmount: moneyNumber(product.discountAmount) }),
+      : { discountAmount: roundMoney(product.discountAmount) }),
   }));
 }
 

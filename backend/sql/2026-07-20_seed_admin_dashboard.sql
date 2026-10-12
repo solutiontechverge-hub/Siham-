@@ -196,7 +196,7 @@ SELECT
   v.method_detail,
   'Paid',
   v.booking_id,
-  jsonb_build_object('documentNumber', v.doc_no, 'totalPrice', ('€' || v.net_amount::text))
+  jsonb_build_object('documentNumber', v.doc_no, 'totalPrice', v.net_amount::numeric)
 FROM users u
 INNER JOIN professional_profiles pp ON pp.user_id = u.id
 INNER JOIN (VALUES

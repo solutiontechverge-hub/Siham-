@@ -104,9 +104,9 @@ export const professionalFixedLocationRatingReviewAnalyticsData: ProfessionalFix
         },
       ],
     },
-    overallRating: 4.5,
-    ratingOutOf: 5.0,
-    totalReviews: 54,
+    overallRating: 0,
+    ratingOutOf: 5,
+    totalReviews: 0,
   },
   ratingReviewAnalytics: {
     title: "4.2 Rating & Review Analytics",
@@ -122,12 +122,7 @@ export const professionalFixedLocationRatingReviewAnalyticsData: ProfessionalFix
         },
       ],
     },
-    rows: [
-      { category: "Bad",          range: "1.0 – 3.0", count: 30, sharePct: 10, repliedTo: 90 },
-      { category: "Good",         range: "3.5 – 4.0", count: 20, sharePct: 5,  repliedTo: 60 },
-      { category: "Excellent",    range: "4.5 – 5.0", count: 20, sharePct: 5,  repliedTo: 60 },
-      { category: "Total Review", range: "—",          count: 50, sharePct: 15, repliedTo: 150, isTotal: true },
-    ],
+    rows: [],
   },
   ratingDistributionByCategory: {
     title: "4.3 Rating Distribution by Category",
@@ -144,43 +139,17 @@ export const professionalFixedLocationRatingReviewAnalyticsData: ProfessionalFix
         },
       ],
     },
-    rows: [
-      { category: "Hair",      badPct: 30, goodPct: 30, excellentPct: 10, totalReviews: 90 },
-      { category: "Nails",     badPct: 20, goodPct: 20, excellentPct: 5,  totalReviews: 60 },
-      { category: "Makeup",    badPct: 20, goodPct: 20, excellentPct: 5,  totalReviews: 60 },
-      { category: "Brows",     badPct: 20, goodPct: 20, excellentPct: 5,  totalReviews: 60 },
-      { category: "EyeLashes", badPct: 20, goodPct: 20, excellentPct: 5,  totalReviews: 60 },
-      { category: "Total (Weighted Avg.)", badPct: 50, goodPct: 50, excellentPct: 15, totalReviews: 150, isTotal: true },
-    ],
+    rows: [],
   },
   reviewSummaryByCategory: {
     title: "Rating & Review Summary by Category",
-    maxReviews: 30,
-    bars: [
-      { category: "Body Treatment", totalReviews: 20, badPct: 5,  goodPct: 25, excellentPct: 70 },
-      { category: "Brows",          totalReviews: 15, badPct: 37, goodPct: 33, excellentPct: 30 },
-      { category: "EyeLashes",      totalReviews: 25, badPct: 37, goodPct: 43, excellentPct: 20 },
-      { category: "Nails",          totalReviews: 15, badPct: 37, goodPct: 33, excellentPct: 30 },
-      { category: "Makeup",         totalReviews: 20, badPct: 37, goodPct: 33, excellentPct: 30 },
-    ],
+    maxReviews: 1,
+    bars: [],
   },
   reviewsByCategory: {
-    Bad: [
-      { id: "bad_1", reviewerName: "Alex Turner", relativeTimeLabel: "3 days ago", rating: 2, reviewText: "Not great — waited 30 minutes past my appointment time and the result wasn't what I asked for. Very disappointing.", tags: [{ label: "TM 1" }, { label: "Nails" }] },
-      { id: "bad_2", reviewerName: "Maria Gomez", relativeTimeLabel: "1 week ago", rating: 1.5, reviewText: "The service was rushed and the quality was below average. Won't be coming back.", tags: [{ label: "TM 2" }, { label: "Makeup" }] },
-    ],
-    Good: [
-      { id: "good_1", reviewerName: "Jamie Lee", relativeTimeLabel: "2 days ago", rating: 3.8, reviewText: "Decent experience overall. The stylist was friendly but the finish could use more attention to detail.", tags: [{ label: "TM 1" }, { label: "Haircut" }], reply: { authorName: "Micheal", message: "Thank you for the feedback Jamie! We will work on improving our attention to detail." } },
-      { id: "good_2", reviewerName: "Nina Patel", relativeTimeLabel: "5 days ago", rating: 4.0, reviewText: "Good service and pleasant environment. Booking was easy and the team was professional.", tags: [{ label: "TM 2" }, { label: "Blowdry" }] },
-    ],
-    Excellent: [
-      { id: "exc_1", reviewerName: "Sara Johnson", relativeTimeLabel: "1 week ago", rating: 5, reviewText: "Jessica is an absolute artist! She took the time to listen to what I wanted and gave me the best haircut I've had in years. The salon has such a relaxing atmosphere. I'll definitely be back!", tags: [{ label: "TM 1" }, { label: "Haircut" }, { label: "Blowdry" }, { label: "TM 2" }, { label: "Haircut" }, { label: "Blowdry" }], reply: { authorName: "Micheal", message: "Thank you, Sarah! So glad you loved your hair. We hope to see you again soon for your next event!" } },
-      { id: "exc_2", reviewerName: "Sara Johnson", relativeTimeLabel: "1 week ago", rating: 5, reviewText: "Jessica is an absolute artist! She took the time to listen to what I wanted and gave me the best haircut I've had in years. The salon has such a relaxing atmosphere. I'll definitely be back!", tags: [{ label: "TM 1" }, { label: "Haircut" }, { label: "Blowdry" }, { label: "TM 2" }, { label: "Haircut" }, { label: "Blowdry" }], reply: { authorName: "Micheal", message: "Thank you, Sarah! So glad you loved your hair. We hope to see you again soon for your next event!" } },
-    ],
-    "Total Review": [
-      { id: "bad_1", reviewerName: "Alex Turner", relativeTimeLabel: "3 days ago", rating: 2, reviewText: "Not great — waited 30 minutes past my appointment time.", tags: [{ label: "TM 1" }, { label: "Nails" }] },
-      { id: "good_1", reviewerName: "Jamie Lee", relativeTimeLabel: "2 days ago", rating: 3.8, reviewText: "Decent experience overall.", tags: [{ label: "TM 1" }, { label: "Haircut" }], reply: { authorName: "Micheal", message: "Thank you for the feedback Jamie!" } },
-      { id: "exc_1", reviewerName: "Sara Johnson", relativeTimeLabel: "1 week ago", rating: 5, reviewText: "Jessica is an absolute artist! Best haircut I've had in years.", tags: [{ label: "TM 1" }, { label: "Haircut" }, { label: "Blowdry" }], reply: { authorName: "Micheal", message: "Thank you, Sarah!" } },
-    ],
+    Bad: [],
+    Good: [],
+    Excellent: [],
+    "Total Review": [],
   },
 };

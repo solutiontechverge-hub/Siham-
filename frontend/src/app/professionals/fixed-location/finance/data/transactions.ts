@@ -273,7 +273,7 @@ export type TransactionDocumentLineItem = {
 
 export type TransactionDocumentBookingItem = {
   label: string;
-  value: string;
+  value: number;
 };
 
 export type TransactionDocument = {

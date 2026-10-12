@@ -7,15 +7,6 @@ import type {
 import type { ClientBookingDraft } from "../client-booking/types";
 import type { FinanceInvoiceSettings } from "./useFinanceInvoiceSettings";
 
-function formatCurrencyEur(amount: number) {
-  return new Intl.NumberFormat("en-NL", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
-
 function resolveVatForLabel(
   name: string,
   settings: FinanceInvoiceSettings,
@@ -127,7 +118,6 @@ export function buildClientBookingTransactionRow({
     };
   });
 
-  const prepaidLabel = formatCurrencyEur(prepaidValue);
   const lineItems =
     asPrepaymentReceipt && prepaidValue > 0
       ? [
@@ -143,15 +133,15 @@ export function buildClientBookingTransactionRow({
       : [...serviceLineItems, ...productLineItems];
 
   const bookingItems = (asPrepaymentReceipt && prepaidValue > 0
-    ? [{ label: "Prepayment", value: prepaidLabel }]
+    ? [{ label: "Prepayment", value: prepaidValue }]
     : [
         ...draft.services.map((service) => ({
           label: service.name,
-          value: formatCurrencyEur(service.price),
+          value: service.price,
         })),
         ...(draft.products ?? []).map((product) => ({
           label: product.name,
-          value: formatCurrencyEur(product.price),
+          value: product.price,
         })),
       ]
   );

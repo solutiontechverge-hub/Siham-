@@ -495,7 +495,7 @@ function SubSummaryCard({
       ) : null}
 
       <SalesActionsMenu
-        isAddon={sub.kind === "addon"}
+        isAddon={false}
         limitedMenu={limitedMenu}
         showRefund={
           sub.paymentState === "paid" || sub.paymentState === "prepaid"

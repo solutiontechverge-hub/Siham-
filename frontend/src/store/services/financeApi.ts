@@ -27,6 +27,38 @@ export type FinanceTransactionsResponse = {
   total: number;
 };
 
+export type FinanceAnalyticsSalesVolume = {
+  productSales: { rows: unknown[]; chartMaxEur: number };
+  salesByCategoriesAndServices: {
+    rows: unknown[];
+    categoryBars: unknown[];
+    legend: unknown[];
+    chartMaxEur: number;
+  };
+  refundsAndAdjustments: { rows: unknown[] };
+  unpaidInvoicesAndFeeCompliance: { rows: unknown[] };
+  netSalesOverview: { rows: unknown[] };
+  salesByBookingOrigin: { rows: unknown[] };
+  transactionSummary: { rows: Array<{ channel: string; count: number; sharePct: number; isTotal?: boolean }> };
+  totals: { gross: number; refunds: number; net: number; transactionCount: number };
+};
+
+export type FinanceAnalyticsResponse = {
+  fromDate: string | null;
+  toDate: string | null;
+  rows: TransactionRow[];
+  total: number;
+  truncated?: boolean;
+  salesVolume: FinanceAnalyticsSalesVolume;
+  transactionSummary: FinanceAnalyticsSalesVolume["transactionSummary"];
+  totals: FinanceAnalyticsSalesVolume["totals"];
+};
+
+export type FinanceAnalyticsParams = {
+  fromDate?: string | null;
+  toDate?: string | null;
+};
+
 export type SalesCardMetadata = Record<string, unknown> & {
   cardId: string;
   bookingId: string;
@@ -146,6 +178,20 @@ const financeApi = baseApi.injectEndpoints({
               ...result.data.rows.map((row) => ({ type: "FinanceTransactions" as const, id: row.id })),
             ]
           : ["FinanceTransactions"],
+    }),
+
+    getFinanceAnalytics: builder.query<
+      ApiEnvelope<FinanceAnalyticsResponse>,
+      FinanceAnalyticsParams | void
+    >({
+      query: (params) => ({
+        url: "/api/finance/analytics",
+        params: {
+          ...(params?.fromDate ? { fromDate: params.fromDate } : {}),
+          ...(params?.toDate ? { toDate: params.toDate } : {}),
+        },
+      }),
+      providesTags: ["FinanceTransactions"],
     }),
 
     createFinanceTransaction: builder.mutation<
@@ -286,6 +332,7 @@ export const {
   useUpdateFinanceTransactionOptionsMutation,
   useUpdateFinanceStripeStatusMutation,
   useGetFinanceTransactionsQuery,
+  useGetFinanceAnalyticsQuery,
   useLazyGetFinanceTransactionsQuery,
   useCreateFinanceTransactionMutation,
   useUpdateFinanceTransactionMutation,

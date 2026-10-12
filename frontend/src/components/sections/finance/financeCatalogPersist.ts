@@ -3,6 +3,7 @@ import type {
   FinanceInvoiceSettings,
 } from "../../common/finance-documents/useFinanceInvoiceSettings";
 import type { ManualEntryCatalogOption } from "./manualEntry.data";
+import { roundMoney } from "../../../utils/money";
 
 export function toFinanceCatalogProduct(input: {
   id: string;
@@ -16,14 +17,14 @@ export function toFinanceCatalogProduct(input: {
   return {
     id: input.id,
     name: input.name,
-    price: input.price,
+    price: roundMoney(input.price),
     vat: input.vat?.trim() || "0%",
     unit: input.unit,
     discountType: input.discountType,
     discountAmount:
       input.discountAmount == null
         ? undefined
-        : Number(input.discountAmount) || 0,
+        : roundMoney(input.discountAmount),
   };
 }
 

@@ -6,6 +6,7 @@ import {
   type ListPagination,
   type ListPaginationParams,
 } from "../../lib/listPagination";
+import { roundMoney } from "../../utils/money";
 
 type ApiEnvelope<T> = {
   success: boolean;
@@ -684,7 +685,7 @@ export type ApiProfessionalClient = {
   bookings_completed: number;
   average_booking_value: number;
   average_booking_value_label: string;
-  recent_services: Array<{ name: string; price: string }>;
+  recent_services: Array<{ name: string; price: number }>;
   booking_history: Array<{ period: string; bookings: number }>;
   first_name: string | null;
   last_name: string | null;
@@ -1267,8 +1268,7 @@ export const businessApi = baseApi.injectEndpoints({
         // Only send notes when we have a real string — never coerce null → "" (wipes meta).
         if (typeof payload.notes === "string") body.notes = payload.notes;
         if (payload.total_price !== undefined && payload.total_price !== null && payload.total_price !== "") {
-          const total = Number(payload.total_price);
-          if (Number.isFinite(total)) body.total_price = total;
+          body.total_price = roundMoney(payload.total_price);
         }
         if (payload.booking_date) body.booking_date = payload.booking_date;
         if (payload.start_time) body.start_time = payload.start_time;
@@ -1302,7 +1302,7 @@ export const businessApi = baseApi.injectEndpoints({
         if (payload.notify_incoming_er) body.notify_incoming_er = true;
         if (payload.notes !== undefined) body.notes = payload.notes ?? "";
         if (payload.total_price !== undefined && payload.total_price !== null && payload.total_price !== "") {
-          body.total_price = Number(payload.total_price);
+          body.total_price = roundMoney(payload.total_price);
         }
         if (payload.booking_date) body.booking_date = payload.booking_date;
         if (payload.start_time) body.start_time = payload.start_time;

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import dynamic from "next/dynamic";
 import DynamicChunkFallback from "../../../../components/common/DynamicChunkFallback";
 import { useFixedLocationAnalyticsPage } from "./useFixedLocationAnalyticsPage";
@@ -11,8 +11,18 @@ const ProfessionalFixedLocationAnalytics = dynamic(
 );
 
 function AnalyticsContent() {
-  const { data } = useFixedLocationAnalyticsPage();
-  return <ProfessionalFixedLocationAnalytics data={data} />;
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const { data } = useFixedLocationAnalyticsPage({ fromDate, toDate });
+  return (
+    <ProfessionalFixedLocationAnalytics
+      data={data}
+      fromDate={fromDate}
+      toDate={toDate}
+      onFromDateChange={setFromDate}
+      onToDateChange={setToDate}
+    />
+  );
 }
 
 export default function FixedLocationAnalyticsPage() {

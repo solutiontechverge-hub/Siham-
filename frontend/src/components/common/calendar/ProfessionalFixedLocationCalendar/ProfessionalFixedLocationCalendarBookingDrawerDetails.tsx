@@ -73,6 +73,7 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsBag = Pick<
   | "grid"
   | "handleBookingActionSelect"
   | "handleClientNameClick"
+  | "handleDiscardBr"
   | "handleProjectFilePick"
   | "handleRestartResponseTime"
   | "handleWithdrawEr"

@@ -429,12 +429,7 @@ export const refreshProfessionalClientBookingInsights = async (
          jsonb_agg(
            jsonb_build_object(
              'name', service_name,
-             'price',
-             CASE
-               WHEN MOD(COALESCE(total_price, 0)::numeric, 1) = 0
-                 THEN '€' || TO_CHAR(COALESCE(total_price, 0)::numeric, 'FM999,999,999')
-               ELSE '€' || TO_CHAR(ROUND(COALESCE(total_price, 0)::numeric, 2), 'FM999,999,990.00')
-             END
+             'price', ROUND(COALESCE(total_price, 0)::numeric, 2)
            )
            ORDER BY booking_date DESC, created_at DESC
          ) AS recent_services

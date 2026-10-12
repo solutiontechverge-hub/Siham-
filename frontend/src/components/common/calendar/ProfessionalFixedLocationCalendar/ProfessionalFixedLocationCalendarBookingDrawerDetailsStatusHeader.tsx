@@ -26,6 +26,7 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderBag
   | "bookingGuests"
   | "businessResponseWindowInput"
   | "handleBookingActionSelect"
+  | "handleDiscardBr"
   | "handleRestartResponseTime"
   | "isMollureClientPath"
   | "isViewingBooking"

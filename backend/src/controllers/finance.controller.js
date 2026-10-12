@@ -30,7 +30,11 @@ import {
   mergeInvoiceSettings,
 } from "../helpers/financeInvoiceSettings.js";
 import { sendCaughtError } from "../utils/httpError.js";
-import { normalizeMoneyJson, parseMoney } from "../utils/money.js";
+import { normalizeMoneyJson, parseMoney, roundMoney } from "../utils/money.js";
+import {
+  aggregateFinanceAnalytics,
+  FINANCE_ANALYTICS_MAX_ROWS,
+} from "../services/finance-analytics.service.js";
 
 const DEFAULT_TRANSACTION_OPTIONS = {
   onlineImmediate: true,
@@ -47,21 +51,7 @@ const getProfessionalProfile = async (userId) => {
   return result.rows[0] || null;
 };
 
-const formatEuro = (value) => {
-  if (value === null || value === undefined) return undefined;
-  const n = Number(value);
-  if (!Number.isFinite(n)) return undefined;
-  const rounded = Math.round(n * 100) / 100;
-  const text = Number.isInteger(rounded)
-    ? rounded.toLocaleString("en-US")
-    : rounded.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return `€${text}`;
-};
-
-const moneyNumber = (value) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? Math.round(parsed * 100) / 100 : 0;
-};
+const moneyNumber = (value) => roundMoney(value);
 
 const toIsoDate = (value) => {
   if (!value) return null;
@@ -390,7 +380,7 @@ export const upsertSalesAddon = async (req, res) => {
       (id, professional_profile_id, booking_id, booking_code, client_name, client_email, lines, discount, discount_amount, total_price, payment_method, created_at, note, voided, refunded)
       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9,$10,$11,$12::timestamptz,$13,$14,$15)
       ON CONFLICT (professional_profile_id,id) DO UPDATE SET booking_id=EXCLUDED.booking_id, booking_code=EXCLUDED.booking_code, client_name=EXCLUDED.client_name, client_email=EXCLUDED.client_email, lines=EXCLUDED.lines, discount=EXCLUDED.discount, discount_amount=EXCLUDED.discount_amount, total_price=EXCLUDED.total_price, payment_method=EXCLUDED.payment_method, note=EXCLUDED.note, voided=EXCLUDED.voided, refunded=EXCLUDED.refunded, updated_at=NOW()
-      RETURNING *`, [String(body.id), profile.id, String(body.bookingId), String(body.bookingCode), body.clientName ?? "", body.clientEmail ?? null, JSON.stringify(body.lines), JSON.stringify(body.discount ?? null), Number(body.discountAmount ?? 0), Number(body.totalPrice ?? 0), String(body.paymentMethod ?? ""), body.createdAt ?? new Date().toISOString(), body.note ?? null, Boolean(body.voided), Boolean(body.refunded)]);
+      RETURNING *`, [String(body.id), profile.id, String(body.bookingId), String(body.bookingCode), body.clientName ?? "", body.clientEmail ?? null, JSON.stringify(body.lines), JSON.stringify(body.discount ?? null), moneyNumber(body.discountAmount), moneyNumber(body.totalPrice), String(body.paymentMethod ?? ""), body.createdAt ?? new Date().toISOString(), body.note ?? null, Boolean(body.voided), Boolean(body.refunded)]);
     return res.status(200).json({ success: true, message: "Sales add-on saved.", data: mapSalesAddonRow(result.rows[0]) });
   } catch (error) { return sendCaughtError(res, error, { fallbackMessage: "Failed to save sales add-on." }); }
 };
@@ -570,6 +560,48 @@ export const listFinanceTransactions = async (req, res) => {
   }
 };
 
+/** Unpaginated finance rollups for professional analytics (date-filtered). */
+export const getFinanceAnalytics = async (req, res) => {
+  try {
+    const profile = await requireProfessional(req, res);
+    if (!profile) return;
+
+    const { conditions, values } = buildTransactionFilters(req.query);
+    const where = conditions.length ? `AND ${conditions.join(" AND ")}` : "";
+    const completeRowGuard = `AND NULLIF(TRIM(COALESCE(entry_id, '')), '') IS NOT NULL
+      AND NULLIF(TRIM(COALESCE(client_name, '')), '') IS NOT NULL`;
+
+    const result = await query(
+      `SELECT * FROM finance_transactions
+       WHERE professional_profile_id = $1
+       ${where} ${completeRowGuard}
+       ORDER BY COALESCE(transaction_date, created_at::date) DESC, created_at DESC
+       LIMIT ${FINANCE_ANALYTICS_MAX_ROWS}`,
+      [profile.id, ...values],
+    );
+
+    const rows = result.rows.map(mapTransactionRow);
+    const salesVolume = aggregateFinanceAnalytics(result.rows);
+
+    return res.status(200).json({
+      success: true,
+      message: "Finance analytics loaded.",
+      data: {
+        fromDate: req.query.fromDate || null,
+        toDate: req.query.toDate || null,
+        rows,
+        total: rows.length,
+        truncated: result.rows.length >= FINANCE_ANALYTICS_MAX_ROWS,
+        salesVolume,
+        transactionSummary: salesVolume.transactionSummary,
+        totals: salesVolume.totals,
+      },
+    });
+  } catch (error) {
+    return sendCaughtError(res, error, { fallbackMessage: "Request failed." });
+  }
+};
+
 export const createFinanceTransaction = async (req, res) => {
   try {
     const profile = await requireProfessional(req, res);
@@ -578,7 +610,7 @@ export const createFinanceTransaction = async (req, res) => {
     const body = req.body ?? {};
     const clientType = normalizeFinanceClientType(body.clientType, null);
     const isOnline = body.paymentMethod === "onlineDirect";
-    const gross = Number(body.totalPrice) || 0;
+    const gross = moneyNumber(body.totalPrice);
     const stripeFee = isOnline ? Math.round(gross * 0.029 * 100) / 100 : null;
     const mollureFee = isOnline ? Math.round(gross * 0.01 * 100) / 100 : null;
     const net = gross - (stripeFee ?? 0) - (mollureFee ?? 0);
@@ -1072,7 +1104,7 @@ export const replaceFinanceTransaction = async (req, res) => {
 
     const body = req.body ?? {};
     const isOnline = body.paymentMethod === "onlineDirect";
-    const gross = Number(body.totalPrice) || 0;
+    const gross = moneyNumber(body.totalPrice);
     const stripeFee = isOnline ? Math.round(gross * 0.029 * 100) / 100 : null;
     const mollureFee = isOnline ? Math.round(gross * 0.01 * 100) / 100 : null;
     const net = gross - (stripeFee ?? 0) - (mollureFee ?? 0);
@@ -1221,7 +1253,7 @@ export const reissueFinanceInvoiceForBooking = async (req, res) => {
     const penaltyAmount = Number(body.penaltyAmount) || 0;
     const totalOverride =
       body.totalPrice != null && body.totalPrice !== ""
-        ? Number(body.totalPrice)
+        ? moneyNumber(body.totalPrice)
         : null;
 
     let txId = null;

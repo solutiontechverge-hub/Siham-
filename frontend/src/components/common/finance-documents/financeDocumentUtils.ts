@@ -409,7 +409,7 @@ export function buildBookingItems(row: TransactionRow | null, lineItems: Preview
   if (hasStoredDocumentSnapshot(row)) return [];
   return lineItems.map((item) => ({
     label: item.description,
-    value: formatCurrencyDisplay(item.totalPrice),
+    value: typeof item.totalPrice === "number" ? item.totalPrice : 0,
   }));
 }
 

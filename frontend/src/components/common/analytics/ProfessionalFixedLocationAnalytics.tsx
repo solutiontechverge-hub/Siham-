@@ -47,6 +47,10 @@ import { useSnackbar } from "../AppSnackbar";
 
 export type ProfessionalFixedLocationAnalyticsProps = {
   data: ProfessionalFixedLocationAnalyticsData;
+  fromDate: string;
+  toDate: string;
+  onFromDateChange: (value: string) => void;
+  onToDateChange: (value: string) => void;
 };
 
 function AnalyticsSubTabs({
@@ -501,13 +505,15 @@ function TransactionSummaryTable({
 
 export default function ProfessionalFixedLocationAnalytics({
   data,
+  fromDate,
+  toDate,
+  onFromDateChange,
+  onToDateChange,
 }: ProfessionalFixedLocationAnalyticsProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
   const { showSnackbar } = useSnackbar();
 
-  const [fromDate, setFromDate] = React.useState("");
-  const [toDate, setToDate] = React.useState("");
   const [exportAnchor, setExportAnchor] = React.useState<HTMLElement | null>(
     null,
   );
@@ -681,7 +687,7 @@ export default function ProfessionalFixedLocationAnalytics({
               </BodyText>
               <AppDatePicker
                 value={fromDate}
-                onChange={(iso) => setFromDate(iso)}
+                onChange={(iso) => onFromDateChange(iso)}
                 max={toDate && toDate < todayIso ? toDate : todayIso}
                 placeholder="DD/MM/YYYY"
               />
@@ -695,7 +701,7 @@ export default function ProfessionalFixedLocationAnalytics({
               </BodyText>
               <AppDatePicker
                 value={toDate}
-                onChange={(iso) => setToDate(iso)}
+                onChange={(iso) => onToDateChange(iso)}
                 min={fromDate || undefined}
                 max={todayIso}
                 placeholder="DD/MM/YYYY"

@@ -28,6 +28,7 @@ import {
 } from "../services/bookingActivity.service.js";
 import { getTeamMemberReviewAggregates } from "../services/review.service.js";
 import { safeEnsureProfessionalClientFromBooking } from "../services/professional-clients.service.js";
+import { roundMoney } from "../utils/money.js";
 import {
   BOOKING_NOTIFICATION_EVENTS,
   dispatchBookingCreatedNotifications,
@@ -187,6 +188,13 @@ const parseOptionalNumber = (value) => {
 
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+};
+
+const parseOptionalMoney = (value) => {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+  return roundMoney(value);
 };
 
 const parseOptionalInteger = (value) => {
@@ -2002,16 +2010,16 @@ const mirrorCalendarRequestToBooking = async ({
       const meta = JSON.parse(metaRaw.trim() || "{}");
       if (!meta.requestDirection) meta.requestDirection = "outgoing";
       const servicesTotal = Array.isArray(meta.services)
-        ? meta.services.reduce((sum, s) => sum + (Number(s?.price) || 0), 0)
+        ? meta.services.reduce((sum, s) => sum + roundMoney(s?.price), 0)
         : 0;
       const productsTotal = Array.isArray(meta.products)
         ? meta.products.reduce(
-            (sum, p) => sum + (Number(p?.price) || 0) * (Number(p?.quantity) || 1),
+            (sum, p) => sum + roundMoney(p?.price) * (Number(p?.quantity) || 1),
             0,
           )
         : 0;
       const snapshotServices = Array.isArray(meta.clientSnapshot?.services)
-        ? meta.clientSnapshot.services.reduce((sum, s) => sum + (Number(s?.price) || 0), 0)
+        ? meta.clientSnapshot.services.reduce((sum, s) => sum + roundMoney(s?.price), 0)
         : 0;
       const computed = servicesTotal + productsTotal || snapshotServices;
       if (computed > 0) mirroredTotal = computed;
@@ -2550,7 +2558,7 @@ export const createBooking = async (req, res) => {
         normalizedStatus,
         bookingType,
         uniqueCode,
-        parseOptionalNumber(req.body.total_price),
+        parseOptionalMoney(req.body.total_price),
         parseTextArray(req.body.images),
         req.body.contact_number ?? null,
         parseTextArray(req.body.documents),
@@ -3044,7 +3052,7 @@ export const updateMyBooking = async (req, res) => {
     const nextNotes = hasNotes ? String(req.body.notes) : existing.notes;
     const nextTotalPrice =
       req.body.total_price !== undefined && req.body.total_price !== null && req.body.total_price !== ""
-        ? Number(req.body.total_price)
+        ? roundMoney(req.body.total_price)
         : existing.total_price;
     const nextBookingDate = hasSchedule
       ? normalizeBookingDateInput(req.body.booking_date) || existing.booking_date
@@ -3063,7 +3071,7 @@ export const updateMyBooking = async (req, res) => {
       (req.body.total_price !== undefined &&
         req.body.total_price !== null &&
         req.body.total_price !== "" &&
-        Number(req.body.total_price) !== Number(existing.total_price));
+        roundMoney(req.body.total_price) !== roundMoney(existing.total_price));
 
     // Confirmed bookings can be edited directly — no ER grant required.
     let nextEditRequest = existing.edit_request ?? null;
@@ -3260,7 +3268,7 @@ export const updateBookingStatus = async (req, res) => {
         : existingBooking.notes;
     const nextTotalPrice =
       req.body.total_price !== undefined && req.body.total_price !== null && req.body.total_price !== ""
-        ? Number(req.body.total_price)
+        ? roundMoney(req.body.total_price)
         : existingBooking.total_price;
 
     const hasSchedule =
@@ -3284,7 +3292,7 @@ export const updateBookingStatus = async (req, res) => {
       (req.body.total_price !== undefined &&
         req.body.total_price !== null &&
         req.body.total_price !== "" &&
-        Number(req.body.total_price) !== Number(existingBooking.total_price));
+        roundMoney(req.body.total_price) !== roundMoney(existingBooking.total_price));
 
     // Confirmed bookings can be edited directly — no ER grant required.
     let nextEditRequest = existingBooking.edit_request ?? null;

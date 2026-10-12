@@ -113,11 +113,7 @@ export const professionalFixedLocationAnalyticsData: ProfessionalFixedLocationAn
   sections: {
     bookingOriginAndType: {
       title: "1.1 Booking Origin and type",
-      rows: [
-        { origin: "Online", flCount: 50, dlCount: 30, projectCount: 10, total: 90, sharePct: 60 },
-        { origin: "Offline", flCount: 35, dlCount: 20, projectCount: 5, total: 60, sharePct: 40 },
-        { origin: "Total", flCount: 85, dlCount: 50, projectCount: 15, total: 150, sharePct: 100, isTotal: true },
-      ],
+      rows: [],
       explanationLabel: "View Explanation",
       explanationContent: {
         blocks: [
@@ -148,15 +144,7 @@ export const professionalFixedLocationAnalyticsData: ProfessionalFixedLocationAn
     },
     bookingStatusSummary: {
       title: "1.2 Booking Outcome Summary",
-      rows: [
-        { status: "Requested", count: 60, sharePct: 30 },
-        { status: "Confirmed", count: 120, sharePct: 60 },
-        { status: "Instantly Confirmed", count: 90, sharePct: 45 },
-        { status: "Converted from Requested", count: 30, sharePct: 15 },
-        { status: "Completed", count: 100, sharePct: 50 },
-        { status: "Cancelled", count: 40, sharePct: 20 },
-        { status: "Total", count: 200, sharePct: 100, isTotal: true },
-      ],
+      rows: [],
       explanationLabel: "View Explanation",
       explanationContent: {
         blocks: [
@@ -193,12 +181,7 @@ export const professionalFixedLocationAnalyticsData: ProfessionalFixedLocationAn
     },
     attendanceNoShowAnalytics: {
       title: "1.3 Attendance / No-Show Summary",
-      rows: [
-        { bookingType: "Fixed Location (FL)", noShowCount: 10, sharePct: 5 },
-        { bookingType: "Desired Location (Normal DL)", noShowCount: 8, sharePct: 4 },
-        { bookingType: "Project DL Booking", noShowCount: 2, sharePct: 1 },
-        { bookingType: "Total (All Bookings)", noShowCount: 20, sharePct: 10, isTotal: true },
-      ],
+      rows: [],
       explanationLabel: "View Explanation",
       explanationContent: {
         blocks: [
@@ -213,15 +196,7 @@ export const professionalFixedLocationAnalyticsData: ProfessionalFixedLocationAn
     },
     transactionSummary: {
       title: "1.6 Transaction Summary",
-      rows: [
-        { channel: "Online Direct", count: 50, sharePct: 25 },
-        { channel: "Online Non-Direct", count: 40, sharePct: 20 },
-        { channel: "Total Online", count: 90, sharePct: 45, isTotal: true },
-        { channel: "Offline Direct", count: 60, sharePct: 30 },
-        { channel: "Offline Non-Direct", count: 50, sharePct: 25 },
-        { channel: "Total Offline", count: 110, sharePct: 55, isTotal: true },
-        { channel: "Grand Total", count: 200, sharePct: 100, isTotal: true },
-      ],
+      rows: [],
       explanationLabel: "View Explanation",
       explanationContent: {
         blocks: [

@@ -1,5 +1,7 @@
 /** Shared invoice payment-term / reminder settings helpers. */
 
+import { roundMoney } from "../utils/money.js";
+
 export const DEFAULT_INVOICE_SETTINGS = {
   logoDataUrl: null,
   defaultInvoiceType: "individual",
@@ -35,8 +37,7 @@ const numericCatalogItem = (item) => {
   const next = { ...item };
   for (const key of ["price", "unitPrice", "originalPrice", "discountAmount"]) {
     if (next[key] == null || next[key] === "") continue;
-    const value = Number(next[key]);
-    if (Number.isFinite(value)) next[key] = Math.round(value * 100) / 100;
+    next[key] = roundMoney(next[key]);
   }
   return next;
 };
@@ -126,14 +127,14 @@ export const isAutomaticTrigger = (trigger) => {
  * `%` → percent of base; otherwise treated as fixed EUR.
  */
 export const computePenaltyAmount = (baseAmount, penaltyValue, penaltyUnit) => {
-  const base = Number(baseAmount) || 0;
+  const base = roundMoney(baseAmount);
   const value = Number(penaltyValue);
   if (!Number.isFinite(value) || value <= 0) return 0;
   const unit = String(penaltyUnit ?? "")
     .trim()
     .toLowerCase();
   if (unit.includes("%") || unit === "percent" || unit === "percentage") {
-    return Math.round(base * (value / 100) * 100) / 100;
+    return roundMoney(base * (value / 100));
   }
-  return Math.round(value * 100) / 100;
+  return roundMoney(value);
 };

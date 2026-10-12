@@ -14,6 +14,7 @@ import {
   getPublicInvoiceSettings,
   getPublicTransactionOptions,
   listFinanceTransactions,
+  getFinanceAnalytics,
   processFinanceInvoiceReissues,
   replaceFinanceTransaction,
   reissueFinanceInvoiceForBooking,
@@ -140,6 +141,7 @@ router.get(
   getPublicInvoiceSettings,
 );
 
+router.get("/analytics", requireProfessional, getFinanceAnalytics);
 router.get("/transactions", requireProfessional, listFinanceTransactions);
 
 router.post(

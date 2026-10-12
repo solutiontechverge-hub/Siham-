@@ -6,6 +6,7 @@ import {
   parseJsonValue,
   parseTextArray,
 } from "./business-setup-parsers.js";
+import { parseMoney } from "./money.js";
 
 const LISTING_RATING = 0;
 const LISTING_TOTAL_REVIEWS = 0;
@@ -25,6 +26,14 @@ const toNullableNumber = (value) => {
   }
 
   const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const toNullableMoney = (value) => {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+  const parsed = parseMoney(value, Number.NaN);
   return Number.isFinite(parsed) ? parsed : null;
 };
 
@@ -69,7 +78,7 @@ const mapTeamMember = (member, memberRatingStats = null) => {
 const mapServiceDetail = (detail, durationByServiceId = new Map()) => ({
   id: detail.id ?? null,
   serviceId: detail.service_id ?? null,
-  price: toNullableNumber(detail.price),
+  price: toNullableMoney(detail.price),
   durationLabel:
     toNullableString(detail.duration_label) ||
     durationByServiceId.get(entityIdKey(detail.service_id) ?? "") ||
@@ -80,7 +89,7 @@ const mapServiceDetail = (detail, durationByServiceId = new Map()) => ({
   isVisible: detail.is_visible === false || detail.isVisible === false ? false : true,
   createdAt: toIsoTimestamp(detail.created_at),
   discountType: toNullableString(detail.discount_type ?? detail.discountType),
-  discountAmount: toNullableNumber(detail.discount_amount ?? detail.discountAmount),
+  discountAmount: toNullableMoney(detail.discount_amount ?? detail.discountAmount),
   discountStartDate: toNullableString(detail.discount_start_date ?? detail.discountStartDate),
   discountEndDate: toNullableString(detail.discount_end_date ?? detail.discountEndDate),
   discountDescription: toNullableString(
