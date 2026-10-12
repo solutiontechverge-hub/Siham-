@@ -57,7 +57,8 @@ export function useClientBookingCancelFlow(input: {
     bookingRef: string;
     paymentPhase: "full";
     paymentMethod: string;
-    status: "Voided";
+    status: "Voided" | "Paid";
+    amount?: number;
   }) => unknown;
   setEbrAction: (value: null) => void;
 }): {
@@ -164,8 +165,21 @@ export function useClientBookingCancelFlow(input: {
         return;
       }
 
+      const chargedLateFee =
+        cancellationSettlement.isLateCancellation &&
+        cancellationSettlement.cancellationFee > 0;
       const clearedNotes = clearEbrSuggestionsFromNotes(activeBookingNotes, {
         cancellationReason: pendingCancelReason.trim() || undefined,
+        ...(chargedLateFee
+          ? {
+              showLateCancellation: true,
+              lateCancellationFeePercent: String(
+                cancellationSettlement.feePercent,
+              ),
+              cancellationFeeAt: new Date().toISOString(),
+              exceededCancellationWindow: true,
+            }
+          : {}),
       });
 
       await updateMyBooking({
@@ -221,12 +235,23 @@ export function useClientBookingCancelFlow(input: {
         showSnackbar({ severity: "success", message: "Booking cancelled" });
       }
 
-      void syncFinanceFromBooking({
-        bookingRef,
-        paymentPhase: "full",
-        paymentMethod: checkoutPaymentMethodApiValue(selectedPaymentMethod),
-        status: "Voided",
-      });
+      // Late fee paid (Stripe and/or prepaid) → Paid LCF invoice. Else void open service sale.
+      void syncFinanceFromBooking(
+        chargedLateFee
+          ? {
+              bookingRef,
+              paymentPhase: "full",
+              paymentMethod: checkoutPaymentMethodApiValue(selectedPaymentMethod),
+              status: "Paid",
+              amount: cancellationSettlement.cancellationFee,
+            }
+          : {
+              bookingRef,
+              paymentPhase: "full",
+              paymentMethod: checkoutPaymentMethodApiValue(selectedPaymentMethod),
+              status: "Voided",
+            },
+      );
 
       await refreshActiveBooking();
       editRequest.refresh();
@@ -239,6 +264,9 @@ export function useClientBookingCancelFlow(input: {
       activeBookingNotes,
       apiBookingId,
       bookingRef,
+      cancellationSettlement.cancellationFee,
+      cancellationSettlement.feePercent,
+      cancellationSettlement.isLateCancellation,
       clearActiveBookingSessionLocal,
       editRequest,
       listTab,

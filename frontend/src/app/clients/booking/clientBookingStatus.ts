@@ -61,9 +61,51 @@ export function bookingStatusChipColors(status: ClientBookingStatus): {
   return {
     bgcolor: theme.chipBg,
     color: theme.chipColor,
-    border: `1px solid ${theme.chipBorder}`,
+    border: "none",
   };
 }
+
+/** BR / ER / EBR / Updated — same height as main status chip, solid grey, no border. */
+export const bookingSecondaryStatusChipSx = {
+  height: 24,
+  minHeight: 24,
+  maxHeight: 24,
+  boxSizing: "border-box",
+  fontWeight: 600,
+  fontSize: 11,
+  borderRadius: "6px",
+  bgcolor: "#F2F4F7",
+  color: "rgba(52, 74, 102, 0.62)",
+  border: "none",
+  borderWidth: 0,
+  borderColor: "transparent",
+  "& .MuiChip-label": {
+    px: 1.1,
+    py: 0,
+    lineHeight: "24px",
+    display: "flex",
+    alignItems: "center",
+  },
+} as const;
+
+/** BR / ER badge stacks in the status row (non-Chip). */
+export const bookingSecondaryStatusBadgeSx = {
+  height: 24,
+  minHeight: 24,
+  maxHeight: 24,
+  boxSizing: "border-box",
+  borderRadius: "6px",
+  bgcolor: "#F2F4F7",
+  border: "none",
+  borderWidth: 0,
+  borderColor: "transparent",
+  color: "rgba(52, 74, 102, 0.62)",
+  px: 1.1,
+  py: 0,
+  flexShrink: 0,
+  display: "inline-flex",
+  alignItems: "center",
+} as const;
 
 export function mapApiBookingStatusToClient(status: string): ClientBookingStatus | null {
   const normalized = status.trim().toLowerCase();

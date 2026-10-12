@@ -1,4 +1,8 @@
 import type { TransactionRow } from "../../../app/professionals/fixed-location/finance/data/transactions";
+import {
+  formatCurrencyDisplay,
+  parseCurrencyValue,
+} from "../../common/finance-documents/financeDocumentUtils";
 
 export type RefundSalesItem = {
   id: string;
@@ -43,8 +47,8 @@ export function refundItemsFromTransactions(rows: readonly TransactionRow[]): Re
     return bookingItems.map((item, index) => ({
       id: `booking-${index}`,
       name: item.label,
-      meta: item.value,
-      amount: Number(String(item.value).replace(/[^\d.]/g, "")) || 0,
+      meta: formatCurrencyDisplay(item.value),
+      amount: parseCurrencyValue(item.value),
     }));
   }
 
@@ -53,8 +57,8 @@ export function refundItemsFromTransactions(rows: readonly TransactionRow[]): Re
     return lineItems.map((item, index) => ({
       id: `line-${index}`,
       name: item.description,
-      meta: typeof item.totalPrice === "number" ? `€${item.totalPrice.toFixed(2)}` : item.totalPrice,
-      amount: Number(String(item.totalPrice).replace(/[^\d.]/g, "")) || 0,
+      meta: formatCurrencyDisplay(item.totalPrice),
+      amount: parseCurrencyValue(item.totalPrice),
     }));
   }
 

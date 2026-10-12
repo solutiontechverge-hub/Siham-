@@ -9,7 +9,7 @@ import {
   mollureSectionTitleSx,
 } from "../../../theme/mollureHierarchy";
 import { BodyText } from "../../ui/typography";
-import { financeMutedTextSx } from "./financeDocumentUtils";
+import { financeMutedTextSx, financePriceTextSx } from "./financeDocumentUtils";
 
 type FinancePreviewLabelValueRowProps = {
   label: string;
@@ -47,7 +47,7 @@ export function FinancePreviewLabelValueRow({
         >
           {label}
         </BodyText>
-        <BodyText sx={mollureLabelSx(m.navy)}>{value}</BodyText>
+        <BodyText sx={mollureLabelSx(m.navy, financePriceTextSx)}>{value}</BodyText>
       </Stack>
     );
   }
@@ -64,7 +64,7 @@ export function FinancePreviewLabelValueRow({
           isMeta
             ? mollureBodyMutedSx(m.navy)
             : isTotal
-              ? mollureLabelSx(m.navy)
+              ? mollureLabelSx(m.navy, { lineHeight: 1 })
               : mollureBodySx(m.navy)
         }
       >
@@ -73,8 +73,15 @@ export function FinancePreviewLabelValueRow({
       <BodyText
         sx={
           isTotal
-            ? mollureSectionTitleSx(m.navy, { textAlign: isMeta ? "right" : undefined })
-            : mollureLabelSx(m.navy, { textAlign: isMeta ? "right" : undefined })
+            ? mollureSectionTitleSx(m.navy, {
+                textAlign: isMeta ? "right" : undefined,
+                lineHeight: 1,
+                ...financePriceTextSx,
+              })
+            : mollureLabelSx(m.navy, {
+                textAlign: isMeta ? "right" : undefined,
+                ...financePriceTextSx,
+              })
         }
       >
         {value}

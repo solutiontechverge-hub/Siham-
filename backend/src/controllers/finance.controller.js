@@ -17,7 +17,9 @@ import {
 } from "../utils/pagination.js";
 import {
   flagFinancePaymentAfterCancel,
+  isReceiptEligibleStatus,
   isSettledFinanceStatus,
+  mintReceiptNumber,
   processOverdueInvoiceReissues,
   syncBookingToFinanceTransaction,
 } from "../services/finance-sync.service.js";
@@ -30,7 +32,7 @@ import {
   mergeInvoiceSettings,
 } from "../helpers/financeInvoiceSettings.js";
 import { sendCaughtError } from "../utils/httpError.js";
-import { normalizeMoneyJson, parseMoney } from "../utils/money.js";
+import { normalizeMoneyJson, parseMoney, roundMoney } from "../utils/money.js";
 
 const DEFAULT_TRANSACTION_OPTIONS = {
   onlineImmediate: true,
@@ -47,21 +49,8 @@ const getProfessionalProfile = async (userId) => {
   return result.rows[0] || null;
 };
 
-const formatEuro = (value) => {
-  if (value === null || value === undefined) return undefined;
-  const n = Number(value);
-  if (!Number.isFinite(n)) return undefined;
-  const rounded = Math.round(n * 100) / 100;
-  const text = Number.isInteger(rounded)
-    ? rounded.toLocaleString("en-US")
-    : rounded.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return `€${text}`;
-};
-
-const moneyNumber = (value) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? Math.round(parsed * 100) / 100 : 0;
-};
+/** Write-boundary: accept numbers or legacy "€1,111" strings; always persist a number. */
+const moneyNumber = roundMoney;
 
 const toIsoDate = (value) => {
   if (!value) return null;
@@ -91,9 +80,8 @@ const mapTransactionRow = (row) => ({
   id: row.id,
   entryType: row.entry_type,
   entryId: row.entry_id,
-  date: ["Paid", "Prepaid", "Refunded"].includes(row.status)
-    ? toIsoDate(row.transaction_date)
-    : null,
+  // Always surface the stored date (incl. Voided / open). Settlement gating hid Voided dates.
+  date: toIsoDate(row.transaction_date) ?? toIsoDate(row.created_at),
   paymentDeadline: toIsoDate(row.payment_deadline),
   entryLabel: row.entry_label ?? undefined,
   clientName: row.client_name,
@@ -159,6 +147,128 @@ const loadProfessionalDocumentSnapshot = async (professionalProfileId) => {
   };
 };
 
+/**
+ * Resolve client list / platform ids + company VAT/KvK for the finance document snapshot.
+ * Guests stay name/email only (no professional_clients guest-record pattern in product).
+ */
+const resolveFinanceClientParty = async ({
+  professionalProfileId,
+  clientName,
+  clientEmail,
+  clientType,
+  vatNumber,
+  cocNumber,
+  bookingUuid,
+}) => {
+  const email = String(clientEmail ?? "").trim();
+  let customerId = null;
+  let clientId = null;
+  let resolvedVat = String(vatNumber ?? "").trim() || null;
+  let resolvedCoc = String(cocNumber ?? "").trim() || null;
+  let resolvedLegalName = String(clientName ?? "").trim() || "Guest";
+  let isMollure = clientType === "mollure";
+
+  // Walk-in / one-time guests: name+email only — product has no guest professional_clients record.
+  if (clientType === "guest") {
+    return {
+      legalName: resolvedLegalName,
+      email: email || undefined,
+    };
+  }
+
+  if (bookingUuid) {
+    const bookingRow = await query(
+      `SELECT b.customer_id,
+              u.user_type,
+              u.email,
+              cp.vat_number,
+              cp.ccc_number,
+              cp.legal_name
+       FROM bookings b
+       INNER JOIN users u ON u.id = b.customer_id
+       LEFT JOIN company_profiles cp ON cp.user_id = u.id
+       WHERE b.id = $1
+       LIMIT 1`,
+      [bookingUuid],
+    );
+    const row = bookingRow.rows[0];
+    if (row) {
+      customerId = row.customer_id;
+      if (!email) {
+        // keep body email when provided
+      }
+      if (!resolvedVat) resolvedVat = row.vat_number || null;
+      if (!resolvedCoc) resolvedCoc = row.ccc_number || null;
+      if (row.user_type === "company" && row.legal_name) {
+        resolvedLegalName = row.legal_name;
+      }
+      if (row.user_type === "company" && clientType === "guest") {
+        // booking-linked company payer is business
+      }
+      isMollure = isMollure || Boolean(row.customer_id);
+    }
+  }
+
+  if (email || customerId) {
+    if (!customerId && email) {
+      const userLookup = await query(
+        `SELECT u.id, u.user_type, cp.vat_number, cp.ccc_number, cp.legal_name
+         FROM users u
+         LEFT JOIN company_profiles cp ON cp.user_id = u.id
+         WHERE lower(u.email) = lower($1)
+           AND u.user_type IN ('individual', 'company')
+         LIMIT 1`,
+        [email],
+      );
+      const user = userLookup.rows[0];
+      if (user) {
+        customerId = user.id;
+        isMollure = true;
+        if (!resolvedVat) resolvedVat = user.vat_number || null;
+        if (!resolvedCoc) resolvedCoc = user.ccc_number || null;
+        if (user.user_type === "company" && user.legal_name) {
+          resolvedLegalName = user.legal_name;
+        }
+      }
+    }
+
+    const clientRow = await query(
+      `SELECT id, mollure_user_id, client_kind, is_mollure, vat, coc, legal_name, display_name
+       FROM professional_clients
+       WHERE professional_profile_id = $1
+         AND (
+           ($2::uuid IS NOT NULL AND mollure_user_id = $2)
+           OR ($3::text <> '' AND lower(email) = lower($3))
+         )
+       ORDER BY
+         CASE WHEN $2::uuid IS NOT NULL AND mollure_user_id = $2 THEN 0 ELSE 1 END,
+         updated_at DESC NULLS LAST
+       LIMIT 1`,
+      [professionalProfileId, customerId, email],
+    );
+    const pc = clientRow.rows[0];
+    if (pc) {
+      clientId = pc.id;
+      if (!resolvedVat) resolvedVat = pc.vat || null;
+      if (!resolvedCoc) resolvedCoc = pc.coc || null;
+      if (pc.client_kind === "company" && pc.legal_name) {
+        resolvedLegalName = pc.legal_name;
+      }
+      if (pc.is_mollure) isMollure = true;
+    }
+  }
+
+  return {
+    legalName: resolvedLegalName,
+    email: email || undefined,
+    ...(resolvedVat ? { vatNumber: resolvedVat } : {}),
+    ...(resolvedCoc ? { cocNumber: resolvedCoc } : {}),
+    ...(customerId ? { customerId } : {}),
+    ...(clientId ? { clientId } : {}),
+    ...(isMollure && clientType !== "guest" ? { isMollure: true } : {}),
+  };
+};
+
 const mapSettingsRow = (row) => ({
   subscriptionStatus: row.subscription_status,
   stripeConnectStatus: row.stripe_connect_status,
@@ -191,6 +301,24 @@ const buildTransactionFilters = (queryParams) => {
   const conditions = [];
   const values = [];
   let idx = 2;
+
+  // Exact booking scope (UUID or unique_code). booking_id may store either form.
+  const bookingId =
+    typeof queryParams.bookingId === "string" ? queryParams.bookingId.trim() : "";
+  if (bookingId) {
+    conditions.push(`(
+      booking_id = $${idx}
+      OR booking_id IN (
+        SELECT b.unique_code FROM bookings b
+        WHERE b.id::text = $${idx} OR b.unique_code = $${idx}
+        UNION
+        SELECT b.id::text FROM bookings b
+        WHERE b.id::text = $${idx} OR b.unique_code = $${idx}
+      )
+    )`);
+    values.push(bookingId);
+    idx += 1;
+  }
 
   const q = typeof queryParams.q === "string" ? queryParams.q.trim().toLowerCase() : "";
   if (q) {
@@ -235,6 +363,11 @@ const buildTransactionFilters = (queryParams) => {
     conditions.push(`status = ANY($${idx}::text[])`);
     values.push(statuses);
     idx += 1;
+  }
+
+  // Checkout replacement voids stay auditable via Voided filter; hide from default lists.
+  if (!statuses.includes("Voided")) {
+    conditions.push(`superseded_by IS NULL`);
   }
 
   const methodFilter = queryParams.methodFilter;
@@ -390,7 +523,7 @@ export const upsertSalesAddon = async (req, res) => {
       (id, professional_profile_id, booking_id, booking_code, client_name, client_email, lines, discount, discount_amount, total_price, payment_method, created_at, note, voided, refunded)
       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9,$10,$11,$12::timestamptz,$13,$14,$15)
       ON CONFLICT (professional_profile_id,id) DO UPDATE SET booking_id=EXCLUDED.booking_id, booking_code=EXCLUDED.booking_code, client_name=EXCLUDED.client_name, client_email=EXCLUDED.client_email, lines=EXCLUDED.lines, discount=EXCLUDED.discount, discount_amount=EXCLUDED.discount_amount, total_price=EXCLUDED.total_price, payment_method=EXCLUDED.payment_method, note=EXCLUDED.note, voided=EXCLUDED.voided, refunded=EXCLUDED.refunded, updated_at=NOW()
-      RETURNING *`, [String(body.id), profile.id, String(body.bookingId), String(body.bookingCode), body.clientName ?? "", body.clientEmail ?? null, JSON.stringify(body.lines), JSON.stringify(body.discount ?? null), Number(body.discountAmount ?? 0), Number(body.totalPrice ?? 0), String(body.paymentMethod ?? ""), body.createdAt ?? new Date().toISOString(), body.note ?? null, Boolean(body.voided), Boolean(body.refunded)]);
+      RETURNING *`, [String(body.id), profile.id, String(body.bookingId), String(body.bookingCode), body.clientName ?? "", body.clientEmail ?? null, JSON.stringify(normalizeMoneyJson(body.lines) ?? []), JSON.stringify(normalizeMoneyJson(body.discount ?? null)), moneyNumber(body.discountAmount), moneyNumber(body.totalPrice), String(body.paymentMethod ?? ""), body.createdAt ?? new Date().toISOString(), body.note ?? null, Boolean(body.voided), Boolean(body.refunded)]);
     return res.status(200).json({ success: true, message: "Sales add-on saved.", data: mapSalesAddonRow(result.rows[0]) });
   } catch (error) { return sendCaughtError(res, error, { fallbackMessage: "Failed to save sales add-on." }); }
 };
@@ -518,8 +651,39 @@ export const updateFinanceStripeStatus = async (req, res) => {
 
 export const listFinanceTransactions = async (req, res) => {
   try {
-    const profile = await requireProfessional(req, res);
-    if (!profile) return;
+    const bookingIdParam =
+      typeof req.query?.bookingId === "string" ? req.query.bookingId.trim() : "";
+    const isProfessional = req.user?.user_type === "professional";
+
+    // Clients may only list issued docs for a booking they own (immutable preview).
+    let scopeProfileId = null;
+    if (isProfessional) {
+      const profile = await requireProfessional(req, res);
+      if (!profile) return;
+      scopeProfileId = profile.id;
+    } else if (!bookingIdParam) {
+      return res.status(403).json({
+        success: false,
+        message: "Only professionals can access finance.",
+        data: null,
+      });
+    } else {
+      const owned = await query(
+        `SELECT b.id, b.unique_code, b.customer_id
+         FROM bookings b
+         WHERE b.customer_id = $1
+           AND (b.id::text = $2 OR b.unique_code = $2)
+         LIMIT 1`,
+        [req.user.id, bookingIdParam],
+      );
+      if (!owned.rows[0]) {
+        return res.status(404).json({
+          success: false,
+          message: "Booking not found.",
+          data: null,
+        });
+      }
+    }
 
     const { conditions, values } = buildTransactionFilters(req.query);
     const where = conditions.length
@@ -533,21 +697,35 @@ export const listFinanceTransactions = async (req, res) => {
       maxLimit: 500,
       force: true,
     });
+
+    const scopeClause = scopeProfileId
+      ? `professional_profile_id = $1`
+      : `(
+          booking_id = $1
+          OR booking_id IN (
+            SELECT b.unique_code FROM bookings b
+            WHERE b.id::text = $1 OR b.unique_code = $1
+            UNION
+            SELECT b.id::text FROM bookings b
+            WHERE b.id::text = $1 OR b.unique_code = $1
+          )
+        )`;
+    const scopeValue = scopeProfileId ?? bookingIdParam;
     const { clause: limitClause } = sqlLimitOffset(2 + values.length);
 
     const result = await query(
       `SELECT * FROM finance_transactions
-       WHERE professional_profile_id = $1
+       WHERE ${scopeClause}
        ${where} ${completeRowGuard}
        ORDER BY COALESCE(transaction_date, created_at::date) DESC, created_at DESC
        ${limitClause}`,
-      withPaginationParams([profile.id, ...values], pagination),
+      withPaginationParams([scopeValue, ...values], pagination),
     );
 
     const countResult = await query(
       `SELECT COUNT(*)::int AS total FROM finance_transactions
-       WHERE professional_profile_id = $1 ${where} ${completeRowGuard}`,
-      [profile.id, ...values],
+       WHERE ${scopeClause} ${where} ${completeRowGuard}`,
+      [scopeValue, ...values],
     );
     const total = countResult.rows[0]?.total ?? 0;
 
@@ -576,15 +754,31 @@ export const createFinanceTransaction = async (req, res) => {
     if (!profile) return;
 
     const body = req.body ?? {};
-    const clientType = normalizeFinanceClientType(body.clientType, null);
-    const isOnline = body.paymentMethod === "onlineDirect";
-    const gross = Number(body.totalPrice) || 0;
-    const stripeFee = isOnline ? Math.round(gross * 0.029 * 100) / 100 : null;
-    const mollureFee = isOnline ? Math.round(gross * 0.01 * 100) / 100 : null;
+    let clientType = normalizeFinanceClientType(body.clientType, null);
+    const paymentMethod = String(body.paymentMethod || "offlineDirect");
+    const isOnlineDirect = paymentMethod === "onlineDirect";
+    const isOnlineNonDirect =
+      paymentMethod === "onlineNonDirect" || paymentMethod === "onlineInvoice";
+    const isOfflineNonDirect =
+      paymentMethod === "offlineNonDirect" || paymentMethod === "offlineInvoice";
+    const isNonDirect = isOnlineNonDirect || isOfflineNonDirect;
+    const isOnline = isOnlineDirect || isOnlineNonDirect;
+    const gross = moneyNumber(body.totalPrice);
+    const stripeFee = isOnlineDirect ? Math.round(gross * 0.029 * 100) / 100 : null;
+    const mollureFee = isOnlineDirect ? Math.round(gross * 0.01 * 100) / 100 : null;
     const net = gross - (stripeFee ?? 0) - (mollureFee ?? 0);
     const today = new Date().toISOString().slice(0, 10);
+    const dueDate =
+      (typeof body.dueDate === "string" && body.dueDate.trim()) || today;
     const entryNum = String(100 + Math.floor(Math.random() * 900));
-    const paymentPhase = body.paymentPhase === "addon" ? "addon" : null;
+    const paymentPhase =
+      body.paymentPhase === "addon"
+        ? "addon"
+        : body.paymentPhase === "prepay"
+          ? "prepay"
+          : body.paymentPhase === "full"
+            ? "full"
+            : null;
     const isAddon = paymentPhase === "addon";
     const bookingRef =
       (typeof body.bookingRef === "string" && body.bookingRef.trim()) ||
@@ -650,41 +844,82 @@ export const createFinanceTransaction = async (req, res) => {
         data: null,
       });
     }
+    // Booking-linked rows store unique_code as entry_id (same as finance-sync); manual keeps a short numeric id.
+    const resolvedEntryId = bookingRef
+      ? String(body.bookingRef || bookingRef).trim() || entryNum
+      : entryNum;
     const entryLabel = isAddon
       ? "Add-ons"
       : bookingRef
         ? body.entryLabel || "Booking"
         : "Manual entry";
     const status = isAddon
-      ? isOnline
+      ? isOnlineDirect
         ? "Pending"
-        : "Paid"
-      : isOnline
+        : isNonDirect
+          ? "Payment due"
+          : "Paid"
+      : isOnlineDirect
         ? "Pending"
-        : "Paid";
+        : isNonDirect
+          ? "Payment due"
+          : "Paid";
+    const methodTitle = isOnlineNonDirect
+      ? "Online – invoice with due date"
+      : isOfflineNonDirect
+        ? "Offline – invoice with due date"
+        : isOnlineDirect
+          ? "Online – direct"
+          : "Offline – direct";
+    const methodDetail = isNonDirect ? `Due date: ${dueDate}` : "";
+    const statusDetail = isOnlineDirect
+      ? "Pay within 15 min"
+      : isNonDirect
+        ? `Due ${dueDate}`
+        : null;
 
     const issuedFinanceSettings = await ensureFinanceSettings(profile.id);
     const issuedInvoiceSettings = issuedFinanceSettings.invoice_settings;
     const issuedProfessionalBusiness = await loadProfessionalDocumentSnapshot(profile.id);
+    const clientParty = await resolveFinanceClientParty({
+      professionalProfileId: profile.id,
+      clientName: body.clientName ?? "Guest",
+      clientEmail: body.clientEmail,
+      clientType,
+      vatNumber: body.vatNumber,
+      cocNumber: body.cocNumber,
+      bookingUuid,
+    });
+    if (
+      clientType !== "guest" &&
+      (clientParty.vatNumber || clientParty.cocNumber)
+    ) {
+      clientType = "business";
+    } else if (clientParty.isMollure && clientType === "nonMollure") {
+      clientType = "mollure";
+    }
+    // ponytail: JSON issued snapshot only — store PDF bytes/S3 at issue-time if auditors need binary immutability.
     const document = {
-      documentNumber: `INV-G${entryNum}`,
-      receiptNumber: isOnline ? undefined : `RCP-G${entryNum}`,
+      documentNumber: `INV-G${resolvedEntryId}`,
+      receiptNumber: mintReceiptNumber(status, `G${resolvedEntryId}`),
       serviceDate: today,
       invoiceDate: today,
-      dueDate: today,
-      client: {
-          legalName: body.clientName ?? "Guest",
-          email: body.clientEmail || undefined,
-          vatNumber: body.vatNumber || undefined,
-          cocNumber: body.cocNumber || undefined,
-      },
+      dueDate,
+      client: clientParty,
       lineItems,
       totalPrice: moneyNumber(gross),
       ...(paymentPhase ? { paymentPhase } : {}),
       ...(addonId ? { addonId, payerKey: addonId } : {}),
       issuedSnapshot: {
-        templateType: issuedInvoiceSettings.defaultInvoiceType,
-        layout: issuedInvoiceSettings.defaultInvoiceType === "company" ? "itemized" : "simplified",
+        // BC / vat-coc clients freeze company layout even if default is individual.
+        templateType:
+          clientType === "business" || issuedInvoiceSettings.defaultInvoiceType === "company"
+            ? "company"
+            : "individual",
+        layout:
+          clientType === "business" || issuedInvoiceSettings.defaultInvoiceType === "company"
+            ? "itemized"
+            : "simplified",
         invoiceSettings: issuedInvoiceSettings,
         professionalBusiness: issuedProfessionalBusiness,
       },
@@ -696,20 +931,22 @@ export const createFinanceTransaction = async (req, res) => {
         client_name, client_email, client_type,
         gross_amount, stripe_fee, mollure_fee, net_amount,
         method_title, method_detail, status, status_detail, booking_id, document,
+        issued_document, issued_at,
         discount_amount, prepayment_amount, paid_amount
       ) VALUES (
         $1, $2, $3, $4::date, $5::date, $6,
         $7, $8, $9,
         $10, $11, $12, $13,
         $14, $15, $16, $17, $18, $19::jsonb,
+        $19::jsonb, NOW(),
         $20, $21, $22
       ) RETURNING *`,
       [
         profile.id,
         entryType,
-        entryNum,
+        resolvedEntryId,
         today,
-        today,
+        dueDate,
         entryLabel,
         body.clientName ?? "Guest",
         body.clientEmail ?? "",
@@ -718,10 +955,10 @@ export const createFinanceTransaction = async (req, res) => {
         stripeFee,
         mollureFee,
         net,
-        isOnline ? "Online – direct" : "Offline – direct",
-        "",
+        methodTitle,
+        methodDetail,
         status,
-        isOnline ? "Pay within 15 min" : null,
+        statusDetail,
         // booking_id is a UUID column. `bookingRef` may be the human-readable
         // booking code, so persist the resolved UUID while keeping the code in
         // the document/entry metadata above.
@@ -729,7 +966,7 @@ export const createFinanceTransaction = async (req, res) => {
         JSON.stringify(document),
         moneyNumber(body.discountAmount),
         moneyNumber(body.prepaymentAmount),
-        isOnline ? 0 : moneyNumber(gross),
+        isOnlineDirect || isNonDirect ? 0 : moneyNumber(gross),
       ],
     );
 
@@ -771,7 +1008,7 @@ export const updateFinanceTransaction = async (req, res) => {
     const { status, note, transactionDate } = req.body ?? {};
 
     const existing = await query(
-      `SELECT id, status, gross_amount FROM finance_transactions
+      `SELECT id, status, gross_amount, entry_id, document, issued_document FROM finance_transactions
        WHERE professional_profile_id = $1 AND id = $2
        LIMIT 1`,
       [profile.id, id],
@@ -804,6 +1041,26 @@ export const updateFinanceTransaction = async (req, res) => {
       fields.push(`status = $${idx}`);
       values.push(status);
       idx += 1;
+
+      // Mint receipt once when moving into Prepaid|Paid|Refunded; never mint on Voided.
+      const currentDoc = existing.rows[0].document || {};
+      if (
+        isReceiptEligibleStatus(status) &&
+        !currentDoc.receiptNumber &&
+        !currentDoc.creditNoteNumber
+      ) {
+        const minted = mintReceiptNumber(status, `G${existing.rows[0].entry_id || ""}`);
+        if (minted) {
+          const nextDoc = { ...currentDoc, receiptNumber: minted };
+          fields.push(`document = $${idx}::jsonb`);
+          values.push(JSON.stringify(nextDoc));
+          idx += 1;
+          const issued = existing.rows[0].issued_document || currentDoc;
+          fields.push(`issued_document = $${idx}::jsonb`);
+          values.push(JSON.stringify({ ...issued, receiptNumber: minted }));
+          idx += 1;
+        }
+      }
     }
     if (note !== undefined) {
       fields.push(`note = $${idx}`);
@@ -980,12 +1237,36 @@ export const bulkFinanceTransactionAction = async (req, res) => {
     const result = await query(
       `UPDATE finance_transactions
        SET status = $3,
-           document = CASE WHEN $3 = 'Voided'
-             THEN jsonb_set(COALESCE(document, '{}'::jsonb), '{status}', '"Voided"'::jsonb, true)
-             ELSE document END,
-           issued_document = CASE WHEN $3 = 'Voided'
-             THEN jsonb_set(COALESCE(issued_document, document, '{}'::jsonb), '{status}', '"Voided"'::jsonb, true)
-             ELSE issued_document END,
+           document = CASE
+             WHEN $3 = 'Voided' THEN
+               jsonb_set(COALESCE(document, '{}'::jsonb), '{status}', '"Voided"'::jsonb, true)
+             WHEN $3 = 'Paid'
+               AND NULLIF(TRIM(COALESCE(document->>'receiptNumber', '')), '') IS NULL
+             THEN
+               jsonb_set(
+                 COALESCE(document, '{}'::jsonb),
+                 '{receiptNumber}',
+                 to_jsonb('RCP-G' || COALESCE(entry_id, '')),
+                 true
+               )
+             ELSE document
+           END,
+           issued_document = CASE
+             WHEN $3 = 'Voided' THEN
+               jsonb_set(COALESCE(issued_document, document, '{}'::jsonb), '{status}', '"Voided"'::jsonb, true)
+             WHEN $3 = 'Paid'
+               AND NULLIF(TRIM(COALESCE(
+                 COALESCE(issued_document, document)->>'receiptNumber', ''
+               )), '') IS NULL
+             THEN
+               jsonb_set(
+                 COALESCE(issued_document, document, '{}'::jsonb),
+                 '{receiptNumber}',
+                 to_jsonb('RCP-G' || COALESCE(entry_id, '')),
+                 true
+               )
+             ELSE issued_document
+           END,
            updated_at = NOW()
        WHERE professional_profile_id = $1 AND id = ANY($2::uuid[])
          AND ( $3 <> 'Unpaid' OR entry_type = 'manualEntry' )
@@ -1071,8 +1352,14 @@ export const replaceFinanceTransaction = async (req, res) => {
     ]);
 
     const body = req.body ?? {};
+    let clientType = normalizeFinanceClientType(body.clientType, {
+      client: {
+        vatNumber: body.vatNumber,
+        cocNumber: body.cocNumber,
+      },
+    });
     const isOnline = body.paymentMethod === "onlineDirect";
-    const gross = Number(body.totalPrice) || 0;
+    const gross = moneyNumber(body.totalPrice);
     const stripeFee = isOnline ? Math.round(gross * 0.029 * 100) / 100 : null;
     const mollureFee = isOnline ? Math.round(gross * 0.01 * 100) / 100 : null;
     const net = gross - (stripeFee ?? 0) - (mollureFee ?? 0);
@@ -1081,6 +1368,34 @@ export const replaceFinanceTransaction = async (req, res) => {
     const issuedFinanceSettings = await ensureFinanceSettings(profile.id);
     const issuedInvoiceSettings = issuedFinanceSettings.invoice_settings;
     const issuedProfessionalBusiness = await loadProfessionalDocumentSnapshot(profile.id);
+    const clientParty = await resolveFinanceClientParty({
+      professionalProfileId: profile.id,
+      clientName: body.clientName ?? "Guest",
+      clientEmail: body.clientEmail,
+      clientType,
+      vatNumber: body.vatNumber,
+      cocNumber: body.cocNumber,
+      bookingUuid: null,
+    });
+    if (
+      clientType !== "guest" &&
+      (clientParty.vatNumber || clientParty.cocNumber)
+    ) {
+      clientType = "business";
+    } else if (clientParty.isMollure && clientType === "nonMollure") {
+      clientType = "mollure";
+    }
+    const submittedLines = Array.isArray(body.lines) ? body.lines : [];
+    const lineItems = submittedLines.map((line) => ({
+      description: line.name,
+      sourceReference: String(line.sourceReference ?? line.id ?? ""),
+      sourceType: line.sourceType ?? "uniqueItemCode",
+      quantity: String(line.quantity ?? 1),
+      vat: "21%",
+      vatRate: 21,
+      pricePerUnit: moneyNumber(line.unitPrice),
+      totalPrice: moneyNumber((line.quantity ?? 1) * (line.unitPrice ?? 0)),
+    }));
 
     const result = await query(
       `INSERT INTO finance_transactions (
@@ -1100,7 +1415,7 @@ export const replaceFinanceTransaction = async (req, res) => {
         today,
         body.clientName ?? "Guest",
         body.clientEmail ?? "",
-        body.clientType ?? "guest",
+        clientType,
         gross,
         stripeFee,
         mollureFee,
@@ -1110,21 +1425,23 @@ export const replaceFinanceTransaction = async (req, res) => {
         isOnline ? "Pending" : "Paid",
         JSON.stringify({
           documentNumber: `INV-RPL-${entryNum}`,
+          receiptNumber: mintReceiptNumber(isOnline ? "Pending" : "Paid", `G${entryNum}`),
           serviceDate: today,
           invoiceDate: today,
           dueDate: today,
-          client: {
-            legalName: body.clientName ?? "Guest",
-            email: body.clientEmail ?? "",
-            vatNumber: body.vatNumber || undefined,
-            cocNumber: body.cocNumber || undefined,
-          },
+          client: clientParty,
           lineItems,
           totalPrice: moneyNumber(gross),
           replacedTransactionId: id,
           issuedSnapshot: {
-            templateType: issuedInvoiceSettings.defaultInvoiceType,
-            layout: issuedInvoiceSettings.defaultInvoiceType === "company" ? "itemized" : "simplified",
+            templateType:
+              clientType === "business" || issuedInvoiceSettings.defaultInvoiceType === "company"
+                ? "company"
+                : "individual",
+            layout:
+              clientType === "business" || issuedInvoiceSettings.defaultInvoiceType === "company"
+                ? "itemized"
+                : "simplified",
             invoiceSettings: issuedInvoiceSettings,
             professionalBusiness: issuedProfessionalBusiness,
           },
@@ -1218,10 +1535,10 @@ export const reissueFinanceInvoiceForBooking = async (req, res) => {
     }
 
     const bookingRef = booking.unique_code;
-    const penaltyAmount = Number(body.penaltyAmount) || 0;
+    const penaltyAmount = moneyNumber(body.penaltyAmount);
     const totalOverride =
       body.totalPrice != null && body.totalPrice !== ""
-        ? Number(body.totalPrice)
+        ? moneyNumber(body.totalPrice)
         : null;
 
     let txId = null;

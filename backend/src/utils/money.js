@@ -2,8 +2,26 @@
 export function parseMoney(value, fallback = 0) {
   if (typeof value === "number") return Number.isFinite(value) ? value : fallback;
   if (value === null || value === undefined || value === "") return fallback;
-  const normalized = String(value).replace(/[^0-9.-]/g, "");
-  const parsed = Number(normalized);
+
+  let cleaned = String(value).replace(/[^0-9,.-]/g, "");
+  if (!cleaned || cleaned === "-") return fallback;
+
+  const hasComma = cleaned.includes(",");
+  const hasDot = cleaned.includes(".");
+  if (hasComma && hasDot) {
+    // Last separator is the decimal; the other is thousands.
+    if (cleaned.lastIndexOf(",") > cleaned.lastIndexOf(".")) {
+      cleaned = cleaned.replace(/\./g, "").replace(",", ".");
+    } else {
+      cleaned = cleaned.replace(/,/g, "");
+    }
+  } else if (hasComma) {
+    cleaned = /,\d{1,2}$/.test(cleaned)
+      ? cleaned.replace(",", ".")
+      : cleaned.replace(/,/g, "");
+  }
+
+  const parsed = Number(cleaned);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
@@ -36,6 +54,7 @@ export const MONEY_JSON_KEYS = new Set([
 /**
  * Read compatibility for legacy JSON snapshots. New persistence already writes
  * numbers; this converts old formatted money strings before API responses.
+ * Also used at write boundaries so inbound string amounts never land in JSONB.
  */
 export function normalizeMoneyJson(value, parentKey = "") {
   if (Array.isArray(value)) {

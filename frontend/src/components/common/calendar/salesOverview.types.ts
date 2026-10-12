@@ -44,6 +44,9 @@ export type SalesFinanceHint = {
   dueDate?: string | null;
   paymentMethod?: string;
   penaltyAmount?: number;
+  /** Finance `entry_label` — used to heal protective-fee Sales cards. */
+  entryLabel?: string;
+  amount?: number;
 };
 
 export type SalesPaymentTermsInput = {
@@ -195,10 +198,13 @@ export type SalesEditCheckoutPayload = {
   clientEmail?: string | null;
 };
 
-export function salesPaymentBadge(state: SalesPaymentState): string {
+export function salesPaymentBadge(
+  state: SalesPaymentState,
+  kind?: SalesOverviewCardData["kind"],
+): string {
   switch (state) {
     case "payment_due":
-      return "Payment Due";
+      return kind === "prepayment" ? "Prepayment Due" : "Payment Due";
     case "pending":
       return "Pending";
     case "prepaid":

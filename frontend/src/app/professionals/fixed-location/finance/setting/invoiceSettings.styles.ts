@@ -17,7 +17,7 @@ export function createInvoiceSettingsSx(m: {
   const tinyBtnSx = {
     borderRadius: "7px",
     textTransform: "none",
-    fontWeight: 800,
+    fontWeight: 600,
     fontSize: 12,
     height: 28,
     px: 1.1,

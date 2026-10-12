@@ -1,4 +1,4 @@
-﻿import type { CalendarBooking } from "../../../store/services/businessApi";
+import type { CalendarBooking } from "../../../store/services/businessApi";
 import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import {
   calculateManualEntryDiscountAmount,
@@ -125,6 +125,7 @@ export function matchFinanceHint(
   card: { id: string; bookingId: string; bookingCode: string; kind: SalesOverviewCardData["kind"]; payerKey?: string },
   hints: SalesFinanceHint[],
 ): SalesFinanceHint | undefined {
+  const isProtectiveFeeCard = /protective-fee|no-show/.test(card.id);
   const matches = hints.filter((hint) => {
     const bookingMatch =
       (hint.bookingId && String(hint.bookingId) === String(card.bookingId)) ||
@@ -143,15 +144,26 @@ export function matchFinanceHint(
     if (hint.payerKey && card.payerKey && hint.payerKey !== card.payerKey) return false;
     return true;
   });
-  const rank = (status: string) => {
-    const s = status.toLowerCase();
-    if (s === "refunded") return 0;
-    if (s === "voided" || s === "void") return 1;
-    if (s === "failed") return 2;
-    if (s === "paid" || s === "prepaid") return 3;
-    return 4;
+  const feeLabel = (label?: string | null) => {
+    const value = String(label ?? "").trim();
+    return (
+      value === "Late Cancellation Booking Fee" ||
+      value === "Late Rescheduling Fee" ||
+      value.toLowerCase() === "no-show fee"
+    );
   };
-  return [...matches].sort((a, b) => rank(a.status) - rank(b.status))[0];
+  const rank = (hint: SalesFinanceHint) => {
+    const s = String(hint.status ?? "").toLowerCase();
+    // Fee Summary cards must bind to LCF/NS rows, not a sibling full service sale.
+    const feeBoost =
+      isProtectiveFeeCard && feeLabel(hint.entryLabel) ? -10 : 0;
+    if (s === "refunded") return 0 + feeBoost;
+    if (s === "voided" || s === "void") return 1 + feeBoost;
+    if (s === "failed") return 2 + feeBoost;
+    if (s === "paid" || s === "prepaid") return 3 + feeBoost;
+    return 4 + feeBoost;
+  };
+  return [...matches].sort((a, b) => rank(a) - rank(b))[0];
 }
 
 export function applyVisualState<T extends {
@@ -167,10 +179,16 @@ export function applyVisualState<T extends {
 }>(
   next: T,
   state: SalesPaymentState,
-  extras: { method?: string | null; dueDate?: string | null; paidAt?: string | null; occurredAt?: string },
+  extras: {
+    method?: string | null;
+    dueDate?: string | null;
+    paidAt?: string | null;
+    occurredAt?: string;
+    kind?: SalesOverviewCardData["kind"];
+  },
 ): T {
   next.paymentState = state;
-  next.statusBadge = salesPaymentBadge(state);
+  next.statusBadge = salesPaymentBadge(state, extras.kind);
   const methodLabel = next.paymentMethodLabel || paymentMethodLabel(extras.method);
   if (state === "prepaid" || state === "paid") {
     next.methodDateLine = formatMethodDateTime(methodLabel, extras.paidAt || extras.occurredAt);
@@ -184,11 +202,21 @@ export function applyVisualState<T extends {
   ) {
     const due = extras.dueDate;
     next.dueDate = due ?? next.dueDate;
-    next.methodDateLine = due
-      ? `${methodLabel} (Due date ${formatFinanceDueDate(due)})`
-      : methodLabel;
+    // Prepayment Due card shows source only (no due-date suffix) — matches Sales mock.
+    next.methodDateLine =
+      extras.kind === "prepayment" && state === "payment_due"
+        ? methodLabel
+        : due
+          ? `${methodLabel} (Due date ${formatFinanceDueDate(due)})`
+          : methodLabel;
     next.overdueKind = state === "overdue" ? "prepayment" : state === "overdue_invoice" ? "invoice" : undefined;
     next.limitedMenu = state === "overdue_invoice";
+  } else if (state === "voided" || state === "refunded") {
+    next.methodDateLine = formatMethodDateTime(
+      methodLabel,
+      extras.paidAt || extras.occurredAt,
+    );
+    next.dueDate = null;
   } else {
     next.methodDateLine = methodLabel;
     if (state !== "unpaid") next.dueDate = extras.dueDate ?? next.dueDate;

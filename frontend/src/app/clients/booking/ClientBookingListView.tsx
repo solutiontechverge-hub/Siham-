@@ -28,9 +28,14 @@ import {
   type ClientBookingRecord,
   type ClientBookingStatus,
 } from "./clientBookingRecords";
-import { bookingStatusChipColors } from "./clientBookingStatus";
+import {
+  bookingSecondaryStatusBadgeSx,
+  bookingSecondaryStatusChipSx,
+  bookingStatusChipColors,
+} from "./clientBookingStatus";
 import BookingRequestBadge from "../../../components/common/calendar/BookingRequestBadge";
 import BookingIndicatorIcon from "../../../components/common/calendar/BookingIndicatorIcon";
+import PrepaymentStatusIcon from "../../../components/common/calendar/PrepaymentStatusIcon";
 import { AppPagination, AppSearchField } from "../../../components/common";
 import { getBookingEditRequest } from "../../../components/common/client-booking/bookingEditRequest";
 import { syncEditRequestFromBookingApi } from "../../../components/common/client-booking/syncEditRequestFromApi";
@@ -410,16 +415,23 @@ export default function ClientBookingListView({ listTab }: Props) {
                               label={chipLabel}
                               size="small"
                               sx={{
-                                height: 18,
-                                fontSize: 9,
-                                fontWeight: 800,
+                                height: 24,
+                                minHeight: 24,
+                                maxHeight: 24,
+                                boxSizing: "border-box",
+                                fontSize: 11,
+                                fontWeight: 600,
                                 bgcolor: chipColors.bgcolor,
                                 color: chipColors.color,
                                 border: chipColors.border,
+                                borderWidth:
+                                  chipColors.border === "none" ? 0 : undefined,
                                 "& .MuiChip-label": {
-                                  px: 0.7,
+                                  px: 1.1,
                                   py: 0,
-                                  lineHeight: 1.2,
+                                  lineHeight: "24px",
+                                  display: "flex",
+                                  alignItems: "center",
                                 },
                               }}
                             />
@@ -427,19 +439,7 @@ export default function ClientBookingListView({ listTab }: Props) {
                               <Chip
                                 label="Updated"
                                 size="small"
-                                sx={{
-                                  height: 18,
-                                  fontSize: 9,
-                                  fontWeight: 800,
-                                  bgcolor: alpha(m.teal, 0.12),
-                                  color: m.teal,
-                                  border: `1px solid ${alpha(m.teal, 0.4)}`,
-                                  "& .MuiChip-label": {
-                                    px: 0.7,
-                                    py: 0,
-                                    lineHeight: 1.2,
-                                  },
-                                }}
+                                sx={bookingSecondaryStatusChipSx}
                               />
                             ) : null}
                             {waitingForPrepayment ? (
@@ -462,50 +462,60 @@ export default function ClientBookingListView({ listTab }: Props) {
                                   openPrepaidCheckout(b);
                                 }}
                                 sx={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
+                                  display: "grid",
+                                  placeItems: "center",
+                                  width: 24,
+                                  height: 24,
                                   cursor: "pointer",
-                                  borderRadius: "6px",
-                                  "&:hover": {
-                                    bgcolor: alpha(m.navy, 0.06),
-                                  },
+                                  border: "none",
+                                  borderRadius: "8px",
+                                  lineHeight: 0,
+                                  bgcolor: "transparent",
+                                  p: 0,
+                                  flexShrink: 0,
+                                  "&:hover": { opacity: 0.88 },
                                 }}
                               >
-                                <BookingIndicatorIcon
-                                  variant="waiting_for_prepayment"
-                                  size={16}
+                                <PrepaymentStatusIcon
+                                  variant="pending"
+                                  size={24}
                                 />
                               </Box>
                             ) : showPrepaidIcon ? (
                               <Box
                                 sx={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
+                                  display: "grid",
+                                  placeItems: "center",
+                                  width: 24,
+                                  height: 24,
+                                  lineHeight: 0,
+                                  flexShrink: 0,
                                 }}
                                 title="Prepayment received"
                                 aria-label="Prepayment received"
                               >
-                                <BookingIndicatorIcon
-                                  variant="prepaid"
-                                  size={16}
+                                <PrepaymentStatusIcon
+                                  variant="confirmed"
+                                  size={24}
                                 />
                               </Box>
                             ) : null}
                             {waitingForPayment ? (
                               <Box
                                 sx={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
+                                  display: "grid",
+                                  placeItems: "center",
+                                  width: 24,
+                                  height: 24,
+                                  lineHeight: 0,
+                                  flexShrink: 0,
                                 }}
                                 title="Waiting for payment"
                                 aria-label="Waiting for payment"
                               >
                                 <BookingIndicatorIcon
                                   variant="waiting_for_payment"
-                                  size={16}
+                                  size={24}
                                 />
                               </Box>
                             ) : null}
@@ -516,6 +526,7 @@ export default function ClientBookingListView({ listTab }: Props) {
                                 direction={
                                   b.bookingRequestDirection ?? "outgoing"
                                 }
+                                sx={bookingSecondaryStatusBadgeSx}
                               />
                             ) : null}
                             {pendingEr ? (
@@ -524,20 +535,16 @@ export default function ClientBookingListView({ listTab }: Props) {
                                   display: "inline-flex",
                                   alignItems: "center",
                                   gap: 0.35,
-                                  height: 22,
-                                  px: 0.75,
-                                  borderRadius: "999px",
-                                  border: `1px solid ${alpha(m.navy, 0.25)}`,
-                                  bgcolor: alpha("#fff", 0.72),
+                                  ...bookingSecondaryStatusBadgeSx,
                                 }}
                                 title="Suggestion for change"
                                 aria-label="Suggestion for change"
                               >
                                 <Typography
                                   sx={{
-                                    fontSize: 10,
-                                    fontWeight: 900,
-                                    color: alpha(m.navy, 0.78),
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    color: "inherit",
                                     lineHeight: 1,
                                   }}
                                 >

@@ -72,7 +72,8 @@ export default function AppButton<C extends React.ElementType = "button">({
   const baseSx = {
     textTransform: "none",
     borderRadius: "10px",
-    fontWeight: 800,
+    // Theme typography.button is 500; 600 keeps labels readable on filled teal without looking black.
+    fontWeight: 600,
   } as const;
 
   const resolvedPreset = presetSize ?? (tone ? ("md" as const) : undefined);
@@ -87,7 +88,6 @@ export default function AppButton<C extends React.ElementType = "button">({
       toneVariant = "contained";
       toneDisableElevation = true;
       toneSx = {
-        fontWeight: 900,
         bgcolor: m.teal,
         color: "#fff",
         "&:hover": { bgcolor: m.tealDark, color: "#fff" },
@@ -100,7 +100,6 @@ export default function AppButton<C extends React.ElementType = "button">({
     case "secondary":
       toneVariant = "outlined";
       toneSx = {
-        fontWeight: 800,
         borderColor: alpha(m.navy, 0.14),
         color: alpha(m.navy, 0.72),
         bgcolor: "#fff",
@@ -116,7 +115,6 @@ export default function AppButton<C extends React.ElementType = "button">({
       toneDisableElevation = true;
       toneSx = outlinedDanger
         ? {
-            fontWeight: 800,
             bgcolor: "#fff",
             color: danger,
             borderColor: alpha(danger, 0.55),
@@ -132,7 +130,6 @@ export default function AppButton<C extends React.ElementType = "button">({
             },
           }
         : {
-            fontWeight: 900,
             bgcolor: danger,
             color: "#fff",
             "&:hover": { bgcolor: "#D14C4C", color: "#fff" },
@@ -146,7 +143,6 @@ export default function AppButton<C extends React.ElementType = "button">({
     case "ghost":
       toneVariant = "text";
       toneSx = {
-        fontWeight: 800,
         color: alpha(m.navy, 0.72),
         "&:hover": { bgcolor: alpha(m.navy, 0.06) },
       };
@@ -155,7 +151,6 @@ export default function AppButton<C extends React.ElementType = "button">({
       toneVariant = "contained";
       toneDisableElevation = true;
       toneSx = {
-        fontWeight: 800,
         bgcolor: alpha(m.teal, 0.14),
         color: m.tealDark,
         boxShadow: "none",

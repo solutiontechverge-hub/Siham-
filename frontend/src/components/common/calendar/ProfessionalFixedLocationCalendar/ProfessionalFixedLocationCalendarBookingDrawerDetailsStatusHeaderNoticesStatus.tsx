@@ -5,6 +5,10 @@ import {
 } from "../../../../theme/mollureHierarchy";
 
 import {
+  MOLLURE_FONT_BODY,
+} from "../../../../theme/typography";
+
+import {
   Box,
   Chip,
   Stack,
@@ -51,6 +55,10 @@ import PrepaymentStatusIcon from "../PrepaymentStatusIcon";
 import {
   PREPAYMENT_STATUS_LABELS,
 } from "../PrepaymentStatusIcon";
+
+import {
+  bookingSecondaryStatusChipSx,
+} from "../../../../app/clients/booking/clientBookingStatus";
 
 import BookingRequestReceivedIcon from "../BookingRequestReceivedIcon";
 
@@ -140,6 +148,9 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
           <BodyText
             sx={{
               ...mollureBodyMutedSx(m.navy),
+              fontFamily: MOLLURE_FONT_BODY,
+              fontVariantNumeric: "lining-nums tabular-nums",
+              whiteSpace: "nowrap",
             }}
           >
             {viewingBookingEvent.bookingCode ??
@@ -184,14 +195,18 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
             size="small"
             label={professionalCalendarStatusLabel(viewingBookingEvent)}
             sx={{
-              height: 18,
-              fontSize: 9,
-              fontWeight: 800,
-              border: "1px solid",
+              height: 24,
+              minHeight: 24,
+              maxHeight: 24,
+              boxSizing: "border-box",
+              fontSize: 11,
+              fontWeight: 600,
               "& .MuiChip-label": {
-                px: 0.7,
+                px: 1.1,
                 py: 0,
-                lineHeight: 1.2,
+                lineHeight: "24px",
+                display: "flex",
+                alignItems: "center",
               },
               ...statusChipSx(
                 professionalCalendarDisplayStatus(viewingBookingEvent),
@@ -212,14 +227,17 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
               const prepaymentVariant = prepayment
                 ? toPrepaymentIconVariant(prepayment)
                 : undefined;
+              // In-pill glyphs only; waiting/overdue are standalone 24×24 below.
               const badgeResponses =
                 indicator === "EBR"
-                  ? responseIndicators
+                  ? responseIndicators.filter(
+                      (item) =>
+                        item !== "overdue_response" &&
+                        item !== "response_time_active",
+                    )
                   : indicator === "ER"
                     ? responseIndicators.filter(
-                        (item) =>
-                          item === "suggestion_for_change" ||
-                          item === "overdue_response",
+                        (item) => item === "suggestion_for_change",
                       )
                     : [];
               const comparisonSignpost =
@@ -282,7 +300,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
                             >
                               <BookingIndicatorIcon
                                 variant={item}
-                                size={18}
+                                size={14}
                               />
                             </Box>
                           </Tooltip>
@@ -300,20 +318,15 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
                         {indicator === "EBR" && prepaymentVariant ? (
                           <PrepaymentStatusIcon
                             variant={prepaymentVariant}
-                            size={18}
+                            size={14}
                           />
                         ) : null}
                       </Stack>
                     }
                     sx={{
-                      height: 24,
-                      fontSize: 11,
+                      ...bookingSecondaryStatusChipSx,
                       fontWeight: 800,
-                      bgcolor: alpha(m.navy, 0.06),
-                      color: alpha(m.navy, 0.62),
-                      border: `1px solid ${alpha(m.navy, 0.14)}`,
                       cursor: comparisonSignpost ? "pointer" : "default",
-                      "& .MuiChip-label": { px: 0.85 },
                     }}
                   />
                 </Tooltip>
@@ -338,18 +351,13 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
             const confirmedPrepaidStandalone =
               prepayment === "confirmed" && !waitingClientPrepay;
 
+            const timingStandalone = responseIndicators.filter(
+              (item) =>
+                item === "overdue_response" || item === "response_time_active",
+            );
             if (scenarioIndicators.length && !hasBr) {
-              // Still allow the prepaid icon through when prepayment is already paid.
-              if (
-                !responseIndicators.includes("overdue_response") &&
-                !confirmedPrepaidStandalone
-              ) {
-                return null;
-              }
-              if (
-                scenarioIndicators.some((indicator) => indicator === "ER") &&
-                !confirmedPrepaidStandalone
-              ) {
+              // Scenario chips own most indicators; waiting/overdue + prepaid stay standalone.
+              if (!timingStandalone.length && !confirmedPrepaidStandalone) {
                 return null;
               }
             }
@@ -358,7 +366,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
               ? responseIndicators
               : scenarioIndicators.length === 0
                 ? responseIndicators
-                : [];
+                : timingStandalone;
 
             // Confirmed prepaid always surfaces unless the EBR chip already renders it.
             // Pending (incl. BR Accepted waiting for client pay) shows the € seal.
@@ -401,10 +409,13 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
                       sx={{
                         display: "grid",
                         placeItems: "center",
+                        width: 24,
+                        height: 24,
                         lineHeight: 0,
+                        flexShrink: 0,
                       }}
                     >
-                      <BookingIndicatorIcon variant={item} size={18} />
+                      <BookingIndicatorIcon variant={item} size={24} />
                     </Box>
                   </Tooltip>
                 ))}
@@ -421,14 +432,17 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
                       sx={{
                         display: "grid",
                         placeItems: "center",
+                        width: 24,
+                        height: 24,
                         lineHeight: 0,
+                        flexShrink: 0,
                       }}
                     >
                       <PrepaymentStatusIcon
                         variant={toPrepaymentIconVariant(
                           standalonePrepayment,
                         )}
-                        size={18}
+                        size={24}
                       />
                     </Box>
                   </Tooltip>
@@ -440,17 +454,15 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
             <Tooltip title="Payment due" placement="top">
               <Box
                 sx={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: 26,
-                  height: 26,
-                  borderRadius: "8px",
-                  bgcolor: alpha(m.navy, 0.04),
-                  border: `1px solid ${alpha(m.navy, 0.08)}`,
+                  display: "grid",
+                  placeItems: "center",
+                  width: 24,
+                  height: 24,
+                  lineHeight: 0,
+                  flexShrink: 0,
                 }}
               >
-                <PaymentDueIcon size={18} />
+                <PaymentDueIcon size={24} />
               </Box>
             </Tooltip>
           ) : null}

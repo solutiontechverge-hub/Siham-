@@ -329,13 +329,24 @@ export default function NotificationBookingSummaryModal({
                     size="small"
                     label={statusChipLabel(record.status)}
                     sx={{
-                      height: 22,
-                      fontWeight: 800,
+                      height: 24,
+                      minHeight: 24,
+                      maxHeight: 24,
+                      boxSizing: "border-box",
+                      fontWeight: 600,
                       fontSize: 11,
                       bgcolor: statusColors?.bgcolor,
                       color: statusColors?.color,
                       border: statusColors?.border,
-                      "& .MuiChip-label": { px: 1 },
+                      borderWidth:
+                        statusColors?.border === "none" ? 0 : undefined,
+                      "& .MuiChip-label": {
+                        px: 1.1,
+                        py: 0,
+                        lineHeight: "24px",
+                        display: "flex",
+                        alignItems: "center",
+                      },
                     }}
                   />
                 }

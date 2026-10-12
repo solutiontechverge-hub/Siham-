@@ -158,10 +158,8 @@ FROM (VALUES
   ('glowup@mollure.dev', 'dash.cc2@mollure.dev', 7, 'desired', 'completed', 'project', 'BK-DASH-O005', 520.00),
   ('glowup@mollure.dev', 'dash.ic5@mollure.dev', 16, 'desired', 'completed', 'online', 'BK-DASH-O006', 140.00),
   ('glowup@mollure.dev', 'dash.ic1@mollure.dev', 24, 'desired', 'completed', 'offline', 'BK-DASH-O007', 90.00),
-  -- Ryan Harris Salon (existing pro) online/offline
-  ('pro@mollure.dev', 'client@mollure.dev', 0, 'fixed', 'completed', 'online', 'BK-DASH-R001', 85.00),
+  -- Ryan Harris Salon (existing pro) online/offline — skip R001/R003 (placeholder purge list)
   ('pro@mollure.dev', 'dash.ic2@mollure.dev', 1, 'fixed', 'completed', 'online', 'BK-DASH-R002', 95.00),
-  ('pro@mollure.dev', 'company@mollure.dev', 2, 'fixed', 'completed', 'offline', 'BK-DASH-R003', 135.00),
   ('pro@mollure.dev', 'dash.ic3@mollure.dev', 4, 'fixed', 'completed', 'online', 'BK-DASH-R004', 75.00),
   ('pro@mollure.dev', 'dash.cc1@mollure.dev', 8, 'fixed', 'completed', 'offline', 'BK-DASH-R005', 160.00),
   ('pro@mollure.dev', 'dash.ic4@mollure.dev', 17, 'fixed', 'completed', 'online', 'BK-DASH-R006', 88.00)
@@ -208,9 +206,7 @@ INNER JOIN (VALUES
   ('luxe@mollure.dev', 'onlineBooking', 'D006', 1, 'Online booking', 'Sofia Martinez', 'dash.ic5@mollure.dev', 'mollure', 165, 5, 3, 157, 'Online – direct', 'Card', 'BK-DASH-L004', 'INV-D006'),
   ('luxe@mollure.dev', 'offlineBooking', 'D007', 2, 'Salon visit', 'Alex Client', 'client@mollure.dev', 'mollure', 120, 0, 0, 120, 'Offline – direct', 'Cash', 'BK-DASH-L003', 'INV-D007'),
   ('glowup@mollure.dev', 'onlineBooking', 'D008', 1, 'Online booking', 'Eva Jansen', 'dash.ic3@mollure.dev', 'mollure', 130, 4, 2, 124, 'Online – invoice', 'iDeal', 'BK-DASH-O002', 'INV-D008'),
-  ('glowup@mollure.dev', 'offlineBooking', 'D009', 3, 'Event prep', 'Tom de Vries', 'dash.ic4@mollure.dev', 'mollure', 85, 0, 0, 85, 'Offline – direct', 'Cash', 'BK-DASH-O003', 'INV-D009'),
-  ('pro@mollure.dev', 'onlineBooking', 'D010', 0, 'Online booking', 'Alex Client', 'client@mollure.dev', 'mollure', 85, 2, 1, 82, 'Online – direct', 'iDeal', 'BK-DASH-R001', 'INV-D010'),
-  ('pro@mollure.dev', 'offlineBooking', 'D011', 2, 'Walk-in', 'Jamie Company', 'company@mollure.dev', 'business', 135, 0, 0, 135, 'Offline – invoice', 'Transfer', 'BK-DASH-R003', 'INV-D011')
+  ('glowup@mollure.dev', 'offlineBooking', 'D009', 3, 'Event prep', 'Tom de Vries', 'dash.ic4@mollure.dev', 'mollure', 85, 0, 0, 85, 'Offline – direct', 'Cash', 'BK-DASH-O003', 'INV-D009')
 ) AS v(
   pro_email, entry_type, entry_id, days_ago, entry_label, client_name, client_email, client_type,
   gross_amount, stripe_fee, mollure_fee, net_amount, method_title, method_detail, booking_id, doc_no

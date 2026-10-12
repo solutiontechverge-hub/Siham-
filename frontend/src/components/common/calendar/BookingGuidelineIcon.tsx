@@ -1,18 +1,12 @@
 "use client";
 
 import { Box } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
 import type { ReactNode } from "react";
 
-/** Twin-bell alarm clock asset path (Overdue). Rendered inline via OverdueAlarmSvg. */
-export const OVERDUE_ALARM_ICON_SRC = "/icons/overdue-alarm.svg";
-// Also mirrored at /icons/overdue-alarm.png (source thumbnail from design).
-
 /**
- * Booking status guideline icons — inline SVGs (was PNG set).
- * Main stroke uses slate `#607080` (sibling set). Badges keep status green/red.
- * Waiting-for-prepayment uses solid navy + bold € coin for clear card-row weight.
- * Overdue uses the alarm-clock asset tinted with theme `statusRedFg`.
+ * Booking status guideline icons — inline SVGs.
+ * All variants sit in a 24×24 soft-grey squircle (`#F2F4F7`, no border).
+ * Stroke weight ~1.15 to match waiting-for-prepayment.
  */
 export type BookingGuidelineIconVariant =
   | "refund_pending"
@@ -29,7 +23,7 @@ export const BOOKING_GUIDELINE_ICON_LABELS: Record<
   BookingGuidelineIconVariant,
   string
 > = {
-  refund_pending: "Refund pending",
+  refund_pending: "Prepayment failed / rejected",
   prepaid: "Prepayment received",
   refund_completed: "Refund completed",
   response_time_active: "Waiting for response",
@@ -43,6 +37,9 @@ export const BOOKING_GUIDELINE_ICON_LABELS: Record<
 const SLATE = "#607080";
 const BADGE_GREEN = "#039855";
 const BADGE_RED = "#F04438";
+const WARN_ORANGE = "#F79009";
+const ICON_BG = "#F2F4F7";
+const STROKE = 1.15;
 
 type SvgProps = { size: number; color?: string };
 
@@ -69,7 +66,7 @@ function EuroMark({
   cy = 12,
   scale = 1,
   color = SLATE,
-  strokeWidth = 1.6,
+  strokeWidth = STROKE,
 }: {
   cx?: number;
   cy?: number;
@@ -77,10 +74,9 @@ function EuroMark({
   color?: string;
   strokeWidth?: number;
 }) {
-  const s = scale;
   return (
     <g
-      transform={`translate(${cx}, ${cy}) scale(${s}) translate(-12, -12)`}
+      transform={`translate(${cx}, ${cy}) scale(${scale}) translate(-12, -12)`}
       stroke={color}
       strokeWidth={strokeWidth}
       strokeLinecap="round"
@@ -94,76 +90,95 @@ function EuroMark({
   );
 }
 
-/**
- * Bold €-in-circle (waiting for prepayment only).
- * Geometric C + equal bars; butt caps read sharper than EuroMark at 16–18px.
- */
+/** € + dashed ring + clock badge (waiting for prepayment). */
 function WaitingForPrepaymentSvg({ size, color = SLATE }: SvgProps) {
   return (
     <SvgRoot size={size}>
       <circle
-        cx="12"
-        cy="12"
-        r="9.25"
+        cx="11"
+        cy="11"
+        r="8.8"
         stroke={color}
-        strokeWidth={2}
+        strokeWidth={STROKE}
+        strokeDasharray="2.4 1.9"
         fill="none"
       />
-      <g
+      <circle
+        cx="11"
+        cy="11"
+        r="5.9"
         stroke={color}
-        strokeWidth={2.15}
-        strokeLinecap="butt"
+        strokeWidth={STROKE}
+        fill="none"
+      />
+      <EuroMark cx={11} cy={11} scale={0.58} color={color} strokeWidth={STROKE} />
+      <circle
+        cx="17.4"
+        cy="17.4"
+        r="4"
+        fill={ICON_BG}
+        stroke={color}
+        strokeWidth={STROKE}
+      />
+      <path
+        d="M17.4 15.5 V17.4 L18.85 18.5"
+        stroke={color}
+        strokeWidth={1.05}
+        strokeLinecap="round"
         strokeLinejoin="round"
         fill="none"
-      >
-        {/* Open C — generous inset so coin rim stays clear */}
-        <path d="M15.6 7.35c-1.15-1.15-2.7-1.75-4.35-1.7-2.85.1-5.1 2.4-5.1 5.35s2.25 5.25 5.1 5.35c1.65.05 3.2-.55 4.35-1.7" />
-        <path d="M6.85 10.55h7.1" />
-        <path d="M6.85 13.45h7.1" />
-      </g>
+      />
     </SvgRoot>
   );
 }
 
-function WaitingForPaymentSvg({ size }: SvgProps) {
+/** Alarm clock — waiting for response / payment due (image-2 squircle glyph). */
+function AlarmClockSvg({ size }: SvgProps) {
   return (
     <SvgRoot size={size}>
+      {/* Twin bells */}
+      <path
+        d="M8.2 6.4c0-.9.7-1.5 1.5-1.2.4.6.5 1.3.2 1.9"
+        stroke={SLATE}
+        strokeWidth={STROKE}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <path
+        d="M15.8 6.4c0-.9-.7-1.5-1.5-1.2-.4.6-.5 1.3-.2 1.9"
+        stroke={SLATE}
+        strokeWidth={STROKE}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
       <circle
         cx="12"
         cy="13"
         r="7.2"
         stroke={SLATE}
-        strokeWidth={1.6}
+        strokeWidth={STROKE}
         fill="none"
       />
+      {/* Hands ~3 o'clock */}
       <path
-        d="M8.2 5.2 L9.6 7.4"
+        d="M12 13 V9.2"
         stroke={SLATE}
-        strokeWidth={1.6}
+        strokeWidth={STROKE}
         strokeLinecap="round"
       />
       <path
-        d="M15.8 5.2 L14.4 7.4"
+        d="M12 13 H16.2"
         stroke={SLATE}
-        strokeWidth={1.6}
-        strokeLinecap="round"
-      />
-      <path
-        d="M12 13 V8.6"
-        stroke={SLATE}
-        strokeWidth={1.6}
-        strokeLinecap="round"
-      />
-      <path
-        d="M12 13 L15.4 15.2"
-        stroke={SLATE}
-        strokeWidth={1.6}
+        strokeWidth={STROKE}
         strokeLinecap="round"
       />
     </SvgRoot>
   );
 }
 
+/** € in circle + green check — prepaid / payment completed. */
 function PrepaidSvg({ size }: SvgProps) {
   return (
     <SvgRoot size={size}>
@@ -172,15 +187,15 @@ function PrepaidSvg({ size }: SvgProps) {
         cy="11"
         r="7.5"
         stroke={SLATE}
-        strokeWidth={1.6}
+        strokeWidth={STROKE}
         fill="none"
       />
-      <EuroMark cx={11} cy={11} scale={0.78} />
+      <EuroMark cx={11} cy={11} scale={0.78} strokeWidth={STROKE} />
       <circle cx="17.2" cy="17.2" r="4.2" fill={BADGE_GREEN} />
       <path
         d="M15.2 17.2 L16.5 18.5 L19.4 15.6"
-        stroke="#1B4332"
-        strokeWidth={1.6}
+        stroke="#fff"
+        strokeWidth={1.2}
         strokeLinecap="round"
         strokeLinejoin="round"
         fill="none"
@@ -189,6 +204,7 @@ function PrepaidSvg({ size }: SvgProps) {
   );
 }
 
+/** € in circle + red X — payment / prepayment failed. */
 function RefundPendingSvg({ size }: SvgProps) {
   return (
     <SvgRoot size={size}>
@@ -197,79 +213,46 @@ function RefundPendingSvg({ size }: SvgProps) {
         cy="11"
         r="7.5"
         stroke={SLATE}
-        strokeWidth={1.6}
+        strokeWidth={STROKE}
         fill="none"
       />
-      <EuroMark cx={11} cy={11} scale={0.78} />
+      <EuroMark cx={11} cy={11} scale={0.78} strokeWidth={STROKE} />
       <circle cx="17.2" cy="17.2" r="4.2" fill={BADGE_RED} />
       <path
         d="M15.6 15.6 L18.8 18.8 M18.8 15.6 L15.6 18.8"
         stroke="#fff"
-        strokeWidth={1.5}
+        strokeWidth={1.2}
         strokeLinecap="round"
       />
     </SvgRoot>
   );
 }
 
+/** € with circular return arrow — refund. */
 function RefundCompletedSvg({ size }: SvgProps) {
   return (
     <SvgRoot size={size}>
       <path
         d="M16.8 7.2 A6.8 6.8 0 1 0 18.2 14.2"
         stroke={SLATE}
-        strokeWidth={1.6}
+        strokeWidth={STROKE}
         strokeLinecap="round"
         fill="none"
       />
       <path
         d="M14.4 5.6 L16.8 7.2 L15.2 9.6"
         stroke={SLATE}
-        strokeWidth={1.6}
+        strokeWidth={STROKE}
         strokeLinecap="round"
         strokeLinejoin="round"
         fill="none"
       />
-      <EuroMark cx={12} cy={12.2} scale={0.7} />
+      <EuroMark cx={12} cy={12.2} scale={0.7} strokeWidth={STROKE} />
     </SvgRoot>
   );
 }
 
-function ResponseTimeActiveSvg({ size }: SvgProps) {
-  return (
-    <SvgRoot size={size}>
-      <path
-        d="M7.5 4.5 H16.5 V6.2 C16.5 7.5 15.7 8.6 14.6 9.2 L12 10.5 L9.4 9.2 C8.3 8.6 7.5 7.5 7.5 6.2 V4.5 Z"
-        stroke={SLATE}
-        strokeWidth={1.5}
-        strokeLinejoin="round"
-        fill="none"
-      />
-      <path
-        d="M7.5 19.5 H16.5 V17.8 C16.5 16.5 15.7 15.4 14.6 14.8 L12 13.5 L9.4 14.8 C8.3 15.4 7.5 16.5 7.5 17.8 V19.5 Z"
-        stroke={SLATE}
-        strokeWidth={1.5}
-        strokeLinejoin="round"
-        fill="none"
-      />
-      <path
-        d="M9.2 7.6 H14.8"
-        stroke={SLATE}
-        strokeWidth={1.4}
-        strokeLinecap="round"
-        opacity={0.85}
-      />
-      <path
-        d="M9.2 16.8 H14.8"
-        stroke={SLATE}
-        strokeWidth={1.4}
-        strokeLinecap="round"
-        opacity={0.85}
-      />
-    </SvgRoot>
-  );
-}
-
+/** Notebook + rotating arrows — BR / ER / edit request. */
 function SuggestionForChangeSvg({ size }: SvgProps) {
   return (
     <SvgRoot size={size}>
@@ -278,43 +261,43 @@ function SuggestionForChangeSvg({ size }: SvgProps) {
         y="4"
         width="12"
         height="16"
-        rx="1.6"
+        rx="1.4"
         stroke={SLATE}
-        strokeWidth={1.6}
+        strokeWidth={STROKE}
         fill="none"
       />
       <path
-        d="M4.8 7.5 H7 M4.8 12 H7 M4.8 16.5 H7"
+        d="M5 7.5 H7 M5 12 H7 M5 16.5 H7"
         stroke={SLATE}
-        strokeWidth={1.6}
+        strokeWidth={STROKE}
         strokeLinecap="round"
       />
       <path
-        d="M14.8 9.2 A2.8 2.8 0 0 0 10.4 10.4"
+        d="M15 9.4 A2.7 2.7 0 0 0 10.8 10.5"
         stroke={SLATE}
-        strokeWidth={1.5}
+        strokeWidth={STROKE}
         strokeLinecap="round"
         fill="none"
       />
       <path
-        d="M10.2 8.6 L10.4 10.4 L12.2 10.1"
+        d="M10.6 8.7 L10.8 10.5 L12.5 10.2"
         stroke={SLATE}
-        strokeWidth={1.5}
+        strokeWidth={STROKE}
         strokeLinecap="round"
         strokeLinejoin="round"
         fill="none"
       />
       <path
-        d="M10.2 14.8 A2.8 2.8 0 0 0 14.6 13.6"
+        d="M10 14.6 A2.7 2.7 0 0 0 14.2 13.5"
         stroke={SLATE}
-        strokeWidth={1.5}
+        strokeWidth={STROKE}
         strokeLinecap="round"
         fill="none"
       />
       <path
-        d="M14.8 15.4 L14.6 13.6 L12.8 13.9"
+        d="M14.4 15.3 L14.2 13.5 L12.5 13.8"
         stroke={SLATE}
-        strokeWidth={1.5}
+        strokeWidth={STROKE}
         strokeLinecap="round"
         strokeLinejoin="round"
         fill="none"
@@ -323,130 +306,82 @@ function SuggestionForChangeSvg({ size }: SvgProps) {
   );
 }
 
-function OverdueAlarmSvg({ size, color }: SvgProps & { color: string }) {
+/** Orange triangle + ! — overdue / warning notice. */
+function WarningTriangleSvg({ size }: SvgProps) {
   return (
     <SvgRoot size={size}>
-      {/* Twin bells */}
       <path
-        d="M7.2 6.2c0-1.1.9-1.8 1.9-1.5.5.8.6 1.6.3 2.3"
-        stroke={color}
-        strokeWidth={1.6}
-        strokeLinecap="round"
+        d="M12 3.2 L21.2 19.8 H2.8 Z"
+        fill={WARN_ORANGE}
+        stroke={WARN_ORANGE}
+        strokeWidth={0.4}
         strokeLinejoin="round"
-        fill="none"
       />
       <path
-        d="M16.8 6.2c0-1.1-.9-1.8-1.9-1.5-.5.8-.6 1.6-.3 2.3"
-        stroke={color}
-        strokeWidth={1.6}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      />
-      <circle
-        cx="12"
-        cy="13"
-        r="7"
-        stroke={color}
-        strokeWidth={1.6}
-        fill="none"
-      />
-      <path
-        d="M12 13V8.8"
-        stroke={color}
+        d="M12 9.2 V14.2"
+        stroke="#fff"
         strokeWidth={1.6}
         strokeLinecap="round"
       />
-      <path
-        d="M12 13l3.2 2.4"
-        stroke={color}
-        strokeWidth={1.6}
-        strokeLinecap="round"
-      />
-      <path
-        d="M8.6 19.6L7.4 21.2"
-        stroke={color}
-        strokeWidth={1.6}
-        strokeLinecap="round"
-      />
-      <path
-        d="M15.4 19.6l1.2 1.6"
-        stroke={color}
-        strokeWidth={1.6}
-        strokeLinecap="round"
-      />
+      <circle cx="12" cy="16.6" r="0.95" fill="#fff" />
     </SvgRoot>
   );
 }
 
-const VARIANT_SVG: Partial<
-  Record<BookingGuidelineIconVariant, (p: SvgProps) => ReactNode>
+const VARIANT_SVG: Record<
+  BookingGuidelineIconVariant,
+  (p: SvgProps) => ReactNode
 > = {
   waiting_for_prepayment: WaitingForPrepaymentSvg,
-  waiting_for_payment: WaitingForPaymentSvg,
+  waiting_for_payment: AlarmClockSvg,
   prepaid: PrepaidSvg,
   refund_pending: RefundPendingSvg,
   refund_completed: RefundCompletedSvg,
-  response_time_active: ResponseTimeActiveSvg,
+  response_time_active: AlarmClockSvg,
   suggestion_for_change: SuggestionForChangeSvg,
+  overdue_response: WarningTriangleSvg,
+  overdue_payment: WarningTriangleSvg,
 };
+
+const WARNING_VARIANTS: ReadonlySet<BookingGuidelineIconVariant> = new Set([
+  "overdue_response",
+  "overdue_payment",
+]);
 
 type Props = {
   variant: BookingGuidelineIconVariant;
   size?: number;
 };
 
-export default function BookingGuidelineIcon({ variant, size = 16 }: Props) {
-  const m = useTheme().palette.mollure;
-  const overdueColor = m.statusRedFg;
-  // Card call sites pass 16; seal needs ~18 optical weight (matches PaymentDue).
-  const resolvedSize =
-    variant === "waiting_for_prepayment" && size < 18 ? 18 : size;
-  // Full navy — alpha washed out the coin at card size vs reference.
-  const prepayColor = m.navy;
-
-  if (variant === "overdue_response" || variant === "overdue_payment") {
-    return (
-      <Box
-        component="span"
-        sx={{
-          width: size,
-          height: size,
-          flexShrink: 0,
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          lineHeight: 0,
-        }}
-        aria-hidden
-      >
-        <OverdueAlarmSvg size={size} color={overdueColor} />
-      </Box>
-    );
-  }
-
+export default function BookingGuidelineIcon({ variant, size = 24 }: Props) {
   const Svg = VARIANT_SVG[variant];
-  if (!Svg) return null;
+  const isWarning = WARNING_VARIANTS.has(variant);
+  // Warnings fill the box (no grey pad). Mini in-pill glyphs (≤16) skip pad so they stay readable.
+  const pad = isWarning ? 0 : size <= 16 ? 0 : Math.max(3, Math.round(size * 0.14));
+  const glyph = Math.max(10, size - pad * 2);
 
   return (
     <Box
       component="span"
       sx={{
-        width: resolvedSize,
-        height: resolvedSize,
+        width: size,
+        height: size,
+        boxSizing: "border-box",
+        p: `${pad}px`,
         flexShrink: 0,
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
         lineHeight: 0,
+        bgcolor: isWarning ? "transparent" : ICON_BG,
+        border: "none",
+        borderRadius: isWarning
+          ? 0
+          : `${Math.max(6, Math.round(size * 0.28))}px`,
       }}
+      aria-hidden
     >
-      <Svg
-        size={resolvedSize}
-        color={
-          variant === "waiting_for_prepayment" ? prepayColor : undefined
-        }
-      />
+      <Svg size={glyph} />
     </Box>
   );
 }

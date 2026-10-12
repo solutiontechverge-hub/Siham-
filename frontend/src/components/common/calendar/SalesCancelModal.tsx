@@ -31,20 +31,20 @@ export default function SalesCancelModal({
           primaryLabel="Confirm"
           cancelDisabled={confirming}
           primaryDisabled={confirming}
-          buttonSx={{}}
+          justifyContent="center"
+          buttonSx={{ height: 40, minWidth: 120 }}
           spacing={1.25}
         />
       }
     >
       <ModalConfirmBody
         showWarning
-        iconFrame="circle"
         iconColor="#F04438"
-        iconFrameSize={56}
-        iconSize={30}
+        iconSize={56}
+        iconMb={1.75}
         bodyOpacity={0.82}
-        py={1.5}
-        px={1}
+        py={3}
+        px={2.5}
         bodySx={{ fontSize: 13.5, fontWeight: 800, lineHeight: 1.45 }}
         body="This pending sales record will be removed and the payment link will be deactivated. The client will no longer be able to complete the payment"
       />

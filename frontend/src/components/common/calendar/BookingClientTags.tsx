@@ -15,9 +15,8 @@ export type {
 
 export function bookingClientTypeTag(
   clientKind?: "individual" | "company" | null,
-): "IC" | "BC" | null {
+): "BC" | null {
   if (clientKind === "company") return "BC";
-  if (clientKind === "individual") return "IC";
   return null;
 }
 

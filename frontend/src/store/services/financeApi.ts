@@ -36,6 +36,8 @@ export type SalesAddonRecord = Record<string, unknown> & { id: string; bookingId
 
 export type ListFinanceTransactionsParams = ListPaginationParams & {
   q?: string;
+  /** Exact booking UUID or unique_code — preferred over fuzzy `q` for issued docs. */
+  bookingId?: string;
   fromDate?: string | null;
   toDate?: string | null;
   entryTypes?: string;
@@ -50,9 +52,16 @@ export type CreateFinanceTransactionRequest = {
   clientType: string;
   vatNumber?: string;
   cocNumber?: string;
-  paymentMethod: "onlineDirect" | "offlineDirect";
+  paymentMethod:
+    | "onlineDirect"
+    | "offlineDirect"
+    | "onlineNonDirect"
+    | "offlineNonDirect"
+    | "onlineInvoice"
+    | "offlineInvoice";
   totalPrice: number;
   discountAmount?: number;
+  dueDate?: string;
   lines: Array<{
     name: string;
     quantity: number;

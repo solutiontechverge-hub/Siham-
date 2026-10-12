@@ -23,4 +23,20 @@ export {
   resolveInvoiceLineItemLayout,
   toInvoiceDisplayLineItems,
   getInvoiceLineItemColumns,
+  getIssuedDocument,
+  hasStoredDocumentSnapshot,
 } from "./financeDocumentUtils";
+export {
+  findIssuedFinanceTransaction,
+  salesCardKindToPaymentPhase,
+  matchesFinanceBooking,
+} from "./findIssuedFinanceTransaction";
+export type { FinanceDocPaymentPhase } from "./findIssuedFinanceTransaction";
+export {
+  LATE_CANCELLATION_BOOKING_FEE,
+  LATE_RESCHEDULING_FEE,
+  formatProtectiveFeeLineDescription,
+  ensureProtectiveFeeLineDescription,
+  isProtectiveFeeEntryLabel,
+  isProtectiveFeeLineDescription,
+} from "./protectiveFeeInvoice";

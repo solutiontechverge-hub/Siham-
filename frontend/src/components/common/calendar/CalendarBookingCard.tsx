@@ -185,10 +185,9 @@ function scenarioBadgeResponseIndicators(
 ) {
   if (label === "BR" || label === "EBR") return responseIndicators;
   if (label === "ER" || label === "E") {
+    // Notebook stays in-pill; waiting/overdue render as standalone 24×24.
     return responseIndicators.filter(
-      (indicator) =>
-        indicator === "suggestion_for_change" ||
-        indicator === "overdue_response",
+      (indicator) => indicator === "suggestion_for_change",
     );
   }
   return [];
@@ -389,9 +388,10 @@ export default function CalendarBookingCard({
                   tooltip: "Guest booking — no profile",
                   bold: true,
                   sx: {
-                    border: `1px solid ${alpha(m.navy, 0.18)}`,
-                    bgcolor: alpha(m.navy, 0.06),
-                    color: alpha(m.navy, 0.72),
+                    border: "none",
+                    borderWidth: 0,
+                    bgcolor: "#F2F4F7",
+                    color: alpha(m.navy, 0.62),
                   },
                 },
               ]
@@ -422,7 +422,8 @@ export default function CalendarBookingCard({
             sx:
               indicator === "ER" && isIncomingEr
                 ? {
-                    border: `1px solid ${alpha(m.teal, 0.45)}`,
+                    border: "none",
+                    borderWidth: 0,
                     bgcolor: alpha(m.teal, 0.12),
                     color: m.teal,
                   }
@@ -440,12 +441,15 @@ export default function CalendarBookingCard({
         }
       : null,
     responseIndicators: (() => {
-      const raw =
-        scenarioIndicators.includes("BR")
-          ? responseIndicators
-          : scenarioIndicators.length
-            ? undefined
-            : responseIndicators;
+      // ER/EBR chips own most indicators; waiting/overdue stay standalone 24-capable.
+      const raw = scenarioIndicators.includes("BR")
+        ? responseIndicators
+        : scenarioIndicators.length
+          ? responseIndicators.filter(
+              (item) =>
+                item === "overdue_response" || item === "response_time_active",
+            )
+          : responseIndicators;
       if (!raw?.length) return raw;
       const skip = new Set<string>();
       if (prepaymentIconVariant === "pending") skip.add("waiting_for_prepayment");

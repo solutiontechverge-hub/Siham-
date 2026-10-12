@@ -32,6 +32,7 @@ import {
   clockHm,
   computeSlotValidation,
   filterEventsMatchingDrawerFilters,
+  findFocusBookingMatch,
   formatLateCancelNoticeLabel,
   isIsoDateTime,
   isMinuteInAvailability,
@@ -625,6 +626,8 @@ export function useProfessionalFixedLocationCalendar({
     paymentMethod,
     setPaymentMethod,
     selectedServices,
+    selectedProducts,
+    bookingUniqueItems,
     selectedSlot,
     editingEventId,
     setEvents,
@@ -1658,9 +1661,8 @@ export function useProfessionalFixedLocationCalendar({
       slotDrawerOpen ||
       deepLinkedBookingRef.current === bookingId
     ) return;
-    const event = events.find((item) =>
-      item.id === bookingId || item.bookingCode === bookingId,
-    );
+    // Match UUID (`b-<uuid>`), unique_code, or exact event id — same as focus deep-links.
+    const event = findFocusBookingMatch(events, bookingId, bookingId);
     if (!event) return;
     deepLinkedBookingRef.current = bookingId;
     if (event.date) setActiveDateIso(event.date);

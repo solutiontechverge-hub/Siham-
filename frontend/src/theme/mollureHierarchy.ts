@@ -1,8 +1,10 @@
 import { alpha } from "@mui/material/styles";
+import { MOLLURE_FONT_DISPLAY } from "./typography";
 
 /**
  * Dense app UI type hierarchy (calendar / booking / finance / analytics).
  * Marketing pages keep theme variants (MainHeading / SubHeading / BodyText).
+ * All levels use Poppins; weight / size / opacity carry hierarchy.
  *
  * Levels:
  * - pageTitle / pageSubtitle — card / screen page headers (Client / Finance / Analytics)
@@ -16,14 +18,19 @@ import { alpha } from "@mui/material/styles";
 export const MOLLURE_UI = {
   pageTitle: {
     fontSize: 20,
-    fontFamily: 'Georgia, "Times New Roman", serif',
+    fontFamily: MOLLURE_FONT_DISPLAY,
     fontWeight: 700 as const,
     opacity: 0.9,
     lineHeight: 1.15,
     letterSpacing: "-0.01em",
   },
   pageSubtitle: { fontSize: 13, fontWeight: 600 as const, opacity: 0.6 },
-  sectionTitle: { fontSize: 20, fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 700 as const, opacity: 0.88 },
+  sectionTitle: {
+    fontSize: 20,
+    fontFamily: MOLLURE_FONT_DISPLAY,
+    fontWeight: 700 as const,
+    opacity: 0.88,
+  },
   label: { fontSize: 12.5, fontWeight: 800 as const, opacity: 0.78 },
   body: { fontSize: 12.5, fontWeight: 700 as const, opacity: 0.72 },
   bodyMuted: { fontSize: 12.5, fontWeight: 600 as const, opacity: 0.55 },
@@ -41,6 +48,7 @@ type Extra = Record<string, unknown> | undefined;
 export function mollurePageTitleSx(navy: string, extra?: Extra) {
   const t = MOLLURE_UI.pageTitle;
   return {
+    fontFamily: t.fontFamily,
     fontSize: t.fontSize,
     fontWeight: t.fontWeight,
     lineHeight: t.lineHeight,
@@ -63,6 +71,7 @@ export function mollurePageSubtitleSx(navy: string, extra?: Extra) {
 export function mollureSectionTitleSx(navy: string, extra?: Extra) {
   const t = MOLLURE_UI.sectionTitle;
   return {
+    fontFamily: t.fontFamily,
     fontSize: t.fontSize,
     fontWeight: t.fontWeight,
     color: alpha(navy, t.opacity),

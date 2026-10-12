@@ -23,24 +23,31 @@ const skipMigrations =
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const waitForDatabase = async (attempts = 5) => {
+// Local/watch: keep retrying (0) so a brief Supabase drop doesn't exit and sit dead.
+// Production/Railway: fail after a few attempts so bad DATABASE_URL doesn't hang deploy.
+const waitForDatabase = async () => {
+  const attempts = Number(
+    process.env.DB_STARTUP_ATTEMPTS || (onRailway || process.env.NODE_ENV === "production" ? 5 : 0),
+  );
   let lastError;
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+  for (let attempt = 1; ; attempt += 1) {
     try {
       await query("SELECT 1");
+      if (attempt > 1) {
+        console.log(`[db] Connected after ${attempt} attempts`);
+      }
       return;
     } catch (error) {
       lastError = error;
       const message = error?.message || String(error);
-      console.warn(
-        `[db] Startup check failed (attempt ${attempt}/${attempts}): ${message}`,
-      );
-      if (attempt < attempts) {
-        await sleep(1500 * attempt);
+      const budget = attempts > 0 ? `/${attempts}` : "";
+      console.warn(`[db] Startup check failed (attempt ${attempt}${budget}): ${message}`);
+      if (attempts > 0 && attempt >= attempts) {
+        throw lastError;
       }
+      await sleep(Math.min(1500 * attempt, 10_000));
     }
   }
-  throw lastError;
 };
 
 const startServer = async () => {

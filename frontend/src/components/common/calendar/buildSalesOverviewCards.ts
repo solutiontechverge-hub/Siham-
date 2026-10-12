@@ -12,7 +12,9 @@ import type {
 import {
   type BuilderCtx,
   buildCardsForEvent,
+  findProtectiveFeeFinanceHint,
   mergeAddonRecordsIntoCards,
+  protectiveFeeFlagsFromBooking,
 } from "./buildSalesOverviewCards.helpers";
 
 export type BuildSalesOverviewInput = {
@@ -25,6 +27,8 @@ export type BuildSalesOverviewInput = {
   fallbackResourceId?: string;
   financeHints?: SalesFinanceHint[];
   paymentTerms?: SalesPaymentTermsInput;
+  /** Business setup late-cancel % — heal Fee Summary for old cancels missing the stamp. */
+  lateCancellationFeePercentDefault?: string | number | null;
 };
 
 export function buildSalesOverviewCards(input: BuildSalesOverviewInput): SalesOverviewCardData[] {
@@ -38,8 +42,13 @@ export function buildSalesOverviewCards(input: BuildSalesOverviewInput): SalesOv
     fallbackResourceId = "unassigned",
     financeHints = [],
     paymentTerms,
+    lateCancellationFeePercentDefault,
   } = input;
-  const ctx: BuilderCtx = { financeHints, paymentTerms };
+  const ctx: BuilderCtx = {
+    financeHints,
+    paymentTerms,
+    lateCancellationFeePercentDefault,
+  };
 
   const cards: SalesOverviewCardData[] = [];
   const seenBookingIds = new Set<string>();
@@ -86,20 +95,49 @@ export function buildSalesOverviewCards(input: BuildSalesOverviewInput): SalesOv
     const event = mapCalendarBookingToEvent(booking, fallbackResourceId);
     const isCancelledStatus = status === "cancelled" || status === "canceled";
     const isNoShowStatus = status === "no_show" || status === "no show";
-    const protectiveFeeActive =
-      (isCancelledStatus && Boolean(event.details?.showLateCancellation)) ||
-      (isNoShowStatus && Boolean(event.details?.showNoShowFee));
-
-    if (isCancelledStatus && !protectiveFeeActive) continue;
-
     const prepay = String(booking.prepayment_status ?? "").toLowerCase();
+    const prepaidCollected = prepay === "paid" || prepay === "confirmed";
+    const notesFee = protectiveFeeFlagsFromBooking(booking);
+    const bookingKey = String(booking.id);
+    const bookingCode = String(booking.unique_code ?? booking.id);
+    const hasFinanceFee = Boolean(
+      findProtectiveFeeFinanceHint(financeHints, bookingKey, bookingCode),
+    );
+    const policyLateCancelPercent =
+      Number(
+        event.details?.lateCancellationFeePercent ??
+          notesFee.lateCancellationFeePercent ??
+          lateCancellationFeePercentDefault,
+      ) || 0;
+    // Match buildCardsForEvent heal: cancelled + policy % + prepaid kept → Fee Summary.
+    const healedLateCancel =
+      isCancelledStatus &&
+      policyLateCancelPercent > 0 &&
+      (prepaidCollected ||
+        notesFee.exceededCancellationWindow === true ||
+        Boolean(notesFee.cancellationFeeAt) ||
+        hasFinanceFee);
+    const protectiveFeeActive =
+      (isCancelledStatus &&
+        (Boolean(event.details?.showLateCancellation) ||
+          notesFee.showLateCancellation ||
+          hasFinanceFee ||
+          healedLateCancel)) ||
+      (isNoShowStatus &&
+        (Boolean(event.details?.showNoShowFee) ||
+          notesFee.showNoShowFee ||
+          hasFinanceFee));
+
+    // Cancelled with neither fee nor prepaid → blank Sales (plain free cancel).
+    if (isCancelledStatus && !protectiveFeeActive && !prepaidCollected) continue;
+
     if (
       !protectiveFeeActive &&
+      !prepaidCollected &&
       status !== "completed" &&
       status !== "confirmed" &&
       status !== "in_progress" &&
       status !== "requested" &&
-      prepay !== "paid" &&
       prepay !== "required" &&
       prepay !== "pending" &&
       prepay !== "failed"
@@ -125,9 +163,17 @@ export function buildSalesOverviewCards(input: BuildSalesOverviewInput): SalesOv
   const withAddons = mergeAddonRecordsIntoCards(cards, addonRecords, ctx);
 
   return withAddons
-    .filter((card) => !card.canceled)
+    // Cancel Sales keeps voided cards visible (grey Voided badge); supersede-only canceled hide.
+    .filter((card) => !card.canceled || card.voided)
     .sort((a, b) => {
       const kindRank = (card: SalesOverviewCardData) => {
+        // Fee Summary above prepaid so late-cancel charge is not below the fold.
+        if (
+          card.title === "Fee Summary" ||
+          card.title === "No-Show Fee Invoice"
+        ) {
+          return -1;
+        }
         if (card.kind === "prepayment") return 0;
         if (card.kind === "after_treatment") return 1;
         if (card.kind === "addon") return 2;

@@ -4,10 +4,9 @@ import { createTheme } from "@mui/material/styles";
 import { MOLLURE_SNACKBAR_COLORS } from "./mollureSnackbar";
 import {
   MOLLURE_FONT_CONTENT_PX,
-  MOLLURE_FONT_HEADING_PX,
-  MOLLURE_FONT_SUBHEADING_PX,
   MOLLURE_FONT_BODY,
   MOLLURE_FONT_DISPLAY,
+  MOLLURE_TYPE_MOBILE_MQ,
   mollureFontSizes,
 } from "./typography";
 
@@ -18,6 +17,9 @@ const headingStyle = {
   lineHeight: 1.12,
   letterSpacing: "-0.025em",
   color: "#333333",
+  [MOLLURE_TYPE_MOBILE_MQ]: {
+    fontSize: mollureFontSizes.headingMobile,
+  },
 } as const;
 
 const subheadingStyle = {
@@ -27,6 +29,9 @@ const subheadingStyle = {
   lineHeight: 1.2,
   letterSpacing: "-0.015em",
   color: "#333333",
+  [MOLLURE_TYPE_MOBILE_MQ]: {
+    fontSize: mollureFontSizes.subheadingMobile,
+  },
 } as const;
 
 const contentStyle = {
@@ -162,12 +167,11 @@ const theme = createTheme({
       statusRedBg: "#FEE4E2",
       statusRedFg: "#F04438",
       statusGreyFg: "#475467",
-      /** No show status chip */
-      statusNoShowBg: "#D0D5DD",
-      statusNoShowFg: "#667085",
-      /** Completed status chip (outlined grey) */
-      statusCompletedBg: "#F9FAFB",
-      statusCompletedBorder: "#D0D5DD",
+      /** No show / Completed status chip (solid grey fill) */
+      statusNoShowBg: "#F3F4F6",
+      statusNoShowFg: "#4B5563",
+      statusCompletedBg: "#F3F4F6",
+      statusCompletedBorder: "#F3F4F6",
       /** Sales Volume stacked bar chart — 4-step teal gradient (Figma) */
       salesVolumeStackDark: "#169BA1",
       salesVolumeStackMid: "#21B8BF",

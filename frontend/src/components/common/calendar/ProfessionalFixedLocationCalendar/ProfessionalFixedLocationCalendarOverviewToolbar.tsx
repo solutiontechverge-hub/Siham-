@@ -26,6 +26,9 @@ import { useProfessionalFixedLocationCalendar } from "./useProfessionalFixedLoca
 
 type Vm = ReturnType<typeof useProfessionalFixedLocationCalendar>;
 
+/** Calendar Overview action-toolbar control height (matches Add @ 40px). */
+const TOOLBAR_H = 40;
+
 export type ProfessionalFixedLocationCalendarOverviewToolbarProps = Pick<
   Vm,
   | "activeDateIso"
@@ -124,15 +127,15 @@ export default function ProfessionalFixedLocationCalendarOverviewToolbar(
         size="small"
         onClick={onPrev}
         sx={{
-          width: 22,
-          height: 22,
+          width: TOOLBAR_H,
+          height: TOOLBAR_H,
           borderRadius: "5px",
           border: `1px solid ${alpha(m.navy, 0.12)}`,
           color: alpha(m.navy, 0.6),
           bgcolor: "#fff",
         }}
       >
-        <ChevronLeftRoundedIcon sx={{ fontSize: 15 }} />
+        <ChevronLeftRoundedIcon sx={{ fontSize: 20 }} />
       </IconButton>
 
       <AppButton
@@ -147,7 +150,7 @@ export default function ProfessionalFixedLocationCalendarOverviewToolbar(
           borderColor: alpha(m.navy, 0.12),
           color: alpha(m.navy, 0.78),
           bgcolor: "#fff",
-          height: 24,
+          height: TOOLBAR_H,
           px: 1,
           "& .MuiButton-startIcon": { mr: 0.45 },
         }}
@@ -189,15 +192,15 @@ export default function ProfessionalFixedLocationCalendarOverviewToolbar(
         size="small"
         onClick={onNext}
         sx={{
-          width: 22,
-          height: 22,
+          width: TOOLBAR_H,
+          height: TOOLBAR_H,
           borderRadius: "5px",
           border: `1px solid ${alpha(m.navy, 0.12)}`,
           color: alpha(m.navy, 0.6),
           bgcolor: "#fff",
         }}
       >
-        <ChevronRightRoundedIcon sx={{ fontSize: 15 }} />
+        <ChevronRightRoundedIcon sx={{ fontSize: 20 }} />
       </IconButton>
     </Stack>
 
@@ -208,7 +211,7 @@ export default function ProfessionalFixedLocationCalendarOverviewToolbar(
       onClick={onToday}
       sx={{
         fontSize: 10.5,
-        height: 24,
+        height: TOOLBAR_H,
         px: 1,
       }}
     >
@@ -218,6 +221,7 @@ export default function ProfessionalFixedLocationCalendarOverviewToolbar(
     <Box
       sx={{
         display: "flex",
+        height: TOOLBAR_H,
         borderRadius: "5px",
         overflow: "hidden",
         border: `1px solid ${alpha(m.navy, 0.12)}`,
@@ -241,7 +245,7 @@ export default function ProfessionalFixedLocationCalendarOverviewToolbar(
             sx={{
               borderRadius: 0,
               minWidth: 38,
-              height: 22,
+              height: TOOLBAR_H,
               textTransform: "none",
               fontWeight: 700,
               fontSize: 10.5,
@@ -262,7 +266,7 @@ export default function ProfessionalFixedLocationCalendarOverviewToolbar(
       sx={{
         borderRadius: "5px",
         fontSize: 10.5,
-        height: 24,
+        height: TOOLBAR_H,
         px: 1,
         "& .MuiButton-startIcon": { mr: 0.45 },
       }}
@@ -276,7 +280,7 @@ export default function ProfessionalFixedLocationCalendarOverviewToolbar(
       onClick={(e) => setAddAnchor(e.currentTarget)}
       sx={{
         fontSize: 10.5,
-        height: 24,
+        height: TOOLBAR_H,
         px: 1.1,
         "& .MuiButton-endIcon": { color: "#fff" },
       }}

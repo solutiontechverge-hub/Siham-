@@ -72,7 +72,7 @@ export default function FinanceSettingStripe() {
   const actionBtnSx = {
     borderRadius: "7px",
     textTransform: "none",
-    fontWeight: 800,
+    fontWeight: 600,
     fontSize: 12,
     height: 30,
     px: 1.25,

@@ -61,18 +61,18 @@ export default function FinanceDocumentPreviewDrawer({
         cocNumber: issuedSnapshot.professionalBusiness.cocNumber ?? undefined,
       }
     : null;
-  const resolvedInvoiceType = React.useMemo(
-    () => frozenDocument
-      ? issuedSnapshot?.templateType ?? "individual"
-      : resolveInvoiceTemplateType({
-        fallback: invoiceType,
-        invoiceType,
-        clientType: row?.clientType,
-        vatNumber: row?.document?.client?.vatNumber,
-        cocNumber: row?.document?.client?.cocNumber,
-      }),
-    [frozenDocument, invoiceType, issuedSnapshot, row],
-  );
+  // Never trust frozen templateType alone — BC rows were often snapshotted as
+  // "individual" from defaultInvoiceType. Client/business signals win.
+  const resolvedInvoiceType = React.useMemo(() => {
+    const document = getIssuedDocument(row);
+    return resolveInvoiceTemplateType({
+      fallback: invoiceType,
+      invoiceType: issuedSnapshot?.templateType ?? invoiceType,
+      clientType: row?.clientType,
+      vatNumber: document?.client?.vatNumber,
+      cocNumber: document?.client?.cocNumber,
+    });
+  }, [invoiceType, issuedSnapshot, row]);
   const lineItems = React.useMemo(
     () => buildPreviewLineItems(settings, renderRow),
     [renderRow, settings],

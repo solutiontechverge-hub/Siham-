@@ -82,7 +82,7 @@ export function resolveBookingResponseIndicators(
     const overdue = hasStoredResponseDeadline(deadlineFields)
       ? isResponseWindowOverdue(deadlineFields, new Date(), opts?.responseTime)
       : isBookingStartPast(event);
-    if (overdue) indicators.push("overdue_response");
+    indicators.push(overdue ? "overdue_response" : "response_time_active");
   }
 
   return indicators;

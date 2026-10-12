@@ -6,6 +6,7 @@ import {
   mollureLabelSx,
   mollureSectionTitleSx,
 } from "../../../theme/mollureHierarchy";
+import { financePriceTextSx } from "../finance-documents/financeDocumentUtils";
 import type { BookingPaymentSummarySection } from "./bookingFinance.types";
 import { formatFinanceEuro } from "./formatBookingFinance";
 
@@ -68,7 +69,7 @@ export default function BookingPaymentSummaryCard({
         direction="row"
         justifyContent="space-between"
         alignItems="center"
-        sx={{ mb: 1 }}
+        sx={{ mb: 1, px: 1.6 }}
       >
         <Typography
           sx={{
@@ -82,6 +83,7 @@ export default function BookingPaymentSummaryCard({
         </Typography>
         <Typography
           sx={mollureSectionTitleSx(m.navy, {
+            ...financePriceTextSx,
             color: alpha(m.navy, 0.9),
             lineHeight: 1,
           })}
@@ -123,6 +125,7 @@ export default function BookingPaymentSummaryCard({
               {section.amount != null ? (
                 <Typography
                   sx={{
+                    ...financePriceTextSx,
                     fontWeight: 900,
                     fontSize: 13,
                     color: alpha(m.navy, 0.88),
@@ -159,6 +162,7 @@ export default function BookingPaymentSummaryCard({
                       </Typography>
                       <Typography
                         sx={mollureLabelSx(m.navy, {
+                          ...financePriceTextSx,
                           fontWeight: 900,
                           color: amountColor,
                           flexShrink: 0,

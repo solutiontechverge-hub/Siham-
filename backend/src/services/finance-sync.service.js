@@ -12,19 +12,7 @@ import {
   sendFinanceClientEmail,
 } from "./financeEmail.service.js";
 import { dispatchInvoiceReissuedNotification } from "./bookingNotification.service.js";
-import { roundMoney as roundParsedMoney } from "../utils/money.js";
-
-const formatEuro = (value) => {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return "€0";
-  const rounded = Math.round(n * 100) / 100;
-  const text = Number.isInteger(rounded)
-    ? rounded.toLocaleString("en-US")
-    : rounded.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return `€${text}`;
-};
-
-const roundMoney = roundParsedMoney;
+import { roundMoney } from "../utils/money.js";
 
 const toIsoDate = (value) => toIsoDateOnly(value);
 
@@ -35,6 +23,19 @@ export const PAYMENT_AFTER_CANCEL_FLAG = "payment_after_cancel";
 
 export function isSettledFinanceStatus(status) {
   return status === "Paid" || status === "Prepaid";
+}
+
+/** Receipt / credit-note numbers only for settled money movement. */
+export function isReceiptEligibleStatus(status) {
+  return status === "Paid" || status === "Prepaid" || status === "Refunded";
+}
+
+/** Mint `RCP-{code}` only when status is Prepaid|Paid|Refunded. Voided never mints. */
+export function mintReceiptNumber(status, code) {
+  if (!isReceiptEligibleStatus(status)) return undefined;
+  const trimmed = String(code ?? "").trim();
+  if (!trimmed) return undefined;
+  return trimmed.startsWith("RCP-") ? trimmed : `RCP-${trimmed}`;
 }
 
 export function shouldFlagPaymentAfterCancel(intendedStatus, hasPriorVoidedSibling) {
@@ -122,23 +123,88 @@ async function getBookingContext(bookingId) {
             bs.professional_profile_id,
             bs.no_show_fee_percentage,
             u.email AS customer_email,
-            COALESCE(ip.display_name, ip.first_name || ' ' || ip.last_name, u.email) AS customer_name,
+            u.user_type AS customer_user_type,
+            COALESCE(
+              NULLIF(TRIM(cp.legal_name), ''),
+              NULLIF(TRIM(ip.display_name), ''),
+              NULLIF(TRIM(CONCAT(ip.first_name, ' ', ip.last_name)), ''),
+              u.email
+            ) AS customer_name,
+            cp.legal_name AS customer_legal_name,
+            cp.vat_number AS customer_vat,
+            cp.ccc_number AS customer_coc,
+            pc.id AS professional_client_id,
+            pc.client_kind AS pc_client_kind,
+            pc.is_mollure AS pc_is_mollure,
+            pc.vat AS pc_vat,
+            pc.coc AS pc_coc,
+            pc.legal_name AS pc_legal_name,
             s.title AS service_title
      FROM bookings b
      INNER JOIN business_setups bs ON bs.id = b.business_setup_id
      INNER JOIN users u ON u.id = b.customer_id
      LEFT JOIN individual_profiles ip ON ip.user_id = u.id
+     LEFT JOIN company_profiles cp ON cp.user_id = u.id
+     LEFT JOIN professional_clients pc
+       ON pc.professional_profile_id = bs.professional_profile_id
+      AND (
+        pc.mollure_user_id = u.id
+        OR lower(pc.email) = lower(u.email)
+      )
      LEFT JOIN subcategories s ON s.id = b.service_id
-     WHERE b.id = $1`,
+     WHERE b.id = $1
+     ORDER BY
+       CASE WHEN pc.mollure_user_id = u.id THEN 0 ELSE 1 END,
+       pc.updated_at DESC NULLS LAST
+     LIMIT 1`,
     [bookingId],
   );
   return result.rows[0] || null;
 }
 
-function resolveClientType(userEmail) {
-  if (!userEmail) return "guest";
-  if (userEmail.endsWith("@mollure.dev") || userEmail.includes("mollure")) return "mollure";
-  return "nonMollure";
+/** Main booking payer → mollure / business / nonMollure; split guests stay guest. */
+function resolveClientType(booking, payerRole = "main_client") {
+  if (payerRole === "guest" || payerRole === "model") return "guest";
+  if (!booking?.customer_id) return "guest";
+  const isCompany =
+    booking.customer_user_type === "company" ||
+    booking.pc_client_kind === "company";
+  if (isCompany) return "business";
+  if (booking.pc_is_mollure === false) return "nonMollure";
+  return "mollure";
+}
+
+function buildFinanceClientParty(booking, { clientName, clientEmail, payerRole }) {
+  if (payerRole === "guest" || payerRole === "model") {
+    return {
+      legalName: clientName,
+      email: clientEmail || "",
+    };
+  }
+  const vat = booking.pc_vat || booking.customer_vat || null;
+  const coc = booking.pc_coc || booking.customer_coc || null;
+  const isCompany =
+    booking.customer_user_type === "company" ||
+    booking.pc_client_kind === "company" ||
+    Boolean(vat || coc);
+  const legalName =
+    (isCompany
+      ? booking.pc_legal_name || booking.customer_legal_name
+      : null) || clientName;
+  const isMollure =
+    booking.pc_is_mollure === true ||
+    (booking.pc_is_mollure !== false && Boolean(booking.customer_id));
+  return {
+    legalName,
+    email: clientEmail || "",
+    ...(vat ? { vatNumber: vat } : {}),
+    ...(coc ? { cocNumber: coc } : {}),
+    ...(booking.customer_id ? { customerId: booking.customer_id } : {}),
+    ...(booking.professional_client_id
+      ? { clientId: booking.professional_client_id }
+      : {}),
+    ...(isMollure ? { isMollure: true } : {}),
+  };
 }
 
 function resolveTransactionStatus(booking, paymentPhase = "full") {
@@ -154,18 +220,69 @@ function resolveTransactionStatus(booking, paymentPhase = "full") {
 
 function resolveMethod(booking, paymentMethod = "onlineDirect") {
   const isOffline = booking.booking_type === "offline";
-  if (paymentMethod === "onlineInvoice") {
+  const method = String(paymentMethod ?? "");
+  if (
+    method === "onlineInvoice" ||
+    method === "onlineNonDirect" ||
+    method === "offlineInvoice" ||
+    method === "offlineNonDirect"
+  ) {
+    const offlineInvoice =
+      isOffline || method === "offlineInvoice" || method === "offlineNonDirect";
     return {
-      methodTitle: isOffline ? "Offline – invoice with due date" : "Online – invoice with due date",
+      methodTitle: offlineInvoice
+        ? "Offline – invoice with due date"
+        : "Online – invoice with due date",
       methodDetail: "Due date: pending",
     };
   }
-  if (isOffline || paymentMethod === "offlineDirect") {
+  if (isOffline || method === "offlineDirect") {
     return { methodTitle: "Offline – direct", methodDetail: "" };
   }
   const gatewayMethod = [booking.gateway_payment_method, booking.payment_method, booking.payment_method_type, booking.card_brand]
     .find((value) => String(value ?? "").trim());
   return { methodTitle: "Online – direct", methodDetail: gatewayMethod ? String(gatewayMethod).trim() : "" };
+}
+
+function snapshotServiceSubtotal(meta, booking) {
+  const services = Array.isArray(meta?.clientSnapshot?.services) ? meta.clientSnapshot.services : [];
+  if (services.length) {
+    return roundMoney(services.reduce((sum, row) => sum + (Number(row.price) || 0), 0));
+  }
+  const guests = Array.isArray(meta?.guests) ? meta.guests : [];
+  let guestTotal = 0;
+  for (const guest of guests) {
+    for (const service of guest.services ?? []) guestTotal += Number(service.price) || 0;
+    for (const product of guest.products ?? []) guestTotal += Number(product.price) || 0;
+  }
+  if (guestTotal > 0) return roundMoney(guestTotal);
+  return roundMoney(Number(booking.total_price ?? 0));
+}
+
+function formatProtectiveFeeBase(baseAmount) {
+  const base = Number.isFinite(baseAmount) ? Math.max(0, baseAmount) : 0;
+  // Design: "10% Of €230" (no trailing .00 for whole euros).
+  return Number.isInteger(base) || Math.abs(base - Math.round(base)) < 0.005
+    ? String(Math.round(base))
+    : base.toFixed(2);
+}
+
+function formatProtectiveFeeDescription(kind, percent, baseAmount) {
+  const name =
+    kind === "lateCancellation"
+      ? "Late Cancellation Booking Fee"
+      : "Late Rescheduling Fee";
+  const pct = Number(percent) || 0;
+  return `${name} (${pct}% Of €${formatProtectiveFeeBase(baseAmount)})`;
+}
+
+function isProtectiveFeeEntryLabel(label) {
+  const value = String(label ?? "").trim();
+  return (
+    value === "Late Cancellation Booking Fee" ||
+    value === "Late Rescheduling Fee" ||
+    value === "No-show fee"
+  );
 }
 
 function isPlanningPerson(person) {
@@ -344,16 +461,19 @@ function resolveSplitPayers(booking, meta) {
       displayName: booking.customer_name || "Client",
       subtotal: mainSubtotal,
       paymentAmount: roundMoney(Math.max(0, mainSubtotal - prepaidAmount)),
-        lineItems: [
-          {
-            description: booking.service_title || "Professional Service",
+      // No-ref generic filler is forbidden — only persist catalog-backed lines.
+      lineItems: booking.service_id
+        ? [{
+            description: booking.service_title || "Service",
+            sourceReference: String(booking.service_id),
+            sourceType: "serviceId",
             quantity: "1",
             vat: "0%",
             vatRate: 0,
             pricePerUnit: roundMoney(mainSubtotal),
             totalPrice: roundMoney(mainSubtotal),
-          },
-        ],
+          }]
+        : [],
     });
 
     return { prepaidAmount, payers };
@@ -369,16 +489,18 @@ function resolveSplitPayers(booking, meta) {
         displayName: booking.customer_name || "Client",
         subtotal: total,
         paymentAmount: roundMoney(Math.max(0, total - prepaidAmount)),
-        lineItems: [
-          {
-            description: booking.service_title || "Professional Service",
-            quantity: "1",
-            vat: "0%",
-            vatRate: 0,
-            pricePerUnit: roundMoney(total),
-            totalPrice: roundMoney(total),
-          },
-        ],
+        lineItems: booking.service_id
+          ? [{
+              description: booking.service_title || "Service",
+              sourceReference: String(booking.service_id),
+              sourceType: "serviceId",
+              quantity: "1",
+              vat: "0%",
+              vatRate: 0,
+              pricePerUnit: roundMoney(total),
+              totalPrice: roundMoney(total),
+            }]
+          : [],
       },
     ],
   };
@@ -401,10 +523,12 @@ async function insertFinanceTransaction({
   entryLabel,
 }) {
   const gross = roundMoney(amount);
+  const labelKey = entryLabel || "";
   // Open (unresolved) invoice for this booking/phase — replace when amount changes
   // so pre-resolution edits do not leave a stale payment link / prepayment row.
+  // Protective fee inserts still void any open same-phase sale (service → LCF).
   const openExisting = await query(
-    `SELECT id, gross_amount, status FROM finance_transactions
+    `SELECT id, gross_amount, status, entry_label FROM finance_transactions
      WHERE professional_profile_id = $1
        AND booking_id = $2
        AND COALESCE(document->>'payerKey', '') = $3
@@ -424,10 +548,15 @@ async function insertFinanceTransaction({
   let supersededOpenId = null;
   if (openRow) {
     const prevGross = roundMoney(openRow.gross_amount);
-    if (prevGross === gross && String(openRow.status) === String(status)) {
+    const sameLabel = String(openRow.entry_label || "") === labelKey;
+    if (
+      sameLabel &&
+      prevGross === gross &&
+      String(openRow.status) === String(status)
+    ) {
       return openRow.id;
     }
-    // Amount or open-status drift → void old (Cancel Sales / deactivate link) then insert fresh.
+    // Amount/label drift → void old (Cancel Sales / deactivate link) then insert fresh.
     supersededOpenId = openRow.id;
     await query(
       `UPDATE finance_transactions
@@ -436,6 +565,7 @@ async function insertFinanceTransaction({
       [openRow.id],
     );
   } else {
+    // Scope by entry_label so Paid LCF is not collapsed into Paid after-treatment.
     const exact = await query(
       `SELECT id FROM finance_transactions
        WHERE professional_profile_id = $1
@@ -443,6 +573,7 @@ async function insertFinanceTransaction({
          AND status = $3
          AND COALESCE(document->>'payerKey', '') = $4
          AND COALESCE(document->>'paymentPhase', '') = $5
+         AND COALESCE(entry_label, '') = $6
        LIMIT 1`,
       [
         booking.professional_profile_id,
@@ -450,13 +581,15 @@ async function insertFinanceTransaction({
         status,
         payerKey || "",
         paymentPhase || "",
+        labelKey,
       ],
     );
     if (exact.rows[0]) return exact.rows[0].id;
   }
 
   // Stale Stripe / payment-link race: Cancel Sales already Voided this phase, but payment still landed.
-  if (isSettledFinanceStatus(status)) {
+  // Do NOT treat intentional fee invoices (LCF/LRF/NS) as that race — voided service sales are expected.
+  if (isSettledFinanceStatus(status) && !isProtectiveFeeEntryLabel(labelKey)) {
     const voidedSibling = await query(
       `SELECT id FROM finance_transactions
        WHERE professional_profile_id = $1
@@ -464,7 +597,8 @@ async function insertFinanceTransaction({
          AND status = 'Voided'
          AND COALESCE(document->>'payerKey', '') = $3
          AND COALESCE(document->>'paymentPhase', '') = $4
-         AND ($5::uuid IS NULL OR id <> $5)
+         AND COALESCE(entry_label, '') = $5
+         AND ($6::uuid IS NULL OR id <> $6)
        ORDER BY updated_at DESC NULLS LAST
        LIMIT 1`,
       [
@@ -472,6 +606,7 @@ async function insertFinanceTransaction({
         booking.unique_code,
         payerKey || "",
         paymentPhase || "",
+        labelKey,
         supersededOpenId,
       ],
     );
@@ -509,10 +644,10 @@ async function insertFinanceTransaction({
   const isPrepaymentDocument = paymentPhase === "prepay";
   const document = {
     documentNumber: docNumber,
-    receiptNumber:
-      ["Paid", "Prepaid", "Refunded"].includes(status)
-        ? `RCP-${booking.unique_code}${docSuffix || ""}`
-        : undefined,
+    receiptNumber: mintReceiptNumber(
+      status,
+      `${booking.unique_code}${docSuffix || ""}`,
+    ),
     serviceDate: toIsoDate(booking.booking_date),
     invoiceDate,
     dueDate,
@@ -521,10 +656,11 @@ async function insertFinanceTransaction({
     payerKey: payerKey || "",
     payerRole: payerRole || "main_client",
     payerLabel: payerLabel || clientName,
-    client: {
-      legalName: clientName,
-      email: clientEmail || "",
-    },
+    client: buildFinanceClientParty(booking, {
+      clientName,
+      clientEmail,
+      payerRole: payerRole || "main_client",
+    }),
     // Keep the snapshot authoritative: an absent line list stays absent. The
     // frontend may display a generic summary, but it must not be persisted as
     // an orphan item without a sold-item reference.
@@ -537,8 +673,15 @@ async function insertFinanceTransaction({
     ...(isPrepaymentDocument ? { prepaymentAmount: roundMoney(gross) } : {}),
     paidAmount: roundMoney(gross),
     issuedSnapshot: {
-      templateType: invoiceSettings.defaultInvoiceType,
-      layout: invoiceSettings.defaultInvoiceType === "company" ? "itemized" : "simplified",
+      // BC rows must freeze company layout even when defaultInvoiceType is individual.
+      templateType:
+        clientType === "business" || invoiceSettings.defaultInvoiceType === "company"
+          ? "company"
+          : "individual",
+      layout:
+        clientType === "business" || invoiceSettings.defaultInvoiceType === "company"
+          ? "itemized"
+          : "simplified",
       invoiceSettings,
       professionalBusiness,
     },
@@ -628,7 +771,153 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
       }]
     : [];
 
-  if (String(booking.status ?? "").toLowerCase() === "no_show") {
+  const withLateRescheduleFeeLine = (lines) => {
+    if (!meta.showLateRescheduling) return lines;
+    const percent = Math.max(0, Math.min(100, Number(meta.lateRescheduleFeePercent) || 0));
+    if (percent <= 0) return lines;
+    const base = snapshotServiceSubtotal(meta, booking);
+    const feeAmount = roundMoney((base * percent) / 100);
+    if (feeAmount <= 0) return lines;
+    const already = (lines ?? []).some(
+      (line) => String(line?.sourceReference ?? "").startsWith("late-reschedule"),
+    );
+    if (already) return lines;
+    return [
+      ...(lines ?? []),
+      {
+        description: formatProtectiveFeeDescription("lateRescheduling", percent, base),
+        sourceType: "uniqueItemCode",
+        sourceReference: "late-reschedule-fee",
+        quantity: 1,
+        vat: "0%",
+        vatRate: 0,
+        pricePerUnit: feeAmount,
+        totalPrice: feeAmount,
+        feePercent: percent,
+        feeBaseAmount: base,
+      },
+    ];
+  };
+
+  const bookingStatus = String(booking.status ?? "").toLowerCase();
+
+  if (bookingStatus === "cancelled" || bookingStatus === "canceled") {
+    const showLateCancellation = Boolean(meta.showLateCancellation);
+    const percent = Math.max(0, Math.min(100, Number(meta.lateCancellationFeePercent) || 0));
+    if (showLateCancellation && percent > 0) {
+      const serviceBase = snapshotServiceSubtotal(meta, booking);
+      // Fee checkout may already have replaced total_price with the fee amount.
+      const computedFee = roundMoney((serviceBase * percent) / 100);
+      const dueFee = roundMoney(
+        amountOverride != null && Number.isFinite(Number(amountOverride))
+          ? Math.max(0, Number(amountOverride))
+          : computedFee > 0
+            ? computedFee
+            : Math.max(0, Number(booking.total_price ?? 0)),
+      );
+      if (dueFee <= 0) return null;
+      const baseForLabel =
+        computedFee > 0 && Math.abs(dueFee - computedFee) < 0.02
+          ? serviceBase
+          : percent > 0
+            ? roundMoney(dueFee / (percent / 100))
+            : serviceBase;
+      // Keep prepaid receipt when it was collected before cancel (fee sync returns early).
+      if (prepayStatus === "paid" && prepaidAmount > 0) {
+        await insertFinanceTransaction({
+          booking,
+          paymentPhase: "prepay",
+          paymentMethod,
+          amount: prepaidAmount,
+          status: "Prepaid",
+          clientName: booking.customer_name,
+          clientEmail: booking.customer_email,
+          clientType: resolveClientType(booking),
+          payerKey: "main-client",
+          payerRole: "main_client",
+          payerLabel: booking.customer_name,
+          lineItems: fallbackBookingLineItems,
+          docSuffix: "-PRE",
+          entryLabel: "Prepayment",
+        });
+      }
+      return insertFinanceTransaction({
+        booking,
+        paymentPhase: "full",
+        paymentMethod,
+        amount: dueFee,
+        status: statusOverride || "Payment due",
+        clientName: booking.customer_name,
+        clientEmail: booking.customer_email,
+        clientType: resolveClientType(booking),
+        payerKey: "main-client",
+        payerRole: "main_client",
+        payerLabel: booking.customer_name,
+        lineItems: [{
+          description: formatProtectiveFeeDescription("lateCancellation", percent, baseForLabel),
+          sourceType: "uniqueItemCode",
+          sourceReference: "late-cancellation-fee",
+          quantity: 1,
+          vat: "0%",
+          vatRate: 0,
+          pricePerUnit: dueFee,
+          totalPrice: dueFee,
+          feePercent: percent,
+          feeBaseAmount: baseForLabel,
+        }],
+        docSuffix: "-LCF",
+        entryLabel: "Late Cancellation Booking Fee",
+      });
+    }
+    // Paid fee sync when stamp is partial (show flag XOR percent) but amount was paid.
+    const overrideFee = roundMoney(Number(amountOverride));
+    if (
+      (showLateCancellation || percent > 0) &&
+      overrideFee > 0 &&
+      isSettledFinanceStatus(statusOverride || "")
+    ) {
+      return insertFinanceTransaction({
+        booking,
+        paymentPhase: "full",
+        paymentMethod,
+        amount: overrideFee,
+        status: statusOverride,
+        clientName: booking.customer_name,
+        clientEmail: booking.customer_email,
+        clientType: resolveClientType(booking),
+        payerKey: "main-client",
+        payerRole: "main_client",
+        payerLabel: booking.customer_name,
+        lineItems: [{
+          description:
+            percent > 0
+              ? formatProtectiveFeeDescription(
+                  "lateCancellation",
+                  percent,
+                  roundMoney(overrideFee / (percent / 100)),
+                )
+              : "Late Cancellation Booking Fee",
+          sourceType: "uniqueItemCode",
+          sourceReference: "late-cancellation-fee",
+          quantity: 1,
+          vat: "0%",
+          vatRate: 0,
+          pricePerUnit: overrideFee,
+          totalPrice: overrideFee,
+          ...(percent > 0
+            ? {
+                feePercent: percent,
+                feeBaseAmount: roundMoney(overrideFee / (percent / 100)),
+              }
+            : {}),
+        }],
+        docSuffix: "-LCF",
+        entryLabel: "Late Cancellation Booking Fee",
+      });
+    }
+  }
+
+  if (bookingStatus === "no_show") {
     const rate = Math.max(0, Math.min(100, Number(booking.no_show_fee_percentage) || 0));
     const grossFee = roundMoney(Number(booking.total_price ?? 0) * rate / 100);
     const dueFee = roundMoney(
@@ -642,10 +931,10 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
       paymentPhase: "full",
       paymentMethod,
       amount: dueFee,
-      status: "Payment due",
+      status: statusOverride || "Payment due",
       clientName: booking.customer_name,
       clientEmail: booking.customer_email,
-      clientType: resolveClientType(booking.customer_email),
+      clientType: resolveClientType(booking),
       payerKey: "main-client",
       payerRole: "main_client",
       payerLabel: booking.customer_name,
@@ -667,7 +956,7 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
       status,
       clientName: booking.customer_name,
       clientEmail: booking.customer_email,
-      clientType: resolveClientType(booking.customer_email),
+      clientType: resolveClientType(booking),
       payerKey: "main-client",
       payerRole: "main_client",
       payerLabel: booking.customer_name,
@@ -690,7 +979,7 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
       status: "Prepaid",
       clientName: booking.customer_name,
       clientEmail: booking.customer_email,
-      clientType: resolveClientType(booking.customer_email),
+      clientType: resolveClientType(booking),
       payerKey: "main-client",
       payerRole: "main_client",
       payerLabel: booking.customer_name,
@@ -733,11 +1022,11 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
         status: statusOverride ?? "Paid",
         clientName: isMain ? booking.customer_name : payer.displayName,
         clientEmail: isMain ? booking.customer_email : "",
-        clientType: isMain ? resolveClientType(booking.customer_email) : "guest",
+        clientType: resolveClientType(booking, payer.role),
         payerKey: payer.key,
         payerRole: payer.role,
         payerLabel: payer.label,
-        lineItems: payer.lineItems,
+        lineItems: withLateRescheduleFeeLine(payer.lineItems),
         docSuffix: suffix,
         entryLabel: isMain
           ? "After treatment · Main Client"
@@ -751,6 +1040,15 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
   if (!createdIds.length && !isCompleted) {
     const phase = prepayStatus === "paid" ? "prepay" : "full";
     const status = statusOverride ?? resolveTransactionStatus(booking, phase);
+    const mainLines = payers.find((payer) => payer.role === "main_client")?.lineItems?.length
+      ? payers.find((payer) => payer.role === "main_client").lineItems
+      : fallbackBookingLineItems;
+    const fullLines = withLateRescheduleFeeLine(mainLines);
+    // Fee-only late-reschedule invoice when sync amount matches just the fee line.
+    const lateRescheduleOnly =
+      phase === "full" &&
+      fullLines.length === 1 &&
+      String(fullLines[0]?.sourceReference ?? "").startsWith("late-reschedule");
     const id = await insertFinanceTransaction({
       booking,
       paymentPhase: phase,
@@ -759,18 +1057,18 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
       status,
       clientName: booking.customer_name,
       clientEmail: booking.customer_email,
-      clientType: resolveClientType(booking.customer_email),
+      clientType: resolveClientType(booking),
       payerKey: "main-client",
       payerRole: "main_client",
       payerLabel: booking.customer_name,
-      lineItems:
+      lineItems: phase === "prepay" ? mainLines : fullLines,
+      docSuffix: phase === "prepay" ? "-PRE" : lateRescheduleOnly ? "-LRF" : "",
+      entryLabel:
         phase === "prepay"
-          ? payers.find((payer) => payer.role === "main_client")?.lineItems?.length
-            ? payers.find((payer) => payer.role === "main_client").lineItems
-            : fallbackBookingLineItems
-          : [],
-      docSuffix: phase === "prepay" ? "-PRE" : "",
-      entryLabel: phase === "prepay" ? "Prepayment" : null,
+          ? "Prepayment"
+          : lateRescheduleOnly
+            ? "Late Rescheduling Fee"
+            : null,
     });
     return id;
   }

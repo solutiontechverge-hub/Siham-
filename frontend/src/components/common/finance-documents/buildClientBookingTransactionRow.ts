@@ -7,15 +7,6 @@ import type {
 import type { ClientBookingDraft } from "../client-booking/types";
 import type { FinanceInvoiceSettings } from "./useFinanceInvoiceSettings";
 
-function formatCurrencyEur(amount: number) {
-  return new Intl.NumberFormat("en-NL", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
-
 function resolveVatForLabel(
   name: string,
   settings: FinanceInvoiceSettings,
@@ -60,8 +51,10 @@ export type BuildClientBookingTransactionRowInput = {
   financeSettings: FinanceInvoiceSettings;
   /** When set (e.g. prepayment receipt), document total uses this amount. */
   documentAmount?: number;
-  /** Prepayment amount shown on invoice/receipt as "Prepayment". */
+  /** Prepayment amount shown on invoice/receipt as "Prepayment" / "Prepaid". */
   prepaymentAmount?: number;
+  /** When set with prepaymentAmount, drives Prepaid vs Prepayment due status. */
+  prepaymentPaid?: boolean;
   /** Receipt for a prepayment: line item is labeled Prepayment. */
   asPrepaymentReceipt?: boolean;
   clientType?: TransactionClientType;
@@ -78,6 +71,7 @@ export function buildClientBookingTransactionRow({
   financeSettings,
   documentAmount,
   prepaymentAmount,
+  prepaymentPaid,
   asPrepaymentReceipt = false,
   clientType = "mollure",
   methodTitle = "Online - Direct",
@@ -101,13 +95,16 @@ export function buildClientBookingTransactionRow({
 
   const serviceLineItems = draft.services.map((service) => {
     const vat = resolveVatForLabel(service.name, financeSettings, "service");
+    const sourceReference = String(service.id).split("::")[0];
     return {
-    description: service.name,
-    quantity: 1,
-    vat,
-    vatRate: vatRateFromText(vat),
-    pricePerUnit: service.price,
-    totalPrice: service.price,
+      description: service.name,
+      sourceReference,
+      sourceType: "serviceId" as const,
+      quantity: 1,
+      vat,
+      vatRate: vatRateFromText(vat),
+      pricePerUnit: service.price,
+      totalPrice: service.price,
     };
   });
 
@@ -117,8 +114,13 @@ export function buildClientBookingTransactionRow({
       product.unitPrice ??
       (quantity > 0 ? product.price / quantity : product.price);
     const vat = resolveVatForLabel(product.name, financeSettings, "product");
+    const sourceReference = String(product.id).split("::")[0];
     return {
       description: product.name,
+      sourceReference,
+      sourceType: (sourceReference.startsWith("unique-")
+        ? "uniqueItemCode"
+        : "productId") as "productId" | "uniqueItemCode",
       quantity,
       vat,
       vatRate: vatRateFromText(vat),
@@ -127,7 +129,6 @@ export function buildClientBookingTransactionRow({
     };
   });
 
-  const prepaidLabel = formatCurrencyEur(prepaidValue);
   const lineItems =
     asPrepaymentReceipt && prepaidValue > 0
       ? [
@@ -143,15 +144,15 @@ export function buildClientBookingTransactionRow({
       : [...serviceLineItems, ...productLineItems];
 
   const bookingItems = (asPrepaymentReceipt && prepaidValue > 0
-    ? [{ label: "Prepayment", value: prepaidLabel }]
+    ? [{ label: "Prepayment", value: prepaidValue }]
     : [
         ...draft.services.map((service) => ({
           label: service.name,
-          value: formatCurrencyEur(service.price),
+          value: service.price,
         })),
         ...(draft.products ?? []).map((product) => ({
           label: product.name,
-          value: formatCurrencyEur(product.price),
+          value: product.price,
         })),
       ]
   );
@@ -196,7 +197,13 @@ export function buildClientBookingTransactionRow({
     netAmount: totalAmount,
     methodTitle,
     methodDetail,
-    status: "Paid",
+    status: asPrepaymentReceipt
+      ? "Paid"
+      : prepaidValue > 0 && prepaymentPaid === true
+        ? "Prepaid"
+        : prepaidValue > 0 && prepaymentPaid === false
+          ? "Prepayment due"
+          : "Paid",
     document,
   };
 }
