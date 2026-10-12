@@ -49,6 +49,7 @@ export function toFinanceHints(rows: TransactionRow[]): SalesFinanceHint[] {
           dueDate?: string;
           penaltyAmount?: number;
           payerKey?: string;
+          reissueLevel?: number;
         }
       | undefined;
     const paid =
@@ -68,8 +69,11 @@ export function toFinanceHints(rows: TransactionRow[]): SalesFinanceHint[] {
       payerKey: doc?.payerKey,
       status: row.status,
       paidAt: paid,
-      dueDate: doc?.dueDate || row.document?.dueDate || null,
+      // Column first (payment_deadline), then document/meta — match backend COALESCE.
+      dueDate:
+        row.paymentDeadline || doc?.dueDate || row.document?.dueDate || null,
       penaltyAmount: doc?.penaltyAmount,
+      reissueLevel: Number(doc?.reissueLevel ?? row.document?.reissueLevel ?? 0) || 0,
       entryLabel: row.entryLabel,
       amount: Number.isFinite(amount) ? amount : undefined,
       ...(lineItems.length ? { lineItems } : {}),

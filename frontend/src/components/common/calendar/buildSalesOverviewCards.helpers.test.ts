@@ -11,6 +11,7 @@ import {
   shouldShowAfterTreatmentCard,
 } from "./buildSalesOverviewCards.helpers";
 import { buildSalesOverviewCards } from "./buildSalesOverviewCards";
+import { hydrateSalesCardMetadata, upsertSalesCardMeta } from "./salesOverview.storage";
 import {
   financeStatusToSalesPaymentState,
   salesPaymentBadge,
@@ -758,5 +759,46 @@ assert.deepEqual(
   Object.keys(cardStatusCounts).sort(),
   ["!Overdue", "Paid", "Payment Due", "Pending", "Refunded", "Voided"],
 );
+
+// Linked finance payment_deadline wins over stale sales-card meta dueDate
+// (status stays server Payment due — do not invent Overdue from meta clock).
+hydrateSalesCardMetadata([]);
+upsertSalesCardMeta({
+  bookingId: "status-sync-1",
+  cardKind: "after_treatment",
+  cardId: "status-sync-1-after-treatment",
+  dueDate: "2020-01-01",
+  paymentMethod: "offlineNonDirect",
+});
+{
+  const cards = buildCardsForEvent({
+    event: {
+      ...statusSyncEvent,
+      details: {
+        ...statusSyncEvent.details,
+        paymentMethod: "offlineNonDirect",
+      },
+    } as unknown as CalendarEvent,
+    clientName: "Bea",
+    ctx: {
+      financeHints: [
+        {
+          transactionId: "tx-deadline-ssot",
+          bookingId: "status-sync-1",
+          bookingCode: "BK-STATUS",
+          phase: "full",
+          status: "Payment due",
+          dueDate: "2026-12-31",
+          lineItems: [{ id: "s1", label: "Cut", amount: 40 }],
+        },
+      ],
+    },
+  });
+  const after = cards.find((c) => c.kind === "after_treatment");
+  assert.equal(after?.paymentState, "payment_due");
+  assert.equal(after?.statusBadge, "Payment Due");
+  assert.equal(after?.dueDate, "2026-12-31");
+}
+hydrateSalesCardMetadata([]);
 
 console.log("buildSalesOverviewCards.helpers.test.ts: all assertions passed");

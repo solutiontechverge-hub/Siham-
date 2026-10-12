@@ -7,16 +7,30 @@ import { useTheme } from "@mui/material/styles";
 import AppDatePicker from "../AppDatePicker";
 import MollureFormField from "../MollureFormField";
 import AppModal from "../AppModal";
-import { tomorrowIso } from "./calendar.utils";
+import { addDaysIso, tomorrowIso, toIsoLocalDate } from "./calendar.utils";
 import { BOOKING_CATALOG_DISCOUNT_TYPE_OPTIONS } from "../../../data/bookingUniqueItem.data";
 import {
   mollureBodyMutedSx,
   mollureBodySx,
 } from "../../../theme/mollureHierarchy";
+import { durationToDays } from "./buildSalesOverviewCards.format";
+import type { FinanceInvoicePaymentTerms } from "../finance-documents/useFinanceInvoiceSettings";
 
 type SalesOverdueReissueModalProps = {
   open: boolean;
   unpaidAmount: number;
+  paymentTerms?: Pick<
+    FinanceInvoicePaymentTerms,
+    | "firstReissueDueValue"
+    | "firstReissueDueUnit"
+    | "firstReissuePenaltyValue"
+    | "firstReissuePenaltyUnit"
+    | "secondReissueDueValue"
+    | "secondReissueDueUnit"
+    | "secondReissuePenaltyValue"
+    | "secondReissuePenaltyUnit"
+  >;
+  alreadyReissued?: boolean;
   onClose: () => void;
   onConfirm: (payload: {
     penaltyType: "fixed" | "percentage";
@@ -26,25 +40,56 @@ type SalesOverdueReissueModalProps = {
   }) => void;
 };
 
+function defaultsFromTerms(
+  terms: SalesOverdueReissueModalProps["paymentTerms"],
+  alreadyReissued: boolean,
+) {
+  const unitRaw = String(
+    (alreadyReissued
+      ? terms?.secondReissuePenaltyUnit
+      : terms?.firstReissuePenaltyUnit) ?? "%",
+  );
+  const penaltyType: "fixed" | "percentage" =
+    unitRaw.includes("%") || unitRaw.toLowerCase().includes("percent")
+      ? "percentage"
+      : "fixed";
+  const penaltyValue = String(
+    (alreadyReissued
+      ? terms?.secondReissuePenaltyValue
+      : terms?.firstReissuePenaltyValue) ?? "0",
+  );
+  const dueDays = durationToDays(
+    alreadyReissued ? terms?.secondReissueDueValue : terms?.firstReissueDueValue,
+    alreadyReissued ? terms?.secondReissueDueUnit : terms?.firstReissueDueUnit,
+  );
+  // Clock reset default: dispatch day (today) + configured reissue duration.
+  const dueDate = addDaysIso(toIsoLocalDate(new Date()), Math.max(1, dueDays));
+  return { penaltyType, penaltyValue, dueDate };
+}
+
 export default function SalesOverdueReissueModal({
   open,
   unpaidAmount,
+  paymentTerms,
+  alreadyReissued = false,
   onClose,
   onConfirm,
 }: SalesOverdueReissueModalProps) {
   const m = useTheme().palette.mollure;
+  const seeded = defaultsFromTerms(paymentTerms, alreadyReissued);
   const [penaltyType, setPenaltyType] = React.useState<"fixed" | "percentage">(
-    "fixed",
+    seeded.penaltyType,
   );
-  const [penaltyValue, setPenaltyValue] = React.useState("0");
-  const [dueDate, setDueDate] = React.useState(tomorrowIso());
+  const [penaltyValue, setPenaltyValue] = React.useState(seeded.penaltyValue);
+  const [dueDate, setDueDate] = React.useState(seeded.dueDate);
 
   React.useEffect(() => {
     if (!open) return;
-    setPenaltyType("fixed");
-    setPenaltyValue("0");
-    setDueDate(tomorrowIso());
-  }, [open]);
+    const next = defaultsFromTerms(paymentTerms, alreadyReissued);
+    setPenaltyType(next.penaltyType);
+    setPenaltyValue(next.penaltyValue);
+    setDueDate(next.dueDate);
+  }, [open, paymentTerms, alreadyReissued]);
 
   const parsed = Math.max(
     0,

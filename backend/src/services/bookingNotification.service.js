@@ -818,6 +818,7 @@ export async function processRespondRequestReminderNotifications() {
        b.id,
        b.created_at,
        b.notes,
+       b.response_deadline_at,
        bs.response_time_hours,
        bs.response_time_minutes
      FROM bookings b
@@ -835,12 +836,11 @@ export async function processRespondRequestReminderNotifications() {
   const now = Date.now();
   const outcomes = [];
   for (const row of result.rows) {
-    const effectiveMinutes = resolveResponseWindowMinutes(
-      row.response_time_hours,
-      row.response_time_minutes,
-    );
+    let dueMs = row.response_deadline_at
+      ? new Date(row.response_deadline_at).getTime()
+      : null;
 
-    let dueMs = null;
+    let metaWindow = null;
     const notes = String(row.notes ?? "");
     const marker = notes.indexOf("---mollure-meta---");
     if (marker !== -1) {
@@ -848,19 +848,32 @@ export async function processRespondRequestReminderNotifications() {
         const meta = JSON.parse(
           notes.slice(marker + "---mollure-meta---".length).trim() || "{}",
         );
-        dueMs = resolveEffectiveRespondByMs(meta, effectiveMinutes);
+        metaWindow = meta?.responseWindowMinutes;
+        if (dueMs == null) {
+          const effectiveMinutes = resolveResponseWindowMinutes(
+            row.response_time_hours,
+            row.response_time_minutes,
+            metaWindow,
+          );
+          dueMs = resolveEffectiveRespondByMs(meta, effectiveMinutes);
+        }
       } catch {
-        // fall through to created_at + live window
+        // fall through
       }
     }
 
     if (dueMs == null) {
+      const effectiveMinutes = resolveResponseWindowMinutes(
+        row.response_time_hours,
+        row.response_time_minutes,
+        metaWindow,
+      );
       const created = Date.parse(row.created_at);
       if (!Number.isFinite(created)) continue;
       dueMs = created + effectiveMinutes * 60_000;
     }
 
-    // Fire reminder near the end of the live window (same timing as overdue stamp).
+    // Fire reminder once the frozen response deadline has passed.
     if (now < dueMs) continue;
 
     const outcome = await dispatchRespondRequestReminderNotification(row.id);

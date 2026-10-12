@@ -42,8 +42,24 @@ const numericCatalogItem = (item) => {
   return next;
 };
 
+/** Keep first occurrence of each catalog id; drop entries without an id. */
+export const uniqueById = (items) => {
+  if (!Array.isArray(items)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const item of items) {
+    const id = item?.id == null ? "" : String(item.id).trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(item);
+  }
+  return out;
+};
+
 const numericCatalog = (items, fallback) =>
-  Array.isArray(items) ? items.map(numericCatalogItem) : fallback;
+  Array.isArray(items)
+    ? uniqueById(items).map(numericCatalogItem)
+    : fallback;
 
 export const mergeInvoiceSettings = (raw) => {
   if (!raw || typeof raw !== "object") return { ...DEFAULT_INVOICE_SETTINGS };
@@ -120,6 +136,18 @@ export const isAutomaticTrigger = (trigger) => {
     .trim()
     .toLowerCase();
   return t === "automatic" || t === "auto";
+};
+
+/**
+ * Next overdue action from reissueLevel + paymentTerms triggers.
+ * level>=2 → close (final reissue already sent); else Automatic|Manual for next stage.
+ */
+export const resolveOverdueReissueAction = (reissueLevel, paymentTerms) => {
+  const level = Number(reissueLevel) || 0;
+  if (level >= 2) return "close";
+  const prefix = level >= 1 ? "second" : "first";
+  const trigger = paymentTerms?.[`${prefix}ReissueTrigger`];
+  return isAutomaticTrigger(trigger) ? "automatic" : "manual";
 };
 
 /**

@@ -161,6 +161,11 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
 
       {showExpiredResponseBanner ? (
         <BookingResponseExpiryBanner
+          message={
+            viewingBookingEvent.status === "BR Accepted"
+              ? "The Client Hasn't Prepaid In Time And Is Still Able To Pay. You Can Restart The Response Time Or You Can Discard The Request."
+              : undefined
+          }
           onRestart={() => void handleRestartResponseTime()}
           onDiscard={() => void handleDiscardBr()}
         />

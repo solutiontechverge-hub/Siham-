@@ -22,6 +22,7 @@ import {
   mintReceiptNumber,
   processOverdueInvoiceReissues,
   ensureSalesCardMetadataForFinanceRow,
+  restartPrepaymentDueForBooking,
   syncBookingToFinanceTransaction,
 } from "../services/finance-sync.service.js";
 import {
@@ -32,7 +33,14 @@ import {
   DEFAULT_INVOICE_SETTINGS,
   mergeInvoiceSettings,
 } from "../helpers/financeInvoiceSettings.js";
+import {
+  canBulkMarkPaid,
+  canBulkMarkUnpaid,
+  isOfflineFinanceRow,
+  resolveBulkVoidOutcome,
+} from "../helpers/financeBulkStatus.js";
 import { sendCaughtError } from "../utils/httpError.js";
+import { computeFinanceFees } from "../utils/financeFees.js";
 import { normalizeMoneyJson, parseMoney, roundMoney } from "../utils/money.js";
 import {
   aggregateFinanceAnalytics,
@@ -960,9 +968,10 @@ export const createFinanceTransaction = async (req, res) => {
     const isNonDirect = isOnlineNonDirect || isOfflineNonDirect;
     const isOnline = isOnlineDirect || isOnlineNonDirect;
     const gross = moneyNumber(body.totalPrice);
-    const stripeFee = isOnlineDirect ? Math.round(gross * 0.029 * 100) / 100 : null;
-    const mollureFee = isOnlineDirect ? Math.round(gross * 0.01 * 100) / 100 : null;
-    const net = gross - (stripeFee ?? 0) - (mollureFee ?? 0);
+    // Live Stripe fees arrive via /api/stripe/webhook; create path uses estimates.
+    const { stripeFee, mollureFee, net } = computeFinanceFees(gross, {
+      isOnline: isOnlineDirect,
+    });
     const today = new Date().toISOString().slice(0, 10);
     const dueDate =
       (typeof body.dueDate === "string" && body.dueDate.trim()) || today;
@@ -1327,9 +1336,20 @@ export const bulkFinanceTransactionAction = async (req, res) => {
     const profile = await requireProfessional(req, res);
     if (!profile) return;
 
-    const { ids, action } = req.body ?? {};
+    const { ids, action, transactionDate } = req.body ?? {};
     if (!Array.isArray(ids) || !ids.length) {
       return res.status(400).json({ success: false, message: "Transaction ids are required.", data: null });
+    }
+    const paidTransactionDate =
+      transactionDate !== undefined && transactionDate !== null && String(transactionDate).trim() !== ""
+        ? String(transactionDate)
+        : null;
+    if (paidTransactionDate && !/^\d{4}-\d{2}-\d{2}$/.test(paidTransactionDate)) {
+      return res.status(400).json({
+        success: false,
+        message: "transactionDate must be YYYY-MM-DD.",
+        data: null,
+      });
     }
 
     const parsedIds = ids.map((id) => parseUuid(id)).filter(Boolean);
@@ -1406,8 +1426,73 @@ export const bulkFinanceTransactionAction = async (req, res) => {
       });
     }
 
+    // Void Paid: UPDATE in place (no INSERT). Owed → Unpaid. Settled refund → block.
+    if (action === "void") {
+      const voidRows = await query(
+        `SELECT id, entry_type, status, document, refund_amount
+           FROM finance_transactions
+          WHERE professional_profile_id = $1 AND id = ANY($2::uuid[])`,
+        [profile.id, parsedIds],
+      );
+      const voidIds = [];
+      const unpaidIds = [];
+      for (const row of voidRows.rows) {
+        const outcome = resolveBulkVoidOutcome(row);
+        if (outcome === "block") {
+          return res.status(400).json({
+            success: false,
+            message:
+              "Void is not allowed for settled refunds or unsupported statuses. Use Unpaid when money is still owed.",
+            data: null,
+          });
+        }
+        if (outcome === "void") voidIds.push(row.id);
+        else unpaidIds.push(row.id);
+      }
+
+      let affected = 0;
+      if (voidIds.length) {
+        const voided = await query(
+          `UPDATE finance_transactions
+           SET status = 'Voided',
+               document = jsonb_set(COALESCE(document, '{}'::jsonb), '{status}', '"Voided"'::jsonb, true),
+               issued_document = jsonb_set(
+                 COALESCE(issued_document, document, '{}'::jsonb),
+                 '{status}',
+                 '"Voided"'::jsonb,
+                 true
+               ),
+               updated_at = NOW()
+           WHERE professional_profile_id = $1 AND id = ANY($2::uuid[])
+           RETURNING id`,
+          [profile.id, voidIds],
+        );
+        affected += voided.rows.length;
+      }
+      if (unpaidIds.length) {
+        const unpaid = await query(
+          `UPDATE finance_transactions
+           SET status = 'Unpaid', updated_at = NOW()
+           WHERE professional_profile_id = $1 AND id = ANY($2::uuid[])
+           RETURNING id`,
+          [profile.id, unpaidIds],
+        );
+        affected += unpaid.rows.length;
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: `Updated ${affected} transaction(s).`,
+        data: {
+          affected,
+          voided: voidIds.length,
+          unpaid: unpaidIds.length,
+          status: voidIds.length && !unpaidIds.length ? "Voided" : unpaidIds.length && !voidIds.length ? "Unpaid" : "mixed",
+        },
+      });
+    }
+
     const statusMap = {
-      void: "Voided",
       cancel: "Voided",
       unpaid: "Unpaid",
       markUnpaid: "Unpaid",
@@ -1420,22 +1505,32 @@ export const bulkFinanceTransactionAction = async (req, res) => {
     }
 
     const currentRows = await query(
-      `SELECT id, entry_type, status, document
+      `SELECT id, entry_type, status, document, method_title
          FROM finance_transactions
         WHERE professional_profile_id = $1 AND id = ANY($2::uuid[])`,
       [profile.id, parsedIds],
     );
+    const markingPaid = action === "paid" || action === "markPaid";
+    if (
+      markingPaid &&
+      !paidTransactionDate &&
+      currentRows.rows.some((row) => isOfflineFinanceRow(row))
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "transactionDate is required when marking offline invoices as Paid.",
+        data: null,
+      });
+    }
     const allowed = currentRows.rows.every((row) => {
-      if (action === "cancel") return row.status === "Pending";
+      if (action === "cancel") {
+        return ["Pending", "Prepayment due", "Overdue response"].includes(row.status);
+      }
       if (action === "unpaid" || action === "markUnpaid") {
-        return ["Payment due", "Overdue"].includes(row.status) && row.entry_type === "manualEntry" &&
-          Number(row.document?.reissueLevel ?? 0) >= 2;
+        return canBulkMarkUnpaid(row);
       }
-      if (action === "paid" || action === "markPaid") {
-        return ["Unpaid", "Pending", "Payment due", "Overdue"].includes(row.status) && row.entry_type === "manualEntry";
-      }
-      if (action === "void") {
-        return ["Paid", "Prepaid", "Payment due", "Overdue", "Unpaid"].includes(row.status);
+      if (markingPaid) {
+        return canBulkMarkPaid(row);
       }
       return false;
     });
@@ -1450,6 +1545,10 @@ export const bulkFinanceTransactionAction = async (req, res) => {
     const result = await query(
       `UPDATE finance_transactions
        SET status = $3,
+           transaction_date = CASE
+             WHEN $3 = 'Paid' AND $4::date IS NOT NULL THEN $4::date
+             ELSE transaction_date
+           END,
            document = CASE
              WHEN $3 = 'Voided' THEN
                jsonb_set(COALESCE(document, '{}'::jsonb), '{status}', '"Voided"'::jsonb, true)
@@ -1482,9 +1581,15 @@ export const bulkFinanceTransactionAction = async (req, res) => {
            END,
            updated_at = NOW()
        WHERE professional_profile_id = $1 AND id = ANY($2::uuid[])
-         AND ( $3 <> 'Unpaid' OR entry_type = 'manualEntry' )
+         AND (
+           $3 <> 'Unpaid'
+           OR entry_type = 'manualEntry'
+           OR entry_type = 'offlineBooking'
+           OR LOWER(COALESCE(method_title, '')) LIKE 'offline%'
+           OR status = 'Pending'
+         )
        RETURNING id`,
-      [profile.id, parsedIds, nextStatus],
+      [profile.id, parsedIds, nextStatus, paidTransactionDate],
     );
 
     return res.status(200).json({
@@ -1541,6 +1646,67 @@ export const createFinanceTransactionFromBooking = async (req, res) => {
   }
 };
 
+/** Archive open Prepayment due / Overdue response and insert a fresh Prepayment due row. */
+export const restartPrepaymentDue = async (req, res) => {
+  try {
+    const profile = await requireProfessional(req, res);
+    if (!profile) return;
+
+    const bookingId = await resolveBookingIdFromRequest(req.body ?? {});
+    if (!bookingId) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid bookingId or bookingRef is required.",
+        data: null,
+      });
+    }
+
+    const owned = await query(
+      `SELECT b.id
+       FROM bookings b
+       INNER JOIN business_setups bs ON bs.id = b.business_setup_id
+       WHERE b.id = $1
+         AND bs.professional_profile_id = $2
+       LIMIT 1`,
+      [bookingId, profile.id],
+    );
+    if (!owned.rows[0]) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found for this professional.",
+        data: null,
+      });
+    }
+
+    const txId = await restartPrepaymentDueForBooking(bookingId);
+    if (!txId) {
+      return res.status(404).json({
+        success: false,
+        message: "Unable to restart prepayment due.",
+        data: null,
+      });
+    }
+
+    const result = await query(`SELECT * FROM finance_transactions WHERE id = $1`, [txId]);
+    const booking = await query(
+      `SELECT id, notes, response_deadline_at, status, prepayment_status, unique_code
+       FROM bookings WHERE id = $1`,
+      [bookingId],
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Prepayment due restarted.",
+      data: {
+        transaction: mapTransactionRow(result.rows[0]),
+        booking: booking.rows[0] ?? null,
+      },
+    });
+  } catch (error) {
+    return sendCaughtError(res, error, { fallbackMessage: "Request failed." });
+  }
+};
+
 export const replaceFinanceTransaction = async (req, res) => {
   try {
     const profile = await requireProfessional(req, res);
@@ -1573,9 +1739,9 @@ export const replaceFinanceTransaction = async (req, res) => {
     });
     const isOnline = body.paymentMethod === "onlineDirect";
     const gross = moneyNumber(body.totalPrice);
-    const stripeFee = isOnline ? Math.round(gross * 0.029 * 100) / 100 : null;
-    const mollureFee = isOnline ? Math.round(gross * 0.01 * 100) / 100 : null;
-    const net = gross - (stripeFee ?? 0) - (mollureFee ?? 0);
+    const { stripeFee, mollureFee, net } = computeFinanceFees(gross, {
+      isOnline,
+    });
     const today = new Date().toISOString().slice(0, 10);
     const entryNum = String(100 + Math.floor(Math.random() * 900));
     const issuedFinanceSettings = await ensureFinanceSettings(profile.id);
@@ -1599,6 +1765,20 @@ export const replaceFinanceTransaction = async (req, res) => {
       clientType = "mollure";
     }
     const submittedLines = Array.isArray(body.lines) ? body.lines : [];
+    const validSourceTypes = new Set(["productId", "uniqueItemCode"]);
+    if (submittedLines.some((line) => {
+      const reference = typeof line?.sourceReference === "string"
+        ? line.sourceReference.trim()
+        : String(line?.sourceReference ?? line?.id ?? "").trim();
+      const sourceType = line?.sourceType ?? "uniqueItemCode";
+      return !reference || !validSourceTypes.has(sourceType);
+    })) {
+      return res.status(400).json({
+        success: false,
+        message: "Manual transactions may contain products or unique items only.",
+        data: null,
+      });
+    }
     const lineItems = submittedLines.map((line) => ({
       description: line.name,
       sourceReference: String(line.sourceReference ?? line.id ?? ""),
@@ -1807,11 +1987,17 @@ export const reissueFinanceInvoiceForBooking = async (req, res) => {
       ? prevNumber
       : `${prevNumber}-R${Date.now().toString().slice(-4)}`;
 
-    const baseAmount =
+    const penalty = Number.isFinite(penaltyAmount) ? penaltyAmount : 0;
+    // totalPrice from client is the final amount (already includes penalty when sent).
+    const nextAmount =
       totalOverride != null && Number.isFinite(totalOverride)
-        ? totalOverride
-        : Number(row.net_amount ?? row.gross_amount ?? booking.total_price ?? 0) || 0;
-    const nextAmount = Math.round((baseAmount + (Number.isFinite(penaltyAmount) ? penaltyAmount : 0)) * 100) / 100;
+        ? Math.round(totalOverride * 100) / 100
+        : Math.round(
+            ((Number(row.net_amount ?? row.gross_amount ?? booking.total_price ?? 0) || 0) +
+              penalty) *
+              100,
+          ) / 100;
+    const nextLevel = (Number(doc.reissueLevel) || 0) + 1;
 
     const nextDoc = {
       ...doc,
@@ -1820,7 +2006,8 @@ export const reissueFinanceInvoiceForBooking = async (req, res) => {
       dueDate,
       totalPrice: moneyNumber(nextAmount),
       reissuedAt: new Date().toISOString(),
-      ...(penaltyAmount > 0 ? { penaltyAmount } : {}),
+      reissueLevel: nextLevel,
+      ...(penalty > 0 ? { penaltyAmount: penalty } : {}),
     };
 
     const clientEmail =

@@ -15,6 +15,7 @@ import messagingRoutes from "./routes/messaging.routes.js";
 import notificationsRoutes from "./routes/notifications.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import reviewRoutes from "./routes/review.routes.js";
+import { handleStripeWebhook } from "./controllers/stripeWebhook.controller.js";
 import { logError, clientErrorMessage, clientErrorStatus } from "./utils/httpError.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -24,6 +25,12 @@ const app = express();
 const uploadsDir = getUploadsDir();
 
 app.use(cors());
+// Stripe webhooks need the raw body for signature verification — before json parser.
+app.post(
+  "/api/stripe/webhook",
+  express.raw({ type: "application/json" }),
+  handleStripeWebhook,
+);
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 app.use(

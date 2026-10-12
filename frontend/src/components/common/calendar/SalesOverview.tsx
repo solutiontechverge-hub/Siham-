@@ -7,6 +7,7 @@ import { Box, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { FinanceDocumentPreviewDrawer } from "../finance-documents";
 import PaymentDueIcon from "../client-booking/PaymentDueIcon";
+import TransactionDateModal from "../../sections/finance/TransactionDateModal";
 import TransactionNoteModal from "../../sections/finance/TransactionNoteModal";
 import SalesAddOnCheckout from "./SalesAddOnCheckout";
 import SalesCancelModal from "./SalesCancelModal";
@@ -72,6 +73,9 @@ export default function SalesOverview({
     refundTransactions,
     setRefundCard,
     subToCard,
+    transactionDateModal,
+    setTransactionDateModal,
+    confirmTransactionDateModal,
   } = useSalesOverview({
     bookings,
     currentEvent,
@@ -280,8 +284,30 @@ export default function SalesOverview({
       <SalesOverdueReissueModal
         open={Boolean(overdueCard)}
         unpaidAmount={overdueCard?.highlightAmount ?? 0}
+        paymentTerms={financeSettings.paymentTerms}
+        alreadyReissued={overdueCard?.kind === "reissued_invoice"}
         onClose={() => setOverdueCard(null)}
         onConfirm={handleReissue}
+      />
+
+      <TransactionDateModal
+        open={Boolean(transactionDateModal)}
+        title={
+          transactionDateModal?.mode === "markPaid"
+            ? "Mark as Paid"
+            : "Edit transaction date"
+        }
+        subtitle={
+          transactionDateModal?.mode === "markPaid"
+            ? "Enter the date this offline payment was received."
+            : "Update the transaction date for this offline payment."
+        }
+        initialDate={transactionDateModal?.initialDate ?? null}
+        confirmLabel={
+          transactionDateModal?.mode === "markPaid" ? "Mark Paid" : "Save"
+        }
+        onClose={() => setTransactionDateModal(null)}
+        onConfirm={(date) => void confirmTransactionDateModal(date)}
       />
     </Box>
   );

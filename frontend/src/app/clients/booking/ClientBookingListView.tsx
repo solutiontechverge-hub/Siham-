@@ -532,10 +532,8 @@ export default function ClientBookingListView({ listTab }: Props) {
                             {pendingEr ? (
                               <Box
                                 sx={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: 0.35,
                                   ...bookingSecondaryStatusBadgeSx,
+                                  gap: 0.35,
                                 }}
                                 title="Suggestion for change"
                                 aria-label="Suggestion for change"

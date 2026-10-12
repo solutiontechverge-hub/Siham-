@@ -74,13 +74,13 @@ export function FinancePreviewLabelValueRow({
         sx={
           isTotal
             ? mollureSectionTitleSx(m.navy, {
+                ...financePriceTextSx,
                 textAlign: isMeta ? "right" : undefined,
                 lineHeight: 1,
-                ...financePriceTextSx,
               })
             : mollureLabelSx(m.navy, {
-                textAlign: isMeta ? "right" : undefined,
                 ...financePriceTextSx,
+                textAlign: isMeta ? "right" : undefined,
               })
         }
       >

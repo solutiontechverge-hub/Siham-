@@ -422,7 +422,9 @@ function applyFinanceAndMetaState(
     ("paymentMethod" in next ? next.paymentMethod : undefined) ||
     finance?.paymentMethod;
   const paidAt = meta?.paidAt || finance?.paidAt || extras.occurredAt;
-  const dueDate = meta?.dueDate || finance?.dueDate || next.dueDate;
+  // Linked finance payment_deadline (via hint.dueDate) beats local sales-card meta —
+  // reissue/overdue jobs update the column; stale meta must not win the due line.
+  const dueDate = finance?.dueDate || meta?.dueDate || next.dueDate;
 
   const linkedTxId = finance?.transactionId || meta?.financeTransactionId;
   if (linkedTxId) {
@@ -452,8 +454,10 @@ function applyFinanceAndMetaState(
       financeState === "paid" || financeState === "prepaid"
         ? paidAt ?? null
         : null;
+    const reissueLevel =
+      Number(finance.reissueLevel ?? (meta?.reissuedAt ? 1 : 0)) || 0;
     if (
-      meta?.reissuedAt &&
+      reissueLevel >= 1 &&
       (financeState === "payment_due" || financeState === "overdue_invoice")
     ) {
       if ("title" in next && typeof next.title === "string") {
@@ -465,7 +469,7 @@ function applyFinanceAndMetaState(
     next.penaltyPrompt = resolvePenaltyPrompt(
       financeState,
       ctx.paymentTerms,
-      Boolean(meta?.reissuedAt),
+      reissueLevel,
     );
     return true;
   }
@@ -532,14 +536,18 @@ function applyFinanceAndMetaState(
   });
   next.markedUnpaid = Boolean(meta?.markedUnpaid) && open.state === "unpaid";
   next.paidAt = open.paidAt ?? null;
-  if (meta?.reissuedAt && (open.state === "payment_due" || open.state === "overdue_invoice")) {
+  const openReissueLevel = meta?.reissuedAt ? 1 : 0;
+  if (
+    openReissueLevel >= 1 &&
+    (open.state === "payment_due" || open.state === "overdue_invoice")
+  ) {
     if ("title" in next && typeof next.title === "string") {
       next.title = "Reissued Invoice Summary";
     }
     if ("kind" in next) next.kind = "reissued_invoice";
     next.limitedMenu = true;
   }
-  next.penaltyPrompt = resolvePenaltyPrompt(open.state, ctx.paymentTerms, Boolean(meta?.reissuedAt));
+  next.penaltyPrompt = resolvePenaltyPrompt(open.state, ctx.paymentTerms, openReissueLevel);
   return false;
 }
 
@@ -593,7 +601,11 @@ function applySubMeta(
     }, "after_treatment");
   }
 
-  next.penaltyPrompt = resolvePenaltyPrompt(next.paymentState, ctx.paymentTerms, Boolean(meta?.reissuedAt));
+  next.penaltyPrompt = resolvePenaltyPrompt(
+    next.paymentState,
+    ctx.paymentTerms,
+    meta?.reissuedAt ? 1 : 0,
+  );
   return next;
 }
 
@@ -653,7 +665,11 @@ function applyMeta(
     }
   }
 
-  next.penaltyPrompt = resolvePenaltyPrompt(next.paymentState, ctx.paymentTerms, Boolean(meta?.reissuedAt));
+  next.penaltyPrompt = resolvePenaltyPrompt(
+    next.paymentState,
+    ctx.paymentTerms,
+    meta?.reissuedAt ? 1 : 0,
+  );
 
   if (next.subCards?.length) {
     next = {

@@ -10,6 +10,7 @@ import {
 import CancelPendingPaymentModal from "../../../../../components/sections/finance/CancelPendingPaymentModal";
 import ManualEntryDrawer from "../../../../../components/sections/finance/ManualEntryDrawer";
 import RefundSalesDrawer from "../../../../../components/sections/finance/RefundSalesDrawer";
+import TransactionDateModal from "../../../../../components/sections/finance/TransactionDateModal";
 import TransactionNoteModal from "../../../../../components/sections/finance/TransactionNoteModal";
 import FinanceFiltersDrawerView from "../../../../../components/sections/finance/FinanceFiltersDrawerView";
 import FinanceDocumentPreviewDrawer from "../../../../../components/sections/finance/FinanceDocumentPreviewDrawer";
@@ -20,6 +21,7 @@ import {
 import MollureCardHeader from "../../../../../components/common/MollureCardHeader";
 import TransactionsTable from "../../../../../components/sections/finance/TransactionsTable";
 import TransactionsToolbar from "../../../../../components/sections/finance/TransactionsToolbar";
+import { buildOverdueReviewHref } from "../data/transactions";
 import {
   ADD_MENU_ITEMS,
   ACTION_EXPORT_ITEMS,
@@ -66,6 +68,10 @@ export default function FinanceOverviewPageView() {
     setEditSalesWarningOpen,
     noteModalTransactionId,
     setNoteModalTransactionId,
+    transactionDateModal,
+    setTransactionDateModal,
+    confirmTransactionDateModal,
+    openEditTransactionDate,
     visibleRows,
     toggleOne,
     toggleAll,
@@ -226,6 +232,7 @@ export default function FinanceOverviewPageView() {
           setActiveDocument({ row, documentType })
         }
         onOpenNote={(row) => openNoteModal(row.id)}
+        onEditTransactionDate={openEditTransactionDate}
         onEntryClick={(row) => {
           if (!row.bookingId) return;
           // Prefer unique_code (entryId) for bookingCode match; bookingId covers UUID / b-<uuid>.
@@ -239,6 +246,10 @@ export default function FinanceOverviewPageView() {
           if (row.clientEmail?.trim()) params.set("clientEmail", row.clientEmail.trim());
           if (row.clientName?.trim()) params.set("clientName", row.clientName.trim());
           router.push(`/professionals/client?${params.toString()}`);
+        }}
+        onReviewOverdue={(row) => {
+          const href = buildOverdueReviewHref(row);
+          if (href) router.push(href);
         }}
         page={page}
         pageCount={pageCount}
@@ -291,6 +302,26 @@ export default function FinanceOverviewPageView() {
         onDelete={
           noteModalTransaction?.note?.trim() ? deleteTransactionNote : undefined
         }
+      />
+
+      <TransactionDateModal
+        open={Boolean(transactionDateModal)}
+        title={
+          transactionDateModal?.mode === "markPaid"
+            ? "Mark as Paid"
+            : "Edit transaction date"
+        }
+        subtitle={
+          transactionDateModal?.mode === "markPaid"
+            ? "Enter the date this offline payment was received."
+            : "Update the transaction date for this offline payment."
+        }
+        initialDate={transactionDateModal?.initialDate ?? null}
+        confirmLabel={
+          transactionDateModal?.mode === "markPaid" ? "Mark Paid" : "Save"
+        }
+        onClose={() => setTransactionDateModal(null)}
+        onConfirm={(date) => void confirmTransactionDateModal(date)}
       />
 
       <CancelPendingPaymentModal

@@ -740,7 +740,7 @@ export default function ManualEntryDrawer({
         onClose={() => setItemDrawerOpen(false)}
         title="Select items"
         options={resolvedItemOptions}
-        emptyLabel="No services configured yet."
+        emptyLabel="No unique items configured yet."
         withQuantity
         allowAddProduct
         addProductLabel="Add Item"

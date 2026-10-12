@@ -27,6 +27,7 @@ export type ProfessionalFixedLocationCalendarBookingDrawerSalesActivityBag = Pic
   | "clientBookingsForActivity"
   | "data"
   | "drawerSalesActivityContext"
+  | "focusSalesCardId"
   | "m"
   | "setActivityDetailItem"
   | "setEvents"
@@ -47,6 +48,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerSalesActiv
     clientBookingsForActivity,
     data,
     drawerSalesActivityContext,
+    focusSalesCardId,
     m,
     setActivityDetailItem,
     setEvents,
@@ -79,6 +81,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerSalesActiv
               data.resources[0]?.id ||
               "unassigned"
             }
+            focusCardId={focusSalesCardId}
             onBookingCompleted={(bookingId) => {
               // Invoice issued → In Progress + payment pending (Completed after pay).
               setEvents((prev) =>

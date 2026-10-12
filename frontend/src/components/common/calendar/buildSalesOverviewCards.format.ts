@@ -114,10 +114,19 @@ export function isAutomaticTrigger(trigger?: string | null): boolean {
 export function resolvePenaltyPrompt(
   state: SalesPaymentState | undefined,
   terms: SalesPaymentTermsInput | undefined,
-  alreadyReissued: boolean,
+  reissueLevel: number | boolean = 0,
 ): SalesPenaltyPrompt {
   if (state !== "overdue_invoice") return "none";
-  const trigger = alreadyReissued ? terms?.secondReissueTrigger : terms?.firstReissueTrigger;
+  // boolean kept for older callers (alreadyReissued → level 0|1)
+  const level =
+    typeof reissueLevel === "boolean"
+      ? reissueLevel
+        ? 1
+        : 0
+      : Number(reissueLevel) || 0;
+  // Final reissue already sent → no Manual/Automatic banner (backend may auto-close).
+  if (level >= 2) return "none";
+  const trigger = level >= 1 ? terms?.secondReissueTrigger : terms?.firstReissueTrigger;
   return isAutomaticTrigger(trigger) ? "automatic" : "manual";
 }
 

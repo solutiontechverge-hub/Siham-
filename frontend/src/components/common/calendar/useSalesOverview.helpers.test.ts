@@ -63,5 +63,16 @@ const hints = toFinanceHints([row]);
 assert.equal(hints[0]?.transactionId, row.id);
 assert.equal(hints[0]?.lineItems?.length, 2);
 assert.equal(hints[0]?.phase, "full");
+assert.equal(hints[0]?.dueDate, "2026-10-14");
+
+// payment_deadline column wins over document.dueDate (backend COALESCE).
+const withColumn = toFinanceHints([
+  {
+    ...row,
+    paymentDeadline: "2026-10-20",
+    document: { ...row.document!, dueDate: "2026-10-14" },
+  },
+]);
+assert.equal(withColumn[0]?.dueDate, "2026-10-20");
 
 console.log("useSalesOverview.helpers.test.ts: ok");

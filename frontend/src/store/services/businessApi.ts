@@ -439,6 +439,8 @@ export type CalendarBooking = {
   date?: string | null;
   start?: string | null;
   end?: string | null;
+  /** Frozen response-window due instant (timestamptz), when stamped. */
+  response_deadline_at?: string | null;
   /** Confirmed Edit Request (ER) — backend source of truth. */
   edit_request?: BookingEditRequestPayload | null;
 };

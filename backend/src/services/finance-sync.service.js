@@ -5,6 +5,7 @@ import {
   durationToDays,
   isAutomaticTrigger,
   mergeInvoiceSettings,
+  resolveOverdueReissueAction,
   toIsoDateOnly,
 } from "../helpers/financeInvoiceSettings.js";
 import {
@@ -12,7 +13,12 @@ import {
   sendFinanceClientEmail,
 } from "./financeEmail.service.js";
 import { dispatchInvoiceReissuedNotification } from "./bookingNotification.service.js";
+import { computeFinanceFees } from "../utils/financeFees.js";
 import { roundMoney } from "../utils/money.js";
+import {
+  resolveResponseWindowMinutes,
+  responseDeadlineAtFromNotes,
+} from "../utils/bookingResponseWindow.js";
 
 const toIsoDate = (value) => toIsoDateOnly(value);
 
@@ -40,6 +46,23 @@ export function mintReceiptNumber(status, code) {
 
 export function shouldFlagPaymentAfterCancel(intendedStatus, hasPriorVoidedSibling) {
   return isSettledFinanceStatus(intendedStatus) && Boolean(hasPriorVoidedSibling);
+}
+
+/** Open-row reuse vs void/replace. Negotiation resend always replaces. */
+export function shouldReuseOpenFinanceRow({
+  forceReplace = false,
+  sameLabel,
+  prevGross,
+  nextGross,
+  prevStatus,
+  nextStatus,
+}) {
+  if (forceReplace) return false;
+  return (
+    Boolean(sameLabel) &&
+    prevGross === nextGross &&
+    String(prevStatus) === String(nextStatus)
+  );
 }
 
 export function buildPaymentAfterCancelDocumentPatch({ intendedStatus, amount }) {
@@ -107,14 +130,39 @@ function resolveOriginalDueDate(invoiceDate, paymentTerms) {
   return addDaysIso(invoiceDate, days);
 }
 
+const NOTES_META_PREFIX = "---mollure-meta---";
+
 function parseBookingNotes(notes) {
   if (!notes || typeof notes !== "string") return {};
+  const markerIndex = notes.indexOf(NOTES_META_PREFIX);
+  const raw =
+    markerIndex === -1
+      ? notes.trim()
+      : notes.slice(markerIndex + NOTES_META_PREFIX.length).trim();
+  if (!raw.startsWith("{")) return {};
   try {
-    const parsed = JSON.parse(notes);
+    const parsed = JSON.parse(raw);
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
     return {};
   }
+}
+
+function joinBookingNotes(human, meta) {
+  const prefix = human?.trim() ? `${human.trim()}\n` : "";
+  return `${prefix}${NOTES_META_PREFIX}\n${JSON.stringify(meta)}`;
+}
+
+function splitBookingNotes(raw) {
+  const text = String(raw ?? "");
+  const markerIndex = text.indexOf(NOTES_META_PREFIX);
+  if (markerIndex === -1) {
+    return { human: text.trim(), meta: parseBookingNotes(text) };
+  }
+  return {
+    human: text.slice(0, markerIndex).trim(),
+    meta: parseBookingNotes(text),
+  };
 }
 
 async function getBookingContext(bookingId) {
@@ -208,14 +256,32 @@ function buildFinanceClientParty(booking, { clientName, clientEmail, payerRole }
 }
 
 function resolveTransactionStatus(booking, paymentPhase = "full") {
-  if (booking.prepayment_status === "paid" && paymentPhase === "prepay") return "Prepaid";
+  const prepay = String(booking.prepayment_status ?? "").toLowerCase();
+  if (prepay === "paid" && paymentPhase === "prepay") return "Prepaid";
+  if (paymentPhase === "prepay" && (prepay === "pending" || prepay === "required")) {
+    return "Prepayment due";
+  }
   if (booking.status === "completed") return "Paid";
   if (booking.status === "confirmed") {
-    return booking.prepayment_status === "paid" ? "Prepaid" : "Pending";
+    return prepay === "paid" ? "Prepaid" : "Pending";
   }
   if (booking.status === "cancelled") return "Voided";
-  if (booking.prepayment_status === "failed") return "Failed";
+  if (prepay === "failed") return "Failed";
   return "Pending";
+}
+
+function resolvePrepaymentResponseDeadlineIso(booking) {
+  if (booking?.response_deadline_at) {
+    const ms = new Date(booking.response_deadline_at).getTime();
+    if (Number.isFinite(ms)) return new Date(ms).toISOString();
+  }
+  return responseDeadlineAtFromNotes(booking?.notes);
+}
+
+function prepaymentStatusDetail(status) {
+  if (status === "Overdue response") return "Past response time";
+  if (status === "Prepayment due") return "Within response time";
+  return "Pay within 15 min";
 }
 
 function resolveMethod(booking, paymentMethod = "onlineDirect") {
@@ -257,6 +323,19 @@ function snapshotServiceSubtotal(meta, booking) {
   }
   if (guestTotal > 0) return roundMoney(guestTotal);
   return roundMoney(Number(booking.total_price ?? 0));
+}
+
+/** Frontend splitBill stores composite line ids (`serviceId::guest::index`). */
+export function catalogRefFromLineId(lineId) {
+  const raw = String(lineId ?? "").trim();
+  if (!raw) return "";
+  return raw.split("::")[0] || raw;
+}
+
+function isCatalogLinkedLine(line) {
+  const type = String(line?.sourceType ?? "");
+  const ref = String(line?.sourceReference ?? "").trim();
+  return Boolean(ref) && ["serviceId", "productId", "uniqueItemCode"].includes(type);
 }
 
 /**
@@ -463,27 +542,62 @@ function isPlanningPerson(person) {
  */
 function resolveSplitPayers(booking, meta) {
   const total = roundMoney(booking.total_price);
-  const prepaymentPercent = Number(meta.prepaymentPercent ?? meta.prepayment_percentage ?? 0);
-  const showPrepayment = Boolean(meta.showPrepayment) || String(booking.prepayment_status ?? "").toLowerCase() === "paid";
+  const prepaymentPercent = Number(
+    meta.prepaymentPercent ??
+      meta.prepayment_percentage ??
+      booking.prepayment_percentage ??
+      0,
+  );
+  const prepayStatus = String(booking.prepayment_status ?? "").toLowerCase();
+  const showPrepayment =
+    Boolean(meta.showPrepayment) ||
+    prepayStatus === "paid" ||
+    prepayStatus === "pending" ||
+    prepayStatus === "required";
   const prepaidAmount =
     showPrepayment && prepaymentPercent > 0
       ? roundMoney((total * prepaymentPercent) / 100)
-      : showPrepayment && String(booking.prepayment_status ?? "").toLowerCase() === "paid"
+      : showPrepayment && prepayStatus === "paid"
         ? roundMoney(total * 0.25)
         : 0;
 
   if (meta.splitBill?.payers?.length) {
+    // Frontend persists lineIds (not lineItems). Resolve catalog rows from the
+    // booking snapshot / service_id so finance documents keep source references.
+    const catalogLines = buildFallbackLineItems(booking, meta);
+    const byRef = new Map(
+      catalogLines
+        .filter(isCatalogLinkedLine)
+        .map((line) => [String(line.sourceReference), line]),
+    );
     return {
       prepaidAmount: roundMoney(meta.splitBill.prepaidAmount ?? prepaidAmount),
-      payers: meta.splitBill.payers.map((p) => ({
-        key: String(p.key),
-        role: p.role || "guest",
-        label: p.label || (p.role === "model" ? "Model" : p.role === "main_client" ? booking.customer_name : "Guest"),
-        displayName: p.displayName || p.label || "Guest",
-        subtotal: roundMoney(p.subtotal),
-        paymentAmount: roundMoney(p.paymentAmount),
-        lineItems: Array.isArray(p.lineItems) ? p.lineItems : [],
-      })),
+      payers: meta.splitBill.payers.map((p) => {
+        const role = p.role || "guest";
+        let lineItems = Array.isArray(p.lineItems)
+          ? p.lineItems.filter(isCatalogLinkedLine)
+          : [];
+        if (!lineItems.length && Array.isArray(p.lineIds)) {
+          lineItems = p.lineIds
+            .map((id) => byRef.get(catalogRefFromLineId(id)))
+            .filter(Boolean);
+        }
+        if (
+          !lineItems.length &&
+          (role === "main_client" || String(p.key) === "main-client")
+        ) {
+          lineItems = catalogLines.filter(isCatalogLinkedLine);
+        }
+        return {
+          key: String(p.key),
+          role,
+          label: p.label || (role === "model" ? "Model" : role === "main_client" ? booking.customer_name : "Guest"),
+          displayName: p.displayName || p.label || "Guest",
+          subtotal: roundMoney(p.subtotal),
+          paymentAmount: roundMoney(p.paymentAmount),
+          lineItems,
+        };
+      }),
     };
   }
 
@@ -560,7 +674,11 @@ function resolveSplitPayers(booking, meta) {
       });
     }
 
-    if (payers.length) return { prepaidAmount, payers };
+    // If snapshot people exist but no catalog-linked lines resolved, fall through
+    // to guests / booking.service_id instead of persisting empty lineItems.
+    if (payers.length && payers.some((payer) => payer.lineItems?.length)) {
+      return { prepaidAmount, payers };
+    }
   }
 
   const guests = Array.isArray(meta.guests) ? meta.guests : [];
@@ -674,9 +792,39 @@ function resolveSplitPayers(booking, meta) {
   };
 }
 
-async function linkSalesCardForInsertedTx(booking, fields, financeTransactionId) {
+/** Fill empty document.lineItems on an existing tx when newer sync has catalog refs. */
+async function healEmptyDocumentLineItems(financeTransactionId, lineItems) {
+  const catalog = (Array.isArray(lineItems) ? lineItems : []).filter(isCatalogLinkedLine);
+  if (!financeTransactionId || !catalog.length) return;
+  await query(
+    `UPDATE finance_transactions
+     SET document = CASE
+           WHEN jsonb_array_length(COALESCE(document->'lineItems', '[]'::jsonb)) = 0
+           THEN jsonb_set(COALESCE(document, '{}'::jsonb), '{lineItems}', $2::jsonb)
+           ELSE document
+         END,
+         issued_document = CASE
+           WHEN issued_document IS NULL THEN issued_document
+           WHEN jsonb_array_length(COALESCE(issued_document->'lineItems', '[]'::jsonb)) = 0
+           THEN jsonb_set(issued_document, '{lineItems}', $2::jsonb)
+           ELSE issued_document
+         END,
+         updated_at = NOW()
+     WHERE id = $1
+       AND jsonb_array_length(COALESCE(document->'lineItems', '[]'::jsonb)) = 0`,
+    [financeTransactionId, JSON.stringify(catalog)],
+  );
+}
+
+async function linkSalesCardForInsertedTx(
+  booking,
+  fields,
+  financeTransactionId,
+  lineItems = [],
+) {
   if (!financeTransactionId || !booking?.id) return financeTransactionId;
   try {
+    await healEmptyDocumentLineItems(financeTransactionId, lineItems);
     await ensureSalesCardMetadataForFinanceRow({
       professionalProfileId: booking.professional_profile_id,
       bookingId: booking.id,
@@ -707,6 +855,10 @@ async function insertFinanceTransaction({
   lineItems,
   docSuffix,
   entryLabel,
+  forceReplace = false,
+  /** Optional live fees from Stripe webhook / PaymentIntent retrieve. */
+  liveStripeFee = null,
+  liveMollureFee = null,
 }) {
   const gross = roundMoney(amount);
   const labelKey = entryLabel || "";
@@ -737,13 +889,23 @@ async function insertFinanceTransaction({
     const prevGross = roundMoney(openRow.gross_amount);
     const sameLabel = String(openRow.entry_label || "") === labelKey;
     if (
-      sameLabel &&
-      prevGross === gross &&
-      String(openRow.status) === String(status)
+      shouldReuseOpenFinanceRow({
+        forceReplace,
+        sameLabel,
+        prevGross,
+        nextGross: gross,
+        prevStatus: openRow.status,
+        nextStatus: status,
+      })
     ) {
-      return linkSalesCardForInsertedTx(booking, salesCardFields, openRow.id);
+      return linkSalesCardForInsertedTx(
+        booking,
+        salesCardFields,
+        openRow.id,
+        lineItems,
+      );
     }
-    // Amount/label drift → void old (Cancel Sales / deactivate link) then insert fresh.
+    // Amount/label drift or negotiation resend → void old + deactivate link, insert fresh.
     supersededOpenId = openRow.id;
     await query(
       `UPDATE finance_transactions
@@ -772,7 +934,12 @@ async function insertFinanceTransaction({
       ],
     );
     if (exact.rows[0]) {
-      return linkSalesCardForInsertedTx(booking, salesCardFields, exact.rows[0].id);
+      return linkSalesCardForInsertedTx(
+        booking,
+        salesCardFields,
+        exact.rows[0].id,
+        lineItems,
+      );
     }
   }
 
@@ -805,16 +972,23 @@ async function insertFinanceTransaction({
         intendedStatus: status,
         amount: gross,
       });
-      return linkSalesCardForInsertedTx(booking, salesCardFields, priorVoidedId);
+      return linkSalesCardForInsertedTx(
+        booking,
+        salesCardFields,
+        priorVoidedId,
+        lineItems,
+      );
     }
   }
 
   if (gross <= 0 && paymentPhase !== "prepay") return null;
 
   const isOnline = paymentMethod.startsWith("online") && booking.booking_type !== "offline";
-  const stripeFee = isOnline ? Math.round(gross * 0.029 * 100) / 100 : null;
-  const mollureFee = isOnline ? Math.round(gross * 0.01 * 100) / 100 : null;
-  const net = gross - (stripeFee ?? 0) - (mollureFee ?? 0);
+  const { stripeFee, mollureFee, net } = computeFinanceFees(gross, {
+    isOnline,
+    stripeFee: liveStripeFee,
+    mollureFee: liveMollureFee,
+  });
   const { methodTitle, methodDetail } = resolveMethod(booking, paymentMethod);
   const entryId = booking.unique_code || null;
   const docNumber = `INV-${booking.unique_code}${docSuffix || ""}`;
@@ -825,10 +999,14 @@ async function insertFinanceTransaction({
   const professionalBusiness = await loadProfessionalDocumentSnapshot(
     booking.professional_profile_id,
   );
+  const prepayResponseDeadlineIso =
+    paymentPhase === "prepay" ? resolvePrepaymentResponseDeadlineIso(booking) : null;
   const dueDate =
-    status === "Payment due" || status === "Pending" || status === "Overdue"
-      ? resolveOriginalDueDate(invoiceDate, invoiceSettings.paymentTerms)
-      : toIsoDate(booking.booking_date);
+    status === "Prepayment due" || status === "Overdue response"
+      ? toIsoDate(prepayResponseDeadlineIso || invoiceDate)
+      : status === "Payment due" || status === "Pending" || status === "Overdue"
+        ? resolveOriginalDueDate(invoiceDate, invoiceSettings.paymentTerms)
+        : toIsoDate(booking.booking_date);
 
   const isPrepaymentDocument = paymentPhase === "prepay";
   const document = {
@@ -860,6 +1038,9 @@ async function insertFinanceTransaction({
       isPrepaymentDocument ? roundMoney(booking.total_price ?? gross) : gross,
     ),
     ...(isPrepaymentDocument ? { prepaymentAmount: roundMoney(gross) } : {}),
+    ...(prepayResponseDeadlineIso
+      ? { responseDeadlineAt: prepayResponseDeadlineIso }
+      : {}),
     paidAmount: roundMoney(gross),
     issuedSnapshot: {
       // BC rows must freeze company layout even when defaultInvoiceType is individual.
@@ -907,7 +1088,11 @@ async function insertFinanceTransaction({
       methodTitle,
       methodDetail,
       status,
-      paymentPhase === "prepay" ? "Pay within 15 min" : payerRole === "guest" || payerRole === "model" ? `${payerLabel}: ${clientName}` : null,
+      paymentPhase === "prepay"
+        ? prepaymentStatusDetail(status)
+        : payerRole === "guest" || payerRole === "model"
+          ? `${payerLabel}: ${clientName}`
+          : null,
       booking.unique_code,
       JSON.stringify(document),
       isPrepaymentDocument ? gross : 0,
@@ -941,6 +1126,7 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
     paymentMethod = "onlineDirect",
     amountOverride = null,
     statusOverride = null,
+    forceReplace = false,
   } = options;
 
   const meta = parseBookingNotes(booking.notes);
@@ -1144,14 +1330,47 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
       lineItems: mainLines,
       docSuffix: phase === "prepay" ? "-PRE" : "",
       entryLabel: phase === "prepay" ? "Prepayment" : null,
+      forceReplace,
     });
   }
 
   const createdIds = [];
+  const mainPayer = payers.find((payer) => payer.role === "main_client");
+  const mainPrepayLines =
+    mainPayer?.lineItems?.length ? mainPayer.lineItems : fallbackBookingLineItems;
+
+  // Unpaid required prepay → Prepayment due (response-window tracked).
+  if (
+    (prepayStatus === "pending" || prepayStatus === "required") &&
+    prepaidAmount > 0 &&
+    ["requested", "br_accepted", "confirmed"].includes(bookingStatus)
+  ) {
+    const id = await insertFinanceTransaction({
+      booking,
+      paymentPhase: "prepay",
+      paymentMethod,
+      amount: prepaidAmount,
+      status: statusOverride || "Prepayment due",
+      clientName: booking.customer_name,
+      clientEmail: booking.customer_email,
+      clientType: resolveClientType(booking),
+      payerKey: "main-client",
+      payerRole: "main_client",
+      payerLabel: booking.customer_name,
+      lineItems: mainPrepayLines,
+      docSuffix: "-PRE",
+      entryLabel: "Prepayment",
+      forceReplace,
+    });
+    if (id) createdIds.push(id);
+    // BR Accepted / requested prepay wait: Prepayment due is the live card.
+    if (bookingStatus === "br_accepted" || bookingStatus === "requested") {
+      return id;
+    }
+  }
 
   // Prepayment always from main client (full booking %)
   if (prepayStatus === "paid" && prepaidAmount > 0) {
-    const mainPayer = payers.find((payer) => payer.role === "main_client");
     const id = await insertFinanceTransaction({
       booking,
       paymentPhase: "prepay",
@@ -1164,8 +1383,7 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
       payerKey: "main-client",
       payerRole: "main_client",
       payerLabel: booking.customer_name,
-      lineItems:
-        mainPayer?.lineItems?.length ? mainPayer.lineItems : fallbackBookingLineItems,
+      lineItems: mainPrepayLines,
       docSuffix: "-PRE",
       entryLabel: "Prepayment",
     });
@@ -1207,7 +1425,13 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
         payerKey: payer.key,
         payerRole: payer.role,
         payerLabel: payer.label,
-        lineItems: withLateRescheduleFeeLine(payer.lineItems),
+        lineItems: withLateRescheduleFeeLine(
+          payer.lineItems?.length
+            ? payer.lineItems
+            : isMain
+              ? fallbackBookingLineItems
+              : [],
+        ),
         docSuffix: suffix,
         entryLabel: isMain
           ? "After treatment · Main Client"
@@ -1324,6 +1548,31 @@ async function applySettingsBasedReissue(row, paymentTerms, level, options = {})
 }
 
 /**
+ * Online overdue write-off after final reissue: Unpaid but keep checkout link live
+ * so a later client payment can still flip to Paid (Voided deactivates links).
+ */
+async function autoCloseOnlineOverdueToUnpaid(row) {
+  if (String(row.entry_type ?? "") !== "onlineBooking") {
+    return { applied: false, reason: "not_online" };
+  }
+  const updated = await query(
+    `UPDATE finance_transactions
+     SET status = 'Unpaid',
+         payment_link_active = TRUE,
+         status_detail = 'Auto-closed after final reissue',
+         updated_at = NOW()
+     WHERE id = $1
+       AND entry_type = 'onlineBooking'
+       AND status IN ('Payment due', 'Overdue')
+     RETURNING id`,
+    [row.id],
+  );
+  return updated.rows[0]
+    ? { applied: true, transactionId: row.id, reason: "auto_closed_unpaid" }
+    : { applied: false, reason: "not_updated" };
+}
+
+/**
  * Process overdue invoice reissues for one professional using their
  * Payments & Reminders settings (first/second Automatic triggers).
  */
@@ -1345,10 +1594,14 @@ export async function processOverdueInvoiceReissues(professionalProfileId) {
     const doc = row.document ?? {};
     const paymentTerms = doc.issuedSnapshot?.invoiceSettings?.paymentTerms ?? settings.paymentTerms;
     const level = Number(doc.reissueLevel) || 0;
-    if (level >= 2) continue;
+    const action = resolveOverdueReissueAction(level, paymentTerms);
+    if (action === "close") {
+      await autoCloseOnlineOverdueToUnpaid(row);
+      continue;
+    }
+    if (action !== "automatic") continue;
 
-    const nextLevel = level + 1;
-    const result = await applySettingsBasedReissue(row, paymentTerms, nextLevel);
+    const result = await applySettingsBasedReissue(row, paymentTerms, level + 1);
     if (result.applied) created += 1;
   }
 
@@ -1356,8 +1609,117 @@ export async function processOverdueInvoiceReissues(professionalProfileId) {
 }
 
 /**
- * Run settings-based automatic reissues across all professionals.
- * Called by the email reminder job.
+ * Flip Prepayment due → Overdue response when the frozen response deadline elapsed.
+ * Uses document.responseDeadlineAt, else booking.response_deadline_at, else payment_deadline EOD.
+ */
+export async function processPrepaymentDueOverdueUpdates() {
+  const result = await query(
+    `SELECT
+       ft.id,
+       ft.document,
+       ft.payment_deadline,
+       b.response_deadline_at
+     FROM finance_transactions ft
+     LEFT JOIN bookings b ON b.unique_code = ft.booking_id
+     WHERE ft.status = 'Prepayment due'
+       AND COALESCE(ft.document->>'paymentPhase', '') = 'prepay'`,
+  );
+
+  const now = Date.now();
+  let flipped = 0;
+
+  for (const row of result.rows) {
+    const doc =
+      row.document && typeof row.document === "object" ? row.document : {};
+    let dueMs = Date.parse(doc.responseDeadlineAt);
+    if (!Number.isFinite(dueMs) && row.response_deadline_at) {
+      dueMs = new Date(row.response_deadline_at).getTime();
+    }
+    if (!Number.isFinite(dueMs) && row.payment_deadline) {
+      dueMs = new Date(`${String(row.payment_deadline).slice(0, 10)}T23:59:59.999Z`).getTime();
+    }
+    if (!Number.isFinite(dueMs) || now <= dueMs) continue;
+
+    const updated = await query(
+      `UPDATE finance_transactions
+       SET status = 'Overdue response',
+           status_detail = 'Past response time',
+           updated_at = NOW()
+       WHERE id = $1
+         AND status = 'Prepayment due'
+       RETURNING id`,
+      [row.id],
+    );
+    if (updated.rows[0]) flipped += 1;
+  }
+
+  return flipped;
+}
+
+/**
+ * Restart Prepayment Due clock: stamp a new respondBy on the booking, void the
+ * open prepay row, and insert a fresh Prepayment due transaction (archive/replace).
+ */
+export async function restartPrepaymentDueForBooking(bookingId) {
+  const booking = await getBookingContext(bookingId);
+  if (!booking) return null;
+
+  const setup = await query(
+    `SELECT response_time_hours, response_time_minutes
+     FROM business_setups
+     WHERE id = $1
+     LIMIT 1`,
+    [booking.business_setup_id],
+  );
+  const windowMinutes = resolveResponseWindowMinutes(
+    setup.rows[0]?.response_time_hours,
+    setup.rows[0]?.response_time_minutes,
+    null,
+  );
+  const startedAt = new Date();
+  const respondBy = new Date(startedAt.getTime() + windowMinutes * 60_000);
+  const { human, meta } = splitBookingNotes(booking.notes);
+  const nextMeta = {
+    ...meta,
+    responseStartedAt: startedAt.toISOString(),
+    respondBy: respondBy.toISOString(),
+    responseWindowMinutes: windowMinutes,
+  };
+  delete nextMeta.responseStatus;
+  const nextNotes = joinBookingNotes(human, nextMeta);
+
+  await query(
+    `UPDATE bookings
+     SET notes = $1,
+         response_deadline_at = $2::timestamptz,
+         updated_at = NOW()
+     WHERE id = $3`,
+    [nextNotes, respondBy.toISOString(), bookingId],
+  );
+
+  await query(
+    `UPDATE finance_transactions
+     SET status = 'Voided',
+         document = jsonb_set(COALESCE(document, '{}'::jsonb), '{status}', '"Voided"'::jsonb, true),
+         updated_at = NOW()
+     WHERE professional_profile_id = $1
+       AND booking_id = $2
+       AND COALESCE(document->>'paymentPhase', '') = 'prepay'
+       AND status IN ('Prepayment due', 'Overdue response', 'Pending')`,
+    [booking.professional_profile_id, booking.unique_code],
+  );
+
+  return syncBookingToFinanceTransaction(bookingId, {
+    paymentPhase: "prepay",
+    paymentMethod:
+      booking.booking_type === "offline" ? "offlineDirect" : "onlineDirect",
+    statusOverride: "Prepayment due",
+  });
+}
+
+/**
+ * Run settings-based automatic reissues (+ online Unpaid auto-close after final)
+ * across all professionals. Called by the email reminder job.
  */
 export async function processAutomaticInvoiceReissues() {
   const overdue = await query(
@@ -1377,10 +1739,19 @@ export async function processAutomaticInvoiceReissues() {
     const settings = mergeInvoiceSettings(row.invoice_settings);
     const doc = row.document ?? {};
     const level = Number(doc.reissueLevel) || 0;
-    if (level >= 2) continue;
+    const action = resolveOverdueReissueAction(level, settings.paymentTerms);
+    if (action === "close") {
+      outcomes.push(await autoCloseOnlineOverdueToUnpaid(row));
+      continue;
+    }
+    if (action !== "automatic") {
+      outcomes.push({ applied: false, reason: "trigger_not_automatic" });
+      continue;
+    }
 
-    const nextLevel = level + 1;
-    const result = await applySettingsBasedReissue(row, settings.paymentTerms, nextLevel, { notify: false });
+    const result = await applySettingsBasedReissue(row, settings.paymentTerms, level + 1, {
+      notify: false,
+    });
     outcomes.push(result);
   }
 

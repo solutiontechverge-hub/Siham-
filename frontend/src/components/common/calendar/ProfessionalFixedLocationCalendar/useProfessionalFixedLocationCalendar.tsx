@@ -24,7 +24,10 @@ import {
   type CalendarEvent,
 } from "../../../../app/professionals/fixed-location/calendar/calendar.data";
 import { useUploadBookingAttachmentsMutation, useManageBookingEditRequestMutation } from "../../../../store/services/businessApi";
-import { useCreateFinanceTransactionMutation } from "../../../../store/services/financeApi";
+import {
+  useCreateFinanceTransactionMutation,
+  useRestartPrepaymentDueMutation,
+} from "../../../../store/services/financeApi";
 import type { ProfessionalFixedLocationCalendarProps } from "./useProfessionalFixedLocationCalendar.types";
 import {
   applyPendingInlineGuestEdit,
@@ -244,6 +247,7 @@ export function useProfessionalFixedLocationCalendar({
     onDateRangeChange,
   });
   const [createFinanceTransaction] = useCreateFinanceTransactionMutation();
+  const [restartPrepaymentDue] = useRestartPrepaymentDueMutation();
   const drawerShellState = useProfessionalFixedLocationCalendarDrawerShellState({
     initialSubTab: data.initialSubTab,
     supportedLocations: data.supportedLocations,
@@ -1655,20 +1659,37 @@ export function useProfessionalFixedLocationCalendar({
 
   React.useEffect(() => {
     const bookingId = searchParams.get("booking");
+    const tab = searchParams.get("tab");
+    const cardId = searchParams.get("cardId")?.trim() || "";
+    const deepKey = `${bookingId}|${tab ?? ""}|${cardId}`;
     if (
       !bookingId ||
       !events.length ||
       slotDrawerOpen ||
-      deepLinkedBookingRef.current === bookingId
+      deepLinkedBookingRef.current === deepKey
     ) return;
     // Match UUID (`b-<uuid>`), unique_code, or exact event id — same as focus deep-links.
     const event = findFocusBookingMatch(events, bookingId, bookingId);
     if (!event) return;
-    deepLinkedBookingRef.current = bookingId;
+    deepLinkedBookingRef.current = deepKey;
     if (event.date) setActiveDateIso(event.date);
     openExistingBooking(event);
+    // Finance overdue Review: invoice → Sales banner; prepay response → booking tab banner.
+    if (tab === "sales") {
+      setSlotDrawerTab("sales");
+      if (cardId) setFocusSalesCardId(cardId);
+    }
     router.replace("/professionals/calendar", { scroll: false });
-  }, [events, openExistingBooking, router, searchParams, setActiveDateIso, slotDrawerOpen]);
+  }, [
+    events,
+    openExistingBooking,
+    router,
+    searchParams,
+    setActiveDateIso,
+    setFocusSalesCardId,
+    setSlotDrawerTab,
+    slotDrawerOpen,
+  ]);
 
   const {
     handleAcceptConfirmedEr,
@@ -1702,6 +1723,7 @@ export function useProfessionalFixedLocationCalendar({
     businessResponseWindowInput,
     manageBookingEditRequest,
     createFinanceTransaction,
+    restartPrepaymentDue,
     onUpdateBookingStatus,
     persistEventStatus,
     restoreIncomingActions,

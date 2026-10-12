@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import {
-  useGetBusinessSetupQuery,
   useGetMollureClientDirectoryQuery,
   useGetProfessionalClientsQuery,
 } from "../../../store/services/businessApi";
@@ -81,13 +80,6 @@ export function useManualEntryDrawer({
   const [itemDrawerOpen, setItemDrawerOpen] = React.useState(false);
   const [guestContactError, setGuestContactError] = React.useState(false);
 
-  const { data: businessSetupResponse } = useGetBusinessSetupQuery(
-    { includeDraft: false },
-    {
-      skip: !open,
-    },
-  );
-  const businessSetup = businessSetupResponse?.data ?? null;
   const { data: professionalClientsResponse } = useGetProfessionalClientsQuery(
     undefined,
     { skip: !open },
@@ -121,35 +113,28 @@ export function useManualEntryDrawer({
     setGuestContactError(false);
   }, [open]);
 
-  const { productOptions, itemOptions, uniqueItemOptions } = React.useMemo(
+  // Manual finance entries: products + unique items only (no service catalog).
+  const { productOptions, uniqueItemOptions } = React.useMemo(
     () =>
       buildManualEntryCatalogOptions({
         products: settings.products,
-        services: settings.services,
+        services: [],
         uniqueItems: settings.uniqueItems,
-        setupServices: businessSetup?.service_details,
       }),
-    [
-      businessSetup?.service_details,
-      settings.products,
-      settings.services,
-      settings.uniqueItems,
-    ],
+    [settings.products, settings.uniqueItems],
   );
 
   const [itemCatalogOverrides, setItemCatalogOverrides] = React.useState<
     Record<string, ManualEntryCatalogOption>
   >({});
 
-  const resolvedItemOptions = React.useMemo(() => {
-    const base = itemOptions.map(
-      (option) => itemCatalogOverrides[option.id] ?? option,
-    );
-    const extras = uniqueItemOptions.filter(
-      (option) => !base.some((item) => item.id === option.id),
-    );
-    return [...base, ...extras];
-  }, [itemCatalogOverrides, itemOptions, uniqueItemOptions]);
+  const resolvedItemOptions = React.useMemo(
+    () =>
+      uniqueItemOptions.map(
+        (option) => itemCatalogOverrides[option.id] ?? option,
+      ),
+    [itemCatalogOverrides, uniqueItemOptions],
+  );
 
   const handleAddProductOption = React.useCallback(
     (option: ManualEntryCatalogOption) => {
@@ -184,10 +169,8 @@ export function useManualEntryDrawer({
   );
 
   const isDeletableItemOption = React.useCallback(
-    (option: ManualEntryCatalogOption) =>
-      option.id.startsWith("unique-") ||
-      (settings.uniqueItems ?? []).some((item) => item.id === option.id),
-    [settings.uniqueItems],
+    () => true,
+    [],
   );
 
   const handleUpdateProductOption = React.useCallback(
@@ -215,22 +198,9 @@ export function useManualEntryDrawer({
   const handleUpdateItemOption = React.useCallback(
     (option: ManualEntryCatalogOption) => {
       setItemCatalogOverrides((prev) => ({ ...prev, [option.id]: option }));
-      setSettings((prev) => {
-        const hasService = prev.services.some((s) => s.id === option.id);
-        if (!hasService) return prev;
-        return {
-          ...prev,
-          services: prev.services.map((service) =>
-            service.id === option.id
-              ? {
-                  ...service,
-                  service: option.label,
-                  vat: option.vat?.trim() || service.vat,
-                }
-              : service,
-          ),
-        };
-      });
+      setSettings((prev) =>
+        upsertFinanceUniqueItem(prev, financeProductFromCatalogOption(option)),
+      );
     },
     [setSettings],
   );
@@ -368,9 +338,18 @@ export function useManualEntryDrawer({
   ) => {
     setLines((prev) => [
       ...prev,
-      ...options.map((option) =>
-        createManualEntryLineFromOption(kind, option, option.quantity ?? 1),
-      ),
+      ...options.map((option) => {
+        const line = createManualEntryLineFromOption(
+          kind,
+          option,
+          option.quantity ?? 1,
+        );
+        // Trust boundary: manual finance never stamps serviceId.
+        if (kind === "item") {
+          return { ...line, sourceType: "uniqueItemCode" as const };
+        }
+        return line;
+      }),
     ]);
   };
 
@@ -394,14 +373,19 @@ export function useManualEntryDrawer({
   };
 
   const handleUniqueItemSave = (line: ManualEntryLine) => {
-    setLines((prev) => [...prev, line]);
+    const stamped: ManualEntryLine = {
+      ...line,
+      sourceReference: line.sourceReference ?? line.id,
+      sourceType: "uniqueItemCode",
+    };
+    setLines((prev) => [...prev, stamped]);
     setSettings((prev) =>
       upsertFinanceUniqueItem(
         prev,
         toFinanceCatalogProduct({
-          id: line.id,
-          name: line.name,
-          price: line.unitPrice,
+          id: stamped.id,
+          name: stamped.name,
+          price: stamped.unitPrice,
         }),
       ),
     );

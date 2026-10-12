@@ -6,7 +6,10 @@ import {
   processRespondRequestReminderNotifications,
 } from "../services/bookingNotification.service.js";
 import { processOverdueResponseStatusUpdates } from "../services/bookingResponseOverdue.service.js";
-import { processAutomaticInvoiceReissues } from "../services/finance-sync.service.js";
+import {
+  processAutomaticInvoiceReissues,
+  processPrepaymentDueOverdueUpdates,
+} from "../services/finance-sync.service.js";
 
 const DEFAULT_INTERVAL_MS = Number(process.env.EMAIL_REMINDER_POLL_MS || 15 * 60 * 1000);
 
@@ -23,12 +26,14 @@ const runReminderCycle = async () => {
       overdueCount,
       dueReminderCount,
       responseOverdueFlipped,
+      prepaymentOverdueFlipped,
     ] = await Promise.all([
       processRespondRequestReminderNotifications(),
       processInvoiceReminders(),
       processPaymentOverdueNotifications(),
       processPaymentDueReminders(),
       processOverdueResponseStatusUpdates(),
+      processPrepaymentDueOverdueUpdates(),
     ]);
 
     // After overdue status flips, apply Automatic first/second reissues from settings.
@@ -55,7 +60,8 @@ const runReminderCycle = async () => {
       overdueCount +
       dueReminderCount +
       reissueOutcomes.filter((item) => item.applied).length +
-      (Number(responseOverdueFlipped) || 0);
+      (Number(responseOverdueFlipped) || 0) +
+      (Number(prepaymentOverdueFlipped) || 0);
 
     if (sentCount > 0) {
       console.log(`[email-reminder] Sent ${sentCount} reminder/reissue/overdue update(s).`);

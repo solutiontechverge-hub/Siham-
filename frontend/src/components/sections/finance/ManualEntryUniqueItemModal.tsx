@@ -50,6 +50,8 @@ export default function ManualEntryUniqueItemModal({
 
     onSave({
       id: line.id,
+      sourceReference: line.id,
+      sourceType: "uniqueItemCode",
       kind: "item",
       name: draft.productName.trim(),
       quantity: line.quantity,

@@ -68,6 +68,16 @@ assert.equal(shouldShowExpiredResponseBanner(expiredEbr, configured), true);
 assert.equal(shouldShowExpiredResponseBanner(expiredEr, configured), true);
 assert.equal(
   shouldShowExpiredResponseBanner(
+    {
+      status: "BR Accepted",
+      details: { ...overdueDetails, showPrepayment: true, prepaymentStatus: "pending" },
+    },
+    configured,
+  ),
+  true,
+);
+assert.equal(
+  shouldShowExpiredResponseBanner(
     { status: "Confirmed", bookingScenario: undefined, details: overdueDetails },
     configured,
   ),
@@ -144,8 +154,9 @@ const pastStartFlags = resolveProfessionalBookingActions(
 );
 assert.equal(pastStartFlags.restart_response, true);
 
-// Dynamic: live template length overrides stamped snapshot.
+// Frozen respondBy wins — live template must not shift the clock on reload.
 const started = Date.parse("2026-01-01T12:00:00.000Z");
+const frozenDue = Date.parse("2026-01-01T12:30:00.000Z");
 const dynamicFields = {
   responseStartedAt: "2026-01-01T12:00:00.000Z",
   respondBy: "2026-01-01T12:30:00.000Z",
@@ -154,16 +165,12 @@ const dynamicFields = {
 };
 const nowAt40 = new Date(started + 40 * 60_000);
 assert.equal(
-  isResponseWindowOverdue(dynamicFields, nowAt40, { hours: 0, minutes: 30 }),
-  true,
+  resolveEffectiveRespondByMs(dynamicFields, { hours: 1, minutes: 0 }),
+  frozenDue,
 );
 assert.equal(
   isResponseWindowOverdue(dynamicFields, nowAt40, { hours: 1, minutes: 0 }),
-  false,
-);
-assert.equal(
-  resolveEffectiveRespondByMs(dynamicFields, { hours: 1, minutes: 0 }),
-  started + 60 * 60_000,
+  true,
 );
 assert.equal(
   shouldShowExpiredResponseBanner(
@@ -171,7 +178,7 @@ assert.equal(
     { hours: 1, minutes: 0 },
     nowAt40,
   ),
-  false,
+  true,
 );
 assert.equal(
   shouldShowExpiredResponseBanner(

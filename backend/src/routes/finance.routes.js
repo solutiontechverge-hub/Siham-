@@ -18,6 +18,7 @@ import {
   processFinanceInvoiceReissues,
   replaceFinanceTransaction,
   reissueFinanceInvoiceForBooking,
+  restartPrepaymentDue,
   updateFinanceInvoiceSettings,
   updateFinanceStripeStatus,
   updateFinanceTransaction,
@@ -127,6 +128,17 @@ router.post(
   ],
   validateRequest,
   reissueFinanceInvoiceForBooking,
+);
+
+router.post(
+  "/prepayment-due/restart",
+  requireProfessional,
+  [
+    body("bookingId").optional({ values: "falsy" }).isUUID(),
+    textBody("bookingRef", { optional: true, max: 120 }),
+  ],
+  validateRequest,
+  restartPrepaymentDue,
 );
 
 router.get(

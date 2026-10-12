@@ -95,6 +95,10 @@ export function resolveProfessionalBookingActions(
     if (professionalShouldAck(event.details)) {
       flags.ok = true;
     }
+    if (expiredBanner) {
+      flags.restart_response = true;
+      flags.discard = true;
+    }
     return flags;
   }
 

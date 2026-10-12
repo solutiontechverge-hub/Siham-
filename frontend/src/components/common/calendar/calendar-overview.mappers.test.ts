@@ -235,4 +235,26 @@ assert.equal(
   "/uploads/bookings/x/a.jpg",
 );
 
+// response_deadline_at column wins over notes respondBy (backend COALESCE).
+const responseDeadlineBooking: CalendarBooking = {
+  ...booking,
+  id: "booking-deadline",
+  unique_code: "ML-DEADLINE",
+  response_deadline_at: "2026-10-13T15:00:00.000Z",
+  notes: `---mollure-meta---\n${JSON.stringify({
+    responseStartedAt: "2026-10-13T14:00:00.000Z",
+    respondBy: "2026-10-13T14:30:00.000Z",
+    responseWindowMinutes: 30,
+    responseStatus: "overdue_response",
+    services: [
+      { id: "svc-1", name: "Cut", price: 40, durationMins: 30, guestId: null },
+    ],
+  })}`,
+};
+const deadlineEvent = mapCalendarBookingToEvent(responseDeadlineBooking, "tm-1");
+assert.equal(deadlineEvent.details?.respondBy, "2026-10-13T15:00:00.000Z");
+assert.equal(deadlineEvent.details?.responseStartedAt, "2026-10-13T14:00:00.000Z");
+assert.equal(deadlineEvent.details?.responseWindowMinutes, 30);
+assert.equal(deadlineEvent.details?.responseStatus, "overdue_response");
+
 console.log("calendar-overview.mappers.test.ts: all assertions passed");

@@ -23,6 +23,7 @@ import {
   mollureTableHeaderSx,
 } from "../../../theme/mollureHierarchy";
 import {
+  canEditFinanceTransactionDate,
   formatEntryIdDisplay,
   formatNetAmountEur,
   formatTransactionDate,
@@ -76,9 +77,11 @@ export type TransactionsTableProps = {
     documentType: "invoice" | "receipt",
   ) => void;
   onOpenNote?: (row: TransactionRow) => void;
+  /** Offline Paid/Unpaid — edit persisted transaction_date. */
+  onEditTransactionDate?: (row: TransactionRow) => void;
   onEntryClick?: (row: TransactionRow) => void;
   onClientClick?: (row: TransactionRow) => void;
-  /** Opens the manual review/reissue surface for an overdue row. */
+  /** Deep-links overdue / overdue-response rows to calendar Sales or booking banner. */
   onReviewOverdue?: (row: TransactionRow) => void;
   disableDocumentLinks?: boolean;
   page: number;
@@ -95,6 +98,7 @@ export default function TransactionsTable({
   onToggleAll,
   onOpenDocument,
   onOpenNote,
+  onEditTransactionDate,
   onEntryClick,
   onClientClick,
   onReviewOverdue,
@@ -251,14 +255,35 @@ export default function TransactionsTable({
                   </TableCell>
                   <TableCell>
                     <Stack spacing={0.35}>
-                      <BodyText
-                        component="span"
-                        sx={mollureBodySx(m.navy, {
-                          color: alpha(m.navy, 0.75),
-                        })}
-                      >
-                        {dateDisplay}
-                      </BodyText>
+                      {canEditFinanceTransactionDate(row) &&
+                      onEditTransactionDate ? (
+                        <MuiLink
+                          component="button"
+                          type="button"
+                          underline="hover"
+                          onClick={() => onEditTransactionDate(row)}
+                          sx={mollureBodySx(m.navy, {
+                            color: theme.palette.primary.main,
+                            border: 0,
+                            bgcolor: "transparent",
+                            p: 0,
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                            textAlign: "left",
+                          })}
+                        >
+                          {dateDisplay}
+                        </MuiLink>
+                      ) : (
+                        <BodyText
+                          component="span"
+                          sx={mollureBodySx(m.navy, {
+                            color: alpha(m.navy, 0.75),
+                          })}
+                        >
+                          {dateDisplay}
+                        </BodyText>
+                      )}
                       {row.note?.trim() ? (
                         <MuiLink
                           component="button"
@@ -435,7 +460,9 @@ export default function TransactionsTable({
                           {row.statusDetail}
                         </BodyText>
                       ) : null}
-                      {row.status === "Overdue" ? (
+                      {(row.status === "Overdue" ||
+                        row.status === "Overdue response") &&
+                      (row.bookingId || row.entryId) ? (
                         <MuiLink
                           component="button"
                           type="button"

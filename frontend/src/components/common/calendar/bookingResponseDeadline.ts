@@ -1,7 +1,8 @@
 /**
  * Response-time / late-response helpers for BR / EBR / ER negotiation windows.
- * Window length is always resolved from the live business template (flat 30-minute
- * default when unset). Stored respondBy / responseWindowMinutes are snapshots only.
+ * Stored respondBy / responseStartedAt are frozen at create (or restart).
+ * Live template only applies when inventing a new stamp or reconstructing a
+ * legacy row that has startedAt but no respondBy.
  */
 
 export type ResponseWindowInput = {
@@ -88,46 +89,38 @@ export function resolveResponseWindowMinutes(
 }
 
 /**
- * Effective wait length for a booking. Live template always wins when supplied
- * (blank → 30). Without a live input, fall back to the stamped snapshot.
+ * Effective wait length. Prefer stamped snapshot when present; live template
+ * only for inventing/reconstructing when no stamp exists.
  */
 export function resolveEffectiveResponseWindowMinutes(
   fields?: ResponseDeadlineFields | null,
   liveWindow?: ResponseWindowInput | null,
 ): number {
+  const stamped = Number(fields?.responseWindowMinutes);
+  if (Number.isFinite(stamped) && stamped > 0) return stamped;
   if (liveWindow !== undefined) {
     return resolveResponseWindowMinutes(liveWindow);
   }
-  const stamped = Number(fields?.responseWindowMinutes);
-  if (Number.isFinite(stamped) && stamped > 0) return stamped;
   return DEFAULT_RESPONSE_WINDOW_MINUTES;
 }
 
-/** Due instant from responseStartedAt + live/effective window (dynamic). */
+/** Due instant: frozen respondBy wins; never shift it with live template. */
 export function resolveEffectiveRespondByMs(
   fields?: ResponseDeadlineFields | null,
   liveWindow?: ResponseWindowInput | null,
 ): number | null {
   if (!fields) return null;
 
-  const windowMinutes = resolveEffectiveResponseWindowMinutes(fields, liveWindow);
+  if (fields.respondBy) {
+    const due = Date.parse(fields.respondBy);
+    if (Number.isFinite(due)) return due;
+  }
 
+  // Legacy rows: reconstruct from startedAt + stamped/live window.
+  const windowMinutes = resolveEffectiveResponseWindowMinutes(fields, liveWindow);
   if (fields.responseStartedAt) {
     const start = Date.parse(fields.responseStartedAt);
     if (Number.isFinite(start)) return start + windowMinutes * 60_000;
-  }
-
-  if (fields.respondBy) {
-    const due = Date.parse(fields.respondBy);
-    if (!Number.isFinite(due)) return null;
-    // No startedAt: shift frozen due when live window differs from stamped.
-    if (liveWindow !== undefined) {
-      const stamped = Number(fields.responseWindowMinutes);
-      if (Number.isFinite(stamped) && stamped > 0 && stamped !== windowMinutes) {
-        return due - stamped * 60_000 + windowMinutes * 60_000;
-      }
-    }
-    return due;
   }
 
   return null;
@@ -166,16 +159,36 @@ export function restartResponseDeadline(
   return buildResponseDeadline(windowInput, startedAt);
 }
 
-/** Original BR, EBR, or Confirmed ER still waiting on a response. */
+type PrepaymentWaitDetails = {
+  showPrepayment?: boolean;
+  prepaymentStatus?: string;
+} | null | undefined;
+
+/** BR Accepted (or notes) still waiting on client prepayment. */
+export function isPendingPrepaymentResponse(
+  event: PendingNegotiationEvent & { details?: PrepaymentWaitDetails },
+): boolean {
+  if (!event || event.status !== "BR Accepted") return false;
+  const prepay = String(event.details?.prepaymentStatus ?? "").toLowerCase();
+  if (prepay === "confirmed" || prepay === "paid") return false;
+  return (
+    Boolean(event.details?.showPrepayment) ||
+    prepay === "pending" ||
+    prepay === "required"
+  );
+}
+
+/** Original BR, EBR, Confirmed ER, or BR Accepted waiting on prepayment. */
 export function isPendingResponseNegotiation(
   event: PendingNegotiationEvent,
 ): boolean {
   if (!event) return false;
   if (event.status === "Requested") return true;
+  if (isPendingPrepaymentResponse(event)) return true;
   return event.status === "Confirmed" && event.bookingScenario === "ER";
 }
 
-/** Expiry banner: pending BR/EBR/ER whose live window (or booking start) has elapsed. */
+/** Expiry banner: pending BR/EBR/ER/prepay whose live window (or booking start) has elapsed. */
 export function shouldShowExpiredResponseBanner(
   event: PendingNegotiationEvent,
   responseTimeInput?: ResponseWindowInput | null,

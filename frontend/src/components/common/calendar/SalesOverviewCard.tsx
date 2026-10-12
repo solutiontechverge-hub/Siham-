@@ -21,6 +21,7 @@ import {
   formatCompactEuro,
   formatFinanceDueDate,
 } from "../booking-finance/formatBookingFinance";
+import { isOfflinePaymentMethod } from "../client-booking/checkoutPaymentOptions";
 import type {
   SalesLineItem,
   SalesOverviewCardData,
@@ -28,11 +29,37 @@ import type {
   SalesSubCardData,
 } from "./salesOverview.types";
 
+/** Offline post-booking invoice status switches (not Stripe/online). */
+function offlineInvoiceMenuFlags(card: {
+  paymentMethod?: string | null;
+  paymentState?: SalesPaymentState;
+}) {
+  if (!isOfflinePaymentMethod(card.paymentMethod)) {
+    return {
+      showMarkPaid: false,
+      showMarkUnpaid: card.paymentState === "pending",
+      showEditTransactionDate: false,
+    };
+  }
+  const state = card.paymentState;
+  return {
+    showMarkPaid:
+      state === "payment_due" ||
+      state === "overdue_invoice" ||
+      state === "unpaid",
+    showMarkUnpaid:
+      state === "pending" || state === "overdue_invoice" || state === "paid",
+    showEditTransactionDate: state === "paid" || state === "unpaid",
+  };
+}
+
 export type SalesCardMenuAction =
   | "editSales"
   | "cancelSales"
   | "refundSales"
+  | "markPaid"
   | "markUnpaid"
+  | "editTransactionDate"
   | "downloadInvoicePdf"
   | "downloadInvoiceExcel"
   | "addNote"
@@ -181,7 +208,10 @@ function SalesActionsMenu({
   limitedMenu,
   downloadNoteOnly,
   showRefund,
+  showCancelSales,
+  showMarkPaid,
   showMarkUnpaid,
+  showEditTransactionDate,
   menuAnchor,
   downloadAnchor,
   setDownloadAnchor,
@@ -194,7 +224,11 @@ function SalesActionsMenu({
   downloadNoteOnly?: boolean;
   /** Show Refund when the sale has received money and is not already muted. */
   showRefund?: boolean;
+  /** Pending cancel, or Paid/Prepaid void-via-cancel (existing). */
+  showCancelSales?: boolean;
+  showMarkPaid?: boolean;
   showMarkUnpaid?: boolean;
+  showEditTransactionDate?: boolean;
   menuAnchor: HTMLElement | null;
   downloadAnchor: HTMLElement | null;
   setDownloadAnchor: (el: HTMLElement | null) => void;
@@ -202,6 +236,18 @@ function SalesActionsMenu({
   run: (action: SalesCardMenuAction) => void;
 }) {
   const m = useTheme().palette.mollure;
+  const cancelItem = showCancelSales
+    ? [{ id: "cancelSales" as const, label: "Cancel Sales" }]
+    : [];
+  const offlineStatusItems = [
+    ...(showMarkPaid ? [{ id: "markPaid" as const, label: "Mark as Paid" }] : []),
+    ...(showMarkUnpaid
+      ? [{ id: "markUnpaid" as const, label: "Mark as Unpaid" }]
+      : []),
+    ...(showEditTransactionDate
+      ? [{ id: "editTransactionDate" as const, label: "Edit transaction date" }]
+      : []),
+  ];
   const items: Array<{
     id: SalesCardMenuAction | "downloadInvoice";
     label: string;
@@ -213,17 +259,16 @@ function SalesActionsMenu({
     : limitedMenu
       ? [
           { id: "editSales", label: "Edit Sales" },
-          { id: "cancelSales", label: "Cancel Sales" },
+          ...cancelItem,
+          ...offlineStatusItems,
           ...(showRefund ? [{ id: "refundSales" as const, label: "Refund" }] : []),
           { id: "downloadInvoice", label: "Download Invoice" },
           { id: "addNote", label: "Add note" },
         ]
       : [
           { id: "editSales", label: "Edit Sales" },
-          { id: "cancelSales", label: "Cancel Sales" },
-          ...(showMarkUnpaid
-            ? [{ id: "markUnpaid" as const, label: "Mark as Unpaid" }]
-            : []),
+          ...cancelItem,
+          ...offlineStatusItems,
           ...(showRefund ? [{ id: "refundSales" as const, label: "Refund" }] : []),
           { id: "downloadInvoice", label: "Download Invoice" },
           { id: "addNote", label: "Add note" },
@@ -509,7 +554,14 @@ function SubSummaryCard({
         showRefund={
           sub.paymentState === "paid" || sub.paymentState === "prepaid"
         }
+        showCancelSales={
+          sub.paymentState === "pending" ||
+          sub.paymentState === "paid" ||
+          sub.paymentState === "prepaid"
+        }
+        showMarkPaid={false}
         showMarkUnpaid={sub.paymentState === "pending"}
+        showEditTransactionDate={false}
         menuAnchor={menuAnchor}
         downloadAnchor={downloadAnchor}
         setDownloadAnchor={setDownloadAnchor}
@@ -970,7 +1022,12 @@ export default function SalesOverviewCard({
         showRefund={
           card.paymentState === "paid" || card.paymentState === "prepaid"
         }
-        showMarkUnpaid={card.paymentState === "pending"}
+        showCancelSales={
+          card.paymentState === "pending" ||
+          card.paymentState === "paid" ||
+          card.paymentState === "prepaid"
+        }
+        {...offlineInvoiceMenuFlags(card)}
         menuAnchor={menuAnchor}
         downloadAnchor={downloadAnchor}
         setDownloadAnchor={setDownloadAnchor}

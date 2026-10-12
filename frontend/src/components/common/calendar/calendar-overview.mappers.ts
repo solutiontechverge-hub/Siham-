@@ -482,6 +482,19 @@ export function mapCalendarBookingToEvent(
       ...(!isIncomingClientEbr && parsedNotes?.responseStatus
         ? { responseStatus: parsedNotes.responseStatus }
         : {}),
+      // Column first (response_deadline_at), then notes respondBy — match backend COALESCE.
+      ...(parsedNotes?.responseStartedAt
+        ? { responseStartedAt: parsedNotes.responseStartedAt }
+        : {}),
+      ...(booking.response_deadline_at || parsedNotes?.respondBy
+        ? {
+            respondBy:
+              booking.response_deadline_at || parsedNotes?.respondBy,
+          }
+        : {}),
+      ...(typeof parsedNotes?.responseWindowMinutes === "number"
+        ? { responseWindowMinutes: parsedNotes.responseWindowMinutes }
+        : {}),
       ...(parsedNotes?.needsOk ? { needsOk: true, ackScenario: parsedNotes.ackScenario } : {}),
       ...(parsedNotes?.ackRecipient ? { ackRecipient: parsedNotes.ackRecipient } : {}),
       ...(parsedNotes?.hiddenForProfessional ? { hiddenForProfessional: true } : {}),

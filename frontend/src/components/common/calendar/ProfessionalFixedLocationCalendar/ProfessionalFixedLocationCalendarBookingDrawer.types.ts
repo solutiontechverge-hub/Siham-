@@ -81,6 +81,7 @@ export type ProfessionalFixedLocationCalendarBookingDrawerBag = Pick<
   | "exceededCancellationWindow"
   | "firstDrawerPlanningId"
   | "fixedLocationAddress"
+  | "focusSalesCardId"
   | "getServiceStaffOptions"
   | "grid"
   | "guestDraft"

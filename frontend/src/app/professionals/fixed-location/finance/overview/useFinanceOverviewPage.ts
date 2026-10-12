@@ -5,7 +5,11 @@ import { useRouter } from "next/navigation";
 import { useTheme } from "@mui/material/styles";
 import { mollureMenuItemSx } from "../../../../../components/common/mollureFormSx";
 import {
+  canEditFinanceTransactionDate,
+  canMarkFinancePaid,
+  canMarkFinanceUnpaid,
   getTransactionActionCategory,
+  isOfflineFinanceTransaction,
   isRefundableTransactionStatus,
   type TransactionRow,
 } from "../data/transactions";
@@ -65,6 +69,11 @@ export function useFinanceOverviewPage() {
   >(null);
   const [noteModalTransactionId, setNoteModalTransactionId] = React.useState<
     string | null
+  >(null);
+  const [transactionDateModal, setTransactionDateModal] = React.useState<
+    | { mode: "markPaid"; ids: string[]; initialDate: string | null }
+    | { mode: "editDate"; id: string; initialDate: string | null }
+    | null
   >(null);
 
   const [bulkAction] = useBulkFinanceTransactionActionMutation();
@@ -149,14 +158,12 @@ export function useFinanceOverviewPage() {
   );
 
   const actionMenuItems = React.useMemo(
-    () => buildActionMenuItems(
-      selectedCount > 0 ? actionCategory : null,
-      selectedRows.length > 0 && selectedRows.every((row) =>
-        row.entryType === "manualEntry" &&
-        ["Payment due", "Overdue"].includes(row.status) &&
-        Number(row.document?.reissueLevel ?? 0) >= 2,
+    () =>
+      buildActionMenuItems(
+        selectedCount > 0 ? actionCategory : null,
+        selectedRows.length > 0 && selectedRows.every(canMarkFinanceUnpaid),
+        selectedRows.length > 0 && selectedRows.every(canMarkFinancePaid),
       ),
-    ),
     [actionCategory, selectedCount, selectedRows],
   );
 
@@ -359,7 +366,9 @@ export function useFinanceOverviewPage() {
           quantity: line.quantity,
           unitPrice: line.unitPrice,
           sourceReference: line.sourceReference ?? line.id,
-          sourceType: line.sourceType ?? (line.kind === "item" ? "serviceId" : "productId"),
+          sourceType:
+            line.sourceType ??
+            (line.kind === "item" ? "uniqueItemCode" : "productId"),
         })),
       };
       const isReplace = Boolean(replaceTransactionId);
@@ -468,8 +477,17 @@ export function useFinanceOverviewPage() {
           showSnackbar({ severity: "warning", message: "Select at least one transaction first." });
           return;
         }
+        const ids = selectedRows.map((row) => row.id);
+        if (actionId === "markPaid" && selectedRows.some(isOfflineFinanceTransaction)) {
+          setTransactionDateModal({
+            mode: "markPaid",
+            ids,
+            initialDate: selectedRows.find((row) => row.date)?.date ?? null,
+          });
+          return;
+        }
         void bulkAction({
-          ids: selectedRows.map((row) => row.id),
+          ids,
           action: actionId === "markUnpaid" ? "markUnpaid" : "markPaid",
         }).unwrap().then(() => {
           showSnackbar({ severity: "success", message: actionId === "markUnpaid" ? "Marked unpaid." : "Marked paid." });
@@ -581,6 +599,48 @@ export function useFinanceOverviewPage() {
     setActionExportAnchor(el);
   }, []);
 
+  const openEditTransactionDate = React.useCallback((row: TransactionRow) => {
+    if (!canEditFinanceTransactionDate(row)) return;
+    setTransactionDateModal({
+      mode: "editDate",
+      id: row.id,
+      initialDate: row.date,
+    });
+  }, []);
+
+  const confirmTransactionDateModal = React.useCallback(
+    async (transactionDate: string) => {
+      const modal = transactionDateModal;
+      if (!modal) return;
+      try {
+        if (modal.mode === "markPaid") {
+          await bulkAction({
+            ids: modal.ids,
+            action: "markPaid",
+            transactionDate,
+          }).unwrap();
+          showSnackbar({ severity: "success", message: "Marked paid." });
+        } else {
+          await updateTransaction({
+            id: modal.id,
+            transactionDate,
+          }).unwrap();
+          showSnackbar({ severity: "success", message: "Transaction date updated." });
+        }
+        setTransactionDateModal(null);
+      } catch {
+        showSnackbar({
+          severity: "error",
+          message:
+            modal.mode === "markPaid"
+              ? "Unable to update payment status."
+              : "Unable to update transaction date.",
+        });
+      }
+    },
+    [bulkAction, showSnackbar, transactionDateModal, updateTransaction],
+  );
+
   return {
     theme,
     m,
@@ -619,6 +679,10 @@ export function useFinanceOverviewPage() {
     setEditSalesWarningOpen,
     noteModalTransactionId,
     setNoteModalTransactionId,
+    transactionDateModal,
+    setTransactionDateModal,
+    confirmTransactionDateModal,
+    openEditTransactionDate,
     visibleRows,
     toggleOne,
     toggleAll,

@@ -119,6 +119,8 @@ export type CreateFinanceTransactionRequest = {
 export type BulkFinanceTransactionAction = {
   ids: string[];
   action: "refund" | "void" | "cancel" | "delete" | "markUnpaid" | "markPaid";
+  /** YYYY-MM-DD — required by backend when marking offline invoices Paid. */
+  transactionDate?: string;
 };
 
 export type UpdateFinanceStripeRequest = {
@@ -230,7 +232,7 @@ const financeApi = baseApi.injectEndpoints({
 
     updateFinanceTransaction: builder.mutation<
       ApiEnvelope<TransactionRow>,
-      { id: string; status?: string; note?: string }
+      { id: string; status?: string; note?: string; transactionDate?: string }
     >({
       query: ({ id, ...body }) => ({
         url: `/api/finance/transactions/${id}`,
@@ -334,6 +336,28 @@ const financeApi = baseApi.injectEndpoints({
       invalidatesTags: ["FinanceTransactions", "Notifications"],
     }),
 
+    restartPrepaymentDue: builder.mutation<
+      ApiEnvelope<{
+        transaction: TransactionRow;
+        booking: {
+          id: string;
+          notes?: string | null;
+          response_deadline_at?: string | null;
+          status?: string;
+          prepayment_status?: string | null;
+          unique_code?: string;
+        } | null;
+      }>,
+      { bookingId?: string; bookingRef?: string }
+    >({
+      query: (body) => ({
+        url: "/api/finance/prepayment-due/restart",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["FinanceTransactions", "Bookings"],
+    }),
+
     createStripeConnectLink: builder.mutation<
       ApiEnvelope<{
         url: string | null;
@@ -371,6 +395,7 @@ export const {
   useGetPublicInvoiceSettingsQuery,
   useProcessFinanceInvoiceReissuesMutation,
   useReissueFinanceInvoiceMutation,
+  useRestartPrepaymentDueMutation,
   useGetSalesCardMetadataQuery,
   useUpsertSalesCardMetadataMutation,
   useGetSalesAddonsQuery,

@@ -13,6 +13,7 @@ import {
   useGetFinanceTransactionsQuery,
   useBulkFinanceTransactionActionMutation,
   useCreateFinanceTransactionMutation,
+  useUpdateFinanceTransactionMutation,
   useProcessFinanceInvoiceReissuesMutation,
   useGetSalesCardMetadataQuery,
   useUpsertSalesCardMetadataMutation,
@@ -29,6 +30,11 @@ import {
 import { buildSplitBillNotesPatch, resolveSalesPayerShares } from "./salesSplitBill";
 import type { CalendarBookingDetails, CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { TransactionRow } from "../../../app/professionals/fixed-location/finance/data/transactions";
+import {
+  canEditFinanceTransactionDate,
+  canMarkFinancePaid,
+  canMarkFinanceUnpaid,
+} from "../../../app/professionals/fixed-location/finance/data/transactions";
 import { useSnackbar } from "../AppSnackbar";
 import {
   buildClientBookingTransactionRow,
@@ -40,6 +46,7 @@ import {
 import {
   checkoutPaymentMethodDetail,
   checkoutPaymentMethodTitle,
+  isOfflinePaymentMethod,
 } from "../client-booking/checkoutPaymentOptions";
 import { useFinanceInvoiceSettings } from "../../sections/finance/useFinanceInvoiceSettings";
 import { buildSalesOverviewCards } from "./buildSalesOverviewCards";
@@ -114,6 +121,16 @@ export function useSalesOverview({
   const [fetchFinanceTransactions] = useLazyGetFinanceTransactionsQuery();
   const [bulkFinanceAction] = useBulkFinanceTransactionActionMutation();
   const [createFinanceTransaction] = useCreateFinanceTransactionMutation();
+  const [updateFinanceTransaction] = useUpdateFinanceTransactionMutation();
+  const [transactionDateModal, setTransactionDateModal] = React.useState<
+    | {
+        mode: "markPaid" | "editDate";
+        card: SalesOverviewCardData;
+        ids: string[];
+        initialDate: string | null;
+      }
+    | null
+  >(null);
   const [refundCard, setRefundCard] = React.useState<SalesOverviewCardData | null>(null);
   const [refundTransactions, setRefundTransactions] = React.useState<TransactionRow[]>([]);
   const [processFinanceInvoiceReissues] = useProcessFinanceInvoiceReissuesMutation();
@@ -655,24 +672,129 @@ export function useSalesOverview({
       setRefundCard(card);
       return;
     }
-    if (action === "markUnpaid") {
-      upsertSalesCardMeta({
-        bookingId: card.bookingId,
-        cardKind: card.kind,
-        cardId: card.id,
-        note: card.note,
-        markedUnpaid: true,
-        paymentMethod: card.paymentMethod,
-        dueDate: card.dueDate,
-        voided: card.voided,
-        refunded: card.refunded,
-        canceled: card.canceled,
-      });
-      bump();
-      showSnackbar({
-        severity: "success",
-        message: SALES_OVERVIEW_COPY.markedUnpaid,
-      });
+    if (
+      action === "markPaid" ||
+      action === "markUnpaid" ||
+      action === "editTransactionDate"
+    ) {
+      const offline = isOfflinePaymentMethod(card.paymentMethod);
+      if (action === "markPaid") {
+        if (
+          !offline ||
+          (card.paymentState !== "payment_due" &&
+            card.paymentState !== "overdue_invoice" &&
+            card.paymentState !== "unpaid")
+        ) {
+          return;
+        }
+      } else if (action === "markUnpaid") {
+        const allowed =
+          card.paymentState === "pending" ||
+          (offline &&
+            (card.paymentState === "overdue_invoice" ||
+              card.paymentState === "paid"));
+        if (!allowed) return;
+      } else if (
+        !offline ||
+        (card.paymentState !== "paid" && card.paymentState !== "unpaid")
+      ) {
+        return;
+      }
+
+      try {
+        const bookingRef = card.bookingCode || card.bookingId;
+        const financeResult = await fetchFinanceTransactions({
+          q: bookingRef,
+          limit: 50,
+        }).unwrap();
+        const rows = financeResult.data?.rows ?? [];
+        const matchesCard = (row: TransactionRow) => {
+          const matchesBooking =
+            row.bookingId === card.bookingCode ||
+            row.bookingId === card.bookingId ||
+            row.entryId === card.bookingCode ||
+            (card.financeTransactionId && row.id === card.financeTransactionId);
+          if (!matchesBooking) return false;
+          const phase = (row.document as { paymentPhase?: string } | undefined)
+            ?.paymentPhase;
+          if (card.kind === "addon") return phase === "addon";
+          if (card.kind === "prepayment") return phase === "prepay" || !phase;
+          return phase === "full" || !phase;
+        };
+        const targets = rows.filter((row) => {
+          if (!matchesCard(row)) return false;
+          if (action === "markPaid") return canMarkFinancePaid(row);
+          if (action === "markUnpaid") return canMarkFinanceUnpaid(row);
+          return canEditFinanceTransactionDate(row);
+        });
+
+        if (action === "editTransactionDate" || action === "markPaid") {
+          const ids = targets.length
+            ? targets.map((row) => row.id)
+            : card.financeTransactionId
+              ? [card.financeTransactionId]
+              : [];
+          if (!ids.length) {
+            showSnackbar({
+              severity: "error",
+              message:
+                action === "markPaid"
+                  ? SALES_OVERVIEW_COPY.markPaidFailed
+                  : SALES_OVERVIEW_COPY.editTransactionDateFailed,
+            });
+            return;
+          }
+          setTransactionDateModal({
+            mode: action === "markPaid" ? "markPaid" : "editDate",
+            card,
+            ids,
+            initialDate: targets.find((row) => row.date)?.date ?? card.paidAt?.slice(0, 10) ?? null,
+          });
+          return;
+        }
+
+        // markUnpaid
+        if (targets.length) {
+          await bulkFinanceAction({
+            ids: targets.map((row) => row.id),
+            action: "markUnpaid",
+          }).unwrap();
+        } else if (card.paymentState !== "pending") {
+          showSnackbar({
+            severity: "error",
+            message: SALES_OVERVIEW_COPY.markUnpaidFailed,
+          });
+          return;
+        }
+        upsertSalesCardMeta({
+          bookingId: card.bookingId,
+          cardKind: card.kind,
+          cardId: card.id,
+          note: card.note,
+          markedUnpaid: true,
+          paidAt: null,
+          paymentMethod: card.paymentMethod,
+          dueDate: card.dueDate,
+          voided: card.voided,
+          refunded: card.refunded,
+          canceled: card.canceled,
+        });
+        bump();
+        showSnackbar({
+          severity: "success",
+          message: SALES_OVERVIEW_COPY.markedUnpaid,
+        });
+      } catch {
+        showSnackbar({
+          severity: "error",
+          message:
+            action === "markPaid"
+              ? SALES_OVERVIEW_COPY.markPaidFailed
+              : action === "editTransactionDate"
+                ? SALES_OVERVIEW_COPY.editTransactionDateFailed
+                : SALES_OVERVIEW_COPY.markUnpaidFailed,
+        });
+      }
       return;
     }
     if (action === "downloadInvoicePdf") {
@@ -694,6 +816,11 @@ export function useSalesOverview({
 
   const handleConfirmCancel = async () => {
     if (!cancelCard) return;
+    // Pending → cancel; Paid/Prepaid → void (existing). Block other states.
+    const voidSettledSale =
+      cancelCard.paymentState === "paid" ||
+      cancelCard.paymentState === "prepaid";
+    if (!voidSettledSale && cancelCard.paymentState !== "pending") return;
     try {
       const bookingRef = cancelCard.bookingCode || cancelCard.bookingId;
       const financeResult = await fetchFinanceTransactions({
@@ -701,14 +828,13 @@ export function useSalesOverview({
         limit: 50,
       }).unwrap();
       const rows = financeResult.data?.rows ?? [];
-      const voidSettledSale =
-        cancelCard.paymentState === "paid" ||
-        cancelCard.paymentState === "prepaid";
       const cancelable = rows.filter((row) => {
         const matchesBooking =
           row.bookingId === cancelCard.bookingCode ||
           row.bookingId === cancelCard.bookingId ||
-          row.entryId === cancelCard.bookingCode;
+          row.entryId === cancelCard.bookingCode ||
+          (cancelCard.financeTransactionId &&
+            row.id === cancelCard.financeTransactionId);
         if (!matchesBooking) return false;
         const open = voidSettledSale
           ? ["Paid", "Prepaid", "Payment due", "Overdue", "Unpaid"].includes(row.status)
@@ -1101,6 +1227,71 @@ export function useSalesOverview({
     });
   };
 
+  const confirmTransactionDateModal = async (transactionDate: string) => {
+    const modal = transactionDateModal;
+    if (!modal) return;
+    try {
+      if (modal.mode === "markPaid") {
+        await bulkFinanceAction({
+          ids: modal.ids,
+          action: "markPaid",
+          transactionDate,
+        }).unwrap();
+        upsertSalesCardMeta({
+          bookingId: modal.card.bookingId,
+          cardKind: modal.card.kind,
+          cardId: modal.card.id,
+          note: modal.card.note,
+          markedUnpaid: false,
+          paidAt: `${transactionDate}T12:00:00`,
+          paymentMethod: modal.card.paymentMethod,
+          dueDate: modal.card.dueDate,
+          voided: modal.card.voided,
+          refunded: modal.card.refunded,
+          canceled: modal.card.canceled,
+        });
+        showSnackbar({
+          severity: "success",
+          message: SALES_OVERVIEW_COPY.markedPaid,
+        });
+      } else {
+        await Promise.all(
+          modal.ids.map((id) =>
+            updateFinanceTransaction({ id, transactionDate }).unwrap(),
+          ),
+        );
+        if (modal.card.paymentState === "paid") {
+          upsertSalesCardMeta({
+            bookingId: modal.card.bookingId,
+            cardKind: modal.card.kind,
+            cardId: modal.card.id,
+            note: modal.card.note,
+            paidAt: `${transactionDate}T12:00:00`,
+            paymentMethod: modal.card.paymentMethod,
+            dueDate: modal.card.dueDate,
+            voided: modal.card.voided,
+            refunded: modal.card.refunded,
+            canceled: modal.card.canceled,
+          });
+        }
+        showSnackbar({
+          severity: "success",
+          message: SALES_OVERVIEW_COPY.transactionDateUpdated,
+        });
+      }
+      setTransactionDateModal(null);
+      bump();
+    } catch {
+      showSnackbar({
+        severity: "error",
+        message:
+          modal.mode === "markPaid"
+            ? SALES_OVERVIEW_COPY.markPaidFailed
+            : SALES_OVERVIEW_COPY.editTransactionDateFailed,
+      });
+    }
+  };
+
   return {
     cancelling,
     cards,
@@ -1137,5 +1328,8 @@ export function useSalesOverview({
     setNoteCard,
     setOverdueCard,
     subToCard,
+    transactionDateModal,
+    setTransactionDateModal,
+    confirmTransactionDateModal,
   };
 }

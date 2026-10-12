@@ -77,6 +77,8 @@ export type UseProfessionalFixedLocationCalendarBookingPersistArgs = {
   manageBookingEditRequest: (args: { id: string; action: "accept" | "reject" }) => any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   createFinanceTransaction: (args: any) => any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  restartPrepaymentDue: (args: { bookingId?: string; bookingRef?: string }) => any;
   onUpdateBookingStatus: ProfessionalFixedLocationCalendarProps["onUpdateBookingStatus"];
   persistEventStatus: PersistEventStatus;
   restoreIncomingActions: () => void;

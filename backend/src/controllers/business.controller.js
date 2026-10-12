@@ -66,6 +66,7 @@ import {
   parseEditRequest,
 } from "../helpers/bookingEditRequest.js";
 import { logError, sendCaughtError } from "../utils/httpError.js";
+import { responseDeadlineAtFromNotes } from "../utils/bookingResponseWindow.js";
 
 const parseJsonValue = (value, fallback) => {
   if (value === undefined || value === null || value === "") {
@@ -2052,6 +2053,7 @@ const mirrorCalendarRequestToBooking = async ({
            end_time = COALESCE($5, end_time),
            location_type = COALESCE($6, location_type),
            notes = $7,
+           response_deadline_at = COALESCE($13::timestamptz, response_deadline_at),
            location_details = COALESCE($8::jsonb, location_details),
            images = CASE WHEN cardinality($9::text[]) > 0 THEN $9::text[] ELSE images END,
            documents = CASE WHEN cardinality($10::text[]) > 0 THEN $10::text[] ELSE documents END,
@@ -2077,6 +2079,7 @@ const mirrorCalendarRequestToBooking = async ({
         mirroredDocuments,
         mirroredTotal,
         existing.rows[0].id,
+        responseDeadlineAtFromNotes(notes),
       ],
     );
     const booking = updated.rows[0] ?? existing.rows[0];
@@ -2115,6 +2118,7 @@ const mirrorCalendarRequestToBooking = async ({
        location_type,
        location_details,
        notes,
+       response_deadline_at,
        status,
        booking_type,
        unique_code,
@@ -2122,7 +2126,7 @@ const mirrorCalendarRequestToBooking = async ({
        images,
        documents
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, 'requested', 'online', $11, $12, $13, $14)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $15::timestamptz, 'requested', 'online', $11, $12, $13, $14)
      RETURNING *`,
     [
       bookingDate,
@@ -2139,6 +2143,7 @@ const mirrorCalendarRequestToBooking = async ({
       mirroredTotal,
       mirroredImages,
       mirroredDocuments,
+      responseDeadlineAtFromNotes(notes),
     ],
   );
   const booking = inserted.rows[0] ?? null;
@@ -2525,6 +2530,7 @@ export const createBooking = async (req, res) => {
          location_type,
          location_details,
          notes,
+         response_deadline_at,
          prepayment_status,
          status,
          booking_type,
@@ -2540,7 +2546,7 @@ export const createBooking = async (req, res) => {
          postal_code
        )
        VALUES (
-         $1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
+         $1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $24::timestamptz, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
        )
        RETURNING *`,
       [
@@ -2567,6 +2573,7 @@ export const createBooking = async (req, res) => {
         req.body.street_address ?? null,
         req.body.street_number ?? null,
         req.body.postal_code ?? null,
+        responseDeadlineAtFromNotes(notes),
       ],
     );
 
@@ -3088,6 +3095,7 @@ export const updateMyBooking = async (req, res) => {
        SET status = $1,
            prepayment_status = $2,
            notes = $3,
+           response_deadline_at = COALESCE($11::timestamptz, response_deadline_at),
            total_price = $4,
            booking_date = $5,
            start_time = $6,
@@ -3108,6 +3116,7 @@ export const updateMyBooking = async (req, res) => {
         nextEditRequest,
         bookingId,
         req.user.id,
+        responseDeadlineAtFromNotes(nextNotes),
       ],
     );
 
@@ -3139,16 +3148,34 @@ export const updateMyBooking = async (req, res) => {
       }
     }
 
-    if (["confirmed", "completed", "no_show"].includes(booking.status)) {
-      try {
-        await syncBookingToFinanceTransaction(booking.id, {
-          paymentPhase: booking.prepayment_status === "paid" ? "prepay" : "full",
-          paymentMethod: booking.booking_type === "offline" ? "offlineDirect" : "onlineDirect",
-        });
-      } catch {
-        // best-effort
+    {
+      const prepay = String(booking.prepayment_status ?? "").toLowerCase();
+      const st = String(booking.status ?? "").toLowerCase();
+      const shouldSyncFinance =
+        ["confirmed", "completed", "no_show", "br_accepted"].includes(st) ||
+        (st === "requested" && ["pending", "required", "paid"].includes(prepay));
+      if (shouldSyncFinance) {
+        try {
+          const notesChanged =
+            hasNotes && String(booking.notes ?? "") !== String(existing.notes ?? "");
+          const negotiationReplace =
+            (st === "requested" || st === "br_accepted") &&
+            (scheduleOrTotalChanged || notesChanged);
+          const paymentPhase =
+            st === "requested" || st === "br_accepted" || prepay === "paid"
+              ? "prepay"
+              : "full";
+          await syncBookingToFinanceTransaction(booking.id, {
+            paymentPhase,
+            paymentMethod:
+              booking.booking_type === "offline" ? "offlineDirect" : "onlineDirect",
+            ...(negotiationReplace ? { forceReplace: true } : {}),
+          });
+        } catch {
+          // best-effort
+        }
+        await safeEnsureProfessionalClientFromBooking(booking.id);
       }
-      await safeEnsureProfessionalClientFromBooking(booking.id);
     }
 
     if (previousStatus !== booking.status || existing.prepayment_status !== booking.prepayment_status) {
@@ -3308,6 +3335,7 @@ export const updateBookingStatus = async (req, res) => {
       `UPDATE bookings
        SET status = $1,
            notes = $2,
+           response_deadline_at = COALESCE($10::timestamptz, response_deadline_at),
            total_price = $3,
            no_show_fee_amount = CASE
              WHEN $1 = 'no_show' THEN ROUND(($3 * COALESCE((SELECT no_show_fee_percentage FROM business_setups WHERE id = $9), 0) / 100)::numeric, 2)
@@ -3340,6 +3368,7 @@ export const updateBookingStatus = async (req, res) => {
         nextEditRequest,
         bookingId,
         businessSetupId,
+        responseDeadlineAtFromNotes(nextNotes),
       ],
     );
 
@@ -3384,15 +3413,55 @@ export const updateBookingStatus = async (req, res) => {
       }
     }
 
-    if (["confirmed", "completed"].includes(booking.status)) {
+    {
+      const prepay = String(booking.prepayment_status ?? "").toLowerCase();
+      const st = String(booking.status ?? "").toLowerCase();
+      const shouldSyncFinance =
+        ["confirmed", "completed", "br_accepted"].includes(st) ||
+        (st === "requested" && ["pending", "required", "paid"].includes(prepay));
+      if (shouldSyncFinance) {
+        try {
+          const notesChanged =
+            req.body.notes !== undefined &&
+            req.body.notes !== null &&
+            String(booking.notes ?? "") !== String(existingBooking.notes ?? "");
+          const negotiationReplace =
+            st === "requested" && (scheduleOrTotalChanged || notesChanged);
+          await syncBookingToFinanceTransaction(booking.id, {
+            paymentMethod:
+              booking.booking_type === "offline" ? "offlineDirect" : "onlineDirect",
+            ...(st === "br_accepted" ||
+            st === "requested" ||
+            prepay === "pending" ||
+            prepay === "required"
+              ? { paymentPhase: "prepay" }
+              : {}),
+            ...(negotiationReplace ? { forceReplace: true } : {}),
+          });
+        } catch {
+          // best-effort
+        }
+        await safeEnsureProfessionalClientFromBooking(booking.id);
+      }
+    }
+
+    // Discard / cancel: void open Prepayment due so Sales no longer shows a live card.
+    if (["invalid", "cancelled", "canceled"].includes(String(booking.status).toLowerCase())) {
       try {
-        await syncBookingToFinanceTransaction(booking.id, {
-          paymentMethod: booking.booking_type === "offline" ? "offlineDirect" : "onlineDirect",
-        });
+        await query(
+          `UPDATE finance_transactions
+           SET status = 'Voided',
+               document = jsonb_set(COALESCE(document, '{}'::jsonb), '{status}', '"Voided"'::jsonb, true),
+               updated_at = NOW()
+           WHERE professional_profile_id = $1
+             AND booking_id = $2
+             AND COALESCE(document->>'paymentPhase', '') = 'prepay'
+             AND status IN ('Prepayment due', 'Overdue response', 'Pending')`,
+          [professionalProfile.id, booking.unique_code],
+        );
       } catch {
         // best-effort
       }
-      await safeEnsureProfessionalClientFromBooking(booking.id);
     }
 
     // Flag the client record when they booked but did not show up.

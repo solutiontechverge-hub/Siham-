@@ -6,7 +6,10 @@ import {
   parseStoredErFromNotes,
   serializeCalendarEntryNotes,
 } from "../bookingEventDetails";
-import { restartResponseDeadline } from "../bookingResponseDeadline";
+import {
+  isPendingPrepaymentResponse,
+  restartResponseDeadline,
+} from "../bookingResponseDeadline";
 import { syncEditRequestFromBookingApi } from "../../client-booking/syncEditRequestFromApi";
 import { extractBookingId } from "../calendar.utils";
 import type { UseProfessionalFixedLocationCalendarBookingPersistArgs } from "./useProfessionalFixedLocationCalendar.bookingPersist";
@@ -19,6 +22,7 @@ export function useProfessionalFixedLocationCalendarBookingPersistDiscard(
     viewingBookingEvent,
     businessResponseWindowInput,
     manageBookingEditRequest,
+    restartPrepaymentDue,
     persistEventStatus,
     showSnackbar,
     setEvents,
@@ -49,7 +53,7 @@ export function useProfessionalFixedLocationCalendarBookingPersistDiscard(
       severity: "success",
       message: "Booking request discarded.",
     });
-  }, [editingEventId, persistEventStatus, showSnackbar]);
+  }, [editingEventId, persistEventStatus, showSnackbar, setEvents, setSlotStatus]);
 
   const [isWithdrawingEr, setIsWithdrawingEr] = React.useState(false);
 
@@ -122,6 +126,7 @@ export function useProfessionalFixedLocationCalendarBookingPersistDiscard(
     persistEventStatus,
     showSnackbar,
     viewingBookingEvent,
+    setEvents,
   ]);
 
   const handleWithdrawEr = React.useCallback(async () => {
@@ -135,6 +140,67 @@ export function useProfessionalFixedLocationCalendarBookingPersistDiscard(
 
   const handleRestartResponseTime = React.useCallback(async () => {
     if (!editingEventId || !viewingBookingEvent) return;
+
+    // Prepayment Due: archive/replace finance row + stamp a fresh clock server-side.
+    if (isPendingPrepaymentResponse(viewingBookingEvent)) {
+      const parsed = parseApiCalendarEventId(editingEventId);
+      if (parsed?.kind !== "booking") return;
+      try {
+        const result = await restartPrepaymentDue({
+          bookingId: parsed.id,
+          bookingRef:
+            viewingBookingEvent.bookingCode ?? extractBookingId(editingEventId),
+        }).unwrap();
+        const booking = result.data?.booking;
+        const windowMinutes =
+          Number(viewingBookingEvent.details?.responseWindowMinutes) > 0
+            ? Number(viewingBookingEvent.details?.responseWindowMinutes)
+            : undefined;
+        const respondBy = booking?.response_deadline_at;
+        const startedAt =
+          respondBy && windowMinutes
+            ? new Date(Date.parse(respondBy) - windowMinutes * 60_000)
+            : new Date();
+        const deadline = {
+          ...restartResponseDeadline(
+            viewingBookingEvent.details,
+            businessResponseWindowInput,
+            startedAt,
+          ),
+          ...(respondBy ? { respondBy } : {}),
+        };
+        const nextDetails = {
+          ...(viewingBookingEvent.details ?? {}),
+          ...deadline,
+          responseStatus: undefined,
+        };
+        setEvents((prev) =>
+          prev.map((event) =>
+            event.id === editingEventId
+              ? {
+                  ...event,
+                  notes: booking?.notes ?? event.notes,
+                  details: nextDetails,
+                }
+              : event,
+          ),
+        );
+        showSnackbar({
+          severity: "success",
+          message: "Prepayment due restarted.",
+        });
+      } catch (error) {
+        showSnackbar({
+          severity: "error",
+          message: getApiErrorMessage(
+            error,
+            "Unable to restart prepayment due.",
+          ),
+        });
+      }
+      return;
+    }
+
     const details = viewingBookingEvent.details ?? {};
     const deadline = restartResponseDeadline(
       details,
@@ -185,8 +251,10 @@ export function useProfessionalFixedLocationCalendarBookingPersistDiscard(
     businessResponseWindowInput,
     editingEventId,
     persistEventStatus,
+    restartPrepaymentDue,
     showSnackbar,
     viewingBookingEvent,
+    setEvents,
   ]);
 
   const handleDiscardEbr = React.useCallback(async () => {
@@ -215,7 +283,14 @@ export function useProfessionalFixedLocationCalendarBookingPersistDiscard(
       severity: "success",
       message: "Edited booking request discarded.",
     });
-  }, [editingEventId, persistEventStatus, showSnackbar]);
+  }, [
+    editingEventId,
+    persistEventStatus,
+    showSnackbar,
+    setEvents,
+    setSlotStatus,
+    setIncomingRequestEditMode,
+  ]);
 
   return {
     handleDiscardBr,

@@ -46,6 +46,8 @@ export type SalesFinanceHint = {
   dueDate?: string | null;
   paymentMethod?: string;
   penaltyAmount?: number;
+  /** document.reissueLevel — gates Manual/Automatic overdue banners */
+  reissueLevel?: number;
   /** Finance `entry_label` — used to heal protective-fee Sales cards. */
   entryLabel?: string;
   amount?: number;

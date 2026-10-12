@@ -14,14 +14,15 @@ export function isResponseTimeConfigured(setupHours, setupMinutes) {
 }
 
 /**
- * Live business-template window. Setup always wins; blank/zero → flat 30-minute
- * default. Meta snapshot is ignored so template edits apply to open requests.
+ * Window minutes: stamped meta wins when provided; else setup; blank → flat 30.
  */
 export function resolveResponseWindowMinutes(
   setupHours,
   setupMinutes,
-  _metaWindowMinutes,
+  metaWindowMinutes,
 ) {
+  const stamped = Number(metaWindowMinutes);
+  if (Number.isFinite(stamped) && stamped > 0) return stamped;
   const hours = Number(setupHours);
   const minutes = Number(setupMinutes);
   const total =
@@ -30,22 +31,32 @@ export function resolveResponseWindowMinutes(
   return total > 0 ? total : DEFAULT_RESPONSE_WINDOW_MINUTES;
 }
 
-/** Due ms from responseStartedAt + live window (falls back to shifted respondBy). */
+/** Due ms: frozen respondBy wins; never shift it with a live window. */
 export function resolveEffectiveRespondByMs(meta, windowMinutes) {
+  if (meta?.respondBy) {
+    const due = Date.parse(meta.respondBy);
+    if (Number.isFinite(due)) return due;
+  }
+
   if (meta?.responseStartedAt) {
     const start = Date.parse(meta.responseStartedAt);
     if (Number.isFinite(start)) return start + windowMinutes * 60_000;
   }
 
-  if (meta?.respondBy) {
-    const due = Date.parse(meta.respondBy);
-    if (!Number.isFinite(due)) return null;
-    const stamped = Number(meta.responseWindowMinutes);
-    if (Number.isFinite(stamped) && stamped > 0 && stamped !== windowMinutes) {
-      return due - stamped * 60_000 + windowMinutes * 60_000;
-    }
-    return due;
-  }
-
   return null;
+}
+
+/** ISO timestamptz from notes meta `respondBy`, or null when absent/invalid. */
+export function responseDeadlineAtFromNotes(notes) {
+  if (!notes || typeof notes !== "string") return null;
+  const marker = "---mollure-meta---";
+  const i = notes.indexOf(marker);
+  const raw = (i === -1 ? notes : notes.slice(i + marker.length)).trim();
+  if (!raw.startsWith("{")) return null;
+  try {
+    const due = Date.parse(JSON.parse(raw)?.respondBy);
+    return Number.isFinite(due) ? new Date(due).toISOString() : null;
+  } catch {
+    return null;
+  }
 }

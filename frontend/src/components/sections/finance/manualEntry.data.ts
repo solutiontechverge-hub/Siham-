@@ -232,6 +232,18 @@ export function createManualEntryLine(
   };
 }
 
+/** Catalog sourceType for a line. Manual finance entries must not use serviceId. */
+export function resolveManualEntrySourceType(
+  kind: ManualEntryLineKind,
+  optionId: string,
+): NonNullable<ManualEntryLine["sourceType"]> {
+  if (kind === "product") return "productId";
+  // Unique-item ids are minted as `unique-…`; everything else in the item
+  // catalog is a booking service (allowed on booking sales, not manual).
+  if (String(optionId).startsWith("unique-")) return "uniqueItemCode";
+  return "serviceId";
+}
+
 export function createManualEntryLineFromOption(
   kind: ManualEntryLineKind,
   option: ManualEntryCatalogOption,
@@ -240,7 +252,7 @@ export function createManualEntryLineFromOption(
   return {
     id: `${kind}-${option.id}-${Date.now()}`,
     sourceReference: option.id,
-    sourceType: kind === "item" ? "serviceId" : "productId",
+    sourceType: resolveManualEntrySourceType(kind, option.id),
     kind,
     name: option.label,
     quantity: Math.max(1, quantity),

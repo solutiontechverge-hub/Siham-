@@ -167,6 +167,60 @@ export function isTransactionOnlinePayment(methodTitle: string): boolean {
   return methodTitle.trim().toLowerCase().startsWith("online");
 }
 
+/** Offline / non-Stripe cash-or-invoice rows (entry type or method title). */
+export function isOfflineFinanceTransaction(
+  row: Pick<TransactionRow, "entryType" | "methodTitle">,
+): boolean {
+  if (row.entryType === "offlineBooking") return true;
+  return row.methodTitle.trim().toLowerCase().startsWith("offline");
+}
+
+/** Mirrors backend canBulkMarkPaid — manualEntry path + offline invoice overrides. */
+export function canMarkFinancePaid(
+  row: Pick<TransactionRow, "entryType" | "methodTitle" | "status">,
+): boolean {
+  if (row.entryType === "manualEntry") {
+    return ["Unpaid", "Pending", "Payment due", "Overdue"].includes(row.status);
+  }
+  if (isOfflineFinanceTransaction(row)) {
+    return ["Unpaid", "Payment due", "Overdue"].includes(row.status);
+  }
+  return false;
+}
+
+/** Mirrors backend canBulkMarkUnpaid — Pending / reissue manual / offline Overdue|Paid. */
+export function canMarkFinanceUnpaid(
+  row: Pick<TransactionRow, "entryType" | "methodTitle" | "status"> & {
+    document?: { reissueLevel?: number } | null;
+  },
+): boolean {
+  if (row.status === "Pending") return true;
+  if (
+    ["Payment due", "Overdue"].includes(row.status) &&
+    row.entryType === "manualEntry" &&
+    Number(row.document?.reissueLevel ?? 0) >= 2
+  ) {
+    return true;
+  }
+  if (
+    isOfflineFinanceTransaction(row) &&
+    (row.status === "Overdue" || row.status === "Paid")
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/** Offline Paid/Unpaid may edit the persisted transaction_date. */
+export function canEditFinanceTransactionDate(
+  row: Pick<TransactionRow, "entryType" | "methodTitle" | "status">,
+): boolean {
+  return (
+    isOfflineFinanceTransaction(row) &&
+    (row.status === "Paid" || row.status === "Unpaid")
+  );
+}
+
 /** Guests share email only for online payments; name is always shown in the table. */
 export function shouldShowTransactionClientEmail(
   row: Pick<TransactionRow, "clientType" | "clientEmail" | "methodTitle">,
@@ -338,4 +392,18 @@ export function getTransactionActionCategory(
 
   if (categories.size > 1) return "mixed";
   return categories.values().next().value ?? null;
+}
+
+/** Calendar deep-link for overdue Review — sales tab (invoice) vs booking banner (prepay response). */
+export function buildOverdueReviewHref(
+  row: Pick<TransactionRow, "status" | "bookingId" | "entryId" | "date">,
+): string | null {
+  if (row.status !== "Overdue" && row.status !== "Overdue response") return null;
+  const ref = row.entryId || row.bookingId;
+  if (!ref) return null;
+  const params = new URLSearchParams();
+  params.set("booking", ref);
+  if (row.date) params.set("date", row.date);
+  if (row.status === "Overdue") params.set("tab", "sales");
+  return `/professionals/calendar?${params.toString()}`;
 }
