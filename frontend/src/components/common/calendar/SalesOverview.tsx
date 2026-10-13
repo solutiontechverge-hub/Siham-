@@ -62,6 +62,7 @@ export default function SalesOverview({
     openDocument,
     overdueCard,
     overdueManualCard,
+    overduePaymentTerms,
     professionalBusinessOverride,
     clearCheckout,
     setCancelCard,
@@ -284,7 +285,7 @@ export default function SalesOverview({
       <SalesOverdueReissueModal
         open={Boolean(overdueCard)}
         unpaidAmount={overdueCard?.highlightAmount ?? 0}
-        paymentTerms={financeSettings.paymentTerms}
+        paymentTerms={overduePaymentTerms}
         alreadyReissued={overdueCard?.kind === "reissued_invoice"}
         onClose={() => setOverdueCard(null)}
         onConfirm={handleReissue}

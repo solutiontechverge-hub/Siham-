@@ -20,13 +20,23 @@ export const defaultFinanceTransactionOptions: FinanceTransactionOptions = {
   offlineInvoiceDueDate: false,
 };
 
+/** Online immediate is mandatory for post-booking checkout — never persist/expose false. */
+export function lockOnlineImmediate(
+  options: FinanceTransactionOptions,
+): FinanceTransactionOptions {
+  return { ...options, onlineImmediate: true };
+}
+
 export function useFinanceTransactionOptions() {
   const { data: settingsResponse, isLoading: isQueryLoading } = useGetFinanceSettingsQuery();
   const [updateOptions, { isLoading: isSaving }] = useUpdateFinanceTransactionOptionsMutation();
   const [localDraft, setLocalDraft] = React.useState<FinanceTransactionOptions | null>(null);
 
-  const options =
-    localDraft ?? settingsResponse?.data?.transactionOptions ?? defaultFinanceTransactionOptions;
+  const options = lockOnlineImmediate(
+    localDraft ??
+      settingsResponse?.data?.transactionOptions ??
+      defaultFinanceTransactionOptions,
+  );
 
   const setOptions = React.useCallback(
     (
@@ -37,7 +47,7 @@ export function useFinanceTransactionOptions() {
       setLocalDraft((prev) => {
         const base = prev ?? settingsResponse?.data?.transactionOptions ?? defaultFinanceTransactionOptions;
         const next = typeof updater === "function" ? updater(base) : updater;
-        const locked = { ...next, onlineImmediate: true };
+        const locked = lockOnlineImmediate(next);
         void updateOptions(locked);
         return locked;
       });
@@ -47,7 +57,7 @@ export function useFinanceTransactionOptions() {
 
   React.useEffect(() => {
     if (settingsResponse?.data?.transactionOptions) {
-      setLocalDraft({ ...settingsResponse.data.transactionOptions, onlineImmediate: true });
+      setLocalDraft(lockOnlineImmediate(settingsResponse.data.transactionOptions));
     }
   }, [settingsResponse?.data?.transactionOptions]);
 

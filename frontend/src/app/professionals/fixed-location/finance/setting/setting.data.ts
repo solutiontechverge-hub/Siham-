@@ -79,6 +79,9 @@ export const TRANSACTION_OPTION_ITEMS: TransactionOptionItem[] = [
 export const DEFAULT_PRODUCT_DRAFT: ProductDraft = emptyBookingUniqueItemDraft();
 
 export const DEFAULT_SERVICE_DRAFT: ServiceDraft = {
+  serviceId: "",
+  category: "",
   service: "",
-  vat: "21%",
+  // Exception rows only — leave blank so pros enter a non-default rate.
+  vat: "",
 };

@@ -56,11 +56,34 @@ type LocationUploadRow = {
   kind?: "image" | "document" | null;
 };
 
+/** Coerce pg/jsonb quirks (stringified JSON, single url) into a string list. */
+function coerceMediaUrlList(value: unknown): string[] {
+  if (value == null) return [];
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => String(entry ?? "").trim())
+      .filter(Boolean);
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    if (trimmed.startsWith("[")) {
+      try {
+        return coerceMediaUrlList(JSON.parse(trimmed));
+      } catch {
+        // fall through — treat as a single url path
+      }
+    }
+    return [trimmed];
+  }
+  return [];
+}
+
 /** Prefer location_details.uploads with live urls; else booking images/documents columns. */
 export function resolveBookingProjectUploads(input: {
   locationUploads?: LocationUploadRow[] | null;
-  images?: Array<string | null | undefined> | null;
-  documents?: Array<string | null | undefined> | null;
+  images?: Array<string | null | undefined> | string | null;
+  documents?: Array<string | null | undefined> | string | null;
 }): Array<{
   id: string;
   name: string;
@@ -69,9 +92,12 @@ export function resolveBookingProjectUploads(input: {
   mimeType?: string;
   kind: "image" | "document";
 }> {
-  const fromLocation = (input.locationUploads ?? [])
+  const locationUploads = Array.isArray(input.locationUploads)
+    ? input.locationUploads
+    : [];
+  const fromLocation = locationUploads
     .map((upload, index) => {
-      const url = liveMediaUrl(upload.url);
+      const url = liveMediaUrl(upload?.url);
       if (!url) return null;
       const name = upload.name || `File ${index + 1}`;
       return {
@@ -86,26 +112,20 @@ export function resolveBookingProjectUploads(input: {
     .filter((row): row is NonNullable<typeof row> => Boolean(row));
   if (fromLocation.length) return fromLocation;
 
-  const imageUploads = (input.images ?? []).filter(Boolean).map((url, index) => {
-    const href = String(url);
-    return {
-      id: `img-${index}`,
-      name: `Image ${index + 1}`,
-      url: href,
-      previewUrl: resolveMediaUrl(href) ?? href,
-      kind: "image" as const,
-    };
-  });
-  const documentUploads = (input.documents ?? []).filter(Boolean).map((url, index) => {
-    const href = String(url);
-    return {
-      id: `doc-${index}`,
-      name: `Document ${index + 1}`,
-      url: href,
-      previewUrl: resolveMediaUrl(href) ?? href,
-      kind: "document" as const,
-    };
-  });
+  const imageUploads = coerceMediaUrlList(input.images).map((href, index) => ({
+    id: `img-${index}`,
+    name: `Image ${index + 1}`,
+    url: href,
+    previewUrl: resolveMediaUrl(href) ?? href,
+    kind: "image" as const,
+  }));
+  const documentUploads = coerceMediaUrlList(input.documents).map((href, index) => ({
+    id: `doc-${index}`,
+    name: `Document ${index + 1}`,
+    url: href,
+    previewUrl: resolveMediaUrl(href) ?? href,
+    kind: "document" as const,
+  }));
   return [...imageUploads, ...documentUploads];
 }
 

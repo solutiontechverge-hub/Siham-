@@ -246,6 +246,7 @@ export function buildClientBookingApiPayload(input: {
   const firstService = services[0] as (typeof services)[number] & { catalogServiceId?: string | null };
   const catalogId = firstService.catalogServiceId || firstService.id;
   const serviceId = resolveSubcategoryServiceId(input.setup, catalogId, firstService.name);
+  if (!serviceId) return null;
   const teamMemberId = resolveTeamMemberId(
     input.setup,
     firstService.teamMemberId ?? input.draft.teamMembers?.[0]?.id ?? null,

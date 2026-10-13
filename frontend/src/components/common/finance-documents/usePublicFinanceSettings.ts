@@ -10,6 +10,7 @@ import {
   type FinanceInvoiceSettings,
 } from "./useFinanceInvoiceSettings";
 import {
+  lockOnlineImmediate,
   type FinanceTransactionOptions,
 } from "./useFinanceTransactionOptions";
 
@@ -25,15 +26,15 @@ export function usePublicFinanceSettings(businessSetupId: string | undefined) {
   );
 
   const transactionOptions = React.useMemo<FinanceTransactionOptions>(
-    () => ({
-      ...(txResponse?.data ?? {
-        onlineImmediate: true,
-        onlineInvoiceDueDate: false,
-        offlineImmediate: false,
-        offlineInvoiceDueDate: false,
-      }),
-      onlineImmediate: true,
-    }),
+    () =>
+      lockOnlineImmediate(
+        txResponse?.data ?? {
+          onlineImmediate: true,
+          onlineInvoiceDueDate: false,
+          offlineImmediate: false,
+          offlineInvoiceDueDate: false,
+        },
+      ),
     [txResponse?.data],
   );
 

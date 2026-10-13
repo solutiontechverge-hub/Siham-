@@ -468,7 +468,7 @@ function applyFinanceAndMetaState(
     }
     next.penaltyPrompt = resolvePenaltyPrompt(
       financeState,
-      ctx.paymentTerms,
+      finance.paymentTerms ?? ctx.paymentTerms,
       reissueLevel,
     );
     return true;

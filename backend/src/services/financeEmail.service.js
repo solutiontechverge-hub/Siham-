@@ -6,9 +6,10 @@ import {
   buildInvoiceReissuedEmail,
 } from "../helpers/financeEmailTemplates.js";
 import {
-  daysUntilDate,
-  durationToDays,
+  isReminderTriggerDay,
   mergeInvoiceSettings,
+  resolveDocumentReminders,
+  resolveStoredDueDate,
 } from "../helpers/financeInvoiceSettings.js";
 
 export const FINANCE_EMAIL_TYPES = {
@@ -177,8 +178,10 @@ export const sendFinanceClientEmail = async (
 };
 
 /**
- * Send pre-due reminder emails for every unpaid invoice whose due date matches
- * that professional's Reminder 1 / Reminder 2 settings (days before due).
+ * Send pre-due reminder emails for every unpaid invoice whose stored due date
+ * matches Reminder 1 / Reminder 2 lead timing (value + Days|Weeks before due).
+ * Trigger dates are computed only from the frozen due date — never from live
+ * "today + payment terms" recalculation.
  */
 export const processInvoiceReminders = async () => {
   const outcomes = [];
@@ -186,47 +189,49 @@ export const processInvoiceReminders = async () => {
   const result = await query(
     `SELECT
        ft.id,
-       ft.document->>'dueDate' AS due_date,
-       COALESCE(ft.document->'issuedSnapshot'->'invoiceSettings', pfs.invoice_settings, '{}'::jsonb) AS invoice_settings
+       ft.payment_deadline,
+       ft.document,
+       COALESCE(pfs.invoice_settings, '{}'::jsonb) AS live_settings
      FROM finance_transactions ft
      LEFT JOIN professional_finance_settings pfs
        ON pfs.professional_profile_id = ft.professional_profile_id
      WHERE ft.status IN ('Payment due', 'Pending')
        AND ft.client_email IS NOT NULL
        AND ft.client_email <> ''
-       AND NULLIF(ft.document->>'dueDate', '') IS NOT NULL`,
+       AND COALESCE(ft.payment_deadline, NULLIF(ft.document->>'dueDate', '')::date) IS NOT NULL`,
   );
 
   for (const row of result.rows) {
-    const settings = mergeInvoiceSettings(row.invoice_settings);
-    const daysLeft = daysUntilDate(row.due_date);
-    if (daysLeft == null || daysLeft < 0) continue;
+    const doc = row.document ?? {};
+    const storedDue = resolveStoredDueDate(
+      row.payment_deadline,
+      doc.dueDate,
+    );
+    if (!storedDue) continue;
+
+    const live = mergeInvoiceSettings(row.live_settings);
+    const reminders = resolveDocumentReminders(doc, live.reminders);
 
     const reminderSlots = [
       {
         key: "reminder1",
-        days: durationToDays(
-          settings.reminders.reminder1Value,
-          settings.reminders.reminder1Unit,
-        ),
+        value: reminders.reminder1Value,
+        unit: reminders.reminder1Unit,
       },
       {
         key: "reminder2",
-        days: durationToDays(
-          settings.reminders.reminder2Value,
-          settings.reminders.reminder2Unit,
-        ),
+        value: reminders.reminder2Value,
+        unit: reminders.reminder2Unit,
       },
     ];
 
     for (const slot of reminderSlots) {
-      if (slot.days == null || slot.days < 0) continue;
-      if (daysLeft !== slot.days) continue;
+      if (!isReminderTriggerDay(storedDue, slot.value, slot.unit)) continue;
 
       const outcome = await sendFinanceClientEmail(
         row.id,
         FINANCE_EMAIL_TYPES.INVOICE_PRE_DUE,
-        { forceKey: `${slot.key}:${row.due_date}` },
+        { forceKey: `${slot.key}:${storedDue}` },
       );
       outcomes.push({
         transactionId: row.id,

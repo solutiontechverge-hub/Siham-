@@ -30,6 +30,7 @@ import {
   useUpdateFinanceTransactionMutation,
 } from "../../../../../store/services/financeApi";
 import { INITIAL_VISIBLE, buildActionMenuItems } from "./overview.data";
+import { useStripePayoutGuard } from "../useStripePayoutGuard";
 
 export function useFinanceOverviewPage() {
   const theme = useTheme();
@@ -38,6 +39,7 @@ export function useFinanceOverviewPage() {
   const { settings } = useFinanceInvoiceSettings();
   const { data: profileResponse } = useGetProfileQuery();
   const { showSnackbar } = useSnackbar();
+  const { runPayoutAction, payoutGuardDialog } = useStripePayoutGuard();
 
   const [query, setQuery] = React.useState("");
   const [selected, setSelected] = React.useState<Record<string, boolean>>({});
@@ -456,6 +458,11 @@ export function useFinanceOverviewPage() {
     }
   }, [closeMoreMenus, rowsToExport, showSnackbar]);
 
+  const handleManagePayouts = React.useCallback(() => {
+    closeMoreMenus();
+    runPayoutAction();
+  }, [closeMoreMenus, runPayoutAction]);
+
   const handleActionMenuAction = React.useCallback(
     (actionId: string) => {
       if (actionId === "export") return;
@@ -707,5 +714,7 @@ export function useFinanceOverviewPage() {
     handleAddMenuAction,
     openActionExportMenu,
     openManualEntryDrawer,
+    handleManagePayouts,
+    payoutGuardDialog,
   };
 }

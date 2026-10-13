@@ -2,21 +2,21 @@
  * Group / Add-ons (⋮) menu visibility and protective-fee clamping.
  * Prepayment is proposable only when not already shown/paid; protective fees need policy + trigger tags.
  */
+import {
+  canTriggerKilometerAllowance,
+  clampProtectiveFeePercent,
+  isPolicyFeeConfigured,
+  parsePolicyPercentCeiling,
+  shouldTriggerLateCancellationFee,
+  shouldTriggerLateRescheduleFee,
+  shouldTriggerNoShowFee,
+} from "./bookingFeeTriggers";
 
-export function isPolicyFeeConfigured(
-  policyPercent: number | string | null | undefined,
-): boolean {
-  const n = Number(policyPercent);
-  return Number.isFinite(n) && n > 0;
-}
-
-export function parsePolicyPercentCeiling(
-  policyPercent: number | string | null | undefined,
-): number {
-  const n = Number(policyPercent);
-  if (!Number.isFinite(n) || n <= 0) return 0;
-  return Math.min(100, n);
-}
+export {
+  clampProtectiveFeePercent,
+  isPolicyFeeConfigured,
+  parsePolicyPercentCeiling,
+};
 
 export function canAddPrepayment(input: {
   alreadyShown?: boolean;
@@ -32,25 +32,24 @@ export function canAddLateCancellation(input: {
   status?: string | null;
   cancelledServiceIds?: readonly string[] | null;
   alreadyShown?: boolean;
+  appointmentStartMs?: number | null;
+  noticeHours?: number | null;
+  noticeMinutes?: number | null;
+  nowMs?: number;
 }): boolean {
-  if (input.alreadyShown) return false;
-  if (!isPolicyFeeConfigured(input.policyPercent)) return false;
-  const status = String(input.status ?? "");
-  const cancelled =
-    status === "Cancelled" ||
-    (Array.isArray(input.cancelledServiceIds) &&
-      input.cancelledServiceIds.length > 0);
-  return cancelled;
+  return shouldTriggerLateCancellationFee(input);
 }
 
 export function canAddLateRescheduling(input: {
   policyPercent?: number | string | null;
   scheduleEdited?: boolean | null;
   alreadyShown?: boolean;
+  appointmentStartMs?: number | null;
+  noticeHours?: number | null;
+  noticeMinutes?: number | null;
+  nowMs?: number;
 }): boolean {
-  if (input.alreadyShown) return false;
-  if (!isPolicyFeeConfigured(input.policyPercent)) return false;
-  return Boolean(input.scheduleEdited);
+  return shouldTriggerLateRescheduleFee(input);
 }
 
 export function canAddNoShowFee(input: {
@@ -58,31 +57,24 @@ export function canAddNoShowFee(input: {
   status?: string | null;
   alreadyShown?: boolean;
 }): boolean {
-  if (input.alreadyShown) return false;
-  if (!isPolicyFeeConfigured(input.policyPercent)) return false;
-  return String(input.status ?? "") === "No Show";
+  return shouldTriggerNoShowFee(input);
+}
+
+export function canAddKilometerAllowance(input: {
+  location?: string | null;
+  alreadyShown?: boolean;
+}): boolean {
+  return canTriggerKilometerAllowance(input);
 }
 
 /**
- * Protective fees may only decrease or stay at the policy ceiling — never increase.
- * Empty / invalid input clears to "" for controlled fields; numeric values clamp to [0, ceiling].
+ * ⋮ restore after remove — same gates as canAdd* (hidden + trigger still active).
+ * Protective: template + event. KM: DL only, manual, no template membership.
  */
-export function clampProtectiveFeePercent(
-  next: string,
-  policyCeiling: number | string | null | undefined,
-): string {
-  const ceiling = parsePolicyPercentCeiling(policyCeiling);
-  const trimmed = String(next ?? "").trim();
-  if (!trimmed) return "";
-  const n = Number(trimmed);
-  if (!Number.isFinite(n)) return "";
-  const clamped = Math.max(0, Math.min(ceiling > 0 ? ceiling : 0, n));
-  // Preserve integer vs decimal feel of input when possible
-  if (Number.isInteger(clamped) && !trimmed.includes(".")) {
-    return String(clamped);
-  }
-  return String(clamped);
-}
+export const canRestoreLateCancellation = canAddLateCancellation;
+export const canRestoreLateRescheduling = canAddLateRescheduling;
+export const canRestoreNoShowFee = canAddNoShowFee;
+export const canRestoreKilometerAllowance = canAddKilometerAllowance;
 
 /** Whether a protective fee amount is due and checkout should be offered. */
 export function canCheckoutProtectiveFee(input: {

@@ -5,7 +5,9 @@ import assert from "node:assert/strict";
 import {
   buildPreviewLineItems,
   getInvoiceLineItemColumns,
+  INVOICE_TOTAL_VAT_INCLUDED_LABEL,
   resolveInvoiceTemplateType,
+  toInvoiceDisplayLineItems,
 } from "./financeDocumentUtils";
 import { buildClientBookingTransactionRow } from "./buildClientBookingTransactionRow";
 import { resolveSalesPayerShares } from "../calendar/salesSplitBill";
@@ -34,9 +36,10 @@ assert.deepEqual(
     entryLabel: "Booking",
     clientName: "Ada",
     clientEmail: "a@b.c",
-    clientType: "individual",
+    clientType: "mollure",
     netAmount: 50,
     methodTitle: "Online - Direct",
+    methodDetail: "",
     status: "Paid",
     document: {
       serviceDate: "2026-10-06",
@@ -109,15 +112,17 @@ assert.notEqual(
   shares.find((s) => s.role === "guest")?.lines[0]?.id,
 );
 
-// Company table: Description | Quantity | VAT % | Price Per Unit | Total Price
+// Company table: Description | VAT | Price/Unit | Total Price
 assert.deepEqual(
   getInvoiceLineItemColumns("itemized").map((c) => c.label),
-  ["Description", "Quantity", "VAT %", "Price Per Unit", "Total Price"],
+  ["Description", "VAT", "Price/Unit", "Total Price"],
 );
 assert.deepEqual(
   getInvoiceLineItemColumns("simplified").map((c) => c.label),
-  ["Description", "Price (Incl. VAT)"],
+  ["Description", "Price"],
 );
+assert.equal(INVOICE_TOTAL_VAT_INCLUDED_LABEL, "Grand Total (VAT included)");
+assert.equal(INVOICE_TOTAL_VAT_INCLUDED_LABEL.includes("%"), false);
 
 // BC clientType beats a frozen individual snapshot / default.
 assert.equal(
@@ -150,12 +155,36 @@ assert.equal(
   }),
   "individual",
 );
+// Individual Mollure beats a wrong frozen company snapshot from defaultInvoiceType.
 assert.equal(
   resolveInvoiceTemplateType({
     clientType: "mollure",
     invoiceType: "company",
   }),
-  "company",
+  "individual",
+);
+
+// Stored payload → individual display: inline 3× qty, preserved totals (read-only path).
+const storedLines = [
+  {
+    description: "Shampoo",
+    quantity: 3,
+    vat: "21%",
+    pricePerUnit: 10,
+    totalPrice: 30,
+  },
+];
+const individualDisplay = toInvoiceDisplayLineItems(storedLines, "individual", true);
+assert.equal(individualDisplay[0]?.displayDescription, "3× Shampoo");
+assert.equal(individualDisplay[0]?.totalPrice, 30);
+assert.equal(individualDisplay[0]?.vat, "21%");
+
+const companyDisplay = toInvoiceDisplayLineItems(storedLines, "company", true);
+assert.equal(companyDisplay[0]?.displayDescription, "Shampoo");
+assert.equal(companyDisplay[0]?.unit, "3");
+assert.deepEqual(
+  getInvoiceLineItemColumns("itemized").map((c) => c.key),
+  ["description", "vat", "pricePerUnit", "totalPrice"],
 );
 
 console.log("lineItemsCoverage.test.ts: ok");

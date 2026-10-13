@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { useTheme } from "@mui/material/styles";
 import { useSnackbar } from "../../../../../components/common/AppSnackbar";
 import {
@@ -29,7 +30,12 @@ import type {
   ServiceDraft,
   SettingsTab,
 } from "./setting.types";
+import { stripeSettingsOnboardingView } from "./stripeSettingsOnboardingView";
 import { PROFILE_IMAGE_INVALID_MESSAGE } from "../../../../../lib/profileImageUpload";
+import {
+  consumeStripeReturnPath,
+  peekStripeReturnPath,
+} from "../stripePayoutGuard";
 
 export function useFinanceSettingPage() {
   const theme = useTheme();
@@ -47,12 +53,12 @@ export function useFinanceSettingPage() {
 export function useStripeSettingsSection() {
   const theme = useTheme();
   const m = theme.palette.mollure;
+  const router = useRouter();
   const { showSnackbar } = useSnackbar();
   const {
     hydrated,
     subscriptionActive,
-    paymentsConnected,
-    connectStatus,
+    onboardingState,
     autoPay,
     subscriptionRenewsAt,
     activateSubscription,
@@ -60,8 +66,24 @@ export function useStripeSettingsSection() {
     setAutoPay,
     confirmManualPayment,
     markPaymentsConnected,
+    openStripeDashboard,
     isUpdating,
   } = useProfessionalStripeStatus();
+
+  const onboardingView = stripeSettingsOnboardingView(onboardingState);
+
+  // Entry point 2: after Stripe return (?stripeReturn=1) + CONNECTED → originating flow.
+  // ponytail: read location.search (avoids useSearchParams Suspense boundary)
+  React.useEffect(() => {
+    if (!hydrated || onboardingState !== "CONNECTED") return;
+    if (typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("stripeReturn") !== "1") {
+      return;
+    }
+    const returnPath =
+      consumeStripeReturnPath() ?? "/professionals/finance/overview";
+    router.replace(returnPath);
+  }, [hydrated, onboardingState, router]);
 
   const handleSubscriptionClick = async () => {
     try {
@@ -132,31 +154,42 @@ export function useStripeSettingsSection() {
       });
       return;
     }
-    // Already connected → dashboard only; never restart onboarding.
-    if (paymentsConnected) {
-      window.open(
-        "https://dashboard.stripe.com/",
-        "_blank",
-        "noopener,noreferrer",
-      );
+    // CONNECTED → Express/Custom dashboard login link; never restart onboarding.
+    if (onboardingState === "CONNECTED") {
+      try {
+        await openStripeDashboard();
+      } catch {
+        showSnackbar({
+          severity: "error",
+          message: "Could not open Stripe dashboard. Please try again.",
+        });
+      }
       return;
     }
     try {
       const result = await markPaymentsConnected();
       if (result.redirected) return;
+      const redirectHomeIfPending = () => {
+        if (!peekStripeReturnPath()) return false;
+        router.replace(
+          consumeStripeReturnPath() ?? "/professionals/finance/overview",
+        );
+        return true;
+      };
       if ("alreadyConnected" in result && result.alreadyConnected) {
         showSnackbar({
           severity: "success",
           message: "Stripe account already connected.",
         });
+        redirectHomeIfPending();
         return;
       }
-      const next = result.stripeConnectStatus ?? connectStatus;
+      // alreadyConnected branch above handles stripeConnectStatus === "connected"
       showSnackbar({
-        severity: next === "connected" ? "success" : "info",
+        severity: "info",
         message:
-          next === "connected"
-            ? "Stripe account connected."
+          onboardingState === "INCOMPLETE"
+            ? "Continue Stripe onboarding to accept online payments."
             : "Stripe onboarding started. Complete the steps to accept online payments.",
       });
     } catch {
@@ -167,20 +200,21 @@ export function useStripeSettingsSection() {
     }
   };
 
-  // Banners derive from persisted GET /settings fields only. Never when connected.
+  // Banners from canonical onboarding machine. Never when CONNECTED.
   const showOnboardingBanner =
-    connectStatus !== "connected" &&
-    (connectStatus === "onboarding" ||
-      (subscriptionActive && connectStatus === "not_connected"));
+    onboardingState !== "CONNECTED" &&
+    (onboardingState === "INCOMPLETE" ||
+      (subscriptionActive && onboardingState === "NOT_CONNECTED"));
   const showDisconnectedBanner =
-    !subscriptionActive && connectStatus === "not_connected";
+    !subscriptionActive && onboardingState === "NOT_CONNECTED";
 
   return {
     m,
     hydrated,
     subscriptionActive,
-    paymentsConnected,
-    connectStatus,
+    onboardingState,
+    onboardingView,
+    paymentsConnected: onboardingView.paymentsConnected,
     autoPay,
     subscriptionRenewsAt,
     showOnboardingBanner,
@@ -301,17 +335,27 @@ export function useInvoiceSettingsSection() {
   };
 
   const handleAddServiceSaveOrUpdate = () => {
+    const serviceId = addServiceDraft.serviceId.trim();
+    if (!serviceId) return;
     const service = addServiceDraft.service.trim();
-    if (!service) return;
-    const vat = addServiceDraft.vat.trim() || "0%";
-    const category = settings.services.find((item) => item.service === service)?.category ?? "Other";
+    const category = addServiceDraft.category.trim() || "Other";
+    const vatRaw = addServiceDraft.vat.trim().replace(/%$/, "");
+    if (!vatRaw) return;
+    const vat = `${vatRaw}%`;
 
     if (editingServiceId) {
       setSettings((prev) => ({
         ...prev,
         services: prev.services.map((item) =>
           item.id === editingServiceId
-            ? { ...item, category, service, vat }
+            ? {
+                ...item,
+                id: serviceId,
+                service_id: serviceId,
+                category,
+                service,
+                vat,
+              }
             : item,
         ),
       }));
@@ -320,10 +364,26 @@ export function useInvoiceSettingsSection() {
         message: "Service updated successfully.",
       });
     } else {
+      const alreadyListed = settings.services.some(
+        (item) => (item.service_id || item.id) === serviceId,
+      );
+      if (alreadyListed) {
+        showSnackbar({
+          severity: "warning",
+          message: "This service already has a VAT exception.",
+        });
+        return;
+      }
       setSettings((prev) => ({
         ...prev,
         services: [
-          { id: `s-${Date.now()}`, category, service, vat },
+          {
+            id: serviceId,
+            service_id: serviceId,
+            category,
+            service,
+            vat,
+          },
           ...prev.services,
         ],
       }));
@@ -373,12 +433,26 @@ export function useInvoiceSettingsSection() {
     const s = settings.services.find((x) => x.id === id);
     if (!s) return;
     setEditingServiceId(id);
-    setAddServiceDraft({ service: s.service, vat: s.vat });
+    setAddServiceDraft({
+      serviceId: s.service_id || s.id,
+      category: s.category,
+      service: s.service,
+      vat: String(s.vat ?? "").replace(/%$/, ""),
+    });
     setAddServiceOpen(true);
   };
 
   const updatePaymentTerm = React.useCallback(
     (key: keyof FinanceInvoiceSettings["paymentTerms"], value: string) => {
+      // Penalty values are mandatory once mode is set — never persist blank/NaN.
+      if (String(key).endsWith("PenaltyValue")) {
+        const raw = String(value ?? "").trim().replace(",", ".");
+        if (!raw || !Number.isFinite(Number(raw))) return;
+      }
+      if (String(key).endsWith("PenaltyUnit")) {
+        const u = String(value ?? "").trim().toLowerCase();
+        if (!(u === "%" || u === "fixed" || u.includes("percent"))) return;
+      }
       setSettings((prev) => ({
         ...prev,
         paymentTerms: {

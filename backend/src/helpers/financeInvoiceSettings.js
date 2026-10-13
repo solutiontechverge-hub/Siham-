@@ -61,15 +61,84 @@ const numericCatalog = (items, fallback) =>
     ? uniqueById(items).map(numericCatalogItem)
     : fallback;
 
+/** Penalty value keys that must stay non-empty once payment terms are configured. */
+export const PENALTY_VALUE_KEYS = [
+  "originalPenaltyValue",
+  "firstReissuePenaltyValue",
+  "secondReissuePenaltyValue",
+];
+
+export const PENALTY_UNIT_KEYS = [
+  "originalPenaltyUnit",
+  "firstReissuePenaltyUnit",
+  "secondReissuePenaltyUnit",
+];
+
+/** True when value is a non-blank finite number (0 allowed; blank/NaN not). */
+export const isConfiguredPenaltyValue = (value) => {
+  const raw = String(value ?? "").trim().replace(",", ".");
+  if (!raw) return false;
+  return Number.isFinite(Number(raw));
+};
+
+/** Normalize unit to `%` or `fixed` (percentage aliases → `%`). */
+export const normalizePenaltyUnit = (unit) => {
+  const u = String(unit ?? "")
+    .trim()
+    .toLowerCase();
+  if (!u) return null;
+  if (u.includes("%") || u.includes("percent")) return "%";
+  if (u.includes("fixed") || u === "eur" || u === "€" || u === "amount") {
+    return "fixed";
+  }
+  return null;
+};
+
+/**
+ * Reject blank/non-numeric penalty values or unknown units.
+ * Returns an error message, or null when valid.
+ */
+export const paymentTermPenaltiesInvalid = (paymentTerms) => {
+  if (!paymentTerms || typeof paymentTerms !== "object") return null;
+  for (const key of PENALTY_VALUE_KEYS) {
+    if (!(key in paymentTerms)) continue;
+    if (!isConfiguredPenaltyValue(paymentTerms[key])) {
+      return "Penalty value is required and cannot be blank.";
+    }
+  }
+  for (const key of PENALTY_UNIT_KEYS) {
+    if (!(key in paymentTerms)) continue;
+    if (!normalizePenaltyUnit(paymentTerms[key])) {
+      return "Penalty type must be Percentage (%) or Fixed amount.";
+    }
+  }
+  return null;
+};
+
+const healPaymentTermsPenalties = (terms) => {
+  const next = { ...terms };
+  for (const key of PENALTY_VALUE_KEYS) {
+    if (!isConfiguredPenaltyValue(next[key])) {
+      next[key] = DEFAULT_INVOICE_SETTINGS.paymentTerms[key];
+    }
+  }
+  for (const key of PENALTY_UNIT_KEYS) {
+    next[key] =
+      normalizePenaltyUnit(next[key]) ??
+      DEFAULT_INVOICE_SETTINGS.paymentTerms[key];
+  }
+  return next;
+};
+
 export const mergeInvoiceSettings = (raw) => {
   if (!raw || typeof raw !== "object") return { ...DEFAULT_INVOICE_SETTINGS };
   return {
     ...DEFAULT_INVOICE_SETTINGS,
     ...raw,
-    paymentTerms: {
+    paymentTerms: healPaymentTermsPenalties({
       ...DEFAULT_INVOICE_SETTINGS.paymentTerms,
       ...(raw.paymentTerms ?? {}),
-    },
+    }),
     reminders: {
       ...DEFAULT_INVOICE_SETTINGS.reminders,
       ...(raw.reminders ?? {}),
@@ -139,6 +208,57 @@ export const isAutomaticTrigger = (trigger) => {
 };
 
 /**
+ * Issued invoices keep paymentTerms from issuedSnapshot; live settings only
+ * fill gaps for legacy rows that never snapshotted.
+ */
+export const resolveDocumentPaymentTerms = (document, livePaymentTerms) =>
+  document?.issuedSnapshot?.invoiceSettings?.paymentTerms ?? livePaymentTerms;
+
+/**
+ * Issued invoices keep reminders from issuedSnapshot; live settings only for
+ * legacy rows that never snapshotted reminders.
+ */
+export const resolveDocumentReminders = (document, liveReminders) =>
+  document?.issuedSnapshot?.invoiceSettings?.reminders ?? liveReminders;
+
+/**
+ * Frozen due date for scheduling: prefer payment_deadline column, else
+ * document.dueDate. Never recompute from live payment terms.
+ */
+export const resolveStoredDueDate = (paymentDeadline, documentDueDate) => {
+  for (const candidate of [paymentDeadline, documentDueDate]) {
+    if (candidate == null || candidate === "") continue;
+    const iso = toIsoDateOnly(candidate);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+  }
+  return null;
+};
+
+/**
+ * Absolute reminder fire date = storedDueDate − lead duration.
+ * Trigger is fixed once due date is stored; it does not drift with "today"
+ * or live payment-term edits.
+ */
+export const reminderTriggerDate = (storedDueDate, value, unit) => {
+  const due = resolveStoredDueDate(storedDueDate);
+  const days = durationToDays(value, unit);
+  if (!due || days == null || days < 0) return null;
+  return addDaysIso(due, -days);
+};
+
+/** True when today matches the fixed trigger date for a reminder slot. */
+export const isReminderTriggerDay = (
+  storedDueDate,
+  value,
+  unit,
+  today = new Date(),
+) => {
+  const trigger = reminderTriggerDate(storedDueDate, value, unit);
+  if (!trigger) return false;
+  return trigger === toIsoDateOnly(today);
+};
+
+/**
  * Next overdue action from reissueLevel + paymentTerms triggers.
  * level>=2 → close (final reissue already sent); else Automatic|Manual for next stage.
  */
@@ -153,16 +273,14 @@ export const resolveOverdueReissueAction = (reissueLevel, paymentTerms) => {
 /**
  * Compute penalty amount from settings value/unit against a base amount.
  * `%` → percent of base; otherwise treated as fixed EUR.
+ * Blank/null/NaN values → 0 (never NaN fees).
  */
 export const computePenaltyAmount = (baseAmount, penaltyValue, penaltyUnit) => {
   const base = roundMoney(baseAmount);
-  const value = Number(penaltyValue);
+  if (!isConfiguredPenaltyValue(penaltyValue)) return 0;
+  const value = Number(String(penaltyValue).trim().replace(",", "."));
   if (!Number.isFinite(value) || value <= 0) return 0;
-  const unit = String(penaltyUnit ?? "")
-    .trim()
-    .toLowerCase();
-  if (unit.includes("%") || unit === "percent" || unit === "percentage") {
-    return roundMoney(base * (value / 100));
-  }
+  const unit = normalizePenaltyUnit(penaltyUnit);
+  if (unit === "%") return roundMoney(base * (value / 100));
   return roundMoney(value);
 };

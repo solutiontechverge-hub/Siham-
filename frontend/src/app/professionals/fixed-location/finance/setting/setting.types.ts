@@ -6,6 +6,9 @@ export type SettingsTab = "stripe" | "transaction" | "invoice";
 export type ProductDraft = BookingUniqueItemDraft;
 
 export type ServiceDraft = {
+  /** True Business Template service_id. */
+  serviceId: string;
+  category: string;
   service: string;
   vat: string;
 };

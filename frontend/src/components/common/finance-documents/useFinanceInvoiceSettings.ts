@@ -20,7 +20,9 @@ export type FinanceInvoiceProduct = {
 };
 
 export type FinanceInvoiceService = {
+  /** True Business Template service_id (UUID). */
   id: string;
+  service_id?: string;
   category: string;
   service: string;
   vat: string;

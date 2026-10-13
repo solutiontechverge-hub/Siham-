@@ -48,6 +48,8 @@ export type ProfessionalFixedLocationCalendarBookingDrawerBag = Pick<
   | "canEditBookingLineItems"
   | "canMutateDrawerContents"
   | "canUseBookingProject"
+  | "appointmentBeforeHours"
+  | "appointmentBeforeMinutes"
   | "cancellationBeforeHours"
   | "cancellationBeforeMinutes"
   | "cancelledServicesForDrawer"

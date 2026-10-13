@@ -166,7 +166,8 @@ export function useFixedLocationCalendarPage() {
   const businessSetupId = setupData?.data?.id ?? "";
   const [overviewQuery, setOverviewQuery] =
     React.useState<CalendarOverviewQuery>(() =>
-      getCalendarQueryDateRange(toIsoLocalDate(new Date()), "day"),
+      // Month grid window from first paint (day/week still filter client-side).
+      getCalendarQueryDateRange(toIsoLocalDate(new Date()), "month"),
     );
   const handleOverviewDateRangeChange = React.useCallback(
     (range: CalendarOverviewQuery) => {
@@ -541,6 +542,8 @@ export function useFixedLocationCalendarPage() {
     noShowFeePercentDefault,
     prepaymentPercentDefault,
     kilometerAllowanceEurPerKmDefault,
+    appointmentBeforeHours: setupData?.data?.appointment_before_hours ?? null,
+    appointmentBeforeMinutes: setupData?.data?.appointment_before_minutes ?? null,
     cancellationBeforeHours: setupData?.data?.cancellation_before_hours ?? null,
     cancellationBeforeMinutes: setupData?.data?.cancellation_before_minutes ?? null,
     responseTimeHours: setupData?.data?.response_time_hours ?? null,

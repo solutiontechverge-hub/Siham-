@@ -12,12 +12,17 @@ type ApiEnvelope<T> = {
   pagination?: ListPagination;
 };
 
+/** DB / legacy UI values (onboarding ≡ INCOMPLETE). */
 export type FinanceStripeConnectStatus = "not_connected" | "onboarding" | "connected";
+/** Canonical Connect onboarding states from Stripe account retrieve. */
+export type StripeOnboardingState = "NOT_CONNECTED" | "INCOMPLETE" | "CONNECTED";
 export type FinanceSubscriptionStatus = "inactive" | "active";
 
 export type FinanceSettings = {
   subscriptionStatus: FinanceSubscriptionStatus;
   stripeConnectStatus: FinanceStripeConnectStatus;
+  /** Persisted Stripe Connect account id; used to resume incomplete onboarding. */
+  stripeAccountId?: string | null;
   /** Charge saved card on renewal anniversary when true. */
   autoPay?: boolean;
   subscriptionActivatedAt?: string | null;
@@ -358,12 +363,31 @@ const financeApi = baseApi.injectEndpoints({
       invalidatesTags: ["FinanceTransactions", "Bookings"],
     }),
 
+    getStripeConnectStatus: builder.query<
+      ApiEnvelope<{
+        status: StripeOnboardingState;
+        stripeConnectStatus: FinanceStripeConnectStatus;
+        accountId: string | null;
+        detailsSubmitted: boolean;
+        payoutsEnabled: boolean;
+        chargesEnabled: boolean;
+      }>,
+      void
+    >({
+      query: () => ({
+        url: "/api/finance/settings/stripe/status",
+        method: "GET",
+      }),
+      providesTags: ["FinanceSettings"],
+    }),
+
     createStripeConnectLink: builder.mutation<
       ApiEnvelope<{
         url: string | null;
         simulated?: boolean;
         alreadyConnected?: boolean;
         accountId?: string;
+        status?: StripeOnboardingState;
         stripeConnectStatus?: FinanceStripeConnectStatus;
       }>,
       { refreshUrl?: string; returnUrl?: string; accountId?: string } | void
@@ -374,6 +398,17 @@ const financeApi = baseApi.injectEndpoints({
         body: body ?? {},
       }),
       invalidatesTags: ["FinanceSettings"],
+    }),
+
+    createStripeDashboardLink: builder.mutation<
+      ApiEnvelope<{ url: string | null; simulated?: boolean }>,
+      void
+    >({
+      query: () => ({
+        url: "/api/finance/settings/stripe/dashboard-link",
+        method: "POST",
+        body: {},
+      }),
     }),
   }),
 });
@@ -402,6 +437,9 @@ export const {
   useUpsertSalesAddonMutation,
   useDeleteSalesAddonMutation,
   useCreateStripeConnectLinkMutation,
+  useCreateStripeDashboardLinkMutation,
+  useGetStripeConnectStatusQuery,
+  useLazyGetStripeConnectStatusQuery,
 } = financeApi;
 
 export type FinanceApiError = FetchBaseQueryError;

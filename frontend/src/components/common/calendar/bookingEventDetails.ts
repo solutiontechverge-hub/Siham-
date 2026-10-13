@@ -493,6 +493,101 @@ export function clearEbrSuggestionsFromNotes(
   return serializeCalendarEntryNotes(internalNote, nextDetails, null);
 }
 
+/**
+ * Historical notes sometimes store services as a free-text string (or mixed array).
+ * Normalize to structured lines so calendar mappers never call .map on a string.
+ */
+export function normalizeNotesServiceLines(
+  raw: unknown,
+): NonNullable<CalendarBookingDetails["services"]> | undefined {
+  if (raw == null) return undefined;
+  if (typeof raw === "string") {
+    const name = raw.trim();
+    if (!name) return undefined;
+    return [{ id: "free-text", name, price: 0, durationMins: 30, guestId: null }];
+  }
+  if (!Array.isArray(raw) || !raw.length) return undefined;
+  const lines: NonNullable<CalendarBookingDetails["services"]> = [];
+  raw.forEach((entry, index) => {
+    if (typeof entry === "string") {
+      const name = entry.trim();
+      if (name) {
+        lines.push({
+          id: `free-text-${index}`,
+          name,
+          price: 0,
+          durationMins: 30,
+          guestId: null,
+        });
+      }
+      return;
+    }
+    if (!entry || typeof entry !== "object") return;
+    const row = entry as Record<string, unknown>;
+    const name = String(row.name ?? row.title ?? row.service_title ?? "").trim();
+    const id = String(row.id ?? row.service_id ?? "").trim() || `svc-${index}`;
+    if (!name && !String(row.id ?? "").trim()) return;
+    const teamMemberId = row.teamMemberId ?? row.staffResourceId;
+    lines.push({
+      id,
+      name: name || "Service",
+      price: Number(row.price) || 0,
+      durationMins: Math.max(15, Number(row.durationMins) || 30),
+      guestId:
+        row.guestId == null || !String(row.guestId).trim()
+          ? null
+          : String(row.guestId),
+      ...(typeof row.startTime === "string" && row.startTime.trim()
+        ? { startTime: row.startTime.trim() }
+        : {}),
+      ...(typeof row.endTime === "string" && row.endTime.trim()
+        ? { endTime: row.endTime.trim() }
+        : {}),
+      ...(teamMemberId != null && String(teamMemberId).trim()
+        ? {
+            teamMemberId: String(teamMemberId),
+            staffResourceId: String(teamMemberId),
+          }
+        : {}),
+      ...(typeof row.teamMemberName === "string" && row.teamMemberName.trim()
+        ? { teamMemberName: row.teamMemberName.trim() }
+        : {}),
+    });
+  });
+  return lines.length ? lines : undefined;
+}
+
+function normalizeNotesGuests(
+  raw: unknown,
+): NonNullable<CalendarBookingDetails["guests"]> | undefined {
+  if (!Array.isArray(raw) || !raw.length) return undefined;
+  const guests: NonNullable<CalendarBookingDetails["guests"]> = [];
+  raw.forEach((entry, index) => {
+    if (!entry || typeof entry !== "object") return;
+    const row = entry as Record<string, unknown>;
+    guests.push({
+      id: String(row.id ?? `guest-${index}`),
+      name: String(row.name ?? "Guest").trim() || "Guest",
+      services: normalizeNotesServiceLines(row.services) ?? [],
+      products: Array.isArray(row.products)
+        ? (row.products as NonNullable<CalendarBookingDetails["products"]>)
+        : [],
+      ...(typeof row.email === "string" ? { email: row.email } : {}),
+      ...(typeof row.phoneCode === "string" ? { phoneCode: row.phoneCode } : {}),
+      ...(typeof row.phoneNumber === "string" ? { phoneNumber: row.phoneNumber } : {}),
+      ...(typeof row.participantType === "string"
+        ? {
+            participantType:
+              row.participantType as NonNullable<
+                CalendarBookingDetails["guests"]
+              >[number]["participantType"],
+          }
+        : {}),
+    });
+  });
+  return guests.length ? guests : undefined;
+}
+
 export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingDetails | undefined {
   if (!notes?.trim()) return undefined;
   const markerIndex = notes.indexOf(NOTES_META_PREFIX);
@@ -588,19 +683,24 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
           ? { clientEditedServiceIds: ebr.editedServiceIds }
           : {}),
       ...(meta.clientSnapshot ? { clientSnapshot: meta.clientSnapshot } : {}),
-      ...(meta.services?.length
-        ? { services: meta.services }
-        : ebr?.status !== "rejected" && ebr?.suggestedServices?.length
-          ? { services: ebr.suggestedServices }
-          : snapshotServices?.length
-            ? { services: snapshotServices }
-            : {}),
-      ...(meta.products?.length
+      ...(() => {
+        const fromMeta = normalizeNotesServiceLines(meta.services);
+        const fromEbr =
+          ebr?.status !== "rejected"
+            ? normalizeNotesServiceLines(ebr?.suggestedServices)
+            : undefined;
+        const services = fromMeta ?? fromEbr ?? snapshotServices;
+        return services?.length ? { services } : {};
+      })(),
+      ...(meta.products?.length && Array.isArray(meta.products)
         ? { products: meta.products }
         : ebr?.status !== "rejected" && ebr?.suggestedProducts?.length
           ? { products: ebr.suggestedProducts }
           : {}),
-      ...(meta.guests?.length ? { guests: meta.guests } : {}),
+      ...(() => {
+        const guests = normalizeNotesGuests(meta.guests);
+        return guests?.length ? { guests } : {};
+      })(),
       ...(meta.clientEmail ? { clientEmail: meta.clientEmail } : {}),
       ...(meta.phoneCode ? { phoneCode: meta.phoneCode } : {}),
       ...(meta.phoneNumber ? { phoneNumber: meta.phoneNumber } : {}),

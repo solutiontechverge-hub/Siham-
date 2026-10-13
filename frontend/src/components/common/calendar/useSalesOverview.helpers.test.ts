@@ -75,4 +75,25 @@ const withColumn = toFinanceHints([
 ]);
 assert.equal(withColumn[0]?.dueDate, "2026-10-20");
 
+// Snapshotted paymentTerms ride along on finance hints (reissue prompt freeze).
+const withSnap = toFinanceHints([
+  {
+    ...row,
+    document: {
+      ...row.document!,
+      issuedSnapshot: {
+        invoiceSettings: {
+          paymentTerms: {
+            originalDueValue: "2",
+            originalDueUnit: "Weeks",
+            firstReissueTrigger: "Manual",
+          },
+        },
+      },
+    },
+  },
+]);
+assert.equal(withSnap[0]?.paymentTerms?.firstReissueTrigger, "Manual");
+assert.equal(withSnap[0]?.paymentTerms?.originalDueUnit, "Weeks");
+
 console.log("useSalesOverview.helpers.test.ts: ok");

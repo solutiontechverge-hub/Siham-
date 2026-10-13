@@ -96,11 +96,13 @@ export default function FinanceSettingTransactionOptions() {
               alignItems="center"
             >
               <Checkbox
+                // Online immediate is always on and non-toggleable.
                 checked={item.key === "onlineImmediate" ? true : draft[item.key]}
                 disabled={!editing || item.key === "onlineImmediate"}
-                onChange={(e) =>
-                  setDraft((p) => ({ ...p, [item.key]: e.target.checked }))
-                }
+                onChange={(e) => {
+                  if (item.key === "onlineImmediate") return;
+                  setDraft((p) => ({ ...p, [item.key]: e.target.checked }));
+                }}
                 size="small"
                 sx={{ p: 0.5 }}
               />

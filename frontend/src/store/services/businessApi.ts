@@ -398,6 +398,7 @@ export type CalendarBooking = {
   booking_date: string;
   business_setup_id: string;
   customer_id: string;
+  /** Historical rows may still arrive null before/during migration — mapper synthesizes a fallback. */
   service_id: string | null;
   team_member_id: string | null;
   start_time: string | null;
@@ -562,7 +563,7 @@ export type DispatchBookingNotificationRequest = {
 export type CreateBookingRequest = {
   booking_date: string;
   business_setup_id: string;
-  service_id?: string | null;
+  service_id: string;
   team_member_id?: string | null;
   start_time?: string | null;
   end_time?: string | null;
@@ -1187,8 +1188,14 @@ export const businessApi = baseApi.injectEndpoints({
           bookingId?: string | null;
           bookingCode?: string | null;
           kind: string;
+          action_type?: string;
+          actionType?: string;
           title: string;
           actor?: string;
+          actor_role?: string;
+          actorRole?: string;
+          user_id?: string | null;
+          userId?: string | null;
           actorLabel?: string | null;
           subtitle?: string | null;
           payload?: Record<string, unknown> | null;
@@ -1222,8 +1229,14 @@ export const businessApi = baseApi.injectEndpoints({
             bookingId?: string | null;
             bookingCode?: string | null;
             kind: string;
+            action_type?: string;
+            actionType?: string;
             title: string;
             actor?: string;
+            actor_role?: string;
+            actorRole?: string;
+            user_id?: string | null;
+            userId?: string | null;
             actorLabel?: string | null;
             subtitle?: string | null;
             payload?: Record<string, unknown> | null;

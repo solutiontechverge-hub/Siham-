@@ -31,6 +31,8 @@ export type ProfessionalFixedLocationCalendarProps = {
   noShowFeePercentDefault?: string;
   prepaymentPercentDefault?: string;
   kilometerAllowanceEurPerKmDefault?: string;
+  appointmentBeforeHours?: number | null;
+  appointmentBeforeMinutes?: number | null;
   cancellationBeforeHours?: number | null;
   cancellationBeforeMinutes?: number | null;
   responseTimeHours?: number | null;

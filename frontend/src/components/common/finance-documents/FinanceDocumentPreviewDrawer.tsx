@@ -55,6 +55,10 @@ export default function FinanceDocumentPreviewDrawer({
   const issuedBusinessOverride = issuedSnapshot?.professionalBusiness
     ? {
         legalName: issuedSnapshot.professionalBusiness.legalName ?? "",
+        shopName:
+          issuedSnapshot.professionalBusiness.shopName ??
+          issuedSnapshot.professionalBusiness.legalName ??
+          undefined,
         phone: issuedSnapshot.professionalBusiness.phone ?? undefined,
         address: issuedSnapshot.professionalBusiness.address ?? undefined,
         vatNumber: issuedSnapshot.professionalBusiness.vatNumber ?? undefined,

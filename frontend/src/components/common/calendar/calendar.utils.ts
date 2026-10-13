@@ -460,10 +460,21 @@ export function isBlockTimeRangeFullyPast(
 }
 
 /** Extract YYYY-MM-DD without UTC timezone shifts (for API timestamps). */
-export function wallClockDateFromDateTime(value?: string | null) {
-  if (!value) return null;
-  const match = String(value).match(/^(\d{4}-\d{2}-\d{2})/);
-  return match ? match[1] : null;
+export function wallClockDateFromDateTime(value?: string | Date | null) {
+  if (value == null || value === "") return null;
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    return toIsoLocalDate(value);
+  }
+  const raw = String(value).trim();
+  if (!raw) return null;
+  // Prefer the literal calendar prefix (avoids TZ off-by-one on DATE/ISO strings).
+  const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (match) return match[1];
+  // Historical free-text dates ("July 9, 2026", locale strings).
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return toIsoLocalDate(parsed);
 }
 
 /** Extract HH:mm without UTC timezone shifts (for API timestamps). */
@@ -535,20 +546,16 @@ export type CalendarQueryDateRange = {
   endDate: string;
 };
 
-/** Maps the visible calendar range to API query params for /calendar/overview. */
+/**
+ * Maps the visible calendar range to API query params for /calendar/overview.
+ * Always fetches the month grid window (~42 days) so day/week UI switches do not
+ * under-fetch; the UI still scopes cards via visibleDates / monthCells.
+ * # ponytail: viewMode ignored for fetch width; restore day/week windows if payload size hurts.
+ */
 export function getCalendarQueryDateRange(
   activeDateIso: string,
-  viewMode: CalendarQueryViewMode,
+  _viewMode?: CalendarQueryViewMode,
 ): CalendarQueryDateRange {
-  if (viewMode === "day") {
-    return { startDate: activeDateIso, endDate: activeDateIso };
-  }
-
-  if (viewMode === "week") {
-    const startDate = startOfWeekIso(activeDateIso);
-    return { startDate, endDate: addDaysIso(startDate, 6) };
-  }
-
   const monthStart = toMonthIso(activeDateIso);
   const gridStart = startOfWeekIso(monthStart);
   return { startDate: gridStart, endDate: addDaysIso(gridStart, 41) };

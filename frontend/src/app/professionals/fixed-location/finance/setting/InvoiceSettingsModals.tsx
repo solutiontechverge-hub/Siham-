@@ -12,8 +12,10 @@ import MollureFormField from "../../../../../components/common/MollureFormField"
 import AppModal from "../../../../../components/common/AppModal";
 import BookingCatalogItemFields from "../../../../../components/common/calendar/BookingCatalogItemFields";
 import FinanceDocumentPreviewDrawer from "../../../../../components/sections/finance/FinanceDocumentPreviewDrawer";
+import { buildInvoiceTemplatePreviewRow } from "../../../../../components/common/finance-documents/financeDocumentUtils";
 import { useGetBusinessSetupQuery } from "../../../../../store/services/businessApi";
-import type { ProductDraft } from "./setting.types";
+import { sanitizeDecimalInput } from "../../../../../lib/field-input";
+import type { ProductDraft, ServiceDraft } from "./setting.types";
 
 export function InvoiceSettingsModals(props: {
   m: { navy: string };
@@ -29,10 +31,8 @@ export function InvoiceSettingsModals(props: {
   setAddServiceOpen: (v: boolean) => void;
   editingServiceId: string | null;
   setEditingServiceId: (v: string | null) => void;
-  addServiceDraft: { service: string; vat: string };
-  setAddServiceDraft: React.Dispatch<
-    React.SetStateAction<{ service: string; vat: string }>
-  >;
+  addServiceDraft: ServiceDraft;
+  setAddServiceDraft: React.Dispatch<React.SetStateAction<ServiceDraft>>;
   handleAddServiceSaveOrUpdate: () => void;
   invoiceDrawerOpen: boolean;
   setInvoiceDrawerOpen: (v: boolean) => void;
@@ -63,24 +63,22 @@ export function InvoiceSettingsModals(props: {
     profileResponse,
     professionalBusinessOverride,
   } = props;
-  const { data: businessSetupResponse } = useGetBusinessSetupQuery({ includeDraft: false });
-  const realServices = React.useMemo(() => {
+  const { data: businessSetupResponse } = useGetBusinessSetupQuery({
+    includeDraft: false,
+  });
+  const serviceGroups = React.useMemo(() => {
     const rows = businessSetupResponse?.data?.service_categories ?? [];
-    type ServicePickerOption = { id: string; label: string; category: string; group?: boolean };
-    const grouped = new Map<string, ServicePickerOption[]>();
+    const grouped = new Map<string, { id: string; label: string }[]>();
     rows.forEach((row) => {
       if (!row.service_id || !row.service_title) return;
       const category = row.category_title || "Other";
       const list = grouped.get(category) ?? [];
       if (!list.some((item) => item.id === row.service_id)) {
-        list.push({ id: row.service_id, label: row.service_title, category });
+        list.push({ id: row.service_id, label: row.service_title });
       }
       grouped.set(category, list);
     });
-    return Array.from(grouped.entries()).flatMap(([category, items]) => [
-      { id: `group-${category}`, label: category, category, group: true },
-      ...items,
-    ]);
+    return Array.from(grouped.entries());
   }, [businessSetupResponse?.data?.service_categories]);
 
   const patchProductDraft = (patch: Partial<ProductDraft>) => {
@@ -128,7 +126,7 @@ export function InvoiceSettingsModals(props: {
         }
       >
         <Box sx={{ px: 2.5, py: 2 }}>
-          {/* Same field set as calendar drawer BookingAddUniqueItemScreen. */}
+          {/* Product name is a plain input — not a service dropdown. */}
           <Stack spacing={1.6}>
             <AppTextField
               label="Product Name"
@@ -197,24 +195,39 @@ export function InvoiceSettingsModals(props: {
               </BodyText>
               <MollureFormField
                 select
-                value={addServiceDraft.service}
-                onChange={(e) =>
+                value={addServiceDraft.serviceId}
+                onChange={(e) => {
+                  const serviceId = String(e.target.value);
+                  const match = serviceGroups
+                    .flatMap(([category, items]) =>
+                      items.map((item) => ({ ...item, category })),
+                    )
+                    .find((item) => item.id === serviceId);
                   setAddServiceDraft((p) => ({
                     ...p,
-                    service: String(e.target.value),
-                  }))
-                }
+                    serviceId,
+                    category: match?.category ?? "",
+                    service: match?.label ?? "",
+                  }));
+                }}
                 SelectProps={{ native: true }}
               >
-                {realServices.length ? realServices.map((opt) => (
-                  opt.group ? (
-                    <optgroup key={opt.id} label={opt.label}>
-                      {realServices.filter((item) => !item.group && item.category === opt.category).map((item) => (
-                        <option key={item.id} value={item.label}>{item.label}</option>
+                <option value="">Select a service</option>
+                {serviceGroups.length ? (
+                  serviceGroups.map(([category, items]) => (
+                    <optgroup key={category} label={category}>
+                      {items.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.label}
+                        </option>
                       ))}
                     </optgroup>
-                  ) : null
-                )) : <option value="">No services configured</option>}
+                  ))
+                ) : (
+                  <option value="" disabled>
+                    No services configured
+                  </option>
+                )}
               </MollureFormField>
             </Box>
 
@@ -227,8 +240,13 @@ export function InvoiceSettingsModals(props: {
               <MollureFormField
                 value={addServiceDraft.vat}
                 onChange={(e) =>
-                  setAddServiceDraft((p) => ({ ...p, vat: e.target.value }))
+                  setAddServiceDraft((p) => ({
+                    ...p,
+                    vat: sanitizeDecimalInput(e.target.value),
+                  }))
                 }
+                placeholder="e.g. 9"
+                inputProps={{ inputMode: "decimal" }}
               />
             </Box>
           </Stack>
@@ -241,6 +259,10 @@ export function InvoiceSettingsModals(props: {
         documentType="invoice"
         invoiceType={settings.defaultInvoiceType}
         settings={settings}
+        row={buildInvoiceTemplatePreviewRow(
+          settings.defaultInvoiceType,
+          professionalBusinessOverride,
+        )}
         profileData={profileResponse?.data ?? null}
         professionalBusinessOverride={professionalBusinessOverride}
       />

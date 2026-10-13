@@ -8,13 +8,17 @@ import AppDatePicker from "../AppDatePicker";
 import MollureFormField from "../MollureFormField";
 import AppModal from "../AppModal";
 import { addDaysIso, tomorrowIso, toIsoLocalDate } from "./calendar.utils";
-import { BOOKING_CATALOG_DISCOUNT_TYPE_OPTIONS } from "../../../data/bookingUniqueItem.data";
 import {
   mollureBodyMutedSx,
   mollureBodySx,
 } from "../../../theme/mollureHierarchy";
 import { durationToDays } from "./buildSalesOverviewCards.format";
 import type { FinanceInvoicePaymentTerms } from "../finance-documents/useFinanceInvoiceSettings";
+
+const PENALTY_TYPE_OPTIONS = [
+  { label: "Percentage", value: "percentage" as const },
+  { label: "Fixed amount", value: "fixed" as const },
+];
 
 type SalesOverdueReissueModalProps = {
   open: boolean;
@@ -91,14 +95,15 @@ export default function SalesOverdueReissueModal({
     setDueDate(next.dueDate);
   }, [open, paymentTerms, alreadyReissued]);
 
-  const parsed = Math.max(
-    0,
-    Number.parseFloat(penaltyValue.replace(",", ".")) || 0,
-  );
+  const trimmed = String(penaltyValue ?? "").trim().replace(",", ".");
+  const parsed = Number.parseFloat(trimmed);
+  const penaltyValid = trimmed !== "" && Number.isFinite(parsed) && parsed >= 0;
+  const safeParsed = penaltyValid ? Math.max(0, parsed) : 0;
   const penaltyAmount =
     penaltyType === "percentage"
-      ? Math.round(((unpaidAmount * parsed) / 100 + Number.EPSILON) * 100) / 100
-      : Math.round((parsed + Number.EPSILON) * 100) / 100;
+      ? Math.round(((unpaidAmount * safeParsed) / 100 + Number.EPSILON) * 100) /
+        100
+      : Math.round((safeParsed + Number.EPSILON) * 100) / 100;
 
   return (
     <AppModal
@@ -112,13 +117,13 @@ export default function SalesOverdueReissueModal({
           onPrimary={() =>
             onConfirm({
               penaltyType,
-              penaltyValue: parsed,
+              penaltyValue: safeParsed,
               penaltyAmount,
               dueDate,
             })
           }
           primaryLabel="Reissue"
-          primaryDisabled={!dueDate}
+          primaryDisabled={!dueDate || !penaltyValid}
           buttonSx={{}}
           spacing={1}
         />
@@ -130,22 +135,30 @@ export default function SalesOverdueReissueModal({
         </Typography>
         <MollureFormField
           select
+          required
           label="Penalty type"
           value={penaltyType}
           onChange={(e) =>
             setPenaltyType(e.target.value as "fixed" | "percentage")
           }
         >
-          {BOOKING_CATALOG_DISCOUNT_TYPE_OPTIONS.map((option) => (
+          {PENALTY_TYPE_OPTIONS.map((option) => (
             <MenuItem key={option.value} value={option.value}>
               {option.label}
             </MenuItem>
           ))}
         </MollureFormField>
         <MollureFormField
+          required
+          type="number"
+          inputProps={{ min: 0, step: "any" }}
           label={penaltyType === "percentage" ? "Penalty %" : "Penalty amount"}
           value={penaltyValue}
           onChange={(e) => setPenaltyValue(e.target.value)}
+          error={!penaltyValid}
+          helperText={
+            penaltyValid ? undefined : "Penalty value is required."
+          }
           InputProps={{
             endAdornment: (
               <InputAdornment position="end">

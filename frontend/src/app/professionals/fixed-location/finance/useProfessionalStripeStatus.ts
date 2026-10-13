@@ -3,14 +3,22 @@
 import * as React from "react";
 import {
   useGetFinanceSettingsQuery,
+  useGetStripeConnectStatusQuery,
   useUpdateFinanceStripeStatusMutation,
   useCreateStripeConnectLinkMutation,
+  useCreateStripeDashboardLinkMutation,
   type FinanceStripeConnectStatus,
   type FinanceSubscriptionStatus,
+  type StripeOnboardingState,
 } from "../../../../store/services/financeApi";
+import {
+  STRIPE_SETTINGS_PATH,
+  peekStripeReturnPath,
+} from "./stripePayoutGuard";
 
 export type StripeSubscriptionStatus = FinanceSubscriptionStatus;
 export type StripeConnectStatus = FinanceStripeConnectStatus;
+export type { StripeOnboardingState };
 
 /** Drop pre-API stripe/invoice keys so localStorage is never mistaken for source of truth. */
 function purgeLegacyFinanceLocalStorage() {
@@ -37,10 +45,15 @@ function purgeLegacyFinanceLocalStorage() {
 export function useProfessionalStripeStatus() {
   const { data: settingsResponse, isLoading, isFetching } =
     useGetFinanceSettingsQuery();
+  // Real-time Stripe retrieve; falls back to settings row when still loading.
+  const { data: stripeStatusResponse, isFetching: isStripeStatusFetching } =
+    useGetStripeConnectStatusQuery();
   const [updateStripeStatus, { isLoading: isUpdating }] =
     useUpdateFinanceStripeStatusMutation();
   const [createConnectLink, { isLoading: isConnecting }] =
     useCreateStripeConnectLinkMutation();
+  const [createDashboardLink, { isLoading: isOpeningDashboard }] =
+    useCreateStripeDashboardLinkMutation();
 
   React.useEffect(() => {
     purgeLegacyFinanceLocalStorage();
@@ -50,7 +63,16 @@ export function useProfessionalStripeStatus() {
   const subscriptionStatus: StripeSubscriptionStatus =
     settings?.subscriptionStatus ?? "inactive";
   const connectStatus: StripeConnectStatus =
-    settings?.stripeConnectStatus ?? "not_connected";
+    stripeStatusResponse?.data?.stripeConnectStatus ??
+    settings?.stripeConnectStatus ??
+    "not_connected";
+  const onboardingState: StripeOnboardingState =
+    stripeStatusResponse?.data?.status ??
+    (connectStatus === "connected"
+      ? "CONNECTED"
+      : connectStatus === "onboarding"
+        ? "INCOMPLETE"
+        : "NOT_CONNECTED");
   const autoPay = settings?.autoPay !== false;
   const subscriptionRenewsAt = settings?.subscriptionRenewsAt ?? null;
   const subscriptionActivatedAt = settings?.subscriptionActivatedAt ?? null;
@@ -80,7 +102,16 @@ export function useProfessionalStripeStatus() {
 
   /** Start/complete Connect onboarding via API (persists DB). Redirects when Stripe returns a URL. */
   const markPaymentsConnected = React.useCallback(async () => {
-    const result = await createConnectLink({}).unwrap();
+    // ponytail: entry point 2 return path → settings?stripeReturn=1 so settings can redirect home
+    const hasReturn = Boolean(peekStripeReturnPath());
+    const settingsUrl = `${window.location.origin}${STRIPE_SETTINGS_PATH}${
+      hasReturn ? "?stripeReturn=1" : ""
+    }`;
+    const result = await createConnectLink(
+      hasReturn
+        ? { returnUrl: settingsUrl, refreshUrl: settingsUrl }
+        : undefined,
+    ).unwrap();
     if (result.data?.alreadyConnected || result.data?.stripeConnectStatus === "connected") {
       return {
         redirected: false as const,
@@ -101,13 +132,29 @@ export function useProfessionalStripeStatus() {
     };
   }, [createConnectLink]);
 
+  /** Express/Custom dashboard login link (CONNECTED only). */
+  const openStripeDashboard = React.useCallback(async () => {
+    const result = await createDashboardLink().unwrap();
+    const url = result.data?.url;
+    if (url) {
+      window.open(url, "_blank", "noopener,noreferrer");
+      return { opened: true as const, simulated: Boolean(result.data?.simulated) };
+    }
+    // ponytail: no URL — fall back to public Stripe dashboard
+    window.open("https://dashboard.stripe.com/", "_blank", "noopener,noreferrer");
+    return { opened: true as const, simulated: true as const };
+  }, [createDashboardLink]);
+
   return {
     hydrated: !isLoading,
-    refreshing: isFetching,
+    refreshing: isFetching || isStripeStatusFetching,
     subscriptionActive,
     paymentsConnected,
     subscriptionStatus,
     connectStatus,
+    onboardingState,
+    stripeAccountId:
+      stripeStatusResponse?.data?.accountId ?? settings?.stripeAccountId ?? null,
     autoPay,
     subscriptionRenewsAt,
     subscriptionActivatedAt,
@@ -116,6 +163,7 @@ export function useProfessionalStripeStatus() {
     setAutoPay,
     confirmManualPayment,
     markPaymentsConnected,
-    isUpdating: isUpdating || isConnecting,
+    openStripeDashboard,
+    isUpdating: isUpdating || isConnecting || isOpeningDashboard,
   };
 }

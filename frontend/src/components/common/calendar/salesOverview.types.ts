@@ -48,6 +48,8 @@ export type SalesFinanceHint = {
   penaltyAmount?: number;
   /** document.reissueLevel — gates Manual/Automatic overdue banners */
   reissueLevel?: number;
+  /** Snapshotted paymentTerms from issued document (freeze for reissue prompts). */
+  paymentTerms?: SalesPaymentTermsInput;
   /** Finance `entry_label` — used to heal protective-fee Sales cards. */
   entryLabel?: string;
   amount?: number;

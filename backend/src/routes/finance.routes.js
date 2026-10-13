@@ -5,6 +5,8 @@ import {
   createFinanceTransaction,
   createFinanceTransactionFromBooking,
   createStripeConnectOnboardingLink,
+  createStripeDashboardLink,
+  getStripeConnectStatus,
   getFinanceSettings,
   listSalesCardMetadata,
   upsertSalesCardMetadata,
@@ -94,6 +96,13 @@ router.put(
   updateFinanceStripeStatus,
 );
 
+router.get(
+  "/settings/stripe/status",
+  requireProfessional,
+  validateRequest,
+  getStripeConnectStatus,
+);
+
 router.post(
   "/settings/stripe/connect-link",
   requireProfessional,
@@ -104,6 +113,13 @@ router.post(
   ],
   validateRequest,
   createStripeConnectOnboardingLink,
+);
+
+router.post(
+  "/settings/stripe/dashboard-link",
+  requireProfessional,
+  validateRequest,
+  createStripeDashboardLink,
 );
 
 router.post(

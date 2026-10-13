@@ -28,6 +28,8 @@ export default function FixedLocationCalendarPageView() {
     noShowFeePercentDefault,
     prepaymentPercentDefault,
     kilometerAllowanceEurPerKmDefault,
+    appointmentBeforeHours,
+    appointmentBeforeMinutes,
     cancellationBeforeHours,
     cancellationBeforeMinutes,
     responseTimeHours,
@@ -63,6 +65,8 @@ export default function FixedLocationCalendarPageView() {
       noShowFeePercentDefault={noShowFeePercentDefault}
       prepaymentPercentDefault={prepaymentPercentDefault}
       kilometerAllowanceEurPerKmDefault={kilometerAllowanceEurPerKmDefault}
+      appointmentBeforeHours={appointmentBeforeHours}
+      appointmentBeforeMinutes={appointmentBeforeMinutes}
       cancellationBeforeHours={cancellationBeforeHours}
       cancellationBeforeMinutes={cancellationBeforeMinutes}
       responseTimeHours={responseTimeHours}

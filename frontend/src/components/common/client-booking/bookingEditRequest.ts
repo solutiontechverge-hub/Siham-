@@ -14,7 +14,7 @@ export type BookingEditSuggestedService = {
   durationMins: number;
   price: number;
   teamMemberId?: string | null;
-  teamMemberName?: string;
+  teamMemberName?: string | null;
   guestId?: string | null;
   startTime?: string;
   endTime?: string;

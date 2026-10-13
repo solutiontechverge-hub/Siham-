@@ -51,8 +51,6 @@ export default function FinanceSettingStripe() {
     m,
     hydrated,
     subscriptionActive,
-    paymentsConnected,
-    connectStatus,
     autoPay,
     subscriptionRenewsAt,
     showOnboardingBanner,
@@ -62,6 +60,7 @@ export default function FinanceSettingStripe() {
     handleManualPaymentClick,
     handlePaymentsClick,
     isUpdating,
+    onboardingView,
   } = useStripeSettingsSection();
 
   const renewLabel = subscriptionRenewsAt
@@ -249,15 +248,13 @@ export default function FinanceSettingStripe() {
             <Box
               component="span"
               sx={{
-                color: paymentsConnected ? "success.main" : alpha(m.navy, 0.7),
+                color: onboardingView.paymentsConnected
+                  ? "success.main"
+                  : alpha(m.navy, 0.7),
                 fontWeight: 800,
               }}
             >
-              {paymentsConnected
-                ? "Connected"
-                : connectStatus === "onboarding"
-                  ? "Started — incomplete"
-                  : "Not connected"}
+              {onboardingView.statusLabel}
             </Box>
           </BodyText>
 
@@ -269,15 +266,11 @@ export default function FinanceSettingStripe() {
               disabled={isUpdating || !subscriptionActive}
               onClick={handlePaymentsClick}
             >
-              {paymentsConnected
-                ? "Stripe dashboard"
-                : connectStatus === "onboarding"
-                  ? "Complete onboarding"
-                  : "Start onboarding"}
+              {onboardingView.ctaLabel}
             </AppButton>
           </Box>
 
-          {!subscriptionActive ? (
+          {onboardingView.panel === "expectations" ? (
             <Box sx={{ mt: 2 }}>
               <CardTitle sx={mollureSectionTitleSx(m.navy)}>
                 What To Expect
@@ -331,9 +324,12 @@ export default function FinanceSettingStripe() {
                 ))}
               </Stack>
             </Box>
-          ) : paymentsConnected ? (
+          ) : (
             <Box sx={{ mt: 2 }}>
-              <CardTitle sx={mollureSectionTitleSx(m.navy)}>Payout</CardTitle>
+              {/* CONNECTED order: Payout details → Account management */}
+              <CardTitle sx={mollureSectionTitleSx(m.navy)}>
+                Payout details
+              </CardTitle>
               <Stack spacing={0.5} sx={{ mt: 0.75, pl: 1.5 }}>
                 {PAYOUT_BULLETS.map((t) => (
                   <BodyText
@@ -350,7 +346,7 @@ export default function FinanceSettingStripe() {
               </Stack>
 
               <CardTitle sx={mollureSectionTitleSx(m.navy, { mt: 2 })}>
-                Managing Your Stripe Account
+                Account management
               </CardTitle>
               <BodyText
                 sx={{ mt: 0.45, fontSize: 12, color: alpha(m.navy, 0.55) }}
@@ -378,13 +374,6 @@ export default function FinanceSettingStripe() {
                 (Note: Stripe handles KYC, AML, etc.)
               </BodyText>
             </Box>
-          ) : (
-            <BodyText
-              sx={mollureBodyMutedSx(m.navy, { mt: 1.5 })}
-            >
-              Your subscription is active. Complete Stripe onboarding to accept
-              online payments and view payout details.
-            </BodyText>
           )}
         </Box>
       </Paper>

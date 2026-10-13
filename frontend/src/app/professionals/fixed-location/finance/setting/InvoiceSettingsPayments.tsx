@@ -17,6 +17,52 @@ import MollureFormField from "../../../../../components/common/MollureFormField"
 import type { FinanceInvoiceSettings } from "../../../../../components/sections/finance/useFinanceInvoiceSettings";
 import type { InvoiceSettingsSx } from "./invoiceSettings.styles";
 
+/** Value + Percentage|Fixed type pair; value is required (non-removable blank). */
+function PenaltyFeeFields(props: {
+  rowLabelSx: InvoiceSettingsSx["rowLabelSx"] | object;
+  editing: boolean;
+  value: string;
+  unit: string;
+  onValue: (value: string) => void;
+  onUnit: (unit: string) => void;
+}) {
+  const { rowLabelSx, editing, value, unit, onValue, onUnit } = props;
+  return (
+    <Stack
+      direction={{ xs: "column", md: "row" }}
+      spacing={1.25}
+      alignItems={{ md: "flex-start" }}
+    >
+      <BodyText sx={rowLabelSx}>Penalty Fee</BodyText>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={1.25}
+        sx={{ flex: 1 }}
+      >
+        <MollureFormField
+          required
+          type="number"
+          inputProps={{ min: 0, step: "any" }}
+          disabled={!editing}
+          value={value}
+          onChange={(e) => onValue(e.target.value)}
+        />
+        <MollureFormField
+          select
+          required
+          disabled={!editing}
+          value={unit === "fixed" ? "fixed" : "%"}
+          onChange={(e) => onUnit(e.target.value)}
+          SelectProps={{ native: true }}
+        >
+          <option value="%">Percentage</option>
+          <option value="fixed">Fixed amount</option>
+        </MollureFormField>
+      </Stack>
+    </Stack>
+  );
+}
+
 export function InvoiceSettingsPayments(props: {
   m: { navy: string };
   sx: InvoiceSettingsSx;
@@ -126,43 +172,18 @@ export function InvoiceSettingsPayments(props: {
                           </Stack>
                         </Stack>
 
-                        <Stack
-                          direction={{ xs: "column", md: "row" }}
-                          spacing={1.25}
-                          alignItems={{ md: "flex-start" }}
-                        >
-                          <BodyText sx={rowLabelSx}>Penalty Fee</BodyText>
-                          <Stack
-                            direction={{ xs: "column", sm: "row" }}
-                            spacing={1.25}
-                            sx={{ flex: 1 }}
-                          >
-                            <MollureFormField
-                              disabled={!paymentsEditing}
-                              value={settings.paymentTerms.originalPenaltyValue}
-                              onChange={(e) =>
-                                updatePaymentTerm(
-                                  "originalPenaltyValue",
-                                  e.target.value,
-                                )
-                              }
-                            />
-                            <MollureFormField
-                              select
-                              disabled={!paymentsEditing}
-                              value={settings.paymentTerms.originalPenaltyUnit}
-                              onChange={(e) =>
-                                updatePaymentTerm(
-                                  "originalPenaltyUnit",
-                                  e.target.value,
-                                )
-                              }
-                              SelectProps={{ native: true }}
-                            >
-                              <option value="%">Percentage</option><option value="fixed">Fixed amount</option>
-                            </MollureFormField>
-                          </Stack>
-                        </Stack>
+                        <PenaltyFeeFields
+                          rowLabelSx={rowLabelSx}
+                          editing={paymentsEditing}
+                          value={settings.paymentTerms.originalPenaltyValue}
+                          unit={settings.paymentTerms.originalPenaltyUnit}
+                          onValue={(v) =>
+                            updatePaymentTerm("originalPenaltyValue", v)
+                          }
+                          onUnit={(v) =>
+                            updatePaymentTerm("originalPenaltyUnit", v)
+                          }
+                        />
                       </Stack>
 
                       <BodyText sx={mollureLabelSx(m.navy, { mt: 2 })}>
@@ -225,43 +246,18 @@ export function InvoiceSettingsPayments(props: {
                           </Stack>
                         </Stack>
 
-                        <Stack
-                          direction={{ xs: "column", md: "row" }}
-                          spacing={1.25}
-                          alignItems={{ md: "flex-start" }}
-                        >
-                          <BodyText sx={rowLabelSx}>Penalty Fee</BodyText>
-                          <Stack
-                            direction={{ xs: "column", sm: "row" }}
-                            spacing={1.25}
-                            sx={{ flex: 1 }}
-                          >
-                            <MollureFormField
-                              disabled={!paymentsEditing}
-                              value={
-                                settings.paymentTerms.firstReissuePenaltyValue
-                              }
-                              onChange={(e) =>
-                                updatePaymentTerm(
-                                  "firstReissuePenaltyValue",
-                                  e.target.value,
-                                )
-                              }
-                            />
-                            <MollureFormField
-                              disabled={!paymentsEditing}
-                              value={
-                                settings.paymentTerms.firstReissuePenaltyUnit
-                              }
-                              onChange={(e) =>
-                                updatePaymentTerm(
-                                  "firstReissuePenaltyUnit",
-                                  e.target.value,
-                                )
-                              }
-                            />
-                          </Stack>
-                        </Stack>
+                        <PenaltyFeeFields
+                          rowLabelSx={rowLabelSx}
+                          editing={paymentsEditing}
+                          value={settings.paymentTerms.firstReissuePenaltyValue}
+                          unit={settings.paymentTerms.firstReissuePenaltyUnit}
+                          onValue={(v) =>
+                            updatePaymentTerm("firstReissuePenaltyValue", v)
+                          }
+                          onUnit={(v) =>
+                            updatePaymentTerm("firstReissuePenaltyUnit", v)
+                          }
+                        />
                       </Stack>
 
                       <BodyText sx={mollureLabelSx(m.navy, { mt: 2 })}>
@@ -326,43 +322,18 @@ export function InvoiceSettingsPayments(props: {
                           </Stack>
                         </Stack>
 
-                        <Stack
-                          direction={{ xs: "column", md: "row" }}
-                          spacing={1.25}
-                          alignItems={{ md: "flex-start" }}
-                        >
-                          <BodyText sx={rowLabelSx}>Penalty Fee</BodyText>
-                          <Stack
-                            direction={{ xs: "column", sm: "row" }}
-                            spacing={1.25}
-                            sx={{ flex: 1 }}
-                          >
-                            <MollureFormField
-                              disabled={!paymentsEditing}
-                              value={
-                                settings.paymentTerms.secondReissuePenaltyValue
-                              }
-                              onChange={(e) =>
-                                updatePaymentTerm(
-                                  "secondReissuePenaltyValue",
-                                  e.target.value,
-                                )
-                              }
-                            />
-                            <MollureFormField
-                              disabled={!paymentsEditing}
-                              value={
-                                settings.paymentTerms.secondReissuePenaltyUnit
-                              }
-                              onChange={(e) =>
-                                updatePaymentTerm(
-                                  "secondReissuePenaltyUnit",
-                                  e.target.value,
-                                )
-                              }
-                            />
-                          </Stack>
-                        </Stack>
+                        <PenaltyFeeFields
+                          rowLabelSx={rowLabelSx}
+                          editing={paymentsEditing}
+                          value={settings.paymentTerms.secondReissuePenaltyValue}
+                          unit={settings.paymentTerms.secondReissuePenaltyUnit}
+                          onValue={(v) =>
+                            updatePaymentTerm("secondReissuePenaltyValue", v)
+                          }
+                          onUnit={(v) =>
+                            updatePaymentTerm("secondReissuePenaltyUnit", v)
+                          }
+                        />
                       </Stack>
                     </Box>
                   </Box>
@@ -384,6 +355,8 @@ export function InvoiceSettingsPayments(props: {
                           sx={{ flex: 1 }}
                         >
                           <MollureFormField
+                            type="number"
+                            inputProps={{ min: 0, step: 1 }}
                             disabled={!paymentsEditing}
                             value={settings.reminders.reminder1Value}
                             onChange={(e) =>
@@ -413,6 +386,8 @@ export function InvoiceSettingsPayments(props: {
                           sx={{ flex: 1 }}
                         >
                           <MollureFormField
+                            type="number"
+                            inputProps={{ min: 0, step: 1 }}
                             disabled={!paymentsEditing}
                             value={settings.reminders.reminder2Value}
                             onChange={(e) =>

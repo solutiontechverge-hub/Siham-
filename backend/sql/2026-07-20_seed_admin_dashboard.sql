@@ -98,13 +98,14 @@ ON CONFLICT (professional_profile_id) DO UPDATE SET
 
 -- Online + offline bookings across the last ~30 days for chart/KPI coverage
 INSERT INTO bookings (
-  booking_date, business_setup_id, customer_id, start_time, end_time,
+  booking_date, business_setup_id, customer_id, service_id, start_time, end_time,
   location_type, status, booking_type, unique_code, total_price, contact_number
 )
 SELECT
   (CURRENT_DATE - v.days_ago)::date,
   bs.id,
   cu.id,
+  s.id,
   ((CURRENT_DATE - v.days_ago)::text || ' 10:00:00+00')::timestamptz,
   ((CURRENT_DATE - v.days_ago)::text || ' 11:00:00+00')::timestamptz,
   v.location_type,
@@ -168,6 +169,8 @@ INNER JOIN users pu ON pu.email = v.pro_email
 INNER JOIN professional_profiles pp ON pp.user_id = pu.id
 INNER JOIN business_setups bs ON bs.professional_profile_id = pp.id
 INNER JOIN users cu ON cu.email = v.customer_email
+INNER JOIN subcategories s ON s.title = 'Haircut'
+INNER JOIN categories c ON c.id = s.category_id AND c.title = 'Hair'
 WHERE NOT EXISTS (SELECT 1 FROM bookings b WHERE b.unique_code = v.unique_code);
 
 -- Finance transactions for summary overview (direct / non-direct)

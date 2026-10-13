@@ -54,8 +54,15 @@ export type BookingActivityApiEvent = {
   bookingId?: string | null;
   bookingCode?: string | null;
   kind: string;
+  /** Server action contract (mirrors kind). */
+  action_type?: string;
+  actionType?: string;
   title: string;
   actor?: string;
+  actor_role?: string;
+  actorRole?: string;
+  user_id?: string | null;
+  userId?: string | null;
   actorLabel?: string | null;
   subtitle?: string | null;
   payload?: Record<string, unknown> | null;
@@ -243,7 +250,10 @@ export type BookingActivityBuildInput = {
   } | null;
   currentDateISO?: string | null;
   currentStart?: string | null;
-  /** Persisted API events — preferred over synthesis when present */
+  /**
+   * Persisted API events. When non-null (including []), timeline is server-driven —
+   * no browser synthesis / localStorage invent. Null = legacy synthesize path.
+   */
   apiEvents?: BookingActivityApiEvent[] | null;
   mode: "activity" | "sales";
 };

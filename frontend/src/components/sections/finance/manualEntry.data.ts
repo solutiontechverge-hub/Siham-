@@ -119,15 +119,22 @@ export function buildManualEntryCatalogOptions(input: {
   }));
 
   const setupServices = input.setupServices ?? [];
+  const exceptionByServiceId = new Map(
+    input.services.map((service) => [
+      String(service.service_id || service.id),
+      service.vat,
+    ]),
+  );
   const itemOptions =
     setupServices.length > 0
       ? setupServices.map((service) => ({
           id: service.id,
           label: service.service_title || service.category_title || "Service",
           unitPrice: parseFinancePrice(String(service.price ?? "")),
+          vat: exceptionByServiceId.get(String(service.id)),
         }))
       : input.services.map((service) => ({
-          id: service.id,
+          id: service.service_id || service.id,
           label: service.service
             ? `${service.category} - ${service.service}`
             : service.category,

@@ -118,7 +118,11 @@ export function useProfessionalFixedLocationCalendarSalesActivity({
         currentDetails: drawerSalesActivityContext?.details ?? null,
         currentDateISO: drawerSalesActivityContext?.date ?? null,
         currentStart: drawerSalesActivityContext?.start ?? null,
-        apiEvents: bookingActivityResponse?.data ?? null,
+        // Always server-driven when viewing a booking — never synthesize from browser state.
+        apiEvents:
+          activityBookingId || activityBookingCode
+            ? (bookingActivityResponse?.data ?? [])
+            : null,
         mode: "activity",
       }),
     [

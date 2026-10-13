@@ -32,6 +32,7 @@ import {
 import {
   DEFAULT_INVOICE_SETTINGS,
   mergeInvoiceSettings,
+  paymentTermPenaltiesInvalid,
 } from "../helpers/financeInvoiceSettings.js";
 import {
   canBulkMarkPaid,
@@ -46,6 +47,12 @@ import {
   aggregateFinanceAnalytics,
   FINANCE_ANALYTICS_MAX_ROWS,
 } from "../services/finance-analytics.service.js";
+import { getStripeClient } from "../services/stripeFees.service.js";
+import {
+  fetchStripeOnboardingStatus,
+  fromDbStripeConnectStatus,
+  toDbStripeConnectStatus,
+} from "../utils/stripeOnboardingStatus.js";
 import {
   activateSubscription,
   applyRenewalIfDue,
@@ -150,14 +157,21 @@ const ensureFinanceSettings = async (professionalProfileId) => {
 
 const loadProfessionalDocumentSnapshot = async (professionalProfileId) => {
   const result = await query(
-    `SELECT legal_name, ccc_number, vat_number, street, street_number,
-            postal_code, province, municipality, phone
-     FROM professional_profiles WHERE id = $1`,
+    `SELECT pp.legal_name, pp.ccc_number, pp.vat_number, pp.street, pp.street_number,
+            pp.postal_code, pp.province, pp.municipality, pp.phone,
+            bs.salon_name, bs.business_name
+     FROM professional_profiles pp
+     LEFT JOIN business_setups bs ON bs.professional_profile_id = pp.id
+     WHERE pp.id = $1
+     ORDER BY bs.updated_at DESC NULLS LAST
+     LIMIT 1`,
     [professionalProfileId],
   );
   const profile = result.rows[0] ?? {};
   return {
     legalName: profile.legal_name ?? null,
+    shopName:
+      profile.salon_name || profile.business_name || profile.legal_name || null,
     cocNumber: profile.ccc_number ?? null,
     vatNumber: profile.vat_number ?? null,
     address: [profile.street, profile.street_number, profile.postal_code, profile.municipality, profile.province]
@@ -186,6 +200,7 @@ const resolveFinanceClientParty = async ({
   let resolvedVat = String(vatNumber ?? "").trim() || null;
   let resolvedCoc = String(cocNumber ?? "").trim() || null;
   let resolvedLegalName = String(clientName ?? "").trim() || "Guest";
+  let resolvedAddress = null;
   let isMollure = clientType === "mollure";
 
   // Walk-in / one-time guests: name+email only — product has no guest professional_clients record.
@@ -203,7 +218,12 @@ const resolveFinanceClientParty = async ({
               u.email,
               cp.vat_number,
               cp.ccc_number,
-              cp.legal_name
+              cp.legal_name,
+              cp.street,
+              cp.street_number,
+              cp.postal_code,
+              cp.municipality,
+              cp.province
        FROM bookings b
        INNER JOIN users u ON u.id = b.customer_id
        LEFT JOIN company_profiles cp ON cp.user_id = u.id
@@ -222,6 +242,12 @@ const resolveFinanceClientParty = async ({
       if (row.user_type === "company" && row.legal_name) {
         resolvedLegalName = row.legal_name;
       }
+      if (!resolvedAddress) {
+        resolvedAddress =
+          [row.street, row.street_number, row.postal_code, row.municipality, row.province]
+            .filter(Boolean)
+            .join(", ") || null;
+      }
       if (row.user_type === "company" && clientType === "guest") {
         // booking-linked company payer is business
       }
@@ -232,7 +258,8 @@ const resolveFinanceClientParty = async ({
   if (email || customerId) {
     if (!customerId && email) {
       const userLookup = await query(
-        `SELECT u.id, u.user_type, cp.vat_number, cp.ccc_number, cp.legal_name
+        `SELECT u.id, u.user_type, cp.vat_number, cp.ccc_number, cp.legal_name,
+                cp.street, cp.street_number, cp.postal_code, cp.municipality, cp.province
          FROM users u
          LEFT JOIN company_profiles cp ON cp.user_id = u.id
          WHERE lower(u.email) = lower($1)
@@ -249,11 +276,17 @@ const resolveFinanceClientParty = async ({
         if (user.user_type === "company" && user.legal_name) {
           resolvedLegalName = user.legal_name;
         }
+        if (!resolvedAddress) {
+          resolvedAddress =
+            [user.street, user.street_number, user.postal_code, user.municipality, user.province]
+              .filter(Boolean)
+              .join(", ") || null;
+        }
       }
     }
 
     const clientRow = await query(
-      `SELECT id, mollure_user_id, client_kind, is_mollure, vat, coc, legal_name, display_name
+      `SELECT id, mollure_user_id, client_kind, is_mollure, vat, coc, legal_name, display_name, business_address
        FROM professional_clients
        WHERE professional_profile_id = $1
          AND (
@@ -274,6 +307,7 @@ const resolveFinanceClientParty = async ({
       if (pc.client_kind === "company" && pc.legal_name) {
         resolvedLegalName = pc.legal_name;
       }
+      if (pc.business_address) resolvedAddress = pc.business_address;
       if (pc.is_mollure) isMollure = true;
     }
   }
@@ -281,6 +315,7 @@ const resolveFinanceClientParty = async ({
   return {
     legalName: resolvedLegalName,
     email: email || undefined,
+    ...(resolvedAddress ? { address: resolvedAddress } : {}),
     ...(resolvedVat ? { vatNumber: resolvedVat } : {}),
     ...(resolvedCoc ? { cocNumber: resolvedCoc } : {}),
     ...(customerId ? { customerId } : {}),
@@ -292,6 +327,7 @@ const resolveFinanceClientParty = async ({
 const mapSettingsRow = (row) => ({
   subscriptionStatus: row.subscription_status,
   stripeConnectStatus: row.stripe_connect_status,
+  stripeAccountId: row.stripe_account_id ?? null,
   autoPay: row.auto_pay !== false,
   subscriptionActivatedAt: row.subscription_activated_at
     ? new Date(row.subscription_activated_at).toISOString()
@@ -305,6 +341,8 @@ const mapSettingsRow = (row) => ({
   transactionOptions: {
     ...DEFAULT_TRANSACTION_OPTIONS,
     ...(row.transaction_options ?? {}),
+    // Online immediate is mandatory for post-booking checkout.
+    onlineImmediate: true,
   },
   invoiceSettings: mergeInvoiceSettings(row.invoice_settings),
 });
@@ -646,7 +684,16 @@ export const updateFinanceInvoiceSettings = async (req, res) => {
     if (!profile) return;
 
     await ensureFinanceSettings(profile.id);
-    const invoiceSettings = mergeInvoiceSettings(req.body?.invoiceSettings ?? req.body);
+    const rawInvoiceSettings = req.body?.invoiceSettings ?? req.body;
+    const penaltyError = paymentTermPenaltiesInvalid(rawInvoiceSettings?.paymentTerms);
+    if (penaltyError) {
+      return res.status(400).json({
+        success: false,
+        message: penaltyError,
+        data: null,
+      });
+    }
+    const invoiceSettings = mergeInvoiceSettings(rawInvoiceSettings);
 
     const result = await query(
       `UPDATE professional_finance_settings
@@ -1116,15 +1163,9 @@ export const createFinanceTransaction = async (req, res) => {
       ...(paymentPhase ? { paymentPhase } : {}),
       ...(addonId ? { addonId, payerKey: addonId } : {}),
       issuedSnapshot: {
-        // BC / vat-coc clients freeze company layout even if default is individual.
-        templateType:
-          clientType === "business" || issuedInvoiceSettings.defaultInvoiceType === "company"
-            ? "company"
-            : "individual",
-        layout:
-          clientType === "business" || issuedInvoiceSettings.defaultInvoiceType === "company"
-            ? "itemized"
-            : "simplified",
+        // Client type alone selects the template — never the pro's defaultInvoiceType.
+        templateType: clientType === "business" ? "company" : "individual",
+        layout: clientType === "business" ? "itemized" : "simplified",
         invoiceSettings: issuedInvoiceSettings,
         professionalBusiness: issuedProfessionalBusiness,
       },
@@ -1827,14 +1868,8 @@ export const replaceFinanceTransaction = async (req, res) => {
           totalPrice: moneyNumber(gross),
           replacedTransactionId: id,
           issuedSnapshot: {
-            templateType:
-              clientType === "business" || issuedInvoiceSettings.defaultInvoiceType === "company"
-                ? "company"
-                : "individual",
-            layout:
-              clientType === "business" || issuedInvoiceSettings.defaultInvoiceType === "company"
-                ? "itemized"
-                : "simplified",
+            templateType: clientType === "business" ? "company" : "individual",
+            layout: clientType === "business" ? "itemized" : "simplified",
             invoiceSettings: issuedInvoiceSettings,
             professionalBusiness: issuedProfessionalBusiness,
           },
@@ -2114,7 +2149,68 @@ export const getPublicTransactionOptions = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Transaction options loaded.",
-      data: { ...DEFAULT_TRANSACTION_OPTIONS, ...options },
+      data: { ...DEFAULT_TRANSACTION_OPTIONS, ...options, onlineImmediate: true },
+    });
+  } catch (error) {
+    return sendCaughtError(res, error, { fallbackMessage: "Request failed." });
+  }
+};
+
+/** Real-time Connect status via stripe.accounts.retrieve; DB fallback when no account id (sim ladder). */
+export const getStripeConnectStatus = async (req, res) => {
+  try {
+    const profile = await requireProfessional(req, res);
+    if (!profile) return;
+
+    const settings = await ensureFinanceSettings(profile.id);
+    const accountId = settings.stripe_account_id ?? null;
+
+    // No Connect account id → trust DB (NOT_CONNECTED, or sim onboarding/connected).
+    if (!accountId) {
+      const status = fromDbStripeConnectStatus(settings.stripe_connect_status);
+      const connected = status === "CONNECTED";
+      return res.status(200).json({
+        success: true,
+        message: "Stripe Connect status loaded.",
+        data: {
+          status,
+          stripeConnectStatus: toDbStripeConnectStatus(status),
+          accountId: null,
+          detailsSubmitted: connected,
+          payoutsEnabled: connected,
+          chargesEnabled: connected,
+        },
+      });
+    }
+
+    const stripe = await getStripeClient();
+    const live = await fetchStripeOnboardingStatus(stripe, accountId);
+    const dbStatus = toDbStripeConnectStatus(live.status);
+
+    if (settings.stripe_connect_status !== dbStatus) {
+      await query(
+        `UPDATE professional_finance_settings
+         SET stripe_connect_status = $2, updated_at = NOW()
+         WHERE professional_profile_id = $1`,
+        [profile.id, dbStatus],
+      );
+      emitBusinessChangedForProfile(profile.id, {
+        action: "updated",
+        scope: "finance",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Stripe Connect status loaded.",
+      data: {
+        status: live.status,
+        stripeConnectStatus: dbStatus,
+        accountId,
+        detailsSubmitted: live.detailsSubmitted,
+        payoutsEnabled: live.payoutsEnabled,
+        chargesEnabled: live.chargesEnabled,
+      },
     });
   } catch (error) {
     return sendCaughtError(res, error, { fallbackMessage: "Request failed." });
@@ -2127,9 +2223,41 @@ export const createStripeConnectOnboardingLink = async (req, res) => {
     if (!profile) return;
 
     const settings = await ensureFinanceSettings(profile.id);
+    // Resume existing Connect account when present (body override only if no stored id).
+    let accountId =
+      settings.stripe_account_id || req.body?.accountId || null;
 
-    // Already completed Connect — never force Start onboarding again.
-    if (settings.stripe_connect_status === "connected") {
+    const stripe = await getStripeClient();
+    if (stripe && accountId) {
+      const live = await fetchStripeOnboardingStatus(stripe, accountId);
+      if (live.status === "CONNECTED") {
+        const dbStatus = toDbStripeConnectStatus(live.status);
+        if (settings.stripe_connect_status !== dbStatus) {
+          await query(
+            `UPDATE professional_finance_settings
+             SET stripe_connect_status = $2, updated_at = NOW()
+             WHERE professional_profile_id = $1`,
+            [profile.id, dbStatus],
+          );
+          emitBusinessChangedForProfile(profile.id, {
+            action: "updated",
+            scope: "finance",
+          });
+        }
+        return res.status(200).json({
+          success: true,
+          message: "Stripe Connect already completed.",
+          data: {
+            url: null,
+            alreadyConnected: true,
+            simulated: false,
+            accountId,
+            status: live.status,
+            stripeConnectStatus: dbStatus,
+          },
+        });
+      }
+    } else if (!stripe && settings.stripe_connect_status === "connected") {
       return res.status(200).json({
         success: true,
         message: "Stripe Connect already completed.",
@@ -2138,12 +2266,12 @@ export const createStripeConnectOnboardingLink = async (req, res) => {
           alreadyConnected: true,
           simulated: false,
           stripeConnectStatus: "connected",
+          status: "CONNECTED",
         },
       });
     }
 
-    const stripeKey = process.env.STRIPE_SECRET_KEY;
-    if (!stripeKey) {
+    if (!stripe) {
       // ponytail: no Stripe keys — persist honest status only. First click → onboarding;
       // second click while already onboarding → connected (test ladder). Wire real Connect + webhooks for prod.
       const nextConnect =
@@ -2169,14 +2297,12 @@ export const createStripeConnectOnboardingLink = async (req, res) => {
           url: null,
           simulated: true,
           stripeConnectStatus: result.rows[0].stripe_connect_status,
+          status: nextConnect === "connected" ? "CONNECTED" : "INCOMPLETE",
         },
       });
     }
 
-    const Stripe = (await import("stripe")).default;
-    const stripe = new Stripe(stripeKey, { apiVersion: "2024-11-20.acacia" });
-
-    let accountId = req.body?.accountId;
+    // NOT_CONNECTED only: create Express account. INCOMPLETE → reuse stored accountId.
     if (!accountId) {
       const account = await stripe.accounts.create({ type: "express" });
       accountId = account.id;
@@ -2196,9 +2322,11 @@ export const createStripeConnectOnboardingLink = async (req, res) => {
 
     await query(
       `UPDATE professional_finance_settings
-       SET stripe_connect_status = 'onboarding', updated_at = NOW()
+       SET stripe_connect_status = 'onboarding',
+           stripe_account_id = $2,
+           updated_at = NOW()
        WHERE professional_profile_id = $1`,
-      [profile.id],
+      [profile.id, accountId],
     );
 
     emitBusinessChangedForProfile(profile.id, {
@@ -2209,7 +2337,49 @@ export const createStripeConnectOnboardingLink = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Stripe onboarding link created.",
-      data: { url: link.url, accountId, simulated: false },
+      data: {
+        url: link.url,
+        accountId,
+        simulated: false,
+        status: "INCOMPLETE",
+        stripeConnectStatus: "onboarding",
+      },
+    });
+  } catch (error) {
+    return sendCaughtError(res, error, { fallbackMessage: "Request failed." });
+  }
+};
+
+/** Express/Custom dashboard login link for CONNECTED accounts. */
+export const createStripeDashboardLink = async (req, res) => {
+  try {
+    const profile = await requireProfessional(req, res);
+    if (!profile) return;
+
+    const settings = await ensureFinanceSettings(profile.id);
+    const accountId = settings.stripe_account_id ?? null;
+    if (!accountId) {
+      return res.status(400).json({
+        success: false,
+        message: "No Stripe Connect account to open.",
+      });
+    }
+
+    const stripe = await getStripeClient();
+    if (!stripe) {
+      // ponytail: no Stripe keys — public dashboard fallback for local/sim.
+      return res.status(200).json({
+        success: true,
+        message: "Stripe dashboard link (simulated).",
+        data: { url: "https://dashboard.stripe.com/", simulated: true },
+      });
+    }
+
+    const login = await stripe.accounts.createLoginLink(accountId);
+    return res.status(200).json({
+      success: true,
+      message: "Stripe dashboard link created.",
+      data: { url: login.url, simulated: false },
     });
   } catch (error) {
     return sendCaughtError(res, error, { fallbackMessage: "Request failed." });

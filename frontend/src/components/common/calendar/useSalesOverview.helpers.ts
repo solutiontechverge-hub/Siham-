@@ -50,6 +50,9 @@ export function toFinanceHints(rows: TransactionRow[]): SalesFinanceHint[] {
           penaltyAmount?: number;
           payerKey?: string;
           reissueLevel?: number;
+          issuedSnapshot?: {
+            invoiceSettings?: { paymentTerms?: SalesFinanceHint["paymentTerms"] };
+          };
         }
       | undefined;
     const paid =
@@ -60,6 +63,7 @@ export function toFinanceHints(rows: TransactionRow[]): SalesFinanceHint[] {
         : null;
     const amount = Number(row.grossAmount ?? row.netAmount);
     const lineItems = financeDocumentLinesToSalesLines(row);
+    const paymentTerms = doc?.issuedSnapshot?.invoiceSettings?.paymentTerms;
     return {
       transactionId: row.id,
       bookingId: row.bookingId,
@@ -74,6 +78,7 @@ export function toFinanceHints(rows: TransactionRow[]): SalesFinanceHint[] {
         row.paymentDeadline || doc?.dueDate || row.document?.dueDate || null,
       penaltyAmount: doc?.penaltyAmount,
       reissueLevel: Number(doc?.reissueLevel ?? row.document?.reissueLevel ?? 0) || 0,
+      ...(paymentTerms ? { paymentTerms } : {}),
       entryLabel: row.entryLabel,
       amount: Number.isFinite(amount) ? amount : undefined,
       ...(lineItems.length ? { lineItems } : {}),

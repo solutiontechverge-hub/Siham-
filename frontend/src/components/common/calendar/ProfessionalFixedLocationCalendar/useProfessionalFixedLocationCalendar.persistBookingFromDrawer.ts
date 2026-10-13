@@ -16,6 +16,10 @@ import {
   serializeCalendarEntryNotes,
 } from "../bookingEventDetails";
 import { resolveOfflineBookingPrepayAction } from "../bookingCheckout";
+import {
+  buildProtectiveFeeActivation,
+  shouldTriggerLateRescheduleFee,
+} from "../bookingFeeTriggers";
 import { consumeConfirmedEditGrant } from "../../client-booking/bookingEditRequest";
 import { supersedeOpenSalesCardsForBooking } from "../salesOverview.storage";
 import { extractBookingId, type SelectedSlot } from "../calendar.utils";
@@ -93,6 +97,12 @@ export type UseProfessionalFixedLocationCalendarPersistBookingFromDrawerArgs = {
   showLateRescheduling: boolean;
   lateRescheduleFeePercent: string;
   lateRescheduleFeePercentCeiling: string;
+  lateRescheduleFeePercentDefault?: string;
+  appointmentBeforeHours?: number | null;
+  appointmentBeforeMinutes?: number | null;
+  setShowLateRescheduling: (v: boolean) => void;
+  setLateRescheduleFeePercent: (v: string) => void;
+  setLateRescheduleFeePercentCeiling: (v: string) => void;
   showNoShowFee: boolean;
   noShowFeePercent: string;
   noShowFeePercentCeiling: string;
@@ -174,6 +184,12 @@ export function useProfessionalFixedLocationCalendarPersistBookingFromDrawer({
   showLateRescheduling,
   lateRescheduleFeePercent,
   lateRescheduleFeePercentCeiling,
+  lateRescheduleFeePercentDefault,
+  appointmentBeforeHours,
+  appointmentBeforeMinutes,
+  setShowLateRescheduling,
+  setLateRescheduleFeePercent,
+  setLateRescheduleFeePercentCeiling,
   showNoShowFee,
   noShowFeePercent,
   noShowFeePercentCeiling,
@@ -469,6 +485,38 @@ export function useProfessionalFixedLocationCalendarPersistBookingFromDrawer({
           originalServicesSnapshot,
           silentBaseline: silentEditBaselineRef.current,
         });
+
+        // Auto-trigger late reschedule fee when schedule edit is outside notice window.
+        if (details.scheduleEdited) {
+          const startMs = Date.parse(
+            `${selectedSlot.date}T${selectedSlot.start}:00`,
+          );
+          if (
+            shouldTriggerLateRescheduleFee({
+              policyPercent: lateRescheduleFeePercentDefault,
+              scheduleEdited: true,
+              alreadyShown: Boolean(
+                showLateRescheduling || details.showLateRescheduling,
+              ),
+              appointmentStartMs: Number.isFinite(startMs) ? startMs : null,
+              noticeHours: appointmentBeforeHours,
+              noticeMinutes: appointmentBeforeMinutes,
+            })
+          ) {
+            const activation = buildProtectiveFeeActivation(
+              lateRescheduleFeePercentDefault,
+              { kind: "lateReschedule" },
+            );
+            if (activation) {
+              details.showLateRescheduling = true;
+              details.lateRescheduleFeePercent = activation.percent;
+              details.lateRescheduleFeePercentCeiling = activation.ceiling;
+              setShowLateRescheduling(true);
+              setLateRescheduleFeePercent(activation.percent);
+              setLateRescheduleFeePercentCeiling(activation.ceiling);
+            }
+          }
+        }
       }
 
       const isMollureManualBooking =
@@ -834,6 +882,12 @@ export function useProfessionalFixedLocationCalendarPersistBookingFromDrawer({
       showLateRescheduling,
       lateRescheduleFeePercent,
       lateRescheduleFeePercentCeiling,
+      lateRescheduleFeePercentDefault,
+      appointmentBeforeHours,
+      appointmentBeforeMinutes,
+      setShowLateRescheduling,
+      setLateRescheduleFeePercent,
+      setLateRescheduleFeePercentCeiling,
       showNoShowFee,
       noShowFeePercent,
       noShowFeePercentCeiling,

@@ -14,7 +14,7 @@ const base = {
   date: "2026-01-01",
   clientName: "Ada",
   clientEmail: "a@b.c",
-  clientType: "individual" as const,
+  clientType: "mollure" as const,
   netAmount: 100,
   methodTitle: "Online",
   methodDetail: "",

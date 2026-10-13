@@ -4,37 +4,13 @@ import type {
   TransactionDocumentParty,
   TransactionRow,
 } from "../../../app/professionals/fixed-location/finance/data/transactions";
+import {
+  parseVatRate,
+  resolveProductVatLabel,
+  resolveServiceVatLabel,
+} from "../../../lib/financeVat";
 import type { ClientBookingDraft } from "../client-booking/types";
 import type { FinanceInvoiceSettings } from "./useFinanceInvoiceSettings";
-
-function resolveVatForLabel(
-  name: string,
-  settings: FinanceInvoiceSettings,
-  kind: "service" | "product",
-): string {
-  const normalized = name.trim().toLowerCase();
-  if (kind === "product") {
-    const match = [...settings.products, ...(settings.uniqueItems ?? [])].find(
-      (row) => {
-        const label = row.name.trim().toLowerCase();
-        return label && (normalized.includes(label) || label.includes(normalized));
-      },
-    );
-    return match?.vat ?? "0%";
-  }
-  const match = settings.services.find((row) => {
-    const label = row.service.trim().toLowerCase();
-    return label && (normalized.includes(label) || label.includes(normalized));
-  });
-  return match?.vat ?? "0%";
-}
-
-function vatRateFromText(vat: string): number | null {
-  const match = String(vat).match(/-?\d+(?:\.\d+)?/);
-  if (!match) return null;
-  const value = Number(match[0]);
-  return Number.isFinite(value) ? value : null;
-}
 
 function addDaysIso(isoDate: string, days: number): string {
   const base = new Date(`${isoDate}T00:00:00`);
@@ -94,15 +70,15 @@ export function buildClientBookingTransactionRow({
         : 0;
 
   const serviceLineItems = draft.services.map((service) => {
-    const vat = resolveVatForLabel(service.name, financeSettings, "service");
     const sourceReference = String(service.id).split("::")[0];
+    const vat = resolveServiceVatLabel(sourceReference, financeSettings);
     return {
       description: service.name,
       sourceReference,
       sourceType: "serviceId" as const,
       quantity: 1,
       vat,
-      vatRate: vatRateFromText(vat),
+      vatRate: parseVatRate(vat),
       pricePerUnit: service.price,
       totalPrice: service.price,
     };
@@ -113,8 +89,8 @@ export function buildClientBookingTransactionRow({
     const unitPrice =
       product.unitPrice ??
       (quantity > 0 ? product.price / quantity : product.price);
-    const vat = resolveVatForLabel(product.name, financeSettings, "product");
     const sourceReference = String(product.id).split("::")[0];
+    const vat = resolveProductVatLabel(sourceReference || product.name, financeSettings);
     return {
       description: product.name,
       sourceReference,
@@ -123,7 +99,7 @@ export function buildClientBookingTransactionRow({
         : "productId") as "productId" | "uniqueItemCode",
       quantity,
       vat,
-      vatRate: vatRateFromText(vat),
+      vatRate: parseVatRate(vat),
       pricePerUnit: unitPrice,
       totalPrice: product.price,
     };

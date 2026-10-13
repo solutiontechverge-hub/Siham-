@@ -95,6 +95,8 @@ export default function FinanceOverviewPageView() {
     handleAddMenuAction,
     openActionExportMenu,
     openManualEntryDrawer,
+    handleManagePayouts,
+    payoutGuardDialog,
   } = useFinanceOverviewPage();
   const professionalBusinessOverride = useProfessionalBusinessOverride();
 
@@ -169,6 +171,12 @@ export default function FinanceOverviewPageView() {
           sx: mollureMenuPaperSx(m.navy, { minWidth: 220 }),
         }}
       >
+        <MenuItem
+          onClick={handleManagePayouts}
+          sx={mollureMenuItemSx(m.navy)}
+        >
+          Manage payouts
+        </MenuItem>
         {actionMenuItems.map((opt) =>
           opt.hasSubmenu ? (
             <MenuItem
@@ -198,6 +206,8 @@ export default function FinanceOverviewPageView() {
           ),
         )}
       </Menu>
+
+      {payoutGuardDialog}
 
       <Menu
         anchorEl={actionExportAnchor}

@@ -10,6 +10,7 @@ import {
   TableCell,
   TableHead,
   TableRow,
+  Tooltip,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import DenseRowIconActions from "../../../../../components/common/DenseRowIconActions";
@@ -19,10 +20,17 @@ import {
 } from "../../../../../theme/mollureHierarchy";
 import { BodyText, SubHeading } from "../../../../../components/ui/typography";
 import AppButton from "../../../../../components/common/AppButton";
+import { VAT_EXCEPTION_INFO_TOOLTIP } from "../../../../../lib/financeVat";
 import type { InvoiceSettingsSx } from "./invoiceSettings.styles";
 
 type Product = { id: string; name: string; price: number; vat: string };
-type Service = { id: string; category: string; service: string; vat: string };
+type Service = {
+  id: string;
+  service_id?: string;
+  category: string;
+  service: string;
+  vat: string;
+};
 
 export function InvoiceSettingsProducts(props: {
   m: { navy: string; tealDark: string; teal: string; addSoftBg: string; addSoftFg: string };
@@ -191,21 +199,25 @@ export function InvoiceSettingsProducts(props: {
                         <SubHeading sx={mollureSectionTitleSx(m.navy)}>
                           Service List
                         </SubHeading>
-                        <Box
-                          sx={{
-                            width: 16,
-                            height: 16,
-                            borderRadius: "50%",
-                            border: `1px solid ${alpha(m.tealDark, 0.35)}`,
-                            color: m.teal,
-                            display: "grid",
-                            placeItems: "center",
-                            fontSize: 11,
-                            fontWeight: 900,
-                          }}
-                        >
-                          i
-                        </Box>
+                        <Tooltip title={VAT_EXCEPTION_INFO_TOOLTIP} arrow>
+                          <Box
+                            component="span"
+                            sx={{
+                              width: 16,
+                              height: 16,
+                              borderRadius: "50%",
+                              border: `1px solid ${alpha(m.tealDark, 0.35)}`,
+                              color: m.teal,
+                              display: "grid",
+                              placeItems: "center",
+                              fontSize: 11,
+                              fontWeight: 900,
+                              cursor: "help",
+                            }}
+                          >
+                            i
+                          </Box>
+                        </Tooltip>
                       </Stack>
                       <AppButton
                         tone="secondary"

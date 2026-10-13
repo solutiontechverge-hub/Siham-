@@ -501,7 +501,11 @@ export function useClientBookingDetails({
     draft,
     bookingNotesMeta,
     displayDraft,
-    apiEvents: bookingActivityResponse?.data,
+    // Always server-driven when viewing a booking — never synthesize from browser state.
+    apiEvents:
+      apiBookingId || bookingRef
+        ? (bookingActivityResponse?.data ?? [])
+        : null,
     showStatusUpdated,
   });
 

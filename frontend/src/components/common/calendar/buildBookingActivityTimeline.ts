@@ -570,7 +570,26 @@ function enrichItemsWithComparison(
   const notesDetails = parseCalendarEntryNotes(booking?.notes ?? null);
   const storedEbr = parseStoredEbrFromNotes(booking?.notes ?? null);
   const storedEr = parseStoredErFromNotes(booking?.notes ?? null);
-  const editReq = getBookingEditRequest(String(code));
+  // ponytail: localStorage ER is browser-only; prefer notes / skip invent when server-driven.
+  const serverDriven = input.apiEvents != null;
+  const editReq = serverDriven
+    ? {
+        status: (storedEr?.status || storedEbr?.status || "none") as ReturnType<
+          typeof getBookingEditRequest
+        >["status"],
+        // ER notes are handshake-only; line diffs live on EBR / meta.
+        editedServiceIds: storedEbr?.editedServiceIds,
+        addedServiceIds: storedEbr?.addedServiceIds,
+        cancelledServiceIds: storedEbr?.cancelledServiceIds,
+        editedProductIds: storedEbr?.editedProductIds,
+        suggestedServices: storedEbr?.suggestedServices,
+        suggestedProducts: storedEbr?.suggestedProducts,
+        suggestedDateISO: storedEbr?.suggestedDateISO,
+        suggestedTime: storedEbr?.suggestedTime,
+        originalDateISO: storedEbr?.originalDateISO,
+        originalTime: storedEbr?.originalTime,
+      }
+    : getBookingEditRequest(String(code));
   const scenario = input.currentScenario;
   const effectiveStatus = input.currentStatus
     ? normalizeStatus(input.currentStatus)
@@ -742,11 +761,13 @@ function enrichItemsWithComparison(
     lastEditedBy,
     clientName: input.clientName,
   };
-  // Only invent edit-request activity when a real ER/EBR signal exists.
-  if (allowEditActivity) {
-    next = injectMissingComparisonItem(next, editComparison, injectInput);
+  // Server-driven: never invent timeline rows from local comparison heuristics.
+  if (!serverDriven) {
+    if (allowEditActivity) {
+      next = injectMissingComparisonItem(next, editComparison, injectInput);
+    }
+    next = injectMissingComparisonItem(next, silentComparison, injectInput);
   }
-  next = injectMissingComparisonItem(next, silentComparison, injectInput);
 
   return next;
 }
@@ -757,16 +778,18 @@ function mapApiEventsToItems(
 ): BookingActivityItem[] {
   const items: BookingActivityItem[] = [];
   for (const event of events) {
-    const kind = mapApiKind(event.kind);
+    const kind = mapApiKind(event.action_type || event.actionType || event.kind);
     const payload = event.payload ?? {};
     const cancellationReason =
       typeof payload.cancellationReason === "string" ? payload.cancellationReason : undefined;
+    const actorRole =
+      event.actor_role || event.actorRole || event.actor || "system";
     pushItem(items, {
       id: event.id,
       bookingId: event.bookingId ? String(event.bookingId) : fallbackBookingId,
       bookingCode: event.bookingCode ?? undefined,
       kind,
-      actor: (event.actor as BookingActivityItem["actor"]) || "system",
+      actor: actorRole as BookingActivityItem["actor"],
       actorLabel: event.actorLabel || "System",
       title: event.title,
       subtitle: event.subtitle ?? undefined,
@@ -1065,7 +1088,8 @@ function synthesizeBookingActivity(
 
 export function buildBookingActivityTimeline(input: BookingActivityBuildInput): BookingActivityItem[] {
   const apiEvents = input.apiEvents;
-  if (apiEvents && apiEvents.length > 0) {
+  // Non-null apiEvents (incl. []) = server SSOT; do not synthesize from browser state.
+  if (apiEvents != null) {
     const fallbackId = input.currentBookingId || input.currentBookingCode || "booking";
     const mapped = dedupeActivityItems(mapApiEventsToItems(apiEvents, fallbackId));
     const filtered =
@@ -1078,6 +1102,7 @@ export function buildBookingActivityTimeline(input: BookingActivityBuildInput): 
     return enrichItemsWithComparison(sorted, input);
   }
 
+  // Legacy fallback for callers that omit apiEvents (tests / offline-only).
   return enrichItemsWithComparison(
     dedupeActivityItems(synthesizeBookingActivity(input)),
     input,

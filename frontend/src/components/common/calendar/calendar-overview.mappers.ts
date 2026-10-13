@@ -5,7 +5,11 @@ import type {
   CalendarEvent,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { CalendarBooking, CalendarEntry } from "../../../store/services/businessApi";
-import { wallClockDateFromDateTime, wallClockTimeFromDateTime } from "./calendar.utils";
+import {
+  toIsoLocalDate,
+  wallClockDateFromDateTime,
+  wallClockTimeFromDateTime,
+} from "./calendar.utils";
 import { mainDrawerServicesFromClientSnapshot, parseCalendarEntryNotes, parseStoredEbrFromNotes, parseStoredErFromNotes, sanitizeInternalNoteText } from "./bookingEventDetails";
 import { mergeBookingClientSnapshots } from "./mergeBookingClientSnapshot";
 import {
@@ -98,15 +102,36 @@ const timeFromIso = (value?: string | null) => {
   return wallClockTimeFromDateTime(value) ?? "08:00";
 };
 
-const dateFromValue = (value?: string | null) => {
-  return wallClockDateFromDateTime(value) ?? new Date().toISOString().slice(0, 10);
+/** Local today — never UTC ISO slice (that shifts the calendar day near midnight). */
+const dateFromValue = (value?: string | Date | null) => {
+  return wallClockDateFromDateTime(value) ?? toIsoLocalDate(new Date());
 };
 
 const bookingDurationMins = (start: string, end: string) => {
-  const [sh, sm] = start.split(":").map(Number);
-  const [eh, em] = end.split(":").map(Number);
-  return Math.max(15, eh * 60 + em - (sh * 60 + sm));
+  const [sh, sm] = String(start || "08:00").split(":").map(Number);
+  const [eh, em] = String(end || "08:15").split(":").map(Number);
+  const mins = eh * 60 + em - (sh * 60 + sm);
+  return Number.isFinite(mins) ? Math.max(15, mins) : 30;
 };
+
+function coerceLocationDetails(
+  value: unknown,
+): Record<string, unknown> | null {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  if (typeof value === "string" && value.trim().startsWith("{")) {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
 
 export function mapCalendarEntryToOverviewEvent(
   entry: CalendarEntry,
@@ -145,33 +170,31 @@ export function mapCalendarBookingToEvent(
   booking: CalendarBooking,
   fallbackResourceId: string,
 ): CalendarEvent {
-  const status = statusFromApi[booking.status] ?? "Requested";
+  const status =
+    statusFromApi[String(booking.status ?? "").toLowerCase()] ?? "Requested";
   const isRequested = status === "Requested";
   const parsedNotes = parseCalendarEntryNotes(booking.notes);
-  const locationDetailsEarly =
-    booking.location_details && typeof booking.location_details === "object"
-      ? (booking.location_details as {
-          clientKind?: "individual" | "company";
-          projectDescription?: string;
-          uploads?: Array<{
-            id?: string;
-            name?: string;
-            url?: string | null;
-            mimeType?: string | null;
-            kind?: "image" | "document" | null;
-          }>;
-          clientSnapshot?: NonNullable<
-            NonNullable<CalendarEvent["details"]>["clientSnapshot"]
-          >;
-          desiredLocation?: {
-            street?: string;
-            number?: string;
-            postalCode?: string;
-            province?: string;
-            municipality?: string;
-          };
-        })
-      : null;
+  const locationDetailsEarly = coerceLocationDetails(booking.location_details) as {
+    clientKind?: "individual" | "company";
+    projectDescription?: string;
+    uploads?: Array<{
+      id?: string;
+      name?: string;
+      url?: string | null;
+      mimeType?: string | null;
+      kind?: "image" | "document" | null;
+    }>;
+    clientSnapshot?: NonNullable<
+      NonNullable<CalendarEvent["details"]>["clientSnapshot"]
+    >;
+    desiredLocation?: {
+      street?: string;
+      number?: string;
+      postalCode?: string;
+      province?: string;
+      municipality?: string;
+    };
+  } | null;
   const locationProjectUploads = resolveBookingProjectUploads({
     locationUploads: Array.isArray(locationDetailsEarly?.uploads)
       ? locationDetailsEarly.uploads
@@ -743,6 +766,48 @@ function dedupeOverviewBookingEvents(
   return out;
 }
 
+export type OverviewBookingMapStats = {
+  fetched: number;
+  mapped: number;
+  dropped: Array<{ id: string; reason: string }>;
+};
+
+/** Map overview bookings one-by-one so a single malformed row cannot abort the list. */
+export function mapOverviewBookingsSafe(
+  bookings: readonly CalendarBooking[],
+  fallbackResourceId: string,
+): { events: CalendarEvent[]; stats: OverviewBookingMapStats } {
+  const dropped: OverviewBookingMapStats["dropped"] = [];
+  const mapped: CalendarEvent[] = [];
+  for (const booking of bookings) {
+    const id = String(booking?.id ?? "");
+    try {
+      const event = mapCalendarBookingToEvent(booking, fallbackResourceId);
+      if (!event.date || !/^\d{4}-\d{2}-\d{2}$/.test(event.date)) {
+        dropped.push({ id, reason: "invalid_date" });
+        continue;
+      }
+      mapped.push(event);
+    } catch (error) {
+      dropped.push({
+        id,
+        reason: error instanceof Error ? error.message : "map_threw",
+      });
+      // ponytail: console warn only — wire to telemetry if drop rate stays high
+      console.warn("[calendar-overview] skipped malformed booking", id, error);
+    }
+  }
+  const events = dedupeOverviewBookingEvents(mapped);
+  return {
+    events,
+    stats: {
+      fetched: bookings.length,
+      mapped: events.length,
+      dropped,
+    },
+  };
+}
+
 export function mergeCalendarOverviewEvents(
   entries: readonly CalendarEntry[],
   bookings: readonly CalendarBooking[],
@@ -750,13 +815,23 @@ export function mergeCalendarOverviewEvents(
 ): CalendarEvent[] {
   const entryEvents = entries
     .filter((entry) => entry.status !== "blocked")
-    .map((entry) => mapCalendarEntryToOverviewEvent(entry, fallbackResourceId))
-    .filter((event) => !event.details?.hiddenForProfessional);
+    .flatMap((entry) => {
+      try {
+        const event = mapCalendarEntryToOverviewEvent(entry, fallbackResourceId);
+        return event.details?.hiddenForProfessional ? [] : [event];
+      } catch (error) {
+        console.warn(
+          "[calendar-overview] skipped malformed calendar entry",
+          entry?.id,
+          error,
+        );
+        return [];
+      }
+    });
 
-  const mappedBookings = dedupeOverviewBookingEvents(
-    bookings.map((booking) =>
-      mapCalendarBookingToEvent(booking, fallbackResourceId),
-    ),
+  const { events: mappedBookings } = mapOverviewBookingsSafe(
+    bookings,
+    fallbackResourceId,
   );
 
   // Soft-deleted bookings must still suppress mirrored calendar entries,

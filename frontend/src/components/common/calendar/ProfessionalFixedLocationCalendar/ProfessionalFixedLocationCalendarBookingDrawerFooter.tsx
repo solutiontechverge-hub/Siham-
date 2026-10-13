@@ -28,6 +28,8 @@ export type ProfessionalFixedLocationCalendarBookingDrawerFooterBag = Pick<
   | "bookingCheckoutOpen"
   | "bookingGuests"
   | "bookingMoreAnchor"
+  | "appointmentBeforeHours"
+  | "appointmentBeforeMinutes"
   | "cancellationBeforeHours"
   | "cancellationBeforeMinutes"
   | "closeBookingDrawer"

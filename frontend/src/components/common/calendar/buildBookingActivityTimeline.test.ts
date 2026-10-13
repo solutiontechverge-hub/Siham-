@@ -600,4 +600,28 @@ assert.equal(
   "identical Confirmed API events must dedupe",
 );
 
+// Empty apiEvents array = server SSOT; must not synthesize browser timeline rows.
+const emptyServerTimeline = buildBookingActivityTimeline({
+  bookings: [
+    {
+      id: "srv-empty",
+      unique_code: "BK-EMPTY",
+      status: "confirmed",
+      created_at: "2026-09-21T10:00:00.000Z",
+      updated_at: "2026-09-21T11:00:00.000Z",
+    },
+  ],
+  clientName: "Client",
+  currentBookingId: "srv-empty",
+  currentBookingCode: "BK-EMPTY",
+  currentStatus: "confirmed",
+  apiEvents: [],
+  mode: "activity",
+});
+assert.equal(
+  emptyServerTimeline.length,
+  0,
+  "empty server activity must not invent timeline rows",
+);
+
 console.log("buildBookingActivityTimeline.test.ts passed");

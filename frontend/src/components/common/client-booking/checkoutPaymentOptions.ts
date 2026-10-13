@@ -1,4 +1,7 @@
-import type { FinanceTransactionOptions } from "../finance-documents/useFinanceTransactionOptions";
+import {
+  lockOnlineImmediate,
+  type FinanceTransactionOptions,
+} from "../finance-documents/useFinanceTransactionOptions";
 
 export type CheckoutPaymentMethodId =
   | "onlineDirect"
@@ -91,6 +94,8 @@ export function resolveCheckoutPaymentOptions(
   locationMode: "fixed" | "desired",
   chosenMethod?: string | null,
 ): CheckoutPaymentOption[] {
+  // ponytail: lock here so checkout never drops online immediate even if stale API data says false
+  const locked = lockOnlineImmediate(txOptions);
   const chosen = optionFromStoredPaymentMethod(chosenMethod);
   if (chosen) {
     if (locationMode === "desired" && chosen.id.startsWith("offline")) {
@@ -100,7 +105,7 @@ export function resolveCheckoutPaymentOptions(
   }
   const pool =
     locationMode === "desired" ? ONLINE_OPTIONS : [...ONLINE_OPTIONS, ...OFFLINE_OPTIONS];
-  return pool.filter((item) => txOptions[item.key]).map(toOption);
+  return pool.filter((item) => locked[item.key]).map(toOption);
 }
 
 export function checkoutPaymentMethodSupportsPayNow(method: CheckoutPaymentMethodId) {

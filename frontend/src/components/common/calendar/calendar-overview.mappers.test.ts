@@ -4,13 +4,23 @@
 import assert from "node:assert/strict";
 import {
   mapCalendarBookingToEvent,
+  mapOverviewBookingsSafe,
   mergeCalendarOverviewEvents,
 } from "./calendar-overview.mappers";
-import { resolveKilometerAllowanceAmount } from "./bookingEventDetails";
+import {
+  normalizeNotesServiceLines,
+  resolveKilometerAllowanceAmount,
+} from "./bookingEventDetails";
 import {
   dedupeCalendarDisplaySegments,
   resolveSameTimeStackChip,
 } from "./calendar-overlap.utils";
+import {
+  addDaysIso,
+  getCalendarQueryDateRange,
+  startOfWeekIso,
+  toMonthIso,
+} from "./calendar.utils";
 import type {
   CalendarBooking,
   CalendarEntry,
@@ -257,4 +267,99 @@ assert.equal(deadlineEvent.details?.responseStartedAt, "2026-10-13T14:00:00.000Z
 assert.equal(deadlineEvent.details?.responseWindowMinutes, 30);
 assert.equal(deadlineEvent.details?.responseStatus, "overdue_response");
 
+// Free-text / no-service historical rows must not abort the overview map loop.
+const freeTextServices = normalizeNotesServiceLines("Cut and color");
+assert.equal(freeTextServices?.length, 1);
+assert.equal(freeTextServices?.[0]?.name, "Cut and color");
+
+const freeTextBooking: CalendarBooking = {
+  ...booking,
+  id: "booking-free-text",
+  unique_code: "ML-FREE",
+  service_id: null,
+  service_title: null,
+  notes: `Client wants bangs\n---mollure-meta---\n${JSON.stringify({
+    services: "Cut and color",
+    guests: [{ id: "g1", name: "Guest", services: "Blow dry" }],
+  })}`,
+  images: '["/uploads/a.jpg"]' as unknown as string[],
+  location_details: JSON.stringify({
+    projectDescription: "legacy",
+  }) as unknown as Record<string, unknown>,
+};
+const freeTextEvent = mapCalendarBookingToEvent(freeTextBooking, "tm-1");
+assert.equal(freeTextEvent.details?.services?.[0]?.name, "Cut and color");
+assert.ok(freeTextEvent.details?.services?.[0]?.id);
+
+const noServiceRequest: CalendarBooking = {
+  ...booking,
+  id: "booking-no-svc",
+  unique_code: "ML-NOSVC",
+  service_id: null,
+  service_title: null,
+  notes: "please call me",
+  status: "requested",
+  booking_type: "request",
+};
+const noServiceEvent = mapCalendarBookingToEvent(noServiceRequest, "tm-1");
+assert.equal(noServiceEvent.details?.services?.[0]?.id, "svc-b-booking-no-svc");
+assert.ok(noServiceEvent.title);
+
+// 174-row stress: one thrower + free-text + no-service must not zero the list.
+const thrower = {
+  get id() {
+    return "booking-throw";
+  },
+  get status() {
+    throw new Error("boom");
+  },
+} as unknown as CalendarBooking;
+
+const bulk: CalendarBooking[] = [];
+const bulkRangeStart = "2026-09-15";
+for (let i = 0; i < 174; i += 1) {
+  const date = addDaysIso(bulkRangeStart, i % 35);
+  bulk.push({
+    ...booking,
+    id: `bulk-${i}`,
+    unique_code: `ML-BULK-${i}`,
+    booking_date: date,
+    date,
+    start_time: `${date}T10:00:00`,
+    end_time: `${date}T11:00:00`,
+    service_id: i % 13 === 0 ? null : `svc-${i % 5}`,
+    notes:
+      i % 7 === 0
+        ? `---mollure-meta---\n${JSON.stringify({ services: `Free text ${i}` })}`
+        : booking.notes,
+  });
+}
+bulk[20] = thrower;
+bulk[21] = freeTextBooking;
+bulk[22] = noServiceRequest;
+
+const safe = mapOverviewBookingsSafe(bulk, "tm-1");
+assert.equal(safe.stats.fetched, 174);
+assert.ok(safe.stats.mapped >= 172, `mapped=${safe.stats.mapped}`);
+assert.ok(
+  safe.stats.dropped.some((row) => row.reason.includes("boom")),
+  "thrower should be dropped with reason",
+);
+const daysCovered = new Set(safe.events.map((event) => event.date));
+assert.ok(daysCovered.size >= 30, `daysCovered=${daysCovered.size}`);
+
+const monthRange = getCalendarQueryDateRange("2026-10-13", "day");
+const gridStart = startOfWeekIso(toMonthIso("2026-10-13"));
+assert.equal(monthRange.startDate, gridStart);
+assert.equal(monthRange.endDate, addDaysIso(gridStart, 41));
+// day/week/month share the same fetch window (no 1-day under-fetch).
+assert.deepEqual(monthRange, getCalendarQueryDateRange("2026-10-13", "week"));
+assert.deepEqual(monthRange, getCalendarQueryDateRange("2026-10-13", "month"));
+
+const mergedBulk = mergeCalendarOverviewEvents([], bulk, "tm-1");
+assert.ok(mergedBulk.length >= 172);
+
+console.log(
+  `calendar-overview.mappers.test.ts: fetched=${safe.stats.fetched} mapped=${safe.stats.mapped} dropped=${safe.stats.dropped.length} days=${daysCovered.size}`,
+);
 console.log("calendar-overview.mappers.test.ts: all assertions passed");

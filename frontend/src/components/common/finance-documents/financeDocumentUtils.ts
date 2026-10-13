@@ -69,6 +69,36 @@ export function getIssuedDocument(row?: TransactionRow | null) {
   return row?.issuedDocument ?? row?.document ?? null;
 }
 
+/**
+ * Issued rows read paymentTerms from issuedSnapshot; live settings only for
+ * drafts / legacy rows that never snapshotted terms.
+ */
+export function resolveIssuedInvoiceSettings(
+  row: TransactionRow | null | undefined,
+  live: FinanceInvoiceSettings,
+): FinanceInvoiceSettings {
+  const snap = getIssuedDocumentSnapshot(row)?.invoiceSettings;
+  if (!snap || typeof snap !== "object") return live;
+  const partial = snap as Partial<FinanceInvoiceSettings>;
+  return {
+    ...live,
+    ...partial,
+    paymentTerms: {
+      ...live.paymentTerms,
+      ...(partial.paymentTerms ?? {}),
+    },
+    reminders: {
+      ...live.reminders,
+      ...(partial.reminders ?? {}),
+    },
+    products: Array.isArray(partial.products) ? partial.products : live.products,
+    uniqueItems: Array.isArray(partial.uniqueItems)
+      ? partial.uniqueItems
+      : live.uniqueItems,
+    services: Array.isArray(partial.services) ? partial.services : live.services,
+  };
+}
+
 /** B2B invoices are fully itemized; individual invoices use a simplified table. */
 export type InvoiceLineItemLayout = "itemized" | "simplified";
 
@@ -91,8 +121,12 @@ export type InvoiceDisplayLineItem = PreviewLineItem & {
   displayDescription: string;
 };
 
-const LINE_QTY_SUFFIX_RE = /(?:,\s*)?[x×]\s*(\d+(?:\.\d+)?)\s*$/i;
+const LINE_QTY_PREFIX_RE = /^(\d+(?:\.\d+)?)\s*[x×]\s*/i;
+const LINE_QTY_SUFFIX_RE = /(?:,\s*)?(?:[x×]\s*(\d+(?:\.\d+)?)|(\d+(?:\.\d+)?)\s*[x×])\s*$/i;
 const NON_AGGREGATABLE_LINE_RE = /^(prepayment|discount)$/i;
+
+/** Grand-total footer copy — rate % never printed on the invoice face. */
+export const INVOICE_TOTAL_VAT_INCLUDED_LABEL = "Grand Total (VAT included)";
 
 export function formatDocumentDate(value?: string | null) {
   if (!value) return "";
@@ -158,6 +192,7 @@ export function professionalBusinessInfoLines(
 ) {
   if (invoiceType !== "company") return [`Professional: ${display.shopName}`];
   return [
+    `Professional Name: ${display.shopName}`,
     `Legal Name: ${display.legalName}`,
     `Professional Address: ${display.location}`,
     `Professional VAT No: ${display.vat}`,
@@ -226,17 +261,22 @@ export function resolveInvoiceTemplateType(input: {
   vatNumber?: string | null;
   cocNumber?: string | null;
 }): FinanceInvoiceTemplateType {
-  const signals = [input.clientKind, input.clientType];
-  if (
-    signals.some((value) => {
-      const normalized = String(value ?? "").trim().toLowerCase();
-      return normalized === "company" || normalized === "business";
-    })
-  ) {
+  const signals = [input.clientKind, input.clientType].map((value) =>
+    String(value ?? "").trim().toLowerCase(),
+  );
+  if (signals.some((value) => value === "company" || value === "business")) {
     return "company";
   }
   if (input.vatNumber?.trim() || input.cocNumber?.trim()) {
     return "company";
+  }
+  // Stored defaultInvoiceType often froze "company" on individual Mollure rows.
+  if (
+    signals.some((value) =>
+      ["individual", "mollure", "nonmollure", "guest"].includes(value),
+    )
+  ) {
+    return "individual";
   }
   if (input.invoiceType === "company" || input.invoiceType === "individual") {
     return input.invoiceType;
@@ -250,14 +290,14 @@ export function getInvoiceLineItemColumns(
   if (layout === "simplified") {
     return [
       { key: "description", label: "Description", pdfWidth: 360 },
-      { key: "totalPrice", label: "Price (Incl. VAT)", pdfWidth: 130, align: "right" },
+      { key: "totalPrice", label: "Price", pdfWidth: 130, align: "right" },
     ];
   }
+  // B2B: Description | VAT | Price/Unit | Total Price (qty lives in stored line payload).
   return [
-    { key: "description", label: "Description", pdfWidth: 150 },
-    { key: "unit", label: "Quantity", pdfWidth: 55 },
-    { key: "vat", label: "VAT %", pdfWidth: 55 },
-    { key: "pricePerUnit", label: "Price Per Unit", pdfWidth: 110, align: "right" },
+    { key: "description", label: "Description", pdfWidth: 205 },
+    { key: "vat", label: "VAT", pdfWidth: 55 },
+    { key: "pricePerUnit", label: "Price/Unit", pdfWidth: 110, align: "right" },
     { key: "totalPrice", label: "Total Price", pdfWidth: 90, align: "right" },
   ];
 }
@@ -268,13 +308,22 @@ export function formatLineItemQuantity(quantity: number) {
 }
 
 export function stripLineItemQuantitySuffix(description: string) {
-  return description.replace(LINE_QTY_SUFFIX_RE, "").trim();
+  return description
+    .replace(LINE_QTY_PREFIX_RE, "")
+    .replace(LINE_QTY_SUFFIX_RE, "")
+    .trim();
 }
 
 function quantityFromDescription(description: string) {
-  const match = LINE_QTY_SUFFIX_RE.exec(description.trim());
+  const trimmed = description.trim();
+  const prefix = LINE_QTY_PREFIX_RE.exec(trimmed);
+  if (prefix) {
+    const parsed = Number(prefix[1]);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  const match = LINE_QTY_SUFFIX_RE.exec(trimmed);
   if (!match) return 0;
-  const parsed = Number(match[1]);
+  const parsed = Number(match[1] || match[2]);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
@@ -289,7 +338,7 @@ export function parseLineItemQuantity(item: Pick<PreviewLineItem, "description" 
 
 export function formatSimplifiedLineItemDescription(description: string, quantity: number) {
   const base = stripLineItemQuantitySuffix(description) || description;
-  if (quantity > 1) return `${base}, ×${formatLineItemQuantity(quantity)}`;
+  if (quantity > 1) return `${formatLineItemQuantity(quantity)}× ${base}`;
   return base;
 }
 
@@ -357,27 +406,22 @@ export function toInvoiceDisplayLineItems(
   invoiceType?: FinanceInvoiceTemplateType | string | null,
   preserveStoredValues = false,
 ): InvoiceDisplayLineItem[] {
-  if (preserveStoredValues) {
-    return items.map((item) => ({
-      ...item,
-      quantity: item.quantity,
-      unit: formatLineItemQuantity(parseLineItemQuantity(item)),
-      displayDescription: item.description,
-    }));
-  }
   const layout = resolveInvoiceLineItemLayout(invoiceType);
-  return aggregatePreviewLineItems(items).map((item) => {
+  const toDisplay = (item: PreviewLineItem): InvoiceDisplayLineItem => {
     const quantity = parseLineItemQuantity(item);
     return {
       ...item,
-      quantity: formatLineItemQuantity(quantity),
+      quantity: preserveStoredValues ? item.quantity : formatLineItemQuantity(quantity),
       unit: formatLineItemQuantity(quantity),
       displayDescription:
         layout === "simplified"
           ? formatSimplifiedLineItemDescription(item.description, quantity)
           : stripLineItemQuantitySuffix(item.description) || item.description,
     };
-  });
+  };
+  // Stored document lines stay authoritative (no re-aggregation); only display labels adapt.
+  if (preserveStoredValues) return items.map(toDisplay);
+  return aggregatePreviewLineItems(items).map(toDisplay);
 }
 
 export function addDuration(dateText: string, value: string, unit: string) {
@@ -498,4 +542,77 @@ export function formatInvoicePrepaymentLabel(
 ): string {
   const word = isInvoicePrepaymentCollected(status) ? "Prepaid" : "Prepayment";
   return dateTime ? `${word} · ${dateTime}` : word;
+}
+
+/**
+ * Frozen sample document for settings “View invoice” — preview reads this payload only
+ * (not live catalog / form state). Template chosen by client type via resolveInvoiceTemplateType.
+ */
+export function buildInvoiceTemplatePreviewRow(
+  invoiceType: FinanceInvoiceTemplateType,
+  professional?: FinanceProfessionalBusinessOverride | null,
+): TransactionRow {
+  const isCompany = invoiceType === "company";
+  const today = new Date().toISOString().slice(0, 10);
+  return {
+    id: "template-preview",
+    entryType: "manualEntry",
+    entryId: "PREVIEW",
+    date: today,
+    entryLabel: "Template preview",
+    clientName: isCompany ? "Acme BV" : "Ada Client",
+    clientEmail: "client@example.com",
+    // Profile split: BC → business template; Mollure/IC (and guests) → individual.
+    clientType: isCompany ? "business" : "mollure",
+    netAmount: 60,
+    methodTitle: "Online - Direct",
+    methodDetail: "",
+    status: "Paid",
+    issuedDocument: {
+      documentNumber: "INV-PREVIEW",
+      serviceDate: today,
+      invoiceDate: today,
+      dueDate: isCompany ? today : "",
+      client: {
+        legalName: isCompany ? "Acme BV" : "Ada Client",
+        email: "client@example.com",
+        ...(isCompany
+          ? {
+              address: "1 Business Street",
+              vatNumber: "NL123456789B01",
+              cocNumber: "12345678",
+            }
+          : {}),
+      },
+      lineItems: [
+        {
+          description: "Cut",
+          quantity: 1,
+          vat: "21%",
+          pricePerUnit: 40,
+          totalPrice: 40,
+        },
+        {
+          description: "Shampoo",
+          quantity: 2,
+          vat: "21%",
+          pricePerUnit: 10,
+          totalPrice: 20,
+        },
+      ],
+      totalPrice: 60,
+      issuedSnapshot: {
+        templateType: isCompany ? "company" : "individual",
+        layout: isCompany ? "itemized" : "simplified",
+        professionalBusiness: {
+          legalName: professional?.legalName || "Professional Legal Name",
+          shopName: professional?.shopName || professional?.legalName || "Professional",
+          address: professional?.address || undefined,
+          phone: professional?.phone || undefined,
+          vatNumber: professional?.vatNumber || undefined,
+          cocNumber: professional?.cocNumber || undefined,
+        },
+      },
+    },
+  };
 }

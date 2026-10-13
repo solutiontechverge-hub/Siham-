@@ -45,6 +45,7 @@ import {
   hasStoredDocumentSnapshot,
   parseCurrencyValue,
   professionalBusinessInfoLines,
+  resolveIssuedInvoiceSettings,
   resolveInvoiceLineItemLayout,
   resolveInvoiceTemplateType,
   resolveProfessionalBusinessDisplay,
@@ -53,6 +54,7 @@ import {
   financePriceTextSx,
   formatInvoicePrepaymentLabel,
   INVOICE_PREPAID_GREEN,
+  INVOICE_TOTAL_VAT_INCLUDED_LABEL,
   isInvoicePrepaymentCollected,
   toInvoiceDisplayLineItems,
 } from "./financeDocumentUtils";
@@ -88,6 +90,8 @@ export default function FinanceInvoicePreview({
   const { showSnackbar } = useSnackbar();
   const document = getIssuedDocument(row);
   const frozenDocument = hasStoredDocumentSnapshot(row);
+  // Issued snapshot paymentTerms/logo win; live settings only for drafts/legacy.
+  const effectiveSettings = resolveIssuedInvoiceSettings(row, settings);
   const clientParty = clientPartyOverride ?? document?.client;
   // BC / vat/coc / snapshot company beat a wrong frozen "individual" default.
   const effectiveInvoiceType = resolveInvoiceTemplateType({
@@ -97,21 +101,14 @@ export default function FinanceInvoicePreview({
     vatNumber: clientParty?.vatNumber,
     cocNumber: clientParty?.cocNumber,
   });
-  // Issued snapshot logo first (immutable); settings cover client draft rows + legacy.
-  const snapshotLogo =
-    document?.issuedSnapshot?.invoiceSettings &&
-    typeof document.issuedSnapshot.invoiceSettings === "object"
-      ? (document.issuedSnapshot.invoiceSettings as { logoDataUrl?: string | null })
-          .logoDataUrl
-      : null;
-  const logoDataUrl = snapshotLogo || settings.logoDataUrl || null;
+  const logoDataUrl = effectiveSettings.logoDataUrl || null;
   const professionalProfile = React.useMemo(
     () => (frozenDocument ? null : getProfessionalProfile(profileData)),
     [profileData, row],
   );
   const lineItems = React.useMemo(
-    () => buildPreviewLineItems(settings, row),
-    [settings, row],
+    () => buildPreviewLineItems(effectiveSettings, row),
+    [effectiveSettings, row],
   );
   const lineItemLayout = resolveInvoiceLineItemLayout(effectiveInvoiceType);
   const displayLineItems = React.useMemo(
@@ -137,8 +134,8 @@ export default function FinanceInvoicePreview({
     ? formatDocumentDate(document?.dueDate || row?.paymentDeadline)
     : formatDocumentDate(document?.dueDate || row?.paymentDeadline) || addDuration(
         row?.date || "",
-        settings.paymentTerms.originalDueValue,
-        settings.paymentTerms.originalDueUnit,
+        effectiveSettings.paymentTerms.originalDueValue,
+        effectiveSettings.paymentTerms.originalDueUnit,
       );
   const documentNumber = document?.documentNumber || "N/A";
   const totalAmount = displayLineItems.reduce(
@@ -154,11 +151,10 @@ export default function FinanceInvoicePreview({
     effectiveInvoiceType === "company"
       ? "Company Clients Business Info"
       : "Client Info";
-  const penaltySummary = frozenDocument
-    ? document?.lateFeeNotice || ""
-    : document?.lateFeeNotice ||
-      (settings.paymentTerms.originalPenaltyValue
-      ? `Late payment fee: ${settings.paymentTerms.originalPenaltyValue} ${settings.paymentTerms.originalPenaltyUnit} applies after the due date.`
+  const penaltySummary =
+    document?.lateFeeNotice ||
+    (effectiveSettings.paymentTerms.originalPenaltyValue
+      ? `Late payment fee: ${effectiveSettings.paymentTerms.originalPenaltyValue} ${effectiveSettings.paymentTerms.originalPenaltyUnit} applies after the due date.`
       : "Late payment fee applies after the due date.");
 
   const professionalDisplay = resolveProfessionalBusinessDisplay(
@@ -216,7 +212,9 @@ export default function FinanceInvoicePreview({
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10.5);
       doc.text(`Service Date: ${serviceDate}`, left, top + 18);
-      if (effectiveInvoiceType === "company") doc.text(`Due Date: ${dueDate}`, left, top + 34);
+      if (effectiveInvoiceType === "company" && dueDate) {
+        doc.text(`Due Date: ${dueDate}`, left, top + 34);
+      }
       doc.text(
         `Invoice Date: ${invoiceDate}`,
         left + usableWidth - 150,
@@ -309,7 +307,7 @@ export default function FinanceInvoicePreview({
       });
       doc.setFont("helvetica", "bold");
       let totalsY = tableTop + 26 + displayLineItems.length * 18 + 22;
-      doc.text("Total (Incl. VAT)", left, totalsY);
+      doc.text(INVOICE_TOTAL_VAT_INCLUDED_LABEL, left, totalsY);
       doc.text(formatCurrencyDisplay(totalPriceLabel), left + usableWidth - 20, totalsY, {
         align: "right",
       });
@@ -414,11 +412,11 @@ export default function FinanceInvoicePreview({
             <BodyText sx={financeMutedTextSx(m.navy)}>
               Service Date: {serviceDate}
             </BodyText>
-            <BodyText
-              sx={financeMutedTextSx(m.navy, { mt: 0.2 })}
-            >
-              {effectiveInvoiceType === "company" ? `Due Date: ${dueDate}` : null}
-            </BodyText>
+            {effectiveInvoiceType === "company" && dueDate ? (
+              <BodyText sx={financeMutedTextSx(m.navy, { mt: 0.2 })}>
+                Due Date: {dueDate}
+              </BodyText>
+            ) : null}
           </Box>
           <Box sx={{ textAlign: { xs: "left", sm: "right" }, mt: { xs: 0.5, sm: 0 } }}>
             <BodyText sx={financeMutedTextSx(m.navy)}>
@@ -530,7 +528,7 @@ export default function FinanceInvoicePreview({
         <Stack spacing={0.75} sx={{ mt: 1.5 }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
             <BodyText sx={mollureBodyMutedSx(m.navy, { color: alpha(m.navy, 0.65) })}>
-              Total (Incl. VAT)
+              {INVOICE_TOTAL_VAT_INCLUDED_LABEL}
             </BodyText>
             <BodyText sx={mollureLabelSx(m.navy, financePriceTextSx)}>
               {formatCurrencyDisplay(totalPriceLabel)}

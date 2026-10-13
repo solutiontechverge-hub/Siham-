@@ -25,6 +25,9 @@ export {
   getInvoiceLineItemColumns,
   getIssuedDocument,
   hasStoredDocumentSnapshot,
+  resolveIssuedInvoiceSettings,
+  buildInvoiceTemplatePreviewRow,
+  INVOICE_TOTAL_VAT_INCLUDED_LABEL,
 } from "./financeDocumentUtils";
 export {
   findIssuedFinanceTransaction,

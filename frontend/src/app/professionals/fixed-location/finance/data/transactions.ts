@@ -296,6 +296,7 @@ export type TransactionDocument = {
     invoiceSettings?: unknown;
     professionalBusiness?: {
       legalName?: string | null;
+      shopName?: string | null;
       cocNumber?: string | null;
       vatNumber?: string | null;
       address?: string | null;

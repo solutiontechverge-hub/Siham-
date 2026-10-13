@@ -1292,6 +1292,18 @@ export function useSalesOverview({
     }
   };
 
+  // Manual reissue modal seeds from issued snapshot terms when available.
+  const overduePaymentTerms = React.useMemo(() => {
+    const txId = overdueCard?.financeTransactionId;
+    if (!txId) return financeSettings.paymentTerms;
+    const snap = financeHints.find(
+      (hint) => String(hint.transactionId) === String(txId),
+    )?.paymentTerms;
+    return snap
+      ? { ...financeSettings.paymentTerms, ...snap }
+      : financeSettings.paymentTerms;
+  }, [financeHints, financeSettings.paymentTerms, overdueCard?.financeTransactionId]);
+
   return {
     cancelling,
     cards,
@@ -1320,6 +1332,7 @@ export function useSalesOverview({
     openDocument,
     overdueCard,
     overdueManualCard,
+    overduePaymentTerms,
     professionalBusinessOverride,
     clearCheckout,
     setCancelCard,

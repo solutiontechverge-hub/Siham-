@@ -9,9 +9,9 @@ import { BodyText } from "../../../ui/typography";
 import AppTextField from "../../AppTextField";
 import { mollureLabelSx } from "../../../../theme/mollureHierarchy";
 import {
-  clampProtectiveFeePercent,
+  enforceProtectiveFeeCap,
   parsePolicyPercentCeiling,
-} from "../bookingGroupAddOns";
+} from "../bookingFeeTriggers";
 import { sanitizeDecimalInput } from "../../../../lib/field-input";
 
 type Props = {
@@ -122,7 +122,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsFee
           onChange={(e) => {
             beginExistingBookingEdit();
             onPercentChange(
-              clampProtectiveFeePercent(
+              enforceProtectiveFeeCap(
                 sanitizeDecimalInput(e.target.value),
                 ceiling,
               ),

@@ -9,15 +9,15 @@ import { Box, IconButton, Popover, Stack } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 
 import {
-  canAddLateCancellation,
-  canAddLateRescheduling,
-  canAddNoShowFee,
   canAddPrepayment,
+  canRestoreKilometerAllowance,
+  canRestoreLateCancellation,
+  canRestoreLateRescheduling,
+  canRestoreNoShowFee,
 } from "../bookingGroupAddOns";
+import { buildProtectiveFeeActivation } from "../bookingFeeTriggers";
 
 import { resolveCalendarPrepaymentStatus } from "../prepaymentStatus";
-
-import { isLateCancellation } from "../../client-booking/settleCancellationFee";
 
 import { useProfessionalFixedLocationCalendar } from "./useProfessionalFixedLocationCalendar";
 
@@ -27,6 +27,8 @@ export type ProfessionalFixedLocationCalendarBookingDrawerFooterAddOnsBag = Pick
   Vm,
   | "beginExistingBookingEdit"
   | "bookingMoreAnchor"
+  | "appointmentBeforeHours"
+  | "appointmentBeforeMinutes"
   | "cancellationBeforeHours"
   | "cancellationBeforeMinutes"
   | "editingEventId"
@@ -77,6 +79,8 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerFooterAddO
   bag,
 }: Props) {
   const {
+    appointmentBeforeHours,
+    appointmentBeforeMinutes,
     beginExistingBookingEdit,
     bookingMoreAnchor,
     cancellationBeforeHours,
@@ -127,6 +131,17 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerFooterAddO
     Boolean(editingEventId) &&
     slotBookingScreen === "new-booking" &&
     slotClientAdded;
+
+  const appointmentStartMs = viewingBookingEvent
+    ? Date.parse(
+        `${viewingBookingEvent.date}T${viewingBookingEvent.start}:00`,
+      )
+    : selectedSlot
+      ? Date.parse(`${selectedSlot.date}T${selectedSlot.start}:00`)
+      : NaN;
+  const startMs = Number.isFinite(appointmentStartMs)
+    ? appointmentStartMs
+    : null;
 
   return (
     <>
@@ -193,12 +208,15 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerFooterAddO
                     },
                   }
                 : null,
-              !isViewingExisting &&
-              slotLocation === "DL" &&
-              !showKilometerAllowance
+              // Restore/add KM: DL only; no template membership required.
+              canRestoreKilometerAllowance({
+                location: slotLocation,
+                alreadyShown: showKilometerAllowance,
+              })
                 ? {
                     label: "Add Kilometer Allowance",
                     onClick: () => {
+                      beginExistingBookingEdit();
                       setShowKilometerAllowance(true);
                       showSnackbar({
                         severity: "info",
@@ -215,43 +233,37 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerFooterAddO
                     },
                   }
                 : null,
-              canAddLateCancellation({
+              // Restore after remove only while cancel/late trigger still holds.
+              canRestoreLateCancellation({
                 policyPercent: lateCancellationFeePercentDefault,
                 status: viewingBookingEvent?.status ?? slotStatus,
                 cancelledServiceIds:
                   viewingBookingEvent?.details?.cancelledServiceIds ??
                   negotiationDetails?.cancelledServiceIds,
                 alreadyShown: showLateCancellation,
+                appointmentStartMs: startMs,
+                noticeHours: cancellationBeforeHours,
+                noticeMinutes: cancellationBeforeMinutes,
               })
                 ? {
                     label: "Add Late Cancellation",
                     onClick: () => {
                       beginExistingBookingEdit();
-                      const ceiling =
-                        lateCancellationFeePercentDefault ?? "";
+                      const activation = buildProtectiveFeeActivation(
+                        lateCancellationFeePercentDefault,
+                        {
+                          kind: "lateCancellation",
+                          cancellationFeeAt: new Date().toISOString(),
+                          exceededCancellationWindow: true,
+                        },
+                      );
+                      if (!activation) return;
                       setShowLateCancellation(true);
-                      setLateCancellationFeePercentCeiling(ceiling);
-                      setLateCancellationFeePercent((prev) =>
-                        prev.trim() ? prev : ceiling,
-                      );
-                      const nowIso = new Date().toISOString();
-                      setCancellationFeeAt(nowIso);
-                      const startMs = viewingBookingEvent
-                        ? Date.parse(
-                            `${viewingBookingEvent.date}T${viewingBookingEvent.start}:00`,
-                          )
-                        : selectedSlot
-                          ? Date.parse(
-                              `${selectedSlot.date}T${selectedSlot.start}:00`,
-                            )
-                          : NaN;
-                      setExceededCancellationWindow(
-                        isLateCancellation({
-                          appointmentStartMs: startMs,
-                          noticeHours: cancellationBeforeHours,
-                          noticeMinutes: cancellationBeforeMinutes,
-                        }),
-                      );
+                      setLateCancellationFeePercentCeiling(activation.ceiling);
+                      // ponytail: always template cap on restore; keep reduce-only after
+                      setLateCancellationFeePercent(activation.percent);
+                      setCancellationFeeAt(activation.cancellationFeeAt);
+                      setExceededCancellationWindow(true);
                       showSnackbar({
                         severity: "info",
                         message: "Late cancellation fee enabled.",
@@ -259,24 +271,28 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerFooterAddO
                     },
                   }
                 : null,
-              canAddLateRescheduling({
+              canRestoreLateRescheduling({
                 policyPercent: lateRescheduleFeePercentDefault,
                 scheduleEdited: Boolean(
                   viewingBookingEvent?.details?.scheduleEdited,
                 ),
                 alreadyShown: showLateRescheduling,
+                appointmentStartMs: startMs,
+                noticeHours: appointmentBeforeHours,
+                noticeMinutes: appointmentBeforeMinutes,
               })
                 ? {
                     label: "Add Late Rescheduling",
                     onClick: () => {
                       beginExistingBookingEdit();
-                      const ceiling =
-                        lateRescheduleFeePercentDefault ?? "";
-                      setShowLateRescheduling(true);
-                      setLateRescheduleFeePercentCeiling(ceiling);
-                      setLateRescheduleFeePercent((prev) =>
-                        prev.trim() ? prev : ceiling,
+                      const activation = buildProtectiveFeeActivation(
+                        lateRescheduleFeePercentDefault,
+                        { kind: "lateReschedule" },
                       );
+                      if (!activation) return;
+                      setShowLateRescheduling(true);
+                      setLateRescheduleFeePercentCeiling(activation.ceiling);
+                      setLateRescheduleFeePercent(activation.percent);
                       showSnackbar({
                         severity: "info",
                         message: "Late rescheduling fee enabled.",
@@ -284,7 +300,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerFooterAddO
                     },
                   }
                 : null,
-              canAddNoShowFee({
+              canRestoreNoShowFee({
                 policyPercent: noShowFeePercentDefault,
                 status: viewingBookingEvent?.status ?? slotStatus,
                 alreadyShown: showNoShowFee,
@@ -293,12 +309,14 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerFooterAddO
                     label: "Add No-Show Fee",
                     onClick: () => {
                       beginExistingBookingEdit();
-                      const ceiling = noShowFeePercentDefault ?? "";
-                      setShowNoShowFee(true);
-                      setNoShowFeePercentCeiling(ceiling);
-                      setNoShowFeePercent((prev) =>
-                        prev.trim() ? prev : ceiling,
+                      const activation = buildProtectiveFeeActivation(
+                        noShowFeePercentDefault,
+                        { kind: "noShow" },
                       );
+                      if (!activation) return;
+                      setShowNoShowFee(true);
+                      setNoShowFeePercentCeiling(activation.ceiling);
+                      setNoShowFeePercent(activation.percent);
                       showSnackbar({
                         severity: "info",
                         message: "No-show fee enabled.",

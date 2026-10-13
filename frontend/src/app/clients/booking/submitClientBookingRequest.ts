@@ -71,6 +71,7 @@ function buildFallbackCreateBookingPayload(
   const resolvedServiceId =
     (catalogServiceId && UUID_RE.test(catalogServiceId) ? catalogServiceId : null) ??
     extractUuidFromSyntheticId(catalogServiceId);
+  if (!resolvedServiceId) return null;
 
   return {
     booking_date: bookingDate,

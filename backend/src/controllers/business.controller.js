@@ -24,6 +24,7 @@ import { syncBookingToFinanceTransaction } from "../services/finance-sync.servic
 import {
   listBookingActivityEvents,
   logBookingCreatedActivity,
+  logEditRequestActivity,
   logBookingStatusActivity,
 } from "../services/bookingActivity.service.js";
 import { getTeamMemberReviewAggregates } from "../services/review.service.js";
@@ -1633,6 +1634,7 @@ export const createCalendarEntry = async (req, res) => {
         {
           actor: "professional",
           actorLabel: "Professional",
+          userId: req.user?.id ?? null,
         },
       );
     }
@@ -1967,6 +1969,42 @@ const extractMirroredProjectMedia = (meta) => {
   };
 };
 
+/** Collect structured service UUIDs from notes meta (not free-text titles). */
+const serviceIdsFromBookingNotes = (notes) => {
+  try {
+    const raw = String(notes ?? "");
+    const marker = "---mollure-meta---";
+    const idx = raw.indexOf(marker);
+    if (idx < 0) return [];
+    const meta = JSON.parse(raw.slice(idx + marker.length).trim() || "{}");
+    const collected = [];
+    const pushService = (service) => {
+      const id = parseUuid(service?.id ?? service?.serviceId ?? service?.service_id);
+      if (id) collected.push(id);
+    };
+    for (const service of meta.services ?? []) pushService(service);
+    for (const service of meta.clientSnapshot?.services ?? []) pushService(service);
+    for (const guest of meta.guests ?? []) {
+      for (const service of guest.services ?? []) pushService(service);
+    }
+    return [...new Set(collected)];
+  } catch {
+    return [];
+  }
+};
+
+const syncBookingServiceLinks = async (bookingId, serviceIds) => {
+  const ids = [...new Set((serviceIds || []).map((id) => parseUuid(id)).filter(Boolean))];
+  if (!bookingId || !ids.length) return;
+  await query(
+    `INSERT INTO booking_service_links (booking_id, service_id, position)
+     SELECT $1::uuid, x.service_id, (x.ord - 1)::int
+     FROM unnest($2::uuid[]) WITH ORDINALITY AS x(service_id, ord)
+     ON CONFLICT DO NOTHING`,
+    [bookingId, ids],
+  );
+};
+
 /**
  * Mirror a professional-sent calendar BR into `bookings` so it appears on the
  * client's Past / Ongoing / Upcoming list (incoming BR).
@@ -1996,8 +2034,11 @@ const mirrorCalendarRequestToBooking = async ({
     normalizeBookingDateInput(entry.start_date) ||
     normalizeBookingDateInput(entry.start_time) ||
     null;
-  const serviceIds = Array.isArray(entry.service_ids) ? entry.service_ids : [];
-  const serviceId = parseOptionalUuid(serviceIds.find((id) => Boolean(id)) ?? null);
+  const serviceIds = [
+    ...parseUuidArray(entry.service_ids),
+    ...serviceIdsFromBookingNotes(entry.notes),
+  ];
+  const serviceId = serviceIds[0] ?? null;
 
   // Mark as professional-outgoing so the client list can show an incoming BR badge.
   let notes = entry.notes ?? null;
@@ -2084,6 +2125,10 @@ const mirrorCalendarRequestToBooking = async ({
     );
     const booking = updated.rows[0] ?? existing.rows[0];
     if (booking?.id) {
+      await syncBookingServiceLinks(booking.id, [
+        booking.service_id,
+        ...serviceIds,
+      ]);
       try {
         void dispatchBookingUpdatedNotifications(
           booking,
@@ -2105,6 +2150,9 @@ const mirrorCalendarRequestToBooking = async ({
     }
     return booking;
   }
+
+  // Refuse new mirrored bookings without a relational service_id.
+  if (!serviceId) return null;
 
   const inserted = await query(
     `INSERT INTO bookings (
@@ -2148,6 +2196,7 @@ const mirrorCalendarRequestToBooking = async ({
   );
   const booking = inserted.rows[0] ?? null;
   if (booking?.id) {
+    await syncBookingServiceLinks(booking.id, serviceIds);
     try {
       await dispatchBookingCreatedNotifications(booking, { fromProfessional: true });
     } catch {
@@ -2161,6 +2210,7 @@ const mirrorCalendarRequestToBooking = async ({
     void logBookingCreatedActivity(booking, {
       actor: "professional",
       actorLabel: "Professional",
+      userId: professionalUserId || null,
     });
   }
   return booking;
@@ -2497,9 +2547,6 @@ export const createBooking = async (req, res) => {
         data: null,
       });
     }
-    const generatedCodePrefix =
-      bookingType === "offline" ? BOOKING_CODE_PREFIX.offline : BOOKING_CODE_PREFIX.online;
-    const uniqueCode = await ensureUniqueBookingCode(req.body.unique_code, generatedCodePrefix);
 
     let notes = req.body.notes ?? null;
     if (
@@ -2517,6 +2564,20 @@ export const createBooking = async (req, res) => {
         // keep original notes
       }
     }
+
+    const serviceId =
+      parseUuid(req.body.service_id) || serviceIdsFromBookingNotes(notes)[0] || null;
+    if (!serviceId) {
+      return res.status(400).json({
+        success: false,
+        message: "service_id is required and must be a valid UUID.",
+        data: null,
+      });
+    }
+
+    const generatedCodePrefix =
+      bookingType === "offline" ? BOOKING_CODE_PREFIX.offline : BOOKING_CODE_PREFIX.online;
+    const uniqueCode = await ensureUniqueBookingCode(req.body.unique_code, generatedCodePrefix);
 
     const result = await query(
       `INSERT INTO bookings (
@@ -2553,7 +2614,7 @@ export const createBooking = async (req, res) => {
         normalizeBookingDateInput(req.body.booking_date),
         req.body.business_setup_id,
         req.user.id,
-        req.body.service_id ?? null,
+        serviceId,
         req.body.team_member_id ?? null,
         req.body.start_time ?? null,
         req.body.end_time ?? null,
@@ -2578,11 +2639,10 @@ export const createBooking = async (req, res) => {
     );
 
     const booking = result.rows[0];
-    await query(
-      `INSERT INTO booking_service_links (booking_id, service_id)
-       VALUES ($1, $2::uuid) ON CONFLICT DO NOTHING`,
-      [booking.id, req.body.service_id],
-    );
+    await syncBookingServiceLinks(booking.id, [
+      serviceId,
+      ...serviceIdsFromBookingNotes(notes),
+    ]);
     if (booking && ["confirmed", "completed"].includes(booking.status)) {
       try {
         await syncBookingToFinanceTransaction(booking.id, {
@@ -2595,7 +2655,11 @@ export const createBooking = async (req, res) => {
       await safeEnsureProfessionalClientFromBooking(booking.id);
     }
 
-    void logBookingCreatedActivity(booking);
+    void logBookingCreatedActivity(booking, {
+      actor: "client",
+      actorLabel: "Client",
+      userId: req.user?.id ?? null,
+    });
 
     void dispatchBookingCreatedNotifications(booking).catch((error) => {
       console.error("[booking-notification] create dispatch failed:", error.message || error);
@@ -2704,10 +2768,13 @@ export const updateCalendarEntryStatus = async (req, res) => {
         booking_type: entry.booking_type,
         prepayment_status: null,
         total_price: null,
+        notes: entry.notes,
       },
       {
         previousStatus: previousEntry.status,
+        actor: "professional",
         actorLabel: "Professional",
+        userId: req.user?.id ?? null,
       },
     );
 
@@ -2863,10 +2930,13 @@ export const updateCalendarEntry = async (req, res) => {
           booking_type: entry.booking_type,
           prepayment_status: null,
           total_price: null,
+          notes: entry.notes,
         },
         {
           previousStatus: existing.status,
+          actor: "professional",
           actorLabel: "Professional",
+          userId: req.user?.id ?? null,
         },
       );
     }
@@ -3189,7 +3259,9 @@ export const updateMyBooking = async (req, res) => {
     void logBookingStatusActivity(booking, {
       previousStatus,
       previousPrepayment: existing.prepayment_status,
+      actor: "client",
       actorLabel: "Client",
+      userId: req.user?.id ?? null,
     });
     emitBookingChanged(booking, "updated");
 
@@ -3497,7 +3569,9 @@ export const updateBookingStatus = async (req, res) => {
     void logBookingStatusActivity(booking, {
       previousStatus,
       previousPrepayment: existingBooking.prepayment_status,
+      actor: "professional",
       actorLabel: "Professional",
+      userId: req.user?.id ?? null,
     });
 
     emitBookingChanged(booking, "updated");
@@ -3674,6 +3748,14 @@ export const manageBookingEditRequest = async (req, res) => {
       void dispatchBookingEventNotification(updated.id, notificationEvent, {
         initiatedBy: actor,
         message: req.body.note || existingEr?.note || undefined,
+      });
+    }
+    if (action === "send" || action === "accept") {
+      void logEditRequestActivity(updated, {
+        action,
+        actor,
+        userId: req.user?.id ?? null,
+        actorLabel: actor === "professional" ? "Professional" : "Client",
       });
     }
     emitBookingChanged(updated, "updated");

@@ -5,9 +5,14 @@ import {
   durationToDays,
   isAutomaticTrigger,
   mergeInvoiceSettings,
+  resolveDocumentPaymentTerms,
   resolveOverdueReissueAction,
   toIsoDateOnly,
 } from "../helpers/financeInvoiceSettings.js";
+import {
+  vatFieldsForProduct,
+  vatFieldsForService,
+} from "../helpers/financeVat.js";
 import {
   FINANCE_EMAIL_TYPES,
   sendFinanceClientEmail,
@@ -106,15 +111,21 @@ async function loadInvoiceSettingsForProfessional(professionalProfileId) {
 
 async function loadProfessionalDocumentSnapshot(professionalProfileId) {
   const result = await query(
-    `SELECT legal_name, ccc_number, vat_number, street, street_number,
-            postal_code, province, municipality, phone
-     FROM professional_profiles
-     WHERE id = $1`,
+    `SELECT pp.legal_name, pp.ccc_number, pp.vat_number, pp.street, pp.street_number,
+            pp.postal_code, pp.province, pp.municipality, pp.phone,
+            bs.salon_name, bs.business_name
+     FROM professional_profiles pp
+     LEFT JOIN business_setups bs ON bs.professional_profile_id = pp.id
+     WHERE pp.id = $1
+     ORDER BY bs.updated_at DESC NULLS LAST
+     LIMIT 1`,
     [professionalProfileId],
   );
   const profile = result.rows[0] ?? {};
   return {
     legalName: profile.legal_name ?? null,
+    shopName:
+      profile.salon_name || profile.business_name || profile.legal_name || null,
     cocNumber: profile.ccc_number ?? null,
     vatNumber: profile.vat_number ?? null,
     address: [profile.street, profile.street_number, profile.postal_code, profile.municipality, profile.province]
@@ -181,12 +192,18 @@ async function getBookingContext(bookingId) {
             cp.legal_name AS customer_legal_name,
             cp.vat_number AS customer_vat,
             cp.ccc_number AS customer_coc,
+            cp.street AS customer_street,
+            cp.street_number AS customer_street_number,
+            cp.postal_code AS customer_postal_code,
+            cp.municipality AS customer_municipality,
+            cp.province AS customer_province,
             pc.id AS professional_client_id,
             pc.client_kind AS pc_client_kind,
             pc.is_mollure AS pc_is_mollure,
             pc.vat AS pc_vat,
             pc.coc AS pc_coc,
             pc.legal_name AS pc_legal_name,
+            pc.business_address AS pc_business_address,
             s.title AS service_title
      FROM bookings b
      INNER JOIN business_setups bs ON bs.id = b.business_setup_id
@@ -239,12 +256,19 @@ function buildFinanceClientParty(booking, { clientName, clientEmail, payerRole }
     (isCompany
       ? booking.pc_legal_name || booking.customer_legal_name
       : null) || clientName;
+  const address =
+    booking.pc_business_address ||
+    [booking.customer_street, booking.customer_street_number, booking.customer_postal_code, booking.customer_municipality, booking.customer_province]
+      .filter(Boolean)
+      .join(", ") ||
+    null;
   const isMollure =
     booking.pc_is_mollure === true ||
     (booking.pc_is_mollure !== false && Boolean(booking.customer_id));
   return {
     legalName,
     email: clientEmail || "",
+    ...(address ? { address } : {}),
     ...(vat ? { vatNumber: vat } : {}),
     ...(coc ? { cocNumber: coc } : {}),
     ...(booking.customer_id ? { customerId: booking.customer_id } : {}),
@@ -338,27 +362,41 @@ function isCatalogLinkedLine(line) {
   return Boolean(ref) && ["serviceId", "productId", "uniqueItemCode"].includes(type);
 }
 
+function applyCatalogVat(line, invoiceSettings) {
+  if (!isCatalogLinkedLine(line)) return line;
+  const type = String(line.sourceType);
+  if (type === "serviceId") {
+    return { ...line, ...vatFieldsForService(line.sourceReference, invoiceSettings) };
+  }
+  if (type === "productId" || type === "uniqueItemCode") {
+    return { ...line, ...vatFieldsForProduct(line.sourceReference, invoiceSettings) };
+  }
+  return line;
+}
+
 /**
  * Catalog-backed document lines from booking notes — prefer full snapshot/guest
  * arrays over collapsing to a single booking.service_id row.
  */
-function buildFallbackLineItems(booking, meta) {
+function buildFallbackLineItems(booking, meta, invoiceSettings) {
   const snapshotServices = Array.isArray(meta?.clientSnapshot?.services)
     ? meta.clientSnapshot.services
     : [];
   if (snapshotServices.length) {
     return snapshotServices
       .filter((service) => service?.id || service?.serviceId)
-      .map((service) => ({
-        description: service.name || "Service",
-        sourceReference: String(service.id || service.serviceId),
-        sourceType: "serviceId",
-        quantity: "1",
-        vat: "21%",
-        vatRate: 21,
-        pricePerUnit: roundMoney(service.price),
-        totalPrice: roundMoney(service.price),
-      }));
+      .map((service) => {
+        const sourceReference = String(service.id || service.serviceId);
+        return {
+          description: service.name || "Service",
+          sourceReference,
+          sourceType: "serviceId",
+          quantity: "1",
+          ...vatFieldsForService(sourceReference, invoiceSettings),
+          pricePerUnit: roundMoney(service.price),
+          totalPrice: roundMoney(service.price),
+        };
+      });
   }
 
   const guests = Array.isArray(meta?.guests) ? meta.guests : [];
@@ -366,26 +404,26 @@ function buildFallbackLineItems(booking, meta) {
   for (const guest of guests) {
     for (const service of guest.services ?? []) {
       if (!service?.id && !service?.serviceId) continue;
+      const sourceReference = String(service.id || service.serviceId);
       fromGuests.push({
         description: service.name || "Service",
-        sourceReference: String(service.id || service.serviceId),
+        sourceReference,
         sourceType: "serviceId",
         quantity: "1",
-        vat: "21%",
-        vatRate: 21,
+        ...vatFieldsForService(sourceReference, invoiceSettings),
         pricePerUnit: roundMoney(service.price),
         totalPrice: roundMoney(service.price),
       });
     }
     for (const product of guest.products ?? []) {
       if (!product?.id && !product?.productId) continue;
+      const sourceReference = String(product.id || product.productId);
       fromGuests.push({
         description: product.name || "Product",
-        sourceReference: String(product.id || product.productId),
+        sourceReference,
         sourceType: "productId",
         quantity: String(product.quantity || 1),
-        vat: "21%",
-        vatRate: 21,
+        ...vatFieldsForProduct(sourceReference, invoiceSettings),
         pricePerUnit: roundMoney(product.unitPrice ?? product.price),
         totalPrice: roundMoney(product.price),
       });
@@ -394,13 +432,13 @@ function buildFallbackLineItems(booking, meta) {
   if (fromGuests.length) return fromGuests;
 
   if (booking.service_id) {
+    const sourceReference = String(booking.service_id);
     return [{
       description: booking.service_title || "Professional Service",
-      sourceReference: String(booking.service_id),
+      sourceReference,
       sourceType: "serviceId",
       quantity: "1",
-      vat: "21%",
-      vatRate: 21,
+      ...vatFieldsForService(sourceReference, invoiceSettings),
       pricePerUnit: roundMoney(booking.total_price),
       totalPrice: roundMoney(booking.total_price),
     }];
@@ -540,7 +578,7 @@ function isPlanningPerson(person) {
  * Build split bill payers from booking notes (clientSnapshot / guests).
  * Prepayment is always charged to the main client against the full booking total %.
  */
-function resolveSplitPayers(booking, meta) {
+function resolveSplitPayers(booking, meta, invoiceSettings) {
   const total = roundMoney(booking.total_price);
   const prepaymentPercent = Number(
     meta.prepaymentPercent ??
@@ -564,7 +602,7 @@ function resolveSplitPayers(booking, meta) {
   if (meta.splitBill?.payers?.length) {
     // Frontend persists lineIds (not lineItems). Resolve catalog rows from the
     // booking snapshot / service_id so finance documents keep source references.
-    const catalogLines = buildFallbackLineItems(booking, meta);
+    const catalogLines = buildFallbackLineItems(booking, meta, invoiceSettings);
     const byRef = new Map(
       catalogLines
         .filter(isCatalogLinkedLine)
@@ -588,6 +626,7 @@ function resolveSplitPayers(booking, meta) {
         ) {
           lineItems = catalogLines.filter(isCatalogLinkedLine);
         }
+        lineItems = lineItems.map((line) => applyCatalogVat(line, invoiceSettings));
         return {
           key: String(p.key),
           role,
@@ -613,13 +652,13 @@ function resolveSplitPayers(booking, meta) {
       if (!service.id && !service.serviceId) continue;
       const assigneeId = String(service.guestId || requester.id);
       const prev = groups.get(assigneeId) ?? [];
+      const sourceReference = service.id || service.serviceId;
       prev.push({
         description: service.name || "Service",
-        sourceReference: service.id || service.serviceId,
+        sourceReference,
         sourceType: "serviceId",
         quantity: "1",
-        vat: "21%",
-        vatRate: 21,
+        ...vatFieldsForService(sourceReference, invoiceSettings),
         pricePerUnit: roundMoney(service.price),
         totalPrice: roundMoney(service.price),
         amount: roundMoney(service.price),
@@ -692,28 +731,32 @@ function resolveSplitPayers(booking, meta) {
       const guestServices = Array.isArray(guest.services) ? guest.services : [];
       const guestProducts = Array.isArray(guest.products) ? guest.products : [];
       const lines = [
-        ...guestServices.map((s) => ({
-          description: s.name || "Service",
-          sourceReference: s.id || s.serviceId,
-          sourceType: "serviceId",
-          quantity: "1",
-          vat: "21%",
-          vatRate: 21,
-          pricePerUnit: roundMoney(s.price),
-          totalPrice: roundMoney(s.price),
-          amount: roundMoney(s.price),
-        })),
-        ...guestProducts.map((p) => ({
-          description: p.name || "Product",
-          sourceReference: p.id || p.productId,
-          sourceType: "productId",
-          quantity: String(p.quantity || 1),
-          vat: "21%",
-          vatRate: 21,
-          pricePerUnit: roundMoney(p.unitPrice ?? p.price),
-          totalPrice: roundMoney(p.price),
-          amount: roundMoney(p.price),
-        })),
+        ...guestServices.map((s) => {
+          const sourceReference = s.id || s.serviceId;
+          return {
+            description: s.name || "Service",
+            sourceReference,
+            sourceType: "serviceId",
+            quantity: "1",
+            ...vatFieldsForService(sourceReference, invoiceSettings),
+            pricePerUnit: roundMoney(s.price),
+            totalPrice: roundMoney(s.price),
+            amount: roundMoney(s.price),
+          };
+        }),
+        ...guestProducts.map((p) => {
+          const sourceReference = p.id || p.productId;
+          return {
+            description: p.name || "Product",
+            sourceReference,
+            sourceType: "productId",
+            quantity: String(p.quantity || 1),
+            ...vatFieldsForProduct(sourceReference, invoiceSettings),
+            pricePerUnit: roundMoney(p.unitPrice ?? p.price),
+            totalPrice: roundMoney(p.price),
+            amount: roundMoney(p.price),
+          };
+        }),
       ].filter((line) => Boolean(line.sourceReference));
       if (!lines.length) continue;
       assigned += lines.reduce((sum, line) => sum + line.amount, 0);
@@ -754,8 +797,7 @@ function resolveSplitPayers(booking, meta) {
             sourceReference: String(booking.service_id),
             sourceType: "serviceId",
             quantity: "1",
-            vat: "0%",
-            vatRate: 0,
+            ...vatFieldsForService(booking.service_id, invoiceSettings),
             pricePerUnit: roundMoney(mainSubtotal),
             totalPrice: roundMoney(mainSubtotal),
           }]
@@ -781,8 +823,7 @@ function resolveSplitPayers(booking, meta) {
               sourceReference: String(booking.service_id),
               sourceType: "serviceId",
               quantity: "1",
-              vat: "0%",
-              vatRate: 0,
+              ...vatFieldsForService(booking.service_id, invoiceSettings),
               pricePerUnit: roundMoney(total),
               totalPrice: roundMoney(total),
             }]
@@ -1043,15 +1084,9 @@ async function insertFinanceTransaction({
       : {}),
     paidAmount: roundMoney(gross),
     issuedSnapshot: {
-      // BC rows must freeze company layout even when defaultInvoiceType is individual.
-      templateType:
-        clientType === "business" || invoiceSettings.defaultInvoiceType === "company"
-          ? "company"
-          : "individual",
-      layout:
-        clientType === "business" || invoiceSettings.defaultInvoiceType === "company"
-          ? "itemized"
-          : "simplified",
+      // Client type alone selects the template — never the pro's defaultInvoiceType.
+      templateType: clientType === "business" ? "company" : "individual",
+      layout: clientType === "business" ? "itemized" : "simplified",
       invoiceSettings,
       professionalBusiness,
     },
@@ -1130,10 +1165,21 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
   } = options;
 
   const meta = parseBookingNotes(booking.notes);
-  const { prepaidAmount, payers } = resolveSplitPayers(booking, meta);
+  const invoiceSettings = await loadInvoiceSettingsForProfessional(
+    booking.professional_profile_id,
+  );
+  const { prepaidAmount, payers } = resolveSplitPayers(
+    booking,
+    meta,
+    invoiceSettings,
+  );
   const prepayStatus = String(booking.prepayment_status ?? "").toLowerCase();
   const isCompleted = String(booking.status ?? "").toLowerCase() === "completed";
-  const fallbackBookingLineItems = buildFallbackLineItems(booking, meta);
+  const fallbackBookingLineItems = buildFallbackLineItems(
+    booking,
+    meta,
+    invoiceSettings,
+  );
 
   const withLateRescheduleFeeLine = (lines) => {
     if (!meta.showLateRescheduling) return lines;
@@ -1592,7 +1638,7 @@ export async function processOverdueInvoiceReissues(professionalProfileId) {
   let created = 0;
   for (const row of overdue.rows) {
     const doc = row.document ?? {};
-    const paymentTerms = doc.issuedSnapshot?.invoiceSettings?.paymentTerms ?? settings.paymentTerms;
+    const paymentTerms = resolveDocumentPaymentTerms(doc, settings.paymentTerms);
     const level = Number(doc.reissueLevel) || 0;
     const action = resolveOverdueReissueAction(level, paymentTerms);
     if (action === "close") {
