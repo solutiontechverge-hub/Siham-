@@ -20,7 +20,29 @@ export type TransactionStatus =
 /** Visual tone for status chips per design spec. */
 export type TransactionStatusTone = "success" | "warning" | "danger" | "neutral" | "muted";
 
-export function getTransactionStatusTone(status: TransactionStatus): TransactionStatusTone {
+/** LCF entry label — fee exists only because the linked booking was cancelled. */
+const LATE_CANCELLATION_BOOKING_FEE = "Late Cancellation Booking Fee";
+
+function isLateCancellationFeeEntry(entryLabel?: string | null): boolean {
+  return String(entryLabel ?? "").trim() === LATE_CANCELLATION_BOOKING_FEE;
+}
+
+/**
+ * Paid late-cancellation fee → display Cancelled (booking lifecycle).
+ * Persisted status stays Paid (receipts / refunds / sales cards).
+ */
+export function isCancelledFeeDisplayStatus(
+  status: TransactionStatus,
+  entryLabel?: string | null,
+): boolean {
+  return status === "Paid" && isLateCancellationFeeEntry(entryLabel);
+}
+
+export function getTransactionStatusTone(
+  status: TransactionStatus,
+  entryLabel?: string | null,
+): TransactionStatusTone {
+  if (isCancelledFeeDisplayStatus(status, entryLabel)) return "danger";
   switch (status) {
     case "Paid":
     case "Prepaid":
@@ -43,7 +65,11 @@ export function getTransactionStatusTone(status: TransactionStatus): Transaction
 }
 
 /** Chip label per Transaction overview status design. */
-export function formatTransactionStatusLabel(status: TransactionStatus): string {
+export function formatTransactionStatusLabel(
+  status: TransactionStatus,
+  entryLabel?: string | null,
+): string {
+  if (isCancelledFeeDisplayStatus(status, entryLabel)) return "Cancelled";
   switch (status) {
     case "Overdue":
       return "!Overdue";
@@ -400,8 +426,9 @@ export function buildOverdueReviewHref(
   row: Pick<TransactionRow, "status" | "bookingId" | "entryId" | "date">,
 ): string | null {
   if (row.status !== "Overdue" && row.status !== "Overdue response") return null;
+  if (!row.bookingId) return null;
+  // Prefer unique_code (entryId) for bookingCode match; bookingId covers UUID / b-<uuid>.
   const ref = row.entryId || row.bookingId;
-  if (!ref) return null;
   const params = new URLSearchParams();
   params.set("booking", ref);
   if (row.date) params.set("date", row.date);

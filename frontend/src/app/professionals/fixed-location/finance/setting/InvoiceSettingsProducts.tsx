@@ -20,8 +20,17 @@ import {
 } from "../../../../../theme/mollureHierarchy";
 import { BodyText, SubHeading } from "../../../../../components/ui/typography";
 import AppButton from "../../../../../components/common/AppButton";
-import { VAT_EXCEPTION_INFO_TOOLTIP } from "../../../../../lib/financeVat";
+import {
+  formatVatPercent,
+  parseVatRate,
+  VAT_EXCEPTION_INFO_TOOLTIP,
+} from "../../../../../lib/financeVat";
 import type { InvoiceSettingsSx } from "./invoiceSettings.styles";
+
+function displayVat(value: string): string {
+  const rate = parseVatRate(value);
+  return rate == null ? value : formatVatPercent(rate);
+}
 
 type Product = { id: string; name: string; price: number; vat: string };
 type Service = {

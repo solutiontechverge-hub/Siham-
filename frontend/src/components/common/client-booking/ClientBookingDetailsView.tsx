@@ -57,7 +57,6 @@ export default function ClientBookingDetailsView({
     bookingNotesMeta,
     bookingRef,
     bookingSetup,
-    bookingTransactionRow,
     businessProfile,
     canActOnPayment,
     cancelDialogOpen,
@@ -136,7 +135,7 @@ export default function ClientBookingDetailsView({
     policySections,
     prepaidAmount,
     prepaymentPercent,
-    prepaymentReceiptRow,
+    hasAnyDocument,
     prepaymentState,
     professionalBusinessOverride,
     professionalPhone,
@@ -353,14 +352,8 @@ export default function ClientBookingDetailsView({
                   prepaidAmount={displayPrepaidAmount}
                   prepaymentPaid={prepaymentState === "paid"}
                   onOk={handleAcknowledgeRejected}
-                  onViewInvoice={
-                    bookingTransactionRow ? openInvoice : undefined
-                  }
-                  onViewReceipt={
-                    (prepaymentReceiptRow ?? bookingTransactionRow)
-                      ? openReceipt
-                      : undefined
-                  }
+                  onViewInvoice={hasAnyDocument ? openInvoice : undefined}
+                  onViewReceipt={hasAnyDocument ? openReceipt : undefined}
                 />
               </>
             ) : (
@@ -386,12 +379,10 @@ export default function ClientBookingDetailsView({
                         sections={visiblePaymentSummarySections}
                         headerTotal={displayTotal}
                         onViewInvoice={
-                          bookingTransactionRow ? openInvoice : undefined
+                          hasAnyDocument ? openInvoice : undefined
                         }
                         onViewReceipt={
-                          (prepaymentReceiptRow ?? bookingTransactionRow)
-                            ? openReceipt
-                            : undefined
+                          hasAnyDocument ? openReceipt : undefined
                         }
                       />
                     ) : undefined
@@ -536,8 +527,6 @@ export default function ClientBookingDetailsView({
         setActiveDocument={setActiveDocument}
         bookingInvoiceType={bookingInvoiceType}
         financeSettings={financeSettings}
-        prepaymentReceiptRow={prepaymentReceiptRow}
-        bookingTransactionRow={bookingTransactionRow}
         professionalBusinessOverride={professionalBusinessOverride}
         hasProfessionalSuggestedEdits={hasProfessionalSuggestedEdits}
       />

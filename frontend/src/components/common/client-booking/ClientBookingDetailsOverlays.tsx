@@ -75,12 +75,15 @@ type Props = {
   setCancelFeeStripeOpen: (open: boolean) => void;
   setCancelFeeDialogOpen: (open: boolean) => void;
   handleCancellationFeeStripeSuccess: () => void | Promise<void>;
-  activeDocument: "invoice" | "receipt" | null;
-  setActiveDocument: (doc: "invoice" | "receipt" | null) => void;
+  activeDocument: {
+    type: "invoice" | "receipt";
+    row: unknown;
+  } | null;
+  setActiveDocument: (
+    doc: { type: "invoice" | "receipt"; row: unknown } | null,
+  ) => void;
   bookingInvoiceType: FinanceInvoiceTemplateType | string;
   financeSettings: unknown;
-  prepaymentReceiptRow: unknown;
-  bookingTransactionRow: unknown;
   professionalBusinessOverride: unknown;
   hasProfessionalSuggestedEdits: boolean;
 };
@@ -140,8 +143,6 @@ export default function ClientBookingDetailsOverlays(props: Props) {
     setActiveDocument,
     bookingInvoiceType,
     financeSettings,
-    prepaymentReceiptRow,
-    bookingTransactionRow,
     professionalBusinessOverride,
     hasProfessionalSuggestedEdits,
   } = props;
@@ -289,14 +290,10 @@ export default function ClientBookingDetailsOverlays(props: Props) {
       <FinanceDocumentPreviewDrawer
         open={Boolean(activeDocument)}
         onClose={() => setActiveDocument(null)}
-        documentType={activeDocument ?? "invoice"}
+        documentType={activeDocument?.type ?? "invoice"}
         invoiceType={bookingInvoiceType as FinanceInvoiceTemplateType}
         settings={financeSettings as never}
-        row={
-          (activeDocument === "receipt"
-            ? (prepaymentReceiptRow ?? bookingTransactionRow)
-            : bookingTransactionRow) as never
-        }
+        row={(activeDocument?.row ?? null) as never}
         professionalBusinessOverride={professionalBusinessOverride as never}
       />
 

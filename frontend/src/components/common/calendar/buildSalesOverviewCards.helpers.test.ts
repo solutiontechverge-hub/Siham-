@@ -152,6 +152,17 @@ assert.equal(
   "plain cancel without fee section yields no invoice",
 );
 
+assert.equal(
+  resolveProtectiveFeeSalesCardSpec({
+    status: "Cancelled",
+    showLateCancellation: true,
+    lateCancellationFeePercent: 50,
+    lineSubtotal: 100,
+  }),
+  null,
+  "stamp alone without Paid LCF does not invent Fee Summary",
+);
+
 const feeCard = resolveProtectiveFeeSalesCardSpec({
   status: "Cancelled",
   showLateCancellation: true,
@@ -159,8 +170,14 @@ const feeCard = resolveProtectiveFeeSalesCardSpec({
   lineSubtotal: 100,
   cancellationFeeAt: "2026-09-23T10:00:00.000Z",
   exceededCancellationWindow: true,
+  financeFeeHint: {
+    bookingId: "x",
+    status: "Paid",
+    entryLabel: "Late Cancellation Booking Fee",
+    amount: 50,
+  },
 });
-assert.ok(feeCard, "cancelled + active late fee builds invoice spec");
+assert.ok(feeCard, "cancelled + Paid LCF builds invoice spec");
 assert.equal(
   feeCard?.feeLabel,
   "Late Cancellation Booking Fee (50% Of €100)",
@@ -189,6 +206,12 @@ const kmFee = resolveProtectiveFeeSalesCardSpec({
   lateCancellationFeePercent: 50,
   lineSubtotal: 100,
   extrasAmount: 20,
+  financeFeeHint: {
+    bookingId: "x",
+    status: "Paid",
+    entryLabel: "Late Cancellation Booking Fee",
+    amount: 60,
+  },
 });
 assert.equal(kmFee?.feeAmount, 60, "km extras enter cancellation fee base");
 
@@ -228,7 +251,18 @@ const cancelledPrepaidFeeCards = buildCardsForEvent({
   } as never,
   clientName: "aliza",
   clientEmail: "aliza@example.com",
-  ctx: { financeHints: [] },
+  ctx: {
+    financeHints: [
+      {
+        bookingId: "cancel-fee-1",
+        bookingCode: "BK-CANCEL-FEE",
+        phase: "full",
+        status: "Paid",
+        entryLabel: "Late Cancellation Booking Fee",
+        amount: 50,
+      },
+    ],
+  },
 });
 assert.equal(
   cancelledPrepaidFeeCards.filter((c) => c.kind === "prepayment").length,
@@ -267,7 +301,7 @@ assert.equal(
   30,
   "Payment = fee €50 − prepaid €20",
 );
-assert.equal(feeSummaryCard?.showAddOns, false, "no Add-ons on Fee Summary");
+assert.equal(feeSummaryCard?.showAddOns, true, "Add-Ons on Fee Summary");
 
 const plainCancelCards = buildCardsForEvent({
   event: {
@@ -311,12 +345,22 @@ const staleEventFeeCards = buildCardsForEvent({
     notes: notesStamp,
   } as never,
   clientName: "aliza",
-  ctx: { financeHints: [] },
+  ctx: {
+    financeHints: [
+      {
+        bookingId: "cancel-fee-stale",
+        bookingCode: "BK-CANCEL-FEE",
+        status: "Paid",
+        entryLabel: "Late Cancellation Booking Fee",
+        amount: 50,
+      },
+    ],
+  },
 });
 assert.equal(
   staleEventFeeCards.filter((c) => c.title === "Fee Summary").length,
   1,
-  "booking.notes stamp heals Fee Summary when event.details lack flag",
+  "Paid LCF + notes % heals Fee Summary when event.details lack flag",
 );
 
 // Finance LCF row heals Fee Summary when notes never got the stamp (pre-fix residual).
@@ -405,7 +449,7 @@ assert.ok(
   "empty-base Fee Summary still shows percent line from hint",
 );
 
-// Aliza residual: cancelled + prepaid, no stamp / no LCF — heal Fee Summary from policy %.
+// Aliza: cancelled + prepaid without Paid LCF → Prepayment only (no invent from policy %).
 const alizaHealEvent = {
   id: "b-aliza-heal",
   title: "Cut",
@@ -433,7 +477,7 @@ const alizaHealEvent = {
   },
 } as unknown as CalendarEvent;
 
-const alizaHealCards = buildSalesOverviewCards({
+const alizaNoFeeCards = buildSalesOverviewCards({
   bookings: [],
   currentEvent: alizaHealEvent,
   clientName: "aliza",
@@ -441,9 +485,36 @@ const alizaHealCards = buildSalesOverviewCards({
   financeHints: [],
   lateCancellationFeePercentDefault: "10",
 });
+assert.equal(
+  alizaNoFeeCards.filter((c) => c.title === "Fee Summary").length,
+  0,
+  "cancelled + prepaid without Paid LCF does not invent Fee Summary",
+);
+assert.ok(
+  alizaNoFeeCards.some((c) => c.title === "Prepayment Summary"),
+  "Prepayment Summary kept after cancel",
+);
+
+// Same booking once Paid LCF exists → Fee Summary below Prepayment.
+const alizaHealCards = buildSalesOverviewCards({
+  bookings: [],
+  currentEvent: alizaHealEvent,
+  clientName: "aliza",
+  clientEmail: "alizaclient@yopmail.com",
+  financeHints: [
+    {
+      bookingId: "aliza-heal",
+      bookingCode: "BK-ALIZA",
+      status: "Paid",
+      entryLabel: "Late Cancellation Booking Fee",
+      amount: 13.2,
+    },
+  ],
+  lateCancellationFeePercentDefault: "10",
+});
 assert.ok(
   alizaHealCards.some((c) => c.title === "Fee Summary"),
-  "cancelled + prepaid + policy lateCancel% heals Fee Summary into cards array",
+  "Paid LCF heals Fee Summary into cards array",
 );
 assert.ok(
   alizaHealCards.some((c) => c.title === "Prepayment Summary"),
@@ -451,13 +522,18 @@ assert.ok(
 );
 assert.equal(
   alizaHealCards[0]?.title,
+  "Prepayment Summary",
+  "Prepayment Summary sorts above Fee Summary",
+);
+assert.equal(
+  alizaHealCards[1]?.title,
   "Fee Summary",
-  "Fee Summary sorts above Prepayment Summary",
+  "Fee Summary sorts below Prepayment Summary",
 );
 assert.equal(
   alizaHealCards.find((c) => c.title === "Fee Summary")?.highlightAmount,
   0,
-  "aliza: €13.20 fee − €26.40 prepaid credit → Payment €0",
+  "aliza: €13.20 fee − prepaid credit → Payment €0",
 );
 assert.ok(
   alizaHealCards
@@ -800,5 +876,141 @@ upsertSalesCardMeta({
   assert.equal(after?.dueDate, "2026-12-31");
 }
 hydrateSalesCardMetadata([]);
+
+// Cancel replaces total_price with fee — Prepayment Total stays booking services base.
+{
+  const poisoned = buildCardsForEvent({
+    event: {
+      id: "b-poison-1",
+      bookingCode: "BK-POISON",
+      title: "Cut",
+      start: "2026-10-13T10:00:00.000Z",
+      end: "2026-10-13T11:00:00.000Z",
+      status: "Cancelled",
+      details: {
+        showPrepayment: true,
+        prepaymentPercent: "20",
+        prepaymentStatus: "confirmed",
+        showLateCancellation: true,
+        lateCancellationFeePercent: "2",
+        paymentMethod: "onlineDirect",
+        // Mapper fallback after cancel: single service priced at fee-only total_price.
+        services: [{ id: "svc1", name: "Cut", price: 2.16 }],
+        clientSnapshot: { people: [], services: [] },
+      },
+    } as unknown as CalendarEvent,
+    booking: {
+      id: "poison-1",
+      unique_code: "BK-POISON",
+      status: "cancelled",
+      prepayment_status: "paid",
+      total_price: 2.16,
+    } as never,
+    clientName: "aliza",
+    ctx: {
+      financeHints: [
+        {
+          bookingId: "poison-1",
+          bookingCode: "BK-POISON",
+          phase: "prepay",
+          status: "Prepaid",
+          amount: 21.6,
+          lineItems: [{ id: "prepay", label: "Prepayment", amount: 21.6 }],
+        },
+        {
+          bookingId: "poison-1",
+          bookingCode: "BK-POISON",
+          phase: "full",
+          status: "Paid",
+          entryLabel: "Late Cancellation Booking Fee",
+          amount: 2.16,
+        },
+      ],
+    },
+  });
+  const prepayCard = poisoned.find((c) => c.title === "Prepayment Summary");
+  const feeCard = poisoned.find((c) => c.title === "Fee Summary");
+  assert.ok(prepayCard, "Prepayment Summary after fee-poisoned cancel");
+  assert.equal(prepayCard?.total, 108, "Prepayment Total = fee÷% booking base (€108)");
+  assert.equal(prepayCard?.highlightAmount, 21.6, "Prepaid = 20% of €108");
+  assert.ok(
+    !prepayCard?.lines.some((l) => l.label === "Prepayment"),
+    "prepay finance deposit line must not replace service lines",
+  );
+  assert.ok(feeCard, "Fee Summary present");
+  assert.equal(feeCard?.total, 2.16, "Fee Total = fee amount");
+  assert.equal(feeCard?.secondaryRows?.[0]?.amount, 2.16, "Prepaid credit applied to fee");
+  assert.equal(feeCard?.highlightAmount, 0, "Payment = max(0, fee − prepaid)");
+}
+
+// Stacked LRF + LCF on one Fee Summary; prepaid applies to combined total.
+{
+  const stacked = buildCardsForEvent({
+    event: {
+      id: "b-stack-1",
+      bookingCode: "BK-STACK",
+      title: "Stack",
+      start: "2026-10-13T10:00:00.000Z",
+      end: "2026-10-13T11:00:00.000Z",
+      status: "Cancelled",
+      details: {
+        showPrepayment: true,
+        prepaymentPercent: "10",
+        prepaymentStatus: "confirmed",
+        showLateCancellation: true,
+        lateCancellationFeePercent: "4",
+        lateRescheduleFeePercent: "10",
+        clientSnapshot: {
+          services: [
+            { id: "s1", name: "Cut", price: 100, durationMins: 30 },
+            { id: "s2", name: "Dry", price: 150, durationMins: 30 },
+          ],
+        },
+      },
+    } as unknown as CalendarEvent,
+    booking: {
+      id: "stack-1",
+      unique_code: "BK-STACK",
+      status: "cancelled",
+      prepayment_status: "paid",
+      total_price: 250,
+      notes: JSON.stringify({
+        showLateCancellation: true,
+        lateCancellationFeePercent: "4",
+      }),
+    } as never,
+    clientName: "Sara",
+    ctx: {
+      financeHints: [
+        {
+          bookingId: "BK-STACK",
+          bookingCode: "BK-STACK",
+          phase: "full",
+          status: "Paid",
+          entryLabel: "Late Rescheduling Fee",
+          amount: 25,
+        },
+        {
+          bookingId: "BK-STACK",
+          bookingCode: "BK-STACK",
+          phase: "full",
+          status: "Paid",
+          entryLabel: "Late Cancellation Booking Fee",
+          amount: 10,
+        },
+      ],
+      paymentTerms: { originalDueValue: "2", originalDueUnit: "days" },
+    },
+  });
+  const feeCard = stacked.find((c) => c.title === "Fee Summary");
+  assert.ok(feeCard, "stacked Fee Summary present");
+  assert.equal(feeCard?.lines.length, 2, "LRF + LCF lines stacked");
+  assert.equal(feeCard?.total, 35, "fee total 25+10");
+  assert.equal(feeCard?.secondaryRows?.[0]?.label, "Prepaid");
+  assert.equal(feeCard?.secondaryRows?.[0]?.amount, 25, "prepaid applied €25 of €35");
+  assert.equal(feeCard?.highlightLabel, "Payment");
+  assert.equal(feeCard?.highlightAmount, 10, "Payment = 35 − 25");
+  assert.equal(feeCard?.showAddOns, true, "Add-Ons on stacked Fee Summary");
+}
 
 console.log("buildSalesOverviewCards.helpers.test.ts: all assertions passed");

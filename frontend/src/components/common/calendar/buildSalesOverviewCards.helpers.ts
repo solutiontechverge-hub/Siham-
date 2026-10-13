@@ -37,7 +37,39 @@ import {
   formatProtectiveFeeLineDescription,
   isProtectiveFeeEntryLabel,
   LATE_CANCELLATION_BOOKING_FEE,
+  LATE_RESCHEDULING_FEE,
 } from "../finance-documents/protectiveFeeInvoice";
+
+function isSettledProtectiveFeeStatus(status?: string | null): boolean {
+  const s = String(status ?? "").toLowerCase();
+  return s === "paid" || s === "prepaid" || s === "confirmed";
+}
+
+/** Reconstruct booking services base from Paid fee amount ÷ % (cancel may store fee-only total_price). */
+function recoverBookingBaseFromFeeHints(
+  hints: readonly SalesFinanceHint[],
+  percents: {
+    lateCancel?: string | number | null;
+    lateReschedule?: string | number | null;
+    noShow?: string | number | null;
+  },
+): number {
+  let best = 0;
+  for (const hint of hints) {
+    const amount = Number(hint.amount) || 0;
+    if (amount <= 0) continue;
+    const label = String(hint.entryLabel ?? "").trim();
+    const pct =
+      label === LATE_RESCHEDULING_FEE
+        ? Number(percents.lateReschedule) || 0
+        : label.toLowerCase() === "no-show fee"
+          ? Number(percents.noShow) || 0
+          : Number(percents.lateCancel) || 0;
+    if (pct <= 0) continue;
+    best = Math.max(best, roundMoney(amount / (pct / 100)));
+  }
+  return best;
+}
 import {
   applyVisualState,
   discountLine,
@@ -281,6 +313,8 @@ function applyEditedLines<T extends {
   total: number;
   highlightAmount: number;
   documentAmount?: number;
+  secondaryRows?: SalesLineItem[];
+  title?: string;
 }>(next: T, meta: SalesCardMetaRecord): void {
   if (!meta.editedLines?.length) return;
   next.lines = meta.editedLines.map((line) => ({
@@ -299,9 +333,36 @@ function applyEditedLines<T extends {
     });
   }
   if (typeof meta.totalPrice === "number") {
-    next.total = roundMoney(meta.totalPrice);
-    next.highlightAmount = roundMoney(meta.totalPrice);
-    if ("documentAmount" in next) next.documentAmount = roundMoney(meta.totalPrice);
+    // Fee Summary: Payment = Total − Prepaid (do not flatten to edited totalPrice).
+    const isFeeSummary =
+      next.title === "Fee Summary" || next.title === "No-Show Fee Invoice";
+    // Prepayment: Total = service lines; teal stays prepaid (never flatten to deposit).
+    const isPrepayment = next.title === "Prepayment Summary";
+    if (isFeeSummary && next.secondaryRows?.length) {
+      next.total = roundMoney(meta.totalPrice);
+      const prepaidCredit = roundMoney(
+        next.secondaryRows.reduce(
+          (sum, row) => sum + Math.max(0, Number(row.amount) || 0),
+          0,
+        ),
+      );
+      next.highlightAmount = roundMoney(Math.max(0, next.total - prepaidCredit));
+      if ("documentAmount" in next) {
+        next.documentAmount =
+          next.highlightAmount > 0 ? next.highlightAmount : next.total;
+      }
+    } else if (isPrepayment) {
+      next.total = roundMoney(
+        next.lines
+          .filter((line) => line.amount >= 0)
+          .reduce((sum, line) => sum + line.amount, 0),
+      );
+      // highlightAmount / documentAmount stay builder prepaid — do not overwrite.
+    } else {
+      next.total = roundMoney(meta.totalPrice);
+      next.highlightAmount = roundMoney(meta.totalPrice);
+      if ("documentAmount" in next) next.documentAmount = roundMoney(meta.totalPrice);
+    }
   }
 }
 
@@ -408,10 +469,19 @@ function applyFinanceAndMetaState(
   );
   // Prefer stored finance document.lineItems over calendar-derived lines so
   // Sales Card count matches finance_transactions (editedLines still win).
+  // Fee Summary: keep builder fee lines + Payment = Total − Prepaid.
+  // Prepayment: keep calendar service lines — prepay docs are deposit-only
+  // ("Prepayment" €X), which would zero/wrong Total after cancel fee checkout.
+  const isFeeSummaryCard =
+    "title" in next &&
+    (next.title === "Fee Summary" || next.title === "No-Show Fee Invoice");
+  const isPrepaymentCard = kind === "prepayment";
   if (
     finance?.lineItems?.length &&
     !meta?.editedLines?.length &&
-    Array.isArray(next.lines)
+    Array.isArray(next.lines) &&
+    !isFeeSummaryCard &&
+    !isPrepaymentCard
   ) {
     next.lines = finance.lineItems.map((line) => ({ ...line }));
     if ("highlightedLineIds" in next) next.highlightedLineIds = undefined;
@@ -812,27 +882,49 @@ function financeHintMatchesBooking(
   bookingId: string,
   bookingCode: string,
 ): boolean {
+  // finance_transactions.booking_id stores unique_code; calendar may pass UUID and/or code.
   return (
     (hint.bookingId != null && String(hint.bookingId) === String(bookingId)) ||
     (hint.bookingCode != null && String(hint.bookingCode) === String(bookingCode)) ||
-    (hint.bookingId != null && String(hint.bookingId) === String(bookingCode))
+    (hint.bookingId != null && String(hint.bookingId) === String(bookingCode)) ||
+    (hint.bookingCode != null && String(hint.bookingCode) === String(bookingId))
   );
 }
 
-/** Paid / open LCF (or no-show) finance row for a booking — heal Sales when notes lack the stamp. */
+function protectiveFeeHintSortKey(entryLabel?: string | null): number {
+  const label = String(entryLabel ?? "");
+  if (label === LATE_RESCHEDULING_FEE) return 0;
+  if (label.startsWith(LATE_CANCELLATION_BOOKING_FEE)) return 1;
+  if (label.toLowerCase() === "no-show fee") return 2;
+  return 3;
+}
+
+/** All settled protective-fee finance rows — Fee Summary can stack LRF + LCF. */
+export function findProtectiveFeeFinanceHints(
+  hints: readonly SalesFinanceHint[],
+  bookingId: string,
+  bookingCode: string,
+): SalesFinanceHint[] {
+  return hints
+    .filter((hint) => {
+      if (!financeHintMatchesBooking(hint, bookingId, bookingCode)) return false;
+      if (!isProtectiveFeeEntryLabel(hint.entryLabel)) return false;
+      return isSettledProtectiveFeeStatus(hint.status);
+    })
+    .sort(
+      (a, b) =>
+        protectiveFeeHintSortKey(a.entryLabel) -
+        protectiveFeeHintSortKey(b.entryLabel),
+    );
+}
+
+/** Paid protective-fee finance row (LCF/LRF/NS) — Fee Summary only when fee is settled. */
 export function findProtectiveFeeFinanceHint(
   hints: readonly SalesFinanceHint[],
   bookingId: string,
   bookingCode: string,
 ): SalesFinanceHint | undefined {
-  const matches = hints.filter((hint) => {
-    if (!financeHintMatchesBooking(hint, bookingId, bookingCode)) return false;
-    if (!isProtectiveFeeEntryLabel(hint.entryLabel)) return false;
-    const status = String(hint.status ?? "").toLowerCase();
-    if (status === "voided" || status === "void" || status === "refunded") return false;
-    return true;
-  });
-  return matches[0];
+  return findProtectiveFeeFinanceHints(hints, bookingId, bookingCode)[0];
 }
 
 /**
@@ -845,12 +937,13 @@ export function resolveProtectiveFeeSalesCardSpec(input: {
   lateCancellationFeePercent?: string | number | null;
   showNoShowFee?: boolean;
   noShowFeePercent?: string | number | null;
+  lateRescheduleFeePercent?: string | number | null;
   lineSubtotal: number;
   extrasAmount?: number;
   discount?: { type: "fixed" | "percentage"; amount: number } | null;
   cancellationFeeAt?: string | null;
   exceededCancellationWindow?: boolean;
-  /** When notes lack the stamp but finance already has a paid/open fee invoice. */
+  /** Paid LCF/LRF/NS finance row — Fee Summary requires settled fee (product rule). */
   financeFeeHint?: SalesFinanceHint | null;
 }): ProtectiveFeeSalesCardSpec | null {
   const status = String(input.status ?? "").toLowerCase();
@@ -866,25 +959,30 @@ export function resolveProtectiveFeeSalesCardSpec(input: {
 
   const hint = input.financeFeeHint;
   const hintAmount = Number(hint?.amount);
-  const hasHintAmount =
-    hint &&
+  const hasPaidFeeHint =
+    Boolean(hint) &&
+    isSettledProtectiveFeeStatus(hint?.status) &&
     Number.isFinite(hintAmount) &&
     hintAmount > 0 &&
-    isProtectiveFeeEntryLabel(hint.entryLabel);
+    isProtectiveFeeEntryLabel(hint?.entryLabel);
+
+  // Product: Fee Summary only when protective fee is Paid (not unpaid due / policy invent).
+  if (!hasPaidFeeHint) return null;
+
+  const label = String(hint!.entryLabel ?? "");
+  const isLateCancelLabel = label.startsWith(LATE_CANCELLATION_BOOKING_FEE);
+  const isLateRescheduleLabel = label === LATE_RESCHEDULING_FEE;
+  const isNoShowLabel = label.toLowerCase() === "no-show fee";
 
   if (
-    (status === "cancelled" || status === "canceled") &&
-    input.showLateCancellation
+    isLateCancelLabel &&
+    ((status === "cancelled" || status === "canceled") ||
+      input.showLateCancellation)
   ) {
-    // Prefer computed % fee; fall back to finance LCF amount when line base is gone
-    // (e.g. total_price replaced with fee-only after checkout).
     const feeAmount =
       price.lateCancellationFeeAmount > 0
         ? price.lateCancellationFeeAmount
-        : hasHintAmount &&
-            String(hint?.entryLabel ?? "").startsWith(LATE_CANCELLATION_BOOKING_FEE)
-          ? roundMoney(hintAmount)
-          : 0;
+        : roundMoney(hintAmount);
     if (feeAmount > 0) {
       const percent = Number(input.lateCancellationFeePercent) || 0;
       const base =
@@ -909,17 +1007,11 @@ export function resolveProtectiveFeeSalesCardSpec(input: {
     }
   }
 
-  if (
-    (status === "no_show" || status === "no show") &&
-    input.showNoShowFee
-  ) {
+  if (isNoShowLabel) {
     const feeAmount =
       price.noShowFeeAmount > 0
         ? price.noShowFeeAmount
-        : hasHintAmount &&
-            String(hint?.entryLabel).toLowerCase() === "no-show fee"
-          ? roundMoney(hintAmount)
-          : 0;
+        : roundMoney(hintAmount);
     if (feeAmount > 0) {
       return {
         title: "No-Show Fee Invoice",
@@ -934,45 +1026,42 @@ export function resolveProtectiveFeeSalesCardSpec(input: {
     }
   }
 
-  // Residual: fee charged (finance LCF) but booking notes never got showLateCancellation.
-  if (hasHintAmount) {
-    const isLateCancelLabel = String(hint!.entryLabel ?? "").startsWith(
-      LATE_CANCELLATION_BOOKING_FEE,
-    );
-    const isNoShowLabel = String(hint!.entryLabel).toLowerCase() === "no-show fee";
-    if (
-      isLateCancelLabel &&
-      (status === "cancelled" || status === "canceled")
-    ) {
-      const percent = Number(input.lateCancellationFeePercent) || 0;
-      const base =
-        percent > 0 ? roundMoney(hintAmount / (percent / 100)) : price.afterDiscount;
-      return {
-        title: "Fee Summary",
-        feeLabel:
-          percent > 0
-            ? formatProtectiveFeeLineDescription("lateCancellation", percent, base)
-            : LATE_CANCELLATION_BOOKING_FEE,
-        feeAmount: roundMoney(hintAmount),
-        entryLabel: LATE_CANCELLATION_BOOKING_FEE,
-        metaLines: buildCancellationFeeInvoiceMetaLines({
-          cancellationFeeAt: input.cancellationFeeAt,
-          exceededCancellationWindow: input.exceededCancellationWindow,
-        }),
-      };
-    }
-    if (isNoShowLabel && (status === "no_show" || status === "no show")) {
-      return {
-        title: "No-Show Fee Invoice",
-        feeLabel: "No-show fee",
-        feeAmount: roundMoney(hintAmount),
-        entryLabel: "No-show fee",
-        metaLines: buildCancellationFeeInvoiceMetaLines({
-          cancellationFeeAt: input.cancellationFeeAt,
-          exceededCancellationWindow: input.exceededCancellationWindow,
-        }),
-      };
-    }
+  if (isLateRescheduleLabel) {
+    const lrfPercent = Number(input.lateRescheduleFeePercent) || 0;
+    const base =
+      lrfPercent > 0
+        ? roundMoney(hintAmount / (lrfPercent / 100))
+        : price.afterDiscount;
+    return {
+      title: "Fee Summary",
+      feeLabel:
+        lrfPercent > 0
+          ? formatProtectiveFeeLineDescription("lateRescheduling", lrfPercent, base)
+          : LATE_RESCHEDULING_FEE,
+      feeAmount: roundMoney(hintAmount),
+      entryLabel: LATE_RESCHEDULING_FEE,
+      metaLines: [],
+    };
+  }
+
+  // Paid protective fee with unrecognized status string — still surface Fee Summary.
+  if (isLateCancelLabel) {
+    const percent = Number(input.lateCancellationFeePercent) || 0;
+    const base =
+      percent > 0 ? roundMoney(hintAmount / (percent / 100)) : price.afterDiscount;
+    return {
+      title: "Fee Summary",
+      feeLabel:
+        percent > 0
+          ? formatProtectiveFeeLineDescription("lateCancellation", percent, base)
+          : LATE_CANCELLATION_BOOKING_FEE,
+      feeAmount: roundMoney(hintAmount),
+      entryLabel: LATE_CANCELLATION_BOOKING_FEE,
+      metaLines: buildCancellationFeeInvoiceMetaLines({
+        cancellationFeeAt: input.cancellationFeeAt,
+        exceededCancellationWindow: input.exceededCancellationWindow,
+      }),
+    };
   }
 
   return null;
@@ -1048,9 +1137,51 @@ export function buildCardsForEvent(input: {
     lines.filter((line) => line.amount >= 0).reduce((sum, line) => sum + line.amount, 0),
   );
   const totalFromBooking = Number(booking?.total_price);
-  const baseTotal = lines.length
+  const rawBaseTotal = lines.length
     ? subtotal
     : roundMoney(Number.isFinite(totalFromBooking) ? totalFromBooking : 0);
+
+  // Prefer live event details; fall back to booking.notes when calendar state is stale.
+  const notesFee = protectiveFeeFlagsFromBooking(booking);
+  const showNoShowFee =
+    Boolean(event.details?.showNoShowFee) || notesFee.showNoShowFee;
+  const noShowFeePercent =
+    event.details?.noShowFeePercent ?? notesFee.noShowFeePercent;
+  const cancellationFeeAt =
+    event.details?.cancellationFeeAt ?? notesFee.cancellationFeeAt;
+  const exceededCancellationWindow =
+    typeof event.details?.exceededCancellationWindow === "boolean"
+      ? event.details.exceededCancellationWindow
+      : notesFee.exceededCancellationWindow;
+
+  const financeFeeHints = findProtectiveFeeFinanceHints(
+    ctx.financeHints,
+    String(bookingId),
+    String(bookingCode),
+  );
+  const financeFeeHint = financeFeeHints[0];
+
+  // Percent: booking stamp → notes → business policy (label % for Fee Summary / invoice line).
+  const stampedLateCancelPercent =
+    event.details?.lateCancellationFeePercent ?? notesFee.lateCancellationFeePercent;
+  const lateCancellationFeePercent =
+    Number(stampedLateCancelPercent) > 0
+      ? stampedLateCancelPercent
+      : ctx.lateCancellationFeePercentDefault;
+  // Paid finance hint heals missing stamp; do not invent Fee Summary from policy alone.
+  const showLateCancellation =
+    Boolean(event.details?.showLateCancellation) ||
+    notesFee.showLateCancellation ||
+    Boolean(financeFeeHint);
+  const isNoShowStatus = status === "no_show" || status === "no show";
+
+  // Cancel fee checkout writes total_price = fee — recover services base for Prepayment Total.
+  const feeRecoveredBase = recoverBookingBaseFromFeeHints(financeFeeHints, {
+    lateCancel: lateCancellationFeePercent,
+    lateReschedule: event.details?.lateRescheduleFeePercent,
+    noShow: noShowFeePercent,
+  });
+  const baseTotal = roundMoney(Math.max(rawBaseTotal, feeRecoveredBase));
   const prepayStatus = String(
     booking?.prepayment_status ?? event.details?.prepaymentStatus ?? "",
   ).toLowerCase();
@@ -1077,63 +1208,134 @@ export function buildCardsForEvent(input: {
           : 0;
   const onlineBooking = isOnlineBookingType(booking, event);
 
-  // Prefer live event details; fall back to booking.notes when calendar state is stale.
-  const notesFee = protectiveFeeFlagsFromBooking(booking);
-  const showNoShowFee =
-    Boolean(event.details?.showNoShowFee) || notesFee.showNoShowFee;
-  const noShowFeePercent =
-    event.details?.noShowFeePercent ?? notesFee.noShowFeePercent;
-  const cancellationFeeAt =
-    event.details?.cancellationFeeAt ?? notesFee.cancellationFeeAt;
-  const exceededCancellationWindow =
-    typeof event.details?.exceededCancellationWindow === "boolean"
-      ? event.details.exceededCancellationWindow
-      : notesFee.exceededCancellationWindow;
-
-  const financeFeeHint = findProtectiveFeeFinanceHint(
-    ctx.financeHints,
-    String(bookingId),
-    String(bookingCode),
-  );
-
-  // Percent: booking stamp → notes → business policy (old cancels never stamped).
-  const stampedLateCancelPercent =
-    event.details?.lateCancellationFeePercent ?? notesFee.lateCancellationFeePercent;
-  const lateCancellationFeePercent =
-    Number(stampedLateCancelPercent) > 0
-      ? stampedLateCancelPercent
-      : ctx.lateCancellationFeePercentDefault;
-  const policyLateCancelPercent = Number(lateCancellationFeePercent) || 0;
-  // Heal Fee Summary when cancel kept prepaid / breached window / LCF exists but stamp missing.
-  const showLateCancellation =
-    Boolean(event.details?.showLateCancellation) ||
-    notesFee.showLateCancellation ||
-    (isCancelled &&
-      policyLateCancelPercent > 0 &&
-      (isPrepayPaid ||
-        exceededCancellationWindow === true ||
-        Boolean(cancellationFeeAt) ||
-        Boolean(financeFeeHint)));
-
-  const feeSpec = resolveProtectiveFeeSalesCardSpec({
+  const feeSpecInput = {
     status,
     showLateCancellation,
     lateCancellationFeePercent,
     showNoShowFee,
     noShowFeePercent,
-    lineSubtotal: lineSubtotalBeforeDiscount,
+    lateRescheduleFeePercent: event.details?.lateRescheduleFeePercent,
+    lineSubtotal: Math.max(lineSubtotalBeforeDiscount, feeRecoveredBase),
     extrasAmount: kilometerExtrasAmount(event),
     discount: event.details?.totalDiscount ?? null,
     cancellationFeeAt,
     exceededCancellationWindow,
-    financeFeeHint,
-  });
+  };
 
-  // Cancelled / protective-fee: fee invoice + prepaid receipt when prepaid was collected.
-  if (feeSpec || isCancelled) {
+  const buildProtectiveFeeSummaryCard = (): SalesOverviewCardData | null => {
+    // Stack all settled protective fees on one Fee Summary (LRF + LCF mocks).
+    const feeLines = financeFeeHints
+      .map((hint, index) => {
+        const spec = resolveProtectiveFeeSalesCardSpec({
+          ...feeSpecInput,
+          financeFeeHint: hint,
+        });
+        if (!spec) return null;
+        const feeLineId =
+          spec.entryLabel === LATE_CANCELLATION_BOOKING_FEE
+            ? `late-cancellation-${bookingId}`
+            : spec.entryLabel === LATE_RESCHEDULING_FEE
+              ? `late-reschedule-${bookingId}`
+              : `no-show-${bookingId}`;
+        return {
+          id: `${feeLineId}-${index}`,
+          label: spec.feeLabel,
+          amount: spec.feeAmount,
+          entryLabel: spec.entryLabel,
+          metaLines: spec.metaLines,
+          title: spec.title,
+        };
+      })
+      .filter((line): line is NonNullable<typeof line> => line != null);
+    if (!feeLines.length) return null;
+
+    const feeId = resolveLiveCardId(bookingId, `${bookingId}-protective-fee`);
+    const feeTotal = roundMoney(
+      feeLines.reduce((sum, line) => sum + line.amount, 0),
+    );
+    // Mocks: Total → Prepaid applied → Payment (remainder). €0 when prepaid covers.
+    const prepaidCredit =
+      isPrepayPaid && prepaidAmount > 0
+        ? roundMoney(Math.min(prepaidAmount, feeTotal))
+        : 0;
+    const paymentAmount = roundMoney(Math.max(0, feeTotal - prepaidCredit));
+    const title = feeLines.some((l) => l.entryLabel === "No-show fee")
+      && feeLines.length === 1
+      ? "No-Show Fee Invoice"
+      : "Fee Summary";
+    const metaLines = feeLines.flatMap((l) => l.metaLines);
+    return applyMeta(
+      {
+        id: feeId,
+        bookingId,
+        bookingCode,
+        kind: "after_treatment",
+        title,
+        clientName: name,
+        payerRole: "main_client",
+        payerKey: "main-client",
+        clientEmail: email,
+        clientPhone: phone,
+        clientKind,
+        lines: feeLines.map(({ id, label, amount }) => ({ id, label, amount })),
+        total: feeTotal,
+        totalLabel: "Total",
+        secondaryRows:
+          prepaidCredit > 0
+            ? [
+                {
+                  id: "prepaid-credit",
+                  label: "Prepaid",
+                  amount: prepaidCredit,
+                },
+              ]
+            : undefined,
+        highlightLabel: "Payment",
+        // Always set (incl. €0) — renderer teal Payment row must stay visible.
+        highlightAmount: paymentAmount,
+        metaLines,
+        methodDateLine: method,
+        dueDate:
+          invoiceDueFromNotes || deriveDueDate(occurredAt, ctx.paymentTerms),
+        // Same + Add-Ons control as After Treatment (Prepayment stays false).
+        showAddOns: true,
+        paymentMethod: eventPaymentMethod,
+        paymentMethodLabel: method,
+        documentAmount: paymentAmount > 0 ? paymentAmount : feeTotal,
+        occurredAt,
+        bookingEndAt: endAt,
+      },
+      ctx,
+      {
+        isOnlineBooking: onlineBooking,
+        isAfterTreatment: true,
+        isPrepayPaid: false,
+        isFailed: false,
+        paidHint: true,
+      },
+    );
+  };
+
+  // Cancelled / no-show: prepaid receipt + Fee Summary when paid protective fee exists.
+  if (isCancelled || isNoShowStatus) {
     const cancelledCards: SalesOverviewCardData[] = [];
     if (isPrepayPaid && prepaidAmount > 0) {
       const prepayId = resolveLiveCardId(bookingId, `${bookingId}-prepayment`);
+      // Heal fee-poisoned single service line (mapper used total_price = fee).
+      const prepayLines = (() => {
+        const positive = lines.filter((line) => line.amount >= 0);
+        const sum = roundMoney(positive.reduce((s, l) => s + l.amount, 0));
+        if (
+          feeRecoveredBase > sum &&
+          positive.length === 1 &&
+          financeFeeHints.some(
+            (h) => roundMoney(Number(h.amount) || 0) === roundMoney(positive[0].amount),
+          )
+        ) {
+          return [{ ...positive[0], amount: baseTotal }];
+        }
+        return positive;
+      })();
       cancelledCards.push(
         applyMeta(
           {
@@ -1148,9 +1350,9 @@ export function buildCardsForEvent(input: {
             clientEmail: email,
             clientPhone: phone,
             clientKind,
-            lines: lines.filter((line) => line.amount >= 0),
+            lines: prepayLines,
             total: baseTotal,
-            totalLabel: "Total Amount",
+            totalLabel: "Total",
             highlightLabel: prepaidBreakdownLabel(prepaymentPercent, true),
             highlightAmount: prepaidAmount,
             methodDateLine: formatMethodDateTime(method, occurredAt),
@@ -1173,84 +1375,9 @@ export function buildCardsForEvent(input: {
         ),
       );
     }
-    if (feeSpec) {
-      const feeId = resolveLiveCardId(bookingId, `${bookingId}-protective-fee`);
-      const feeLineId =
-        feeSpec.entryLabel === LATE_CANCELLATION_BOOKING_FEE
-          ? `late-cancellation-${bookingId}`
-          : `no-show-${bookingId}`;
-      // Image 2 Fee Summary: Total → Prepaid credit → Payment (net).
-      const prepaidCredit =
-        isPrepayPaid && prepaidAmount > 0
-          ? roundMoney(Math.min(prepaidAmount, feeSpec.feeAmount))
-          : 0;
-      const paymentAmount = roundMoney(
-        Math.max(0, feeSpec.feeAmount - prepaidCredit),
-      );
-      const feeHintStatus = String(financeFeeHint?.status ?? "").toLowerCase();
-      const feePaidHint =
-        feeHintStatus === "paid" ||
-        feeHintStatus === "prepaid" ||
-        feeHintStatus === "confirmed" ||
-        paymentAmount <= 0;
-      cancelledCards.push(
-        applyMeta(
-          {
-            id: feeId,
-            bookingId,
-            bookingCode,
-            kind: "after_treatment",
-            title: feeSpec.title,
-            clientName: name,
-            payerRole: "main_client",
-            payerKey: "main-client",
-            clientEmail: email,
-            clientPhone: phone,
-            clientKind,
-            lines: [
-              {
-                id: feeLineId,
-                label: feeSpec.feeLabel,
-                amount: feeSpec.feeAmount,
-              },
-            ],
-            total: feeSpec.feeAmount,
-            totalLabel: "Total",
-            secondaryRows:
-              prepaidCredit > 0
-                ? [
-                    {
-                      id: "prepaid-credit",
-                      label: "Prepaid",
-                      amount: prepaidCredit,
-                    },
-                  ]
-                : undefined,
-            highlightLabel: "Payment",
-            highlightAmount: paymentAmount,
-            metaLines: feeSpec.metaLines,
-            methodDateLine: method,
-            dueDate:
-              invoiceDueFromNotes || deriveDueDate(occurredAt, ctx.paymentTerms),
-            showAddOns: false,
-            paymentMethod: eventPaymentMethod,
-            paymentMethodLabel: method,
-            documentAmount: paymentAmount > 0 ? paymentAmount : feeSpec.feeAmount,
-            occurredAt,
-            bookingEndAt: endAt,
-          },
-          ctx,
-          {
-            isOnlineBooking: onlineBooking,
-            isAfterTreatment: true,
-            isPrepayPaid: false,
-            isFailed: false,
-            paidHint: feePaidHint,
-          },
-        ),
-      );
-    }
-    if (cancelledCards.length || isCancelled) return cancelledCards;
+    const feeCard = buildProtectiveFeeSummaryCard();
+    if (feeCard) cancelledCards.push(feeCard);
+    return cancelledCards;
   }
 
   if (!lines.length && !booking) return [];
@@ -1341,7 +1468,7 @@ export function buildCardsForEvent(input: {
           clientKind,
           lines: effectiveLines.filter((line) => line.amount >= 0),
           total,
-          totalLabel: "Total Amount",
+          totalLabel: "Total",
           highlightLabel: prepaidBreakdownLabel(prepaymentPercent, isPrepayPaid),
           highlightAmount: prepaidAmount,
           methodDateLine: isPrepayPaid ? formatMethodDateTime(method, occurredAt) : method,
@@ -1361,12 +1488,21 @@ export function buildCardsForEvent(input: {
     );
   };
 
+  const withProtectiveFeeSummary = (list: SalesOverviewCardData[]) => {
+    const feeCard = buildProtectiveFeeSummaryCard();
+    if (!feeCard) return list;
+    if (list.some((c) => c.id === feeCard.id || c.title === feeCard.title)) {
+      return list;
+    }
+    return [...list, feeCard];
+  };
+
   if (isPendingRequest) {
     if (!mainShareBase) return [];
     // Requested + prepay: same Prepayment Summary as accepted (never Add-ons here).
     if (showPrepayment && prepaidAmount > 0) {
       pushPrepaymentCard();
-      return cards;
+      return withProtectiveFeeSummary(cards);
     }
 
     const summaryId = resolveLiveCardId(bookingId, `${bookingId}-summary`);
@@ -1426,7 +1562,7 @@ export function buildCardsForEvent(input: {
         { ...applyExtras, isAfterTreatment: false },
       ),
     );
-    return cards;
+    return withProtectiveFeeSummary(cards);
   }
 
   if (isAccepted && showPrepayment && prepaidAmount > 0) {
@@ -1552,5 +1688,5 @@ export function buildCardsForEvent(input: {
     }
   }
 
-  return cards;
+  return withProtectiveFeeSummary(cards);
 }

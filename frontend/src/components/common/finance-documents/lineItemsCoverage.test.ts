@@ -112,16 +112,16 @@ assert.notEqual(
   shares.find((s) => s.role === "guest")?.lines[0]?.id,
 );
 
-// Company table: Description | VAT | Price/Unit | Total Price
+// BC mock: Description | Quantity | VAT % | Price Per Unit | Total Price
 assert.deepEqual(
   getInvoiceLineItemColumns("itemized").map((c) => c.label),
-  ["Description", "VAT", "Price/Unit", "Total Price"],
+  ["Description", "Quantity", "VAT %", "Price Per Unit", "Total Price"],
 );
 assert.deepEqual(
   getInvoiceLineItemColumns("simplified").map((c) => c.label),
-  ["Description", "Price"],
+  ["Description", "Price (Incl. VAT)"],
 );
-assert.equal(INVOICE_TOTAL_VAT_INCLUDED_LABEL, "Grand Total (VAT included)");
+assert.equal(INVOICE_TOTAL_VAT_INCLUDED_LABEL, "Total (Incl. VAT)");
 assert.equal(INVOICE_TOTAL_VAT_INCLUDED_LABEL.includes("%"), false);
 
 // BC clientType beats a frozen individual snapshot / default.
@@ -184,7 +184,12 @@ assert.equal(companyDisplay[0]?.displayDescription, "Shampoo");
 assert.equal(companyDisplay[0]?.unit, "3");
 assert.deepEqual(
   getInvoiceLineItemColumns("itemized").map((c) => c.key),
-  ["description", "vat", "pricePerUnit", "totalPrice"],
+  ["description", "unit", "vat", "pricePerUnit", "totalPrice"],
+);
+assert.equal(
+  getInvoiceLineItemColumns("simplified").find((c) => c.key === "totalPrice")
+    ?.label,
+  "Price (Incl. VAT)",
 );
 
 console.log("lineItemsCoverage.test.ts: ok");

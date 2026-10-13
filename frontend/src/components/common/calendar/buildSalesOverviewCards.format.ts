@@ -16,6 +16,7 @@ import type {
 import { salesPaymentBadge } from "./salesOverview.types";
 import { formatFinanceDueDate } from "../booking-finance/formatBookingFinance";
 import { roundBookingMoney as roundMoney } from "../../../data/bookingLinePricing";
+import { isProtectiveFeeEntryLabel } from "../finance-documents/protectiveFeeInvoice";
 export function formatDateLabel(iso?: string | null): string {
   const d = iso ? new Date(iso) : new Date();
   if (Number.isNaN(d.getTime())) {
@@ -160,7 +161,11 @@ export function matchFinanceHint(
       (hint.bookingCode && String(hint.bookingCode) === String(card.bookingId));
     if (!bookingMatch) return false;
     const phase = String(hint.phase ?? "").toLowerCase();
-    if (card.kind === "prepayment") return phase === "prepay" || !phase;
+    // Prepay cards must not bind LCF/LRF/NS rows (often phase-less) — those are Fee Summary.
+    if (card.kind === "prepayment") {
+      if (isProtectiveFeeEntryLabel(hint.entryLabel)) return false;
+      return phase === "prepay" || !phase;
+    }
     if (card.kind === "addon") {
       const addonId = card.id.replace(/^addon-/, "");
       return phase === "addon" && (!hint.addonId || card.id.includes(hint.addonId) || hint.addonId === addonId);
@@ -186,9 +191,9 @@ export function matchFinanceHint(
   };
   const rank = (hint: SalesFinanceHint) => {
     const s = String(hint.status ?? "").toLowerCase();
-    // Fee Summary cards must bind to LCF/NS rows, not a sibling full service sale.
+    // Fee Summary cards must bind to LCF/LRF/NS rows, not a sibling full service sale.
     const feeBoost =
-      isProtectiveFeeCard && feeLabel(hint.entryLabel) ? -10 : 0;
+      isProtectiveFeeCard && feeLabel(hint.entryLabel) ? 10 : 0;
     // Higher = preferred among live rows (paid before open).
     if (s === "paid" || s === "prepaid") return 4 + feeBoost;
     if (s === "failed") return 3 + feeBoost;

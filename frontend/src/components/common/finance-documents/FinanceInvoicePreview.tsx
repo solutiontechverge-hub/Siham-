@@ -58,6 +58,7 @@ import {
   isInvoicePrepaymentCollected,
   toInvoiceDisplayLineItems,
 } from "./financeDocumentUtils";
+import { isProtectiveFeeLineDescription } from "./protectiveFeeInvoice";
 import FinanceInfoBlock from "./FinanceInfoBlock";
 import {
   FinanceMutedLines,
@@ -111,12 +112,20 @@ export default function FinanceInvoicePreview({
     [effectiveSettings, row],
   );
   const lineItemLayout = resolveInvoiceLineItemLayout(effectiveInvoiceType);
-  const displayLineItems = React.useMemo(
-    // Stored document lines are already authoritative. Keep every row and its
-    // original values; aggregation is only appropriate for derived data.
-    () => toInvoiceDisplayLineItems(lineItems, effectiveInvoiceType, true),
-    [effectiveInvoiceType, lineItems],
-  );
+  const displayLineItems = React.useMemo(() => {
+    // Stored document lines are authoritative; keep protective fee lines last
+    // (still before Grand Total / Stripe·Mollure fee breakdown).
+    const display = toInvoiceDisplayLineItems(
+      lineItems,
+      effectiveInvoiceType,
+      true,
+    );
+    return [...display].sort((a, b) => {
+      const aFee = isProtectiveFeeLineDescription(a.displayDescription) ? 1 : 0;
+      const bFee = isProtectiveFeeLineDescription(b.displayDescription) ? 1 : 0;
+      return aFee - bFee;
+    });
+  }, [effectiveInvoiceType, lineItems]);
   const lineItemColumns = React.useMemo(
     () => getInvoiceLineItemColumns(lineItemLayout),
     [lineItemLayout],
@@ -142,11 +151,13 @@ export default function FinanceInvoicePreview({
     (sum, item) => sum + parseCurrencyValue(item.totalPrice),
     0,
   );
-  const totalPriceLabel =
-    document?.totalPrice ||
-    formatCurrencyValue(
-      (frozenDocument ? parseCurrencyValue(row?.grossAmount) : totalAmount || parseCurrencyValue(row?.grossAmount)) || 0,
-    );
+  // Footer total always resolved — never leave Total (Incl. VAT) blank (BC mock).
+  const resolvedFooterTotal =
+    parseCurrencyValue(document?.totalPrice) ||
+    totalAmount ||
+    parseCurrencyValue(row?.grossAmount) ||
+    0;
+  const totalPriceLabel = formatCurrencyValue(resolvedFooterTotal);
   const clientInfoTitle =
     effectiveInvoiceType === "company"
       ? "Company Clients Business Info"
@@ -165,7 +176,17 @@ export default function FinanceInvoicePreview({
     professionalDisplay,
     effectiveInvoiceType,
   );
-  const prepaidAmountLabel = document?.prepaymentAmount;
+  // PRE docs: heal missing snapshot prepaymentAmount from paid/gross (legacy rows).
+  const docPhase = (document as { paymentPhase?: string } | null | undefined)
+    ?.paymentPhase;
+  const isPrepayDoc =
+    docPhase === "prepay" ||
+    String(row?.entryLabel ?? "").toLowerCase() === "prepayment";
+  const prepaidAmountLabel =
+    document?.prepaymentAmount ??
+    (isPrepayDoc
+      ? document?.paidAmount ?? row?.grossAmount ?? null
+      : null);
   const prepaymentDateTime = row?.issuedAt
     ? new Date(row.issuedAt).toLocaleString()
     : row?.date;
@@ -273,7 +294,6 @@ export default function FinanceInvoicePreview({
           ...bookingItems.map(
             (item) => `${item.label}: ${formatCurrencyDisplay(item.value)}`,
           ),
-          `Total Price: ${formatCurrencyDisplay(totalPriceLabel)}`,
         ]);
       }
 
@@ -459,11 +479,6 @@ export default function FinanceInvoicePreview({
                   variant="line"
                 />
               ))}
-              <FinancePreviewLabelValueRow
-                label="Total Price:"
-                value={formatCurrencyDisplay(totalPriceLabel)}
-                variant="total"
-              />
             </FinanceInfoBlock>
           </Stack>
         ) : (
@@ -480,6 +495,9 @@ export default function FinanceInvoicePreview({
         <Table
           size="small"
           sx={{
+            // IC + BC: fixed columns so long fee descriptions don't shove Price off the right edge.
+            tableLayout: "fixed",
+            width: "100%",
             // Match summary stack (no horizontal pad) so price + totals share one right edge.
             "& .MuiTableCell-root:first-of-type": { pl: 0 },
             "& .MuiTableCell-root:last-of-type": { pr: 0 },
@@ -495,7 +513,21 @@ export default function FinanceInvoicePreview({
                     ...mollureTableHeaderSx(m.navy),
                     borderBottom: "none",
                     pb: 0.5,
-                    ...(column.align === "right" ? financePriceTextSx : null),
+                    width:
+                      lineItemLayout === "simplified"
+                        ? column.key === "description"
+                          ? "70%"
+                          : "30%"
+                        : column.key === "description"
+                          ? "36%"
+                          : column.key === "unit"
+                            ? "10%"
+                            : column.key === "vat"
+                              ? "12%"
+                              : "21%",
+                    ...(column.align === "right"
+                      ? { ...financePriceTextSx, whiteSpace: "nowrap" }
+                      : null),
                   }}
                 >
                   {column.label}
@@ -515,7 +547,9 @@ export default function FinanceInvoicePreview({
                       // Divider under service row(s), not under Description header.
                       borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
                       py: 3,
-                      ...(column.align === "right" ? financePriceTextSx : null),
+                      ...(column.align === "right"
+                        ? { ...financePriceTextSx, whiteSpace: "nowrap" }
+                        : { wordBreak: "break-word" }),
                     })}
                   >
                     {getInvoiceLineItemCellValue(item, column.key)}

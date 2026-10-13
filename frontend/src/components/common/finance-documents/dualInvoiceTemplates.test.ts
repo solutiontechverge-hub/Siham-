@@ -119,7 +119,7 @@ const businessDisplay = toInvoiceDisplayLineItems(businessLines, businessType, t
 const businessCols = getInvoiceLineItemColumns("itemized");
 assert.deepEqual(
   businessCols.map((c) => c.label),
-  ["Description", "VAT", "Price/Unit", "Total Price"],
+  ["Description", "Quantity", "VAT %", "Price Per Unit", "Total Price"],
 );
 assert.equal(getInvoiceLineItemCellValue(businessDisplay[1]!, "description"), "Shampoo");
 assert.equal(getInvoiceLineItemCellValue(businessDisplay[1]!, "vat"), "21%");
@@ -150,12 +150,16 @@ const individualDisplay = toInvoiceDisplayLineItems(
 );
 assert.deepEqual(
   getInvoiceLineItemColumns("simplified").map((c) => c.label),
-  ["Description", "Price"],
+  ["Description", "Price (Incl. VAT)"],
+);
+assert.deepEqual(
+  getInvoiceLineItemColumns("itemized").map((c) => c.label),
+  ["Description", "Quantity", "VAT %", "Price Per Unit", "Total Price"],
 );
 assert.equal(individualDisplay[1]?.displayDescription, "2× Shampoo");
 assert.equal(individualDisplay[1]?.totalPrice, 20);
 assert.equal(INVOICE_TOTAL_VAT_INCLUDED_LABEL.includes("%"), false);
-assert.match(INVOICE_TOTAL_VAT_INCLUDED_LABEL, /VAT included/i);
+assert.match(INVOICE_TOTAL_VAT_INCLUDED_LABEL, /Total \(Incl\. VAT\)/i);
 
 // Read-only: same stored totals — no client-side reconstruction of amounts.
 assert.equal(

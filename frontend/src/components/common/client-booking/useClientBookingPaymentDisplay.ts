@@ -40,6 +40,13 @@ export function useClientBookingPaymentDisplay(input: {
   requesterName: string;
   selectedPaymentMethod: CheckoutPaymentMethodId;
   shopDisplayName: string;
+  /** Paid LCF/LRF/NS rows from finance — drives Fee Summary under Prepayment. */
+  paidProtectiveFees?: ReadonlyArray<{
+    entryLabel?: string | null;
+    amount: number;
+    dateLabel?: string;
+    methodLabel?: string;
+  }>;
 }) {
   const kilometerAllowanceAmount = React.useMemo(
     () =>
@@ -157,6 +164,7 @@ export function useClientBookingPaymentDisplay(input: {
         prepaidAmountOverride: displayPrepaidAmount,
         showUnpaidPrepayment: input.isOfflinePay,
         shopName: input.shopDisplayName,
+        paidProtectiveFees: input.paidProtectiveFees,
       }),
     [
       input.activeBooking?.paid,
@@ -169,6 +177,7 @@ export function useClientBookingPaymentDisplay(input: {
       input.isOfflinePay,
       input.isPaymentDue,
       input.isPrepaymentPaid,
+      input.paidProtectiveFees,
       input.prepaymentPercent,
       input.requesterName,
       input.requiresPrepayment,
@@ -200,6 +209,7 @@ export function useClientBookingPaymentDisplay(input: {
     visiblePaymentSummarySections.length > 0 &&
     (input.isPrepaymentPaid ||
       input.activeBooking?.paid === true ||
+      Boolean(input.paidProtectiveFees?.length) ||
       (input.isOfflinePay &&
         input.requiresPrepayment &&
         input.bookingStatus !== "draft"));

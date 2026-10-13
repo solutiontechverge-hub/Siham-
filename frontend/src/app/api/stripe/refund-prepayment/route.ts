@@ -61,6 +61,7 @@ export async function POST(request: Request) {
     }
 
     const received = paymentIntent.amount_received ?? paymentIntent.amount ?? 0;
+    // ponytail: PI search payload may include amount_refunded; Stripe typings omit it — widen if API drifts
     const alreadyRefunded = (paymentIntent as { amount_refunded?: number }).amount_refunded ?? 0;
     const refundable = received - alreadyRefunded;
     if (refundable <= 0) {

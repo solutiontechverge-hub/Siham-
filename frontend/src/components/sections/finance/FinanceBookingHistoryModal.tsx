@@ -4,7 +4,12 @@ import * as React from "react";
 import { Dialog, DialogContent, DialogTitle, IconButton, Stack, Typography } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { useGetBookingActivityQuery } from "../../../store/services/businessApi";
-import { formatNetAmountEur, formatEntryIdDisplay, type TransactionRow } from "../../../app/professionals/fixed-location/finance/data/transactions";
+import {
+  formatEntryIdDisplay,
+  formatNetAmountEur,
+  formatTransactionStatusLabel,
+  type TransactionRow,
+} from "../../../app/professionals/fixed-location/finance/data/transactions";
 
 export default function FinanceBookingHistoryModal({
   row,
@@ -37,7 +42,9 @@ export default function FinanceBookingHistoryModal({
             <Typography fontWeight={600}>Transaction details</Typography>
             <Typography>Entry: {entryDisplay || row.id}</Typography>
             <Typography>Amount: {formatNetAmountEur(row.grossAmount ?? row.netAmount)}</Typography>
-            <Typography>Status: {row.status}</Typography>
+            <Typography>
+              Status: {formatTransactionStatusLabel(row.status, row.entryLabel)}
+            </Typography>
           </Stack>
         ) : null}
         {isLoading ? <Typography>Loading booking history…</Typography> : null}

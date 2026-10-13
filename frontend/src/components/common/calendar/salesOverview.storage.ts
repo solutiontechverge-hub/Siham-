@@ -15,9 +15,7 @@ function emitSalesMetaChanged() {
 
 export function hydrateSalesCardMetadata(records: SalesCardMetaRecord[]) {
   cardMetadata = records;
-  addonRecords = records
-    .map((record) => record.addon)
-    .filter((record): record is SalesAddonRecord => Boolean(record));
+  // Add-ons live in getSalesAddons — do not clobber addonRecords from meta embeds.
   emitSalesMetaChanged();
 }
 

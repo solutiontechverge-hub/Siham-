@@ -544,7 +544,7 @@ function SubSummaryCard({
             "&:hover": { bgcolor: "transparent", textDecoration: "underline" },
           }}
         >
-          + Add-ons
+          + Add-Ons
         </AppButton>
       ) : null}
 
@@ -843,7 +843,7 @@ export default function SalesOverviewCard({
                 color: alpha(m.navy, 0.82),
               }}
             >
-              {card.highlightLabel}
+              {card.highlightLabel || "Payment"}
             </Typography>
             <Typography
               sx={{
@@ -855,7 +855,7 @@ export default function SalesOverviewCard({
                 flexShrink: 0,
               }}
             >
-              {formatCompactEuro(card.highlightAmount)}
+              {formatCompactEuro(Number(card.highlightAmount) || 0)}
             </Typography>
           </Stack>
         ) : (
@@ -1011,7 +1011,7 @@ export default function SalesOverviewCard({
             "&:hover": { bgcolor: "transparent", textDecoration: "underline" },
           }}
         >
-          + Add-ons
+          + Add-Ons
         </AppButton>
       ) : null}
 

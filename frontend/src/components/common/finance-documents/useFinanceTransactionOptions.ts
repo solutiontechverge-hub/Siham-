@@ -24,7 +24,10 @@ export const defaultFinanceTransactionOptions: FinanceTransactionOptions = {
 export function lockOnlineImmediate(
   options: FinanceTransactionOptions,
 ): FinanceTransactionOptions {
-  return { ...options, onlineImmediate: true };
+  // Keep referential identity when already locked — callers sync draft via useEffect([options]).
+  return options.onlineImmediate === true
+    ? options
+    : { ...options, onlineImmediate: true };
 }
 
 export function useFinanceTransactionOptions() {
@@ -32,10 +35,14 @@ export function useFinanceTransactionOptions() {
   const [updateOptions, { isLoading: isSaving }] = useUpdateFinanceTransactionOptionsMutation();
   const [localDraft, setLocalDraft] = React.useState<FinanceTransactionOptions | null>(null);
 
-  const options = lockOnlineImmediate(
-    localDraft ??
-      settingsResponse?.data?.transactionOptions ??
-      defaultFinanceTransactionOptions,
+  const options = React.useMemo(
+    () =>
+      lockOnlineImmediate(
+        localDraft ??
+          settingsResponse?.data?.transactionOptions ??
+          defaultFinanceTransactionOptions,
+      ),
+    [localDraft, settingsResponse?.data?.transactionOptions],
   );
 
   const setOptions = React.useCallback(

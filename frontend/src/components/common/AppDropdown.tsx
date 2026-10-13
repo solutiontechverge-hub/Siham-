@@ -26,6 +26,8 @@ export type AppDropdownOption = {
   disabled?: boolean;
   /** Hover text, including for disabled rows. */
   tooltip?: string;
+  /** When set, consecutive options with the same group render under a ListSubheader. */
+  group?: string;
 };
 
 const SELECT_ALL_VALUE = "__select_all__";
@@ -263,14 +265,34 @@ export default function AppDropdown({
           {selectAllLabel}
         </MenuItem>
       ) : null}
-      {visibleOptions.map((option) => {
+      {visibleOptions.map((option, index) => {
         const selected = Array.isArray(value)
           ? value.includes(option.value)
           : value === option.value;
         const rowColor = option.disabled
           ? m.placeholder
           : option.color;
-        return (
+        const prevGroup = visibleOptions[index - 1]?.group;
+        const showGroup =
+          Boolean(option.group) && option.group !== prevGroup;
+        return [
+          showGroup ? (
+            <ListSubheader
+              key={`group:${option.group}`}
+              disableSticky
+              sx={{
+                px: 1.5,
+                py: 0.75,
+                lineHeight: 1.3,
+                bgcolor: "#fff",
+                color: m.navy,
+                fontSize: 12,
+                fontWeight: 800,
+              }}
+            >
+              {option.group}
+            </ListSubheader>
+          ) : null,
           <MenuItem
             key={option.value}
             value={option.value}
@@ -300,8 +322,8 @@ export default function AppDropdown({
               option.label
             )}
             {option.endAdornment}
-          </MenuItem>
-        );
+          </MenuItem>,
+        ];
       })}
     </AppTextField>
   );

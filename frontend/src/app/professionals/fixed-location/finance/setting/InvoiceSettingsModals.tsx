@@ -7,6 +7,9 @@ import {
 } from "../../../../../theme/mollureHierarchy";
 import { BodyText } from "../../../../../components/ui/typography";
 import AppButton from "../../../../../components/common/AppButton";
+import AppDropdown, {
+  type AppDropdownOption,
+} from "../../../../../components/common/AppDropdown";
 import AppTextField from "../../../../../components/common/AppTextField";
 import MollureFormField from "../../../../../components/common/MollureFormField";
 import AppModal from "../../../../../components/common/AppModal";
@@ -66,19 +69,27 @@ export function InvoiceSettingsModals(props: {
   const { data: businessSetupResponse } = useGetBusinessSetupQuery({
     includeDraft: false,
   });
-  const serviceGroups = React.useMemo(() => {
+  const { serviceOptions, serviceById } = React.useMemo(() => {
     const rows = businessSetupResponse?.data?.service_categories ?? [];
     const grouped = new Map<string, { id: string; label: string }[]>();
-    rows.forEach((row) => {
-      if (!row.service_id || !row.service_title) return;
+    for (const row of rows) {
+      if (!row.service_id || !row.service_title) continue;
       const category = row.category_title || "Other";
       const list = grouped.get(category) ?? [];
       if (!list.some((item) => item.id === row.service_id)) {
         list.push({ id: row.service_id, label: row.service_title });
       }
       grouped.set(category, list);
-    });
-    return Array.from(grouped.entries());
+    }
+    const options: AppDropdownOption[] = [];
+    const byId = new Map<string, { label: string; category: string }>();
+    for (const [category, items] of grouped) {
+      for (const item of items) {
+        options.push({ label: item.label, value: item.id, group: category });
+        byId.set(item.id, { label: item.label, category });
+      }
+    }
+    return { serviceOptions: options, serviceById: byId };
   }, [businessSetupResponse?.data?.service_categories]);
 
   const patchProductDraft = (patch: Partial<ProductDraft>) => {
@@ -193,16 +204,17 @@ export function InvoiceSettingsModals(props: {
               >
                 Select Service
               </BodyText>
-              <MollureFormField
-                select
+              <AppDropdown
                 value={addServiceDraft.serviceId}
-                onChange={(e) => {
-                  const serviceId = String(e.target.value);
-                  const match = serviceGroups
-                    .flatMap(([category, items]) =>
-                      items.map((item) => ({ ...item, category })),
-                    )
-                    .find((item) => item.id === serviceId);
+                options={serviceOptions}
+                placeholder={
+                  serviceOptions.length
+                    ? "Select a service"
+                    : "No services configured"
+                }
+                onChange={(value) => {
+                  const serviceId = String(value);
+                  const match = serviceById.get(serviceId);
                   setAddServiceDraft((p) => ({
                     ...p,
                     serviceId,
@@ -210,25 +222,8 @@ export function InvoiceSettingsModals(props: {
                     service: match?.label ?? "",
                   }));
                 }}
-                SelectProps={{ native: true }}
-              >
-                <option value="">Select a service</option>
-                {serviceGroups.length ? (
-                  serviceGroups.map(([category, items]) => (
-                    <optgroup key={category} label={category}>
-                      {items.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))
-                ) : (
-                  <option value="" disabled>
-                    No services configured
-                  </option>
-                )}
-              </MollureFormField>
+                fullWidth
+              />
             </Box>
 
             <Box>

@@ -38,8 +38,12 @@ import ClientPlatformTag from "../../common/ClientPlatformTag";
 import { BodyText } from "../../ui/typography";
 import { displayReceiptNumber } from "../../common/finance-documents/financeDocumentUtils";
 
-function statusChipSx(status: TransactionStatus, theme: Theme) {
-  const tone = getTransactionStatusTone(status);
+function statusChipSx(
+  status: TransactionStatus,
+  theme: Theme,
+  entryLabel?: string | null,
+) {
+  const tone = getTransactionStatusTone(status, entryLabel);
   const m = theme.palette.mollure;
   switch (tone) {
     case "success":
@@ -312,8 +316,9 @@ export default function TransactionsTable({
                         direction="row"
                         spacing={0.75}
                         alignItems="center"
-                        flexWrap="wrap"
+                        flexWrap="nowrap"
                         useFlexGap
+                        sx={{ minWidth: 0 }}
                       >
                         {clientClickable && onClientClick ? (
                           <MuiLink
@@ -429,7 +434,7 @@ export default function TransactionsTable({
                   <TableCell>
                     <Stack spacing={0.35}>
                       <Chip
-                        label={formatTransactionStatusLabel(row.status)}
+                        label={formatTransactionStatusLabel(row.status, row.entryLabel)}
                         size="small"
                         variant="filled"
                         sx={{
@@ -444,7 +449,7 @@ export default function TransactionsTable({
                             py: 0,
                             lineHeight: 1.2,
                           },
-                          ...statusChipSx(row.status, theme),
+                          ...statusChipSx(row.status, theme, row.entryLabel),
                         }}
                       />
                       {row.statusDetail ? (
@@ -462,7 +467,7 @@ export default function TransactionsTable({
                       ) : null}
                       {(row.status === "Overdue" ||
                         row.status === "Overdue response") &&
-                      (row.bookingId || row.entryId) ? (
+                      row.bookingId ? (
                         <MuiLink
                           component="button"
                           type="button"
@@ -471,7 +476,15 @@ export default function TransactionsTable({
                             else onOpenDocument(row, "invoice");
                           }}
                           underline="hover"
-                          sx={{ fontSize: 10.5, fontWeight: 800, color: theme.palette.warning.main, width: "fit-content", p: 0, border: 0, bgcolor: "transparent" }}
+                          sx={{
+                            fontSize: 10.5,
+                            fontWeight: 800,
+                            color: theme.palette.primary.main,
+                            width: "fit-content",
+                            p: 0,
+                            border: 0,
+                            bgcolor: "transparent",
+                          }}
                         >
                           Review
                         </MuiLink>

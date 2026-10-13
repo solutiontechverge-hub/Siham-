@@ -342,6 +342,8 @@ export function useClientBookingDetails({
     bookingInvoiceType,
     bookingTransactionRow,
     prepaymentReceiptRow,
+    hasAnyDocument,
+    financeRows,
     openInvoice,
     openReceipt,
   } = useClientBookingInvoiceDocs({
@@ -366,6 +368,31 @@ export function useClientBookingDetails({
     prepaidAmount,
     isOfflinePay,
   });
+
+  const paidProtectiveFees = React.useMemo(
+    () =>
+      (financeRows ?? [])
+        .filter((row) => {
+          const status = String(row.status ?? "").toLowerCase();
+          if (status !== "paid" && status !== "prepaid") return false;
+          const label = String(row.entryLabel ?? "");
+          return (
+            label === "Late Cancellation Booking Fee" ||
+            label === "Late Rescheduling Fee" ||
+            label.toLowerCase() === "no-show fee"
+          );
+        })
+        .map((row) => ({
+          entryLabel: row.entryLabel,
+          amount: Number(row.grossAmount ?? row.netAmount ?? 0),
+          dateLabel: row.date
+            ? new Date(`${row.date}T12:00:00`).toLocaleDateString("en-GB")
+            : undefined,
+          methodLabel: row.methodTitle || undefined,
+        }))
+        .filter((fee) => fee.amount > 0),
+    [financeRows],
+  );
 
   const {
     isSubmittingRequest,
@@ -565,6 +592,7 @@ export function useClientBookingDetails({
     requesterName,
     selectedPaymentMethod,
     shopDisplayName,
+    paidProtectiveFees,
   });
 
   return {
@@ -665,6 +693,7 @@ export function useClientBookingDetails({
     prepaidAmount,
     prepaymentPercent,
     prepaymentReceiptRow,
+    hasAnyDocument,
     prepaymentState,
     professional,
     professionalBusinessOverride,

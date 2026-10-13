@@ -35,7 +35,10 @@ import {
   clearBookingEditRequest,
 } from "./bookingEditRequest";
 import { syncEditRequestFromBookingApi } from "./syncEditRequestFromApi";
-import type { ClientBookingDetailsActionFeedback } from "./clientBookingDetails.helpers";
+import type {
+  ClientBookingDetailsActionFeedback,
+  ClientBookingDetailsActiveDocument,
+} from "./clientBookingDetails.helpers";
 import type { UpdateMyBookingRequest } from "../../../store/services/businessApi";
 
 type EditRequestApi = {
@@ -97,7 +100,9 @@ export function useClientBookingEbrResponses(input: {
   setActionFeedback: React.Dispatch<
     React.SetStateAction<ClientBookingDetailsActionFeedback | null>
   >;
-  setActiveDocument: React.Dispatch<React.SetStateAction<"invoice" | "receipt" | null>>;
+  setActiveDocument: React.Dispatch<
+    React.SetStateAction<ClientBookingDetailsActiveDocument>
+  >;
   setStripeDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
   const {

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import type { TransactionRow } from "../../../app/professionals/fixed-location/finance/data/transactions";
 import {
   buildClientBookingTransactionRow,
   buildProfessionalBusinessOverride,
@@ -16,6 +17,14 @@ import {
 } from "./checkoutPaymentOptions";
 import type { ClientBookingDetailsActiveDocument } from "./clientBookingDetails.helpers";
 import type { ClientBookingDraft } from "./types";
+
+function isFeeSummaryLineId(lineId?: string | null) {
+  return Boolean(lineId && String(lineId).startsWith("fee-"));
+}
+
+function isPrepaymentLineId(lineId?: string | null) {
+  return Boolean(lineId && String(lineId).startsWith("prepaid-"));
+}
 
 /** Invoice / receipt rows + document drawer openers for client booking details. */
 export function useClientBookingInvoiceDocs(input: {
@@ -52,10 +61,15 @@ export function useClientBookingInvoiceDocs(input: {
   const [activeDocument, setActiveDocument] =
     React.useState<ClientBookingDetailsActiveDocument>(null);
 
-  const financeBookingKey = input.bookingId || input.bookingRef || "";
+  const financeBookingKey = input.bookingRef || input.bookingId || "";
   const { data: financeResponse } = useGetFinanceTransactionsQuery(
     { bookingId: String(financeBookingKey), limit: 50 },
-    { skip: !financeBookingKey },
+    {
+      skip: !financeBookingKey,
+      refetchOnMountOrArgChange: true,
+      // ponytail: same 12s Sales poll so Fee Summary appears after LCF pay without refresh.
+      pollingInterval: 12_000,
+    },
   );
   const financeRows = financeResponse?.data?.rows ?? [];
 
@@ -86,11 +100,33 @@ export function useClientBookingInvoiceDocs(input: {
     input.requesterUserType === "company" ? "company" : "individual"
   ) as FinanceInvoiceTemplateType;
 
+  const clientParty = React.useMemo(
+    () => ({
+      legalName: input.requesterName,
+      email: input.requesterEmail ?? undefined,
+      address: input.requesterAddress || undefined,
+      vatNumber: input.requesterVat || undefined,
+      cocNumber: input.requesterCoc || undefined,
+    }),
+    [
+      input.requesterAddress,
+      input.requesterCoc,
+      input.requesterEmail,
+      input.requesterName,
+      input.requesterVat,
+    ],
+  );
+
+  const methodTitle = checkoutPaymentMethodTitle(input.selectedPaymentMethod);
+  const methodDetail = checkoutPaymentMethodDetail(input.selectedPaymentMethod);
+
+  /** After-treatment / non-fee full invoice — never bind LCF when opening service docs. */
   const bookingTransactionRow = React.useMemo(() => {
     const issued = findIssuedFinanceTransaction(financeRows, {
       bookingId: input.bookingId,
       bookingCode: input.bookingRef,
       phase: "full",
+      protectiveFee: false,
     });
     if (issued && hasStoredDocumentSnapshot(issued)) return issued;
 
@@ -101,23 +137,18 @@ export function useClientBookingInvoiceDocs(input: {
       requesterName: input.requesterName,
       requesterEmail: input.requesterEmail ?? undefined,
       financeSettings: input.financeSettings as never,
-      methodTitle: checkoutPaymentMethodTitle(input.selectedPaymentMethod),
-      methodDetail: checkoutPaymentMethodDetail(input.selectedPaymentMethod),
+      methodTitle,
+      methodDetail,
       prepaymentAmount:
         (input.requiresPrepayment || input.isPrepaymentPaid) &&
         input.prepaidAmount > 0
           ? input.prepaidAmount
           : undefined,
       prepaymentPaid: input.isPrepaymentPaid,
-      clientParty: {
-        legalName: input.requesterName,
-        email: input.requesterEmail ?? undefined,
-        address: input.requesterAddress || undefined,
-        vatNumber: input.requesterVat || undefined,
-        cocNumber: input.requesterCoc || undefined,
-      },
+      clientParty,
     });
   }, [
+    clientParty,
     financeRows,
     input.bookingId,
     input.bookingRef,
@@ -125,13 +156,53 @@ export function useClientBookingInvoiceDocs(input: {
     input.financeSettings,
     input.isPrepaymentPaid,
     input.prepaidAmount,
-    input.requesterAddress,
-    input.requesterCoc,
     input.requesterEmail,
     input.requesterName,
-    input.requesterVat,
     input.requiresPrepayment,
-    input.selectedPaymentMethod,
+    methodDetail,
+    methodTitle,
+  ]);
+
+  /** PRE invoice — services + prepaid amount; never fee lines. */
+  const prepaymentInvoiceRow = React.useMemo(() => {
+    const issued = findIssuedFinanceTransaction(financeRows, {
+      bookingId: input.bookingId,
+      bookingCode: input.bookingRef,
+      phase: "prepay",
+      protectiveFee: false,
+    });
+    if (issued && hasStoredDocumentSnapshot(issued)) return issued;
+
+    if (!input.draft?.services?.length) return null;
+    if (!input.isPrepaymentPaid && !input.isOfflinePay) return null;
+    if (!(input.prepaidAmount > 0)) return null;
+    return buildClientBookingTransactionRow({
+      bookingRef: `${input.bookingRef}-prepay`,
+      draft: input.draft,
+      requesterName: input.requesterName,
+      requesterEmail: input.requesterEmail ?? undefined,
+      financeSettings: input.financeSettings as never,
+      documentAmount: input.prepaidAmount,
+      prepaymentAmount: input.prepaidAmount,
+      prepaymentPaid: true,
+      methodTitle,
+      methodDetail,
+      clientParty,
+    });
+  }, [
+    clientParty,
+    financeRows,
+    input.bookingId,
+    input.bookingRef,
+    input.draft,
+    input.financeSettings,
+    input.isOfflinePay,
+    input.isPrepaymentPaid,
+    input.prepaidAmount,
+    input.requesterEmail,
+    input.requesterName,
+    methodDetail,
+    methodTitle,
   ]);
 
   const prepaymentReceiptRow = React.useMemo(() => {
@@ -139,6 +210,7 @@ export function useClientBookingInvoiceDocs(input: {
       bookingId: input.bookingId,
       bookingCode: input.bookingRef,
       phase: "prepay",
+      protectiveFee: false,
     });
     if (issued && hasStoredDocumentSnapshot(issued)) return issued;
 
@@ -154,17 +226,12 @@ export function useClientBookingInvoiceDocs(input: {
       documentAmount: input.prepaidAmount,
       prepaymentAmount: input.prepaidAmount,
       asPrepaymentReceipt: true,
-      methodTitle: checkoutPaymentMethodTitle(input.selectedPaymentMethod),
-      methodDetail: checkoutPaymentMethodDetail(input.selectedPaymentMethod),
-      clientParty: {
-        legalName: input.requesterName,
-        email: input.requesterEmail ?? undefined,
-        address: input.requesterAddress || undefined,
-        vatNumber: input.requesterVat || undefined,
-        cocNumber: input.requesterCoc || undefined,
-      },
+      methodTitle,
+      methodDetail,
+      clientParty,
     });
   }, [
+    clientParty,
     financeRows,
     input.bookingId,
     input.bookingRef,
@@ -173,23 +240,70 @@ export function useClientBookingInvoiceDocs(input: {
     input.isOfflinePay,
     input.isPrepaymentPaid,
     input.prepaidAmount,
-    input.requesterAddress,
-    input.requesterCoc,
     input.requesterEmail,
     input.requesterName,
-    input.requesterVat,
-    input.selectedPaymentMethod,
+    methodDetail,
+    methodTitle,
   ]);
 
-  const openInvoice = React.useCallback(() => {
-    if (!bookingTransactionRow) return;
-    setActiveDocument("invoice");
-  }, [bookingTransactionRow]);
+  /** Fee Summary invoice — LCF/LRF/NS only. */
+  const feeInvoiceRow = React.useMemo(
+    () =>
+      findIssuedFinanceTransaction(financeRows, {
+        bookingId: input.bookingId,
+        bookingCode: input.bookingRef,
+        phase: "full",
+        protectiveFee: true,
+      }),
+    [financeRows, input.bookingId, input.bookingRef],
+  );
 
-  const openReceipt = React.useCallback(() => {
-    if (!(prepaymentReceiptRow ?? bookingTransactionRow)) return;
-    setActiveDocument("receipt");
-  }, [bookingTransactionRow, prepaymentReceiptRow]);
+  const hasAnyDocument = Boolean(
+    bookingTransactionRow ||
+      prepaymentInvoiceRow ||
+      prepaymentReceiptRow ||
+      feeInvoiceRow,
+  );
+
+  const resolveRowForLine = React.useCallback(
+    (lineId: string | undefined, type: "invoice" | "receipt"): TransactionRow | null => {
+      if (isFeeSummaryLineId(lineId)) {
+        return feeInvoiceRow ?? bookingTransactionRow;
+      }
+      if (isPrepaymentLineId(lineId)) {
+        return type === "receipt"
+          ? (prepaymentReceiptRow ?? prepaymentInvoiceRow)
+          : (prepaymentInvoiceRow ?? prepaymentReceiptRow);
+      }
+      return type === "receipt"
+        ? (prepaymentReceiptRow ?? bookingTransactionRow)
+        : bookingTransactionRow;
+    },
+    [
+      bookingTransactionRow,
+      feeInvoiceRow,
+      prepaymentInvoiceRow,
+      prepaymentReceiptRow,
+    ],
+  );
+
+  const openInvoice = React.useCallback(
+    (lineId?: string) => {
+      const row = resolveRowForLine(lineId, "invoice");
+      if (!row) return;
+      setActiveDocument({ type: "invoice", row });
+    },
+    [resolveRowForLine],
+  );
+
+  const openReceipt = React.useCallback(
+    (lineId?: string) => {
+      const row = resolveRowForLine(lineId, "receipt");
+      if (!row) return;
+      setActiveDocument({ type: "receipt", row });
+    },
+    [resolveRowForLine],
+  );
 
   return {
     activeDocument,
@@ -198,6 +312,10 @@ export function useClientBookingInvoiceDocs(input: {
     bookingInvoiceType,
     bookingTransactionRow,
     prepaymentReceiptRow,
+    prepaymentInvoiceRow,
+    feeInvoiceRow,
+    hasAnyDocument,
+    financeRows,
     openInvoice,
     openReceipt,
   };

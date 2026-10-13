@@ -66,7 +66,22 @@ export function getIssuedDocumentSnapshot(row?: TransactionRow | null) {
 }
 
 export function getIssuedDocument(row?: TransactionRow | null) {
-  return row?.issuedDocument ?? row?.document ?? null;
+  const doc = row?.issuedDocument ?? row?.document ?? null;
+  if (!doc) return null;
+  // PRE docs must surface prepaid amount (heal legacy snapshots missing the field).
+  const phase = String(
+    (doc as { paymentPhase?: string }).paymentPhase ?? "",
+  ).toLowerCase();
+  const isPrepay =
+    phase === "prepay" ||
+    String(row?.entryLabel ?? "").toLowerCase() === "prepayment";
+  if (!isPrepay) return doc;
+  if (parseCurrencyValue(doc.prepaymentAmount) > 0) return doc;
+  const healed =
+    parseCurrencyValue(doc.paidAmount) ||
+    parseCurrencyValue(row?.grossAmount) ||
+    0;
+  return healed > 0 ? { ...doc, prepaymentAmount: healed } : doc;
 }
 
 /**
@@ -125,8 +140,8 @@ const LINE_QTY_PREFIX_RE = /^(\d+(?:\.\d+)?)\s*[x×]\s*/i;
 const LINE_QTY_SUFFIX_RE = /(?:,\s*)?(?:[x×]\s*(\d+(?:\.\d+)?)|(\d+(?:\.\d+)?)\s*[x×])\s*$/i;
 const NON_AGGREGATABLE_LINE_RE = /^(prepayment|discount)$/i;
 
-/** Grand-total footer copy — rate % never printed on the invoice face. */
-export const INVOICE_TOTAL_VAT_INCLUDED_LABEL = "Grand Total (VAT included)";
+/** Footer total — mocks use Total (Incl. VAT); rate % never on the face. */
+export const INVOICE_TOTAL_VAT_INCLUDED_LABEL = "Total (Incl. VAT)";
 
 export function formatDocumentDate(value?: string | null) {
   if (!value) return "";
@@ -288,16 +303,28 @@ export function getInvoiceLineItemColumns(
   layout: InvoiceLineItemLayout,
 ): InvoiceLineItemColumn[] {
   if (layout === "simplified") {
+    // IC mock: Description | Price (Incl. VAT)
     return [
-      { key: "description", label: "Description", pdfWidth: 360 },
-      { key: "totalPrice", label: "Price", pdfWidth: 130, align: "right" },
+      { key: "description", label: "Description", pdfWidth: 340 },
+      {
+        key: "totalPrice",
+        label: "Price (Incl. VAT)",
+        pdfWidth: 150,
+        align: "right",
+      },
     ];
   }
-  // B2B: Description | VAT | Price/Unit | Total Price (qty lives in stored line payload).
+  // BC mock: Description | Quantity | VAT % | Price Per Unit | Total Price
   return [
-    { key: "description", label: "Description", pdfWidth: 205 },
-    { key: "vat", label: "VAT", pdfWidth: 55 },
-    { key: "pricePerUnit", label: "Price/Unit", pdfWidth: 110, align: "right" },
+    { key: "description", label: "Description", pdfWidth: 160 },
+    { key: "unit", label: "Quantity", pdfWidth: 55, align: "right" },
+    { key: "vat", label: "VAT %", pdfWidth: 50 },
+    {
+      key: "pricePerUnit",
+      label: "Price Per Unit",
+      pdfWidth: 100,
+      align: "right",
+    },
     { key: "totalPrice", label: "Total Price", pdfWidth: 90, align: "right" },
   ];
 }

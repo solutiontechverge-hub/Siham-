@@ -123,6 +123,94 @@ const feeInvoice = findIssuedFinanceTransaction(feeRows, {
 });
 assert.equal(feeInvoice?.id, "tx-late-cancel-fee");
 
+const feeOnly = findIssuedFinanceTransaction(feeRows, {
+  bookingId: "fee-booking",
+  phase: "full",
+  protectiveFee: true,
+});
+assert.equal(feeOnly?.id, "tx-late-cancel-fee");
+
+const nonFeeFull = findIssuedFinanceTransaction(
+  [
+    ...feeRows,
+    {
+      ...base,
+      id: "tx-services-live",
+      bookingId: "fee-booking",
+      status: "Paid",
+      entryLabel: "After treatment · Main Client",
+      issuedDocument: {
+        documentNumber: "INV-AT",
+        paymentPhase: "full",
+        lineItems: [
+          {
+            description: "Cut",
+            quantity: 1,
+            vat: "21%",
+            pricePerUnit: 100,
+            totalPrice: 100,
+          },
+        ],
+        totalPrice: 100,
+        issuedSnapshot: { templateType: "individual" },
+      } as never,
+    },
+  ],
+  { bookingId: "fee-booking", phase: "full", protectiveFee: false },
+);
+assert.equal(nonFeeFull?.id, "tx-services-live", "protectiveFee:false skips LCF");
+
+// PRE phase must never return an LCF row even if mis-labeled phase-wise.
+const prepayIgnoresFee = findIssuedFinanceTransaction(
+  [
+    {
+      ...base,
+      id: "tx-fee-as-prepay-noise",
+      bookingId: "pre-booking",
+      entryLabel: "Late Cancellation Booking Fee",
+      issuedDocument: {
+        documentNumber: "INV-LCF",
+        paymentPhase: "prepay",
+        lineItems: [
+          {
+            description: "Late Cancellation Booking Fee (2% Of €108)",
+            quantity: 1,
+            vat: "0%",
+            pricePerUnit: 2.16,
+            totalPrice: 2.16,
+          },
+        ],
+        totalPrice: 2.16,
+        issuedSnapshot: { templateType: "individual" },
+      } as never,
+    },
+    {
+      ...base,
+      id: "tx-real-prepay",
+      bookingId: "pre-booking",
+      entryLabel: "Prepayment",
+      issuedDocument: {
+        documentNumber: "INV-PRE",
+        paymentPhase: "prepay",
+        prepaymentAmount: 10.8,
+        lineItems: [
+          {
+            description: "Cut",
+            quantity: 1,
+            vat: "21%",
+            pricePerUnit: 108,
+            totalPrice: 108,
+          },
+        ],
+        totalPrice: 108,
+        issuedSnapshot: { templateType: "individual" },
+      } as never,
+    },
+  ],
+  { bookingId: "pre-booking", phase: "prepay" },
+);
+assert.equal(prepayIgnoresFee?.id, "tx-real-prepay", "prepay excludes fee rows");
+
 // Linked card: financeTransactionId wins over phase heuristics.
 const byTx = findIssuedFinanceTransaction(rows, {
   bookingId: "booking-uuid",

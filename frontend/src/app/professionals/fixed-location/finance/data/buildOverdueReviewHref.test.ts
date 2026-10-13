@@ -37,9 +37,19 @@ assert.equal(
 assert.equal(
   buildOverdueReviewHref({
     status: "Overdue",
-    entryId: null,
+    entryId: "OL-only",
     bookingId: undefined,
     date: null,
+  }),
+  null,
+);
+
+assert.equal(
+  buildOverdueReviewHref({
+    status: "Payment due",
+    entryId: "OL1",
+    bookingId: "uuid-3",
+    date: "2026-10-13",
   }),
   null,
 );

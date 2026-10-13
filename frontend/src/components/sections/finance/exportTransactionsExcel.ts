@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import {
+  formatTransactionStatusLabel,
   getTransactionClientTypeLabel,
   shouldShowTransactionClientEmail,
   type TransactionRow,
@@ -36,7 +37,7 @@ export function transactionRowToExportRow(row: TransactionRow): Array<string | n
     formatClientNameCell(row),
     row.netAmount,
     formatMethodCell(row),
-    row.status,
+    formatTransactionStatusLabel(row.status, row.entryLabel),
     "Invoice, Receipt",
   ];
 }

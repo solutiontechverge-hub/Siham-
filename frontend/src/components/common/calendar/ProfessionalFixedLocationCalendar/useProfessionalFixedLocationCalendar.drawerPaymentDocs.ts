@@ -181,7 +181,11 @@ export function useProfessionalFixedLocationCalendarDrawerPaymentDocs({
     "";
   const { data: drawerFinanceResponse } = useGetFinanceTransactionsQuery(
     { bookingId: String(drawerBookingKey), limit: 50 },
-    { skip: !drawerBookingKey },
+    {
+      skip: !drawerBookingKey,
+      refetchOnMountOrArgChange: true,
+      pollingInterval: 12_000,
+    },
   );
   const drawerFinanceRows = drawerFinanceResponse?.data?.rows ?? [];
 

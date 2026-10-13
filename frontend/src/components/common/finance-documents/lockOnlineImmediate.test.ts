@@ -22,6 +22,11 @@ assert.deepEqual(lockOnlineImmediate(allOff), {
 });
 
 assert.equal(defaultFinanceTransactionOptions.onlineImmediate, true);
+assert.equal(
+  lockOnlineImmediate(defaultFinanceTransactionOptions),
+  defaultFinanceTransactionOptions,
+  "already-locked options must keep the same reference (avoids draft sync loops)",
+);
 
 const checkout = resolveCheckoutPaymentOptions(allOff, "fixed");
 assert.ok(

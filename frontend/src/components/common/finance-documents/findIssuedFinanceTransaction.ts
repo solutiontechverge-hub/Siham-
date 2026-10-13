@@ -60,6 +60,11 @@ export function findIssuedFinanceTransaction(
     addonId?: string | null;
     /** Prefer exact finance_transactions.id when Sales card is linked. */
     transactionId?: string | null;
+    /**
+     * true = only LCF/LRF/NS rows; false = exclude them.
+     * Omit: prefer fee among full-phase matches (Fee Summary); never for prepay.
+     */
+    protectiveFee?: boolean;
   },
 ): TransactionRow | null {
   if (opts.transactionId) {
@@ -82,21 +87,31 @@ export function findIssuedFinanceTransaction(
       );
     }
     if (!phase) return true;
-    if (phase === "prepay") return rowPhase === "prepay" || (!rowPhase && Boolean(doc.receiptNumber));
+    // PRE docs are never protective-fee invoices (LCF/LRF/NS live on full phase).
+    if (phase === "prepay") {
+      if (isFeeInvoiceRow(row)) return false;
+      return rowPhase === "prepay" || (!rowPhase && Boolean(doc.receiptNumber));
+    }
     if (phase === "full") return rowPhase === "full" || rowPhase == null || rowPhase === "";
     if (phase === "addon") return rowPhase === "addon";
     return rowPhase === phase;
   });
 
-  if (!candidates.length) return null;
-  // Prefer fee invoices over superseded service-sale snapshots for the same booking.
-  const withSnapshot = candidates.filter((row) => hasStoredDocumentSnapshot(row));
-  const pool = withSnapshot.length ? withSnapshot : candidates;
+  const feeFiltered =
+    opts.protectiveFee === true
+      ? candidates.filter((row) => isFeeInvoiceRow(row))
+      : opts.protectiveFee === false
+        ? candidates.filter((row) => !isFeeInvoiceRow(row))
+        : candidates;
+
+  if (!feeFiltered.length) return null;
+  const withSnapshot = feeFiltered.filter((row) => hasStoredDocumentSnapshot(row));
+  const pool = withSnapshot.length ? withSnapshot : feeFiltered;
   const live = pool.filter((row) => row.status !== "Voided");
   const prefer = live.length ? live : pool;
-  return (
-    prefer.find((row) => isFeeInvoiceRow(row)) ??
-    prefer[0] ??
-    null
-  );
+  // Fee Summary (full, unspecified): prefer LCF/LRF/NS over voided service sales.
+  if (opts.protectiveFee !== false && phase === "full") {
+    return prefer.find((row) => isFeeInvoiceRow(row)) ?? prefer[0] ?? null;
+  }
+  return prefer[0] ?? null;
 }

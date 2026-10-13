@@ -64,6 +64,7 @@ import {
   hydrateSalesAddons,
   listSalesAddons,
   configureSalesAddonPersistence,
+  SALES_META_CHANGED_EVENT,
 } from "./salesOverview.storage";
 import type {
   SalesAddOnCheckoutPayload,
@@ -135,9 +136,14 @@ export function useSalesOverview({
   const [refundTransactions, setRefundTransactions] = React.useState<TransactionRow[]>([]);
   const [processFinanceInvoiceReissues] = useProcessFinanceInvoiceReissuesMutation();
   const { data: salesMetadataResponse } = useGetSalesCardMetadataQuery();
-  const { data: salesAddonsResponse } = useGetSalesAddonsQuery();
+  const { data: salesAddonsResponse } = useGetSalesAddonsQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+    // ponytail: same 12s cadence as finance poll so Add-ons Summary tracks API.
+    pollingInterval: 12_000,
+  });
   const [saveSalesCardMetadata] = useUpsertSalesCardMetadataMutation();
-  const [saveSalesAddon] = useUpsertSalesAddonMutation();
+  // Do not shadow storage `saveSalesAddon` — local list must update before cards rebuild.
+  const [upsertSalesAddonApi] = useUpsertSalesAddonMutation();
 
   React.useEffect(() => {
     hydrateSalesCardMetadata((salesMetadataResponse?.data ?? []) as never[] as import("./salesOverview.types").SalesCardMetaRecord[]);
@@ -155,24 +161,32 @@ export function useSalesOverview({
   }, [saveSalesCardMetadata]);
 
   React.useEffect(() => {
-    configureSalesAddonPersistence((record) => { void saveSalesAddon(record as never); });
+    configureSalesAddonPersistence((record) => {
+      void upsertSalesAddonApi(record as never);
+    });
     return () => configureSalesAddonPersistence(null);
-  }, [saveSalesAddon]);
+  }, [upsertSalesAddonApi]);
 
-  // Prefer the drawer booking so Fee Summary heal / View Invoice hit the right LCF row.
+  // Prefer unique_code (matches finance_transactions.booking_id); UUID still resolves server-side.
   const parsedCurrentId = currentEvent
     ? parseApiCalendarEventId(currentEvent.id)
     : null;
   const financeBookingId =
-    (parsedCurrentId?.kind === "booking" ? parsedCurrentId.id : null) ||
     currentEvent?.bookingCode ||
-    bookings[0]?.id ||
     bookings[0]?.unique_code ||
+    (parsedCurrentId?.kind === "booking" ? parsedCurrentId.id : null) ||
+    bookings[0]?.id ||
     "";
+  // Live while Sales is open: remount refetch + short poll so Paid LCF/LRF/NS appear without manual refresh.
   const { data: financeResponse, isError: financeQueryError } =
     useGetFinanceTransactionsQuery(
       { bookingId: String(financeBookingId), limit: 50 },
-      { skip: !financeBookingId },
+      {
+        skip: !financeBookingId,
+        refetchOnMountOrArgChange: true,
+        // ponytail: 12s matches calendar page poll; websockets not in codebase.
+        pollingInterval: 12_000,
+      },
     );
   const financeHints = React.useMemo(
     () => toFinanceHints(financeResponse?.data?.rows ?? []),
@@ -180,6 +194,13 @@ export function useSalesOverview({
   );
 
   const [revision, setRevision] = React.useState(0);
+  // Hydrate/save emit this; without it, API refetch updates storage but cards stay stale.
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onMeta = () => setRevision((n) => n + 1);
+    window.addEventListener(SALES_META_CHANGED_EVENT, onMeta);
+    return () => window.removeEventListener(SALES_META_CHANGED_EVENT, onMeta);
+  }, []);
   const [checkoutBookingId, setCheckoutBookingId] = React.useState<
     string | null
   >(null);
@@ -415,6 +436,13 @@ export function useSalesOverview({
         phase,
         addonId,
         transactionId: card.financeTransactionId,
+        // Fee Summary / No-Show cards share after_treatment kind — pin protective fee docs.
+        protectiveFee:
+          card.title === "Fee Summary" || card.title === "No-Show Fee Invoice"
+            ? true
+            : card.kind === "after_treatment"
+              ? false
+              : undefined,
       };
       const cached = findIssuedFinanceTransaction(
         financeResponse?.data?.rows ?? [],

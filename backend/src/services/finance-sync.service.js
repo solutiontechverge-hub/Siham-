@@ -579,7 +579,10 @@ function isPlanningPerson(person) {
  * Prepayment is always charged to the main client against the full booking total %.
  */
 function resolveSplitPayers(booking, meta, invoiceSettings) {
-  const total = roundMoney(booking.total_price);
+  // Snapshot services beat total_price (fee checkout may replace total with LCF only).
+  const total = roundMoney(
+    Math.max(snapshotServiceSubtotal(meta, booking), Number(booking.total_price) || 0),
+  );
   const prepaymentPercent = Number(
     meta.prepaymentPercent ??
       meta.prepayment_percentage ??
@@ -1050,6 +1053,39 @@ async function insertFinanceTransaction({
         : toIsoDate(booking.booking_date);
 
   const isPrepaymentDocument = paymentPhase === "prepay";
+  // PRE: never persist LCF/LRF/NS lines — those belong on the fee invoice only.
+  const rawLines = Array.isArray(lineItems) ? lineItems : [];
+  const documentLines = isPrepaymentDocument
+    ? rawLines.filter((line) => {
+        const desc = String(line?.description ?? "");
+        const ref = String(line?.sourceReference ?? "");
+        if (isProtectiveFeeEntryLabel(desc)) return false;
+        if (desc.startsWith("Late Cancellation Booking Fee")) return false;
+        if (desc.startsWith("Late Rescheduling Fee")) return false;
+        if (/^no-show fee/i.test(desc)) return false;
+        if (/late-cancel|late-reschedule|no-show/i.test(ref)) return false;
+        return true;
+      })
+    : rawLines;
+  // PRE total = booking services (snapshot), not fee-replaced total_price.
+  const notesMeta = (() => {
+    try {
+      return typeof booking.notes === "string"
+        ? JSON.parse(booking.notes || "{}")
+        : booking.notes || {};
+    } catch {
+      return {};
+    }
+  })();
+  const prepayBookingTotal = isPrepaymentDocument
+    ? roundMoney(
+        Math.max(
+          snapshotServiceSubtotal(notesMeta, booking),
+          Number(booking.total_price) || 0,
+          gross,
+        ),
+      )
+    : gross;
   const document = {
     documentNumber: docNumber,
     receiptNumber: mintReceiptNumber(
@@ -1074,10 +1110,8 @@ async function insertFinanceTransaction({
     // an orphan item without a sold-item reference.
     // A prepayment document still represents the complete booking. The paid
     // amount is kept separately so invoice remaining balance is not zeroed.
-    lineItems: Array.isArray(lineItems) ? lineItems : [],
-    totalPrice: roundMoney(
-      isPrepaymentDocument ? roundMoney(booking.total_price ?? gross) : gross,
-    ),
+    lineItems: documentLines,
+    totalPrice: roundMoney(isPrepaymentDocument ? prepayBookingTotal : gross),
     ...(isPrepaymentDocument ? { prepaymentAmount: roundMoney(gross) } : {}),
     ...(prepayResponseDeadlineIso
       ? { responseDeadlineAt: prepayResponseDeadlineIso }

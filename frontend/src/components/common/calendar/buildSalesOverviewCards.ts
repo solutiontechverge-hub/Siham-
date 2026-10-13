@@ -103,30 +103,17 @@ export function buildSalesOverviewCards(input: BuildSalesOverviewInput): SalesOv
     const hasFinanceFee = Boolean(
       findProtectiveFeeFinanceHint(financeHints, bookingKey, bookingCode),
     );
-    const policyLateCancelPercent =
-      Number(
-        event.details?.lateCancellationFeePercent ??
-          notesFee.lateCancellationFeePercent ??
-          lateCancellationFeePercentDefault,
-      ) || 0;
-    // Match buildCardsForEvent heal: cancelled + policy % + prepaid kept → Fee Summary.
-    const healedLateCancel =
-      isCancelledStatus &&
-      policyLateCancelPercent > 0 &&
-      (prepaidCollected ||
-        notesFee.exceededCancellationWindow === true ||
-        Boolean(notesFee.cancellationFeeAt) ||
-        hasFinanceFee);
+    // Paid protective finance row (or stamp) — never invent Fee Summary from policy alone.
     const protectiveFeeActive =
       (isCancelledStatus &&
         (Boolean(event.details?.showLateCancellation) ||
           notesFee.showLateCancellation ||
-          hasFinanceFee ||
-          healedLateCancel)) ||
+          hasFinanceFee)) ||
       (isNoShowStatus &&
         (Boolean(event.details?.showNoShowFee) ||
           notesFee.showNoShowFee ||
-          hasFinanceFee));
+          hasFinanceFee)) ||
+      hasFinanceFee;
 
     // Cancelled with neither fee nor prepaid → blank Sales (plain free cancel).
     if (isCancelledStatus && !protectiveFeeActive && !prepaidCollected) continue;
@@ -167,18 +154,18 @@ export function buildSalesOverviewCards(input: BuildSalesOverviewInput): SalesOv
     .filter((card) => !card.canceled || card.voided)
     .sort((a, b) => {
       const kindRank = (card: SalesOverviewCardData) => {
-        // Fee Summary above prepaid so late-cancel charge is not below the fold.
+        // Keep Prepayment Summary, Fee Summary below it (product rule).
+        if (card.kind === "prepayment") return 0;
         if (
           card.title === "Fee Summary" ||
           card.title === "No-Show Fee Invoice"
         ) {
-          return -1;
+          return 1;
         }
-        if (card.kind === "prepayment") return 0;
-        if (card.kind === "after_treatment") return 1;
-        if (card.kind === "addon") return 2;
-        if (card.kind === "reissued_invoice") return 3;
-        return 4;
+        if (card.kind === "after_treatment") return 2;
+        if (card.kind === "addon") return 3;
+        if (card.kind === "reissued_invoice") return 4;
+        return 5;
       };
       const rankDiff = kindRank(a) - kindRank(b);
       if (rankDiff !== 0) return rankDiff;

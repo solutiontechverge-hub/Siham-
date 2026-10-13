@@ -7,7 +7,11 @@ export type ClientBookingDetailsActionFeedback = {
   severity: "success" | "error";
 };
 
-export type ClientBookingDetailsActiveDocument = "invoice" | "receipt" | null;
+export type ClientBookingDetailsActiveDocument = {
+  type: "invoice" | "receipt";
+  /** Issued/draft row for this document surface (PRE vs LCF vs booking). */
+  row: unknown;
+} | null;
 
 export type ClientBookingDetailsPendingEbrSuggestSend = {
   note: string;
@@ -151,8 +155,14 @@ export function filterVisiblePaymentSummarySections<
     !flags.isCompleted &&
     !flags.isPaymentDue
   ) {
+    // Keep Prepayment + paid Fee Summary; hide after-treatment until due/completed.
     return paymentSummarySections.filter(
-      (section) => section.id === "prepayment" || section.title === "Prepayment",
+      (section) =>
+        section.id === "prepayment" ||
+        section.title === "Prepayment" ||
+        section.id === "fee-summary" ||
+        section.title === "Fee Summary" ||
+        (section as { variant?: string }).variant === "fee",
     );
   }
   return [...paymentSummarySections];

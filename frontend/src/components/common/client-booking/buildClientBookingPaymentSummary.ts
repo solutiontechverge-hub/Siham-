@@ -7,6 +7,11 @@ import {
 } from "../booking-finance/formatBookingFinance";
 import type { BookingPaymentSummarySection } from "../booking-finance/bookingFinance.types";
 import { isOfflinePaymentMethod } from "./checkoutPaymentOptions";
+import {
+  isProtectiveFeeEntryLabel,
+  LATE_CANCELLATION_BOOKING_FEE,
+  LATE_RESCHEDULING_FEE,
+} from "../finance-documents/protectiveFeeInvoice";
 
 export type PaymentSummaryLine = {
   id: string;
@@ -35,6 +40,13 @@ type BuildInput = {
   /** Offline prepayment still appears as "Prepayment" before online capture. */
   showUnpaidPrepayment?: boolean;
   shopName?: string | null;
+  /** Paid LCF/LRF/NS finance rows — Fee Summary only when fee is settled. */
+  paidProtectiveFees?: ReadonlyArray<{
+    entryLabel?: string | null;
+    amount: number;
+    dateLabel?: string;
+    methodLabel?: string;
+  }>;
 };
 
 function sumServices(services: ClientBookingDraftService[]): number {
@@ -73,18 +85,21 @@ export function buildClientBookingPaymentSummary(input: BuildInput): PaymentSumm
     prepaidAmountOverride,
     showUnpaidPrepayment = false,
     shopName,
+    paidProtectiveFees = [],
   } = input;
 
-  if (!draft?.services?.length) return [];
+  if (!draft?.services?.length && !paidProtectiveFees.length) return [];
 
   const bookingDate = formatFinanceDateTime(
-    paymentDateIso || draft.selectedDateISO,
-    paymentTime || draft.selectedTime,
+    paymentDateIso || draft?.selectedDateISO,
+    paymentTime || draft?.selectedTime,
   );
   const methodLabel = formatFinanceMethodLabel(paymentMethod);
   const offline = isOfflinePaymentMethod(paymentMethod);
   const visitNote = formatOfflinePrepaymentVisitNote(shopName, bookingDate);
-  const total = draft.total ?? sumServices(draft.services);
+  const total =
+    draft?.total ??
+    (draft?.services?.length ? sumServices(draft.services) : 0);
   const computedPrepaid =
     Math.round(((total * prepaymentPercent) / 100 + Number.EPSILON) * 100) / 100;
   const prepaidAmount =
@@ -126,6 +141,41 @@ export function buildClientBookingPaymentSummary(input: BuildInput): PaymentSumm
       });
     }
   }
+
+  const paidFees = paidProtectiveFees.filter(
+    (fee) =>
+      isProtectiveFeeEntryLabel(fee.entryLabel) &&
+      Number.isFinite(fee.amount) &&
+      fee.amount > 0,
+  );
+  if (paidFees.length) {
+    const feeLines: PaymentSummaryLine[] = paidFees.map((fee, index) => {
+      const label =
+        fee.entryLabel === LATE_RESCHEDULING_FEE
+          ? LATE_RESCHEDULING_FEE
+          : String(fee.entryLabel ?? "").toLowerCase() === "no-show fee"
+            ? "No-show fee"
+            : String(fee.entryLabel || LATE_CANCELLATION_BOOKING_FEE);
+      const when = fee.dateLabel || bookingDate;
+      const method = fee.methodLabel || methodLabel;
+      return {
+        id: `fee-${index}`,
+        label: `${label} - ${when} - ${method}`,
+        amount: fee.amount,
+        showInvoice: true,
+        showReceipt: true,
+      };
+    });
+    sections.push({
+      id: "fee-summary",
+      title: "Fee Summary",
+      variant: "fee",
+      amount: feeLines.reduce((sum, line) => sum + line.amount, 0),
+      lines: feeLines,
+    });
+  }
+
+  if (!draft?.services?.length) return sections;
 
   const summarySections = buildBookingSummarySections(draft);
   const afterTreatmentLines: PaymentSummaryLine[] = [];
