@@ -27,7 +27,7 @@ export function HowItWorksGettingStartedSections({
           <Box sx={mollureSectionGapSx}>
             <HowItWorksSectionTitle
               title={howItWorksData.sectionTitles.gettingStarted}
-              sx={{ fontSize: 30, fontWeight: 700, lineHeight: 1.2 }}
+              sx={{ fontSize: 20, fontWeight: 700, lineHeight: 1.2 }}
             />
 
             <Grid container spacing={3}>
@@ -119,7 +119,7 @@ export function HowItWorksGettingStartedSections({
           >
             <HowItWorksSectionTitle
               title={howItWorksData.sectionTitles.gettingStarted}
-              sx={{ fontSize: 30, fontWeight: 700, lineHeight: 1.2 }}
+              sx={{ fontSize: 20, fontWeight: 700, lineHeight: 1.2 }}
             />
 
             <Stack spacing={3}>

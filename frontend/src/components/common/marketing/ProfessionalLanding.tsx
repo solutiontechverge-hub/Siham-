@@ -177,7 +177,7 @@ export default function ProfessionalLanding({
                 />
                 <MarketingHeroTitle
                   sx={{
-                    fontSize: { xs: 28, sm: 34, md: 40 },
+                    fontSize: 20,
                     fontWeight: 700,
                     lineHeight: 1.2,
                     letterSpacing: "-0.02em",
@@ -337,7 +337,7 @@ export default function ProfessionalLanding({
       <Container maxWidth="lg" sx={{ py: `${MOLLURE_SECTION_GAP_PX}px` }}>
         <MarketingSectionHeading
           title={whyChoose.title}
-          titleSx={{ fontSize: "30px", fontWeight: 700 }}
+          titleSx={{ fontSize: 20, fontWeight: 700 }}
         />
         <Grid container spacing={2.25}>
           {whyChoose.items.map((item) => (
@@ -360,7 +360,7 @@ export default function ProfessionalLanding({
         }}
       >
         <Container maxWidth="lg">
-          <MarketingSectionTitle sx={{ fontSize: "30px", fontWeight: 700 }}>
+          <MarketingSectionTitle sx={{ fontSize: 20, fontWeight: 700 }}>
             {results.title}
           </MarketingSectionTitle>
           <MarketingSectionSubtitle>
@@ -409,7 +409,7 @@ export default function ProfessionalLanding({
               textAlign: "center",
               fontWeight: 800,
               color: "mollure.textcolorgrey700",
-              fontSize: { xs: "1.9rem", md: "2.35rem" },
+              fontSize: 20,
               letterSpacing: "-0.02em",
             }}
           >
@@ -609,7 +609,7 @@ export default function ProfessionalLanding({
         <MarketingSectionHeading
           title={steps.title}
           subtitle={steps.subtitle}
-          titleSx={{ fontSize: 30, mt: 4 }}
+          titleSx={{ fontSize: 20, mt: 4 }}
         />
         <Grid container spacing={2.25}>
           {steps.items.map((s) => (
@@ -667,7 +667,7 @@ export default function ProfessionalLanding({
               sx={{
                 fontWeight: 600,
                 color: "common.white",
-                fontSize: { xs: "2rem", md: "2.6rem" },
+                fontSize: 20,
                 lineHeight: 1.12,
                 letterSpacing: "-0.02em",
               }}

@@ -20,6 +20,7 @@ import {
   REFUND_METHOD_OPTIONS,
   REFUND_REASON_OPTIONS_AMOUNT,
   REFUND_REASON_OPTIONS_ITEM,
+  mergeRefundSalesItems,
   refundItemsFromTransactions,
   type RefundSalesItem,
 } from "./refundSales.data";
@@ -121,8 +122,12 @@ export default function RefundSalesDrawer({
 
   React.useEffect(() => {
     if (!open) return;
-    const nextItems = refundItemsFromTransactions(transactions);
-    const resolvedItems = nextItems.length ? nextItems : fallbackItems;
+    // Finance rows first (non-fee sorted ahead of LCF), then Sales card lines
+    // fill any booking services/products missing from documents.
+    const resolvedItems = mergeRefundSalesItems(
+      refundItemsFromTransactions(transactions),
+      fallbackItems,
+    );
     setTab("item");
     setItems(resolvedItems);
     setSelectedItemIds(resolvedItems.length ? [resolvedItems[0].id] : []);
@@ -186,7 +191,7 @@ export default function RefundSalesDrawer({
       {completed ? (
         <Stack alignItems="center" justifyContent="center" spacing={2} sx={{ minHeight: 420 }}>
           <Typography sx={{ fontSize: 28, color: m.teal }}>✓</Typography>
-          <Typography sx={{ fontSize: 22, fontWeight: 800, color: m.navy }}>
+          <Typography sx={{ fontSize: 20, fontWeight: 800, color: m.navy }}>
             Refund Completed
           </Typography>
         </Stack>

@@ -84,7 +84,7 @@ export function BusinessPublicProfileShopCard(props: {
           <Typography
             sx={{
               fontWeight: 900,
-              fontSize: { xs: 17, md: 18 },
+              fontSize: 20,
               color: alpha(m.navy, 0.88),
               lineHeight: 1.2,
               minWidth: 0,

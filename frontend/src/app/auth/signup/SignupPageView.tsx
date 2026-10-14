@@ -127,7 +127,7 @@ export default function SignupPageView() {
               component="h1"
               sx={{
                 fontWeight: 500,
-                fontSize: { xs: "1.65rem", sm: "2rem" },
+                fontSize: 20,
                 lineHeight: 1.25,
                 color: m.navy,
                 mb: { xs: 3, sm: 4 },

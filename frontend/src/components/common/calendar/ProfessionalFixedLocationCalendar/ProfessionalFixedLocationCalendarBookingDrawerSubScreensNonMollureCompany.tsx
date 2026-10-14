@@ -42,7 +42,7 @@ export function ProfessionalFixedLocationCalendarBookingDrawerSubScreensNonMollu
             sx={{
               fontWeight: 900,
               color: alpha(m.navy, 0.88),
-              fontSize: 22,
+              fontSize: 20,
               letterSpacing: "-0.01em",
             }}
           >

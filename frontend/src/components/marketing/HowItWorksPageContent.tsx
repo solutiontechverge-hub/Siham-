@@ -77,7 +77,7 @@ export function HowItWorksPageContent({
           sx={{ bgcolor: cardbg, color: textcolorgrey700 }}
           withAccent={true}
           title={howItWorksData.interactiveProcess.title}
-          titleSx={{ fontSize: 30, fontWeight: 700, lineHeight: 1.2 }}
+          titleSx={{ fontSize: 20, fontWeight: 700, lineHeight: 1.2 }}
           description={howItWorksData.interactiveProcess.description}
         />
 

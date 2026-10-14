@@ -33,7 +33,7 @@ export function HowItWorksPaymentsAndInvoicesSection({
           sx={{
             ...sectionHeadingSx,
             textAlign: "center",
-            fontSize: 30,
+            fontSize: 20,
             fontWeight: 700,
             lineHeight: 1.2,
             ...mollureHeadingBodyGapSx,

@@ -52,7 +52,7 @@ export default function ProfessionalFeatures({
               sx={{
                 fontWeight: 900,
                 letterSpacing: "-0.04em",
-                fontSize: { xs: "2.7rem", md: "4rem" },
+                fontSize: 20,
                 color: tokens.navy,
               }}
             >

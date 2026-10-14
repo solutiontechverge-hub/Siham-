@@ -47,7 +47,7 @@ export function HowItWorksBookingCommunicationSection({
             variant="h4"
             sx={{
               ...sectionHeadingSx,
-              fontSize: 30,
+              fontSize: 20,
               fontWeight: 700,
               lineHeight: 1.2,
               maxWidth: 640,

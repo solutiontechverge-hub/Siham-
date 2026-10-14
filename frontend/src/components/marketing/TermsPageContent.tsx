@@ -40,7 +40,7 @@ export function LegalPageContent({ data }: { data: LegalPageData }) {
           }}
         >
           <Stack spacing={1.25} sx={{ mb: 3.5 }}>
-            <MainHeading component="h1" sx={{ fontSize: { xs: 28, sm: 34 } }}>
+            <MainHeading component="h1" sx={{ fontSize: 20 }}>
               {data.title}
             </MainHeading>
             <BodyText sx={{ color: alpha(m.navy, 0.55), fontSize: 14 }}>
@@ -56,7 +56,7 @@ export function LegalPageContent({ data }: { data: LegalPageData }) {
               <Box key={section.id} component="section">
                 <SubHeading
                   component="h2"
-                  sx={{ mb: 1.25, fontSize: { xs: 18, sm: 20 } }}
+                  sx={{ mb: 1.25, fontSize: 20 }}
                 >
                   {section.heading}
                 </SubHeading>

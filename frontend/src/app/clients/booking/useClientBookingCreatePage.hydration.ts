@@ -203,10 +203,8 @@ export function useClientBookingCreateHydration(
         price: row.price,
         // New Book Now: always Unassigned for every professional. Edit/EBR keeps draft guestId.
         guestId: null,
-        // Keep default TM on the picker while Unassigned so assign can stamp it.
-        teamMemberId: noSelectableTeam
-          ? null
-          : row.teamMemberId || defaultTeamMemberId,
+        // Do not stamp first roster TM — auto-assign fills only when free at the slot.
+        teamMemberId: noSelectableTeam ? null : row.teamMemberId ?? null,
       }));
 
       setServices(profileServices);
@@ -626,13 +624,13 @@ export function useClientBookingCreateHydration(
         originalPrice: priced.originalPrice,
         discountPct: priced.discountPct,
         guestId: null as string | null,
-        teamMemberId: defaultTeamMemberId,
+        teamMemberId: null as string | null,
       };
     });
 
     setServices(catalogServices.slice(0, 3));
     setShopTeamMembers(apiTeam);
-    // First load: team member comes from backend roster when present.
+    // Picker default only — services stay unassigned until auto-assign finds a free TM.
     setSelectedTeamMemberId(defaultTeamMemberId ?? "");
     setServiceTab(getPreferredServiceTab(catalogServices.slice(0, 3)));
     setProfileHydrated(true);

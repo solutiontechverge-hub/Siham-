@@ -751,24 +751,13 @@ export function useClientBookingCreatePage() {
   React.useEffect(() => {
     if (filteredTeamMembers.some((tm) => tm.id === selectedTeamMemberId))
       return;
-    // First load / roster ready: pick backend team member (Desired + Fixed).
+    // Picker default only — never stamp services with first TM (may be off-schedule).
     const fallbackId = filteredTeamMembers[0]?.id ?? "";
     if (!fallbackId) {
       if (selectedTeamMemberId) setSelectedTeamMemberId("");
       return;
     }
     setSelectedTeamMemberId(fallbackId);
-    setServices((prev) => {
-      let changed = false;
-      const next = prev.map((s) => {
-        const teamMemberId = s.teamMemberId || fallbackId;
-        if (teamMemberId === s.teamMemberId) return s;
-        changed = true;
-        // Stamp TM without moving Unassigned → Assigned.
-        return { ...s, teamMemberId };
-      });
-      return changed ? next : prev;
-    });
   }, [filteredTeamMembers, selectedTeamMemberId]);
 
   const { onContinue } = useClientBookingCreateContinue({

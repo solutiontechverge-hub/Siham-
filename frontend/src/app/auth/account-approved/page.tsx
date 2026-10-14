@@ -22,7 +22,7 @@ export default function AccountApprovedPage() {
       <Typography
         sx={{
           fontWeight: 900,
-          fontSize: { xs: 22, sm: 26 },
+          fontSize: 20,
           color: alpha(m.navy, 0.88),
           lineHeight: 1.25,
         }}

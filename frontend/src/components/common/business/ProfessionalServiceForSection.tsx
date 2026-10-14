@@ -38,7 +38,7 @@ export function ProfessionalServiceForSection({
           sx={{
             fontWeight: 700,
             color: alpha(m.navy, 0.9),
-            fontSize: { xs: 24, sm: 28, md: 30 },
+            fontSize: 20,
             lineHeight: 1.2,
             minWidth: 0,
             overflow: "hidden",

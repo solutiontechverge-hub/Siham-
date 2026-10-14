@@ -344,7 +344,7 @@ export function useClientBookingCreatePeopleServices(
             ? {
                 ...s,
                 guestId: personId,
-                teamMemberId: selectedTeamMemberId || s.teamMemberId || null,
+                teamMemberId: s.teamMemberId || null,
               }
             : s,
         ),
@@ -559,7 +559,8 @@ export function useClientBookingCreatePeopleServices(
         return {
           ...s,
           guestId: selectedPersonId,
-          teamMemberId: selectedTeamMemberId || s.teamMemberId || null,
+          // Keep existing TM only; auto-assign fills/clears from availability.
+          teamMemberId: s.teamMemberId || null,
         };
       }),
     );
@@ -636,10 +637,9 @@ export function useClientBookingCreatePeopleServices(
           originalPrice: picked.originalPrice,
           discountPct: picked.discountPct,
           guestId: null,
-          teamMemberId: hasAssignableTeamMembers
-            ? (isDesiredLocation
-                ? selectedTeamMemberId || addServiceTeamMemberId
-                : addServiceTeamMemberId) || null
+          // Leave null — availability auto-assign picks a free TM for the slot.
+          teamMemberId: hasAssignableTeamMembers && isDesiredLocation
+            ? selectedTeamMemberId || addServiceTeamMemberId || null
             : null,
         });
       }

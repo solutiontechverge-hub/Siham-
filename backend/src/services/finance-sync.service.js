@@ -21,6 +21,10 @@ import { dispatchInvoiceReissuedNotification } from "./bookingNotification.servi
 import { computeFinanceFees } from "../utils/financeFees.js";
 import { roundMoney } from "../utils/money.js";
 import {
+  protectiveFeeNetsPrepaid,
+  settleProtectiveFee,
+} from "../utils/protectiveFeeSettlement.js";
+import {
   resolveResponseWindowMinutes,
   responseDeadlineAtFromNotes,
 } from "../utils/bookingResponseWindow.js";
@@ -463,6 +467,57 @@ function formatProtectiveFeeDescription(kind, percent, baseAmount) {
   return `${name} (${pct}% Of €${formatProtectiveFeeBase(baseAmount)})`;
 }
 
+function clampFeePercent(value, ceiling) {
+  const pct = Math.max(0, Math.min(100, Number(value) || 0));
+  const max = Number(ceiling);
+  return Number.isFinite(max) && max > 0 ? Math.min(pct, max) : pct;
+}
+
+/** Stamped late reschedule fine + Rule A/B (persisted `lateRescheduleAppointmentPassed`). */
+function resolveLateRescheduleFee(meta, booking) {
+  if (!meta?.showLateRescheduling) return null;
+  const percent = clampFeePercent(
+    meta.lateRescheduleFeePercent,
+    meta.lateRescheduleFeePercentCeiling,
+  );
+  if (percent <= 0) return null;
+  const base = snapshotServiceSubtotal(meta, booking);
+  const amount = roundMoney((base * percent) / 100);
+  if (amount <= 0) return null;
+  return {
+    amount,
+    netsPrepaid: protectiveFeeNetsPrepaid(
+      "lateReschedule",
+      meta.lateRescheduleAppointmentPassed === true,
+    ),
+    line: {
+      description: formatProtectiveFeeDescription("lateRescheduling", percent, base),
+      sourceType: "uniqueItemCode",
+      sourceReference: "late-reschedule-fee",
+      quantity: 1,
+      vat: "0%",
+      vatRate: 0,
+      pricePerUnit: amount,
+      totalPrice: amount,
+      feePercent: percent,
+      feeBaseAmount: base,
+    },
+  };
+}
+
+async function hasSettledFeeRow(booking, entryLabel) {
+  const found = await query(
+    `SELECT 1 FROM finance_transactions
+     WHERE professional_profile_id = $1
+       AND booking_id = $2
+       AND entry_label = $3
+       AND status IN ('Paid', 'Prepaid')
+     LIMIT 1`,
+    [booking.professional_profile_id, booking.unique_code, entryLabel],
+  );
+  return Boolean(found.rows[0]);
+}
+
 function isProtectiveFeeEntryLabel(label) {
   const value = String(label ?? "").trim();
   return (
@@ -903,8 +958,12 @@ async function insertFinanceTransaction({
   /** Optional live fees from Stripe webhook / PaymentIntent retrieve. */
   liveStripeFee = null,
   liveMollureFee = null,
+  /** LCF/LRF/NS: `{ feeTotal, prepaidApplied }` — `amount` is the remainder actually charged. */
+  feeSettlement = null,
 }) {
   const gross = roundMoney(amount);
+  const feeTotal = feeSettlement ? roundMoney(feeSettlement.feeTotal) : 0;
+  const feePrepaidApplied = feeSettlement ? roundMoney(feeSettlement.prepaidApplied) : 0;
   const labelKey = entryLabel || "";
   const salesCardFields = { paymentPhase, payerKey, payerRole, entryLabel };
   // Open (unresolved) invoice for this booking/phase — replace when amount changes
@@ -1025,7 +1084,8 @@ async function insertFinanceTransaction({
     }
   }
 
-  if (gross <= 0 && paymentPhase !== "prepay") return null;
+  // Fee fully covered by prepaid still persists a €0 Paid row (Fee Summary + invoice).
+  if (gross <= 0 && paymentPhase !== "prepay" && feeTotal <= 0) return null;
 
   const isOnline = paymentMethod.startsWith("online") && booking.booking_type !== "offline";
   const { stripeFee, mollureFee, net } = computeFinanceFees(gross, {
@@ -1111,8 +1171,21 @@ async function insertFinanceTransaction({
     // A prepayment document still represents the complete booking. The paid
     // amount is kept separately so invoice remaining balance is not zeroed.
     lineItems: documentLines,
-    totalPrice: roundMoney(isPrepaymentDocument ? prepayBookingTotal : gross),
+    totalPrice: roundMoney(
+      isPrepaymentDocument ? prepayBookingTotal : feeSettlement ? feeTotal : gross,
+    ),
     ...(isPrepaymentDocument ? { prepaymentAmount: roundMoney(gross) } : {}),
+    // Fee docs: invoice renders Total (fee) → Prepaid → Remaining from these.
+    ...(feeSettlement
+      ? {
+          prepaymentAmount: feePrepaidApplied,
+          feeSettlement: {
+            feeTotal,
+            prepaidApplied: feePrepaidApplied,
+            amountDue: gross,
+          },
+        }
+      : {}),
     ...(prepayResponseDeadlineIso
       ? { responseDeadlineAt: prepayResponseDeadlineIso }
       : {}),
@@ -1164,7 +1237,7 @@ async function insertFinanceTransaction({
           : null,
       booking.unique_code,
       JSON.stringify(document),
-      isPrepaymentDocument ? gross : 0,
+      isPrepaymentDocument ? gross : feePrepaidApplied,
       isSettledFinanceStatus(status) ? gross : 0,
     ],
   );

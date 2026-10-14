@@ -282,7 +282,7 @@ export default function BookingDrawerClientSnapshotSection({
                   (service.teamMemberId
                     ? teamNameById.get(String(service.teamMemberId))
                     : undefined) || service.teamMemberName?.trim();
-                const staff = staffFull?.split(/\s+/)[0];
+                const staff = staffFull?.trim() || undefined;
                 return (
                   <Box
                     key={`${service.id}::${person.id}::${serviceIndex}`}

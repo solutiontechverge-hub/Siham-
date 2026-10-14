@@ -48,7 +48,7 @@ export default function AdminDashboardHeader({
       >
         <Typography
           variant="mainHeading"
-          sx={{ fontSize: { xs: 26, md: 30 }, whiteSpace: "nowrap" }}
+          sx={{ fontSize: 20, whiteSpace: "nowrap" }}
         >
           Dashboard
         </Typography>

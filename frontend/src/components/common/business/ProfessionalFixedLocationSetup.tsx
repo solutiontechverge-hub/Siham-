@@ -331,7 +331,7 @@ export default function ProfessionalFixedLocationSetup(
             sx={{
               fontWeight: 700,
               color: alpha(m.navy, 0.9),
-              fontSize: 30,
+              fontSize: 20,
               lineHeight: 1.2,
               minWidth: 0,
               overflow: "hidden",

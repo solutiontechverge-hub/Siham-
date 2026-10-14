@@ -27,7 +27,7 @@ export default function EmailHeader({
       </div>
       <div
         style={{
-          fontSize: "28px",
+          fontSize: "20px",
           fontWeight: 800,
           color: "#10233f",
           marginBottom: subtitle ? "12px" : 0,

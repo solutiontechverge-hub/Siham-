@@ -33,7 +33,6 @@ export function useClientBookingCreateSummary(
     people,
     shopTeamMembers,
     availabilitySnapshot,
-    selectedTeamMemberId,
     filteredTeamMembers,
     selectedDate,
     selectedTime,
@@ -96,9 +95,7 @@ export function useClientBookingCreateSummary(
       if (ids.length === 0) return undefined;
       // One shared professional — single chip. Multiple different TMs — per-service labels instead.
       if (ids.length !== 1) return undefined;
-      const fullName = teamMemberNameById.get(ids[0]);
-      if (!fullName) return undefined;
-      return fullName.split(/\s+/)[0];
+      return teamMemberNameById.get(ids[0]) || undefined;
     },
     [teamMemberNameById],
   );
@@ -107,23 +104,18 @@ export function useClientBookingCreateSummary(
     (teamMemberId: string | null | undefined) => {
       const id = String(teamMemberId ?? "").trim();
       if (!id) return undefined;
-      const fullName = teamMemberNameById.get(id);
-      if (!fullName) return undefined;
-      return fullName.split(/\s+/)[0] || fullName;
+      return teamMemberNameById.get(id) || undefined;
     },
     [teamMemberNameById],
   );
 
   const resolveServiceTeamMemberId = React.useCallback(
     (service: { teamMemberId?: string | null }) => {
-      const id =
-        String(service.teamMemberId ?? "").trim() ||
-        String(selectedTeamMemberId ?? "").trim() ||
-        filteredTeamMembers[0]?.id ||
-        "";
+      // Never invent a TM — first-roster fallback hid unavailable auto-assign clears.
+      const id = String(service.teamMemberId ?? "").trim();
       return id || undefined;
     },
-    [filteredTeamMembers, selectedTeamMemberId],
+    [],
   );
 
   const resolveServiceTeamMemberName = React.useCallback(

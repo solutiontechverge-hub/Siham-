@@ -74,7 +74,7 @@ const fourServices = [
 }
 
 {
-  // Nobody free at 10:00; C has lowest day occupancy.
+  // Nobody free at 10:00 — must not assign a blocked/busy TM.
   const assigned = autoAssignServicesByAvailability({
     snapshot: makeSnapshot(members.slice(0, 3), {
       a: [{ startMin: 9 * 60, endMin: 17 * 60 }],
@@ -91,8 +91,79 @@ const fourServices = [
   });
   assert.equal(
     assigned[0]?.teamMemberId,
-    "c",
-    "when nobody free, pick lowest day occupancy",
+    null,
+    "when nobody free, leave unassigned (do not pick blocked TM)",
+  );
+}
+
+{
+  // Blocked member excluded; free peer is chosen.
+  const assigned = autoAssignServicesByAvailability({
+    snapshot: makeSnapshot(members.slice(0, 2), {
+      a: [{ startMin: 10 * 60, endMin: 11 * 60 }],
+    }),
+    services: [{ id: "1", catalogServiceId: "s1", durationMins: 60 }],
+    candidateMemberIds: ["a", "b"],
+    fallbackCatalogIds: ["s1"],
+    startMin: 10 * 60,
+  });
+  assert.equal(assigned[0]?.teamMemberId, "b", "assign free TM when peer is blocked");
+}
+
+{
+  // Pre-stamped busy TM must not stick when Combine Services shares one window.
+  const assigned = autoAssignServicesByAvailability({
+    snapshot: makeSnapshot(members.slice(0, 2), {
+      a: [{ startMin: 9 * 60, endMin: 12 * 60 }],
+    }),
+    services: [
+      {
+        id: "1",
+        catalogServiceId: "s1",
+        durationMins: 15,
+        teamMemberId: "a",
+      },
+      {
+        id: "2",
+        catalogServiceId: "s2",
+        durationMins: 15,
+        teamMemberId: "a",
+      },
+    ],
+    candidateMemberIds: ["a", "b"],
+    fallbackCatalogIds: ["s1", "s2"],
+    startMin: 9 * 60,
+    assignOneMemberForAll: true,
+    sharedWindowMins: 15,
+  });
+  assert.equal(
+    assigned[0]?.teamMemberId,
+    "b",
+    "combine: busy pre-assign cleared, free peer used",
+  );
+  assert.equal(assigned[1]?.teamMemberId, "b", "combine: both services share free TM");
+}
+
+{
+  // Member with no working hours (empty overrides) must not be auto-assigned.
+  const noSchedule = makeSnapshot(
+    [{ id: "a", name: "A", assignedServiceIds: ["s1"] }],
+    {},
+  );
+  noSchedule.dateOverrides = [];
+  const assigned = autoAssignServicesByAvailability({
+    snapshot: noSchedule,
+    services: [
+      { id: "1", catalogServiceId: "s1", durationMins: 15, teamMemberId: "a" },
+    ],
+    candidateMemberIds: ["a"],
+    fallbackCatalogIds: ["s1"],
+    startMin: 9 * 60,
+  });
+  assert.equal(
+    assigned[0]?.teamMemberId,
+    null,
+    "no-schedule member must not stay auto-assigned",
   );
 }
 

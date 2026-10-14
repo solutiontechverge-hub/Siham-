@@ -6,7 +6,6 @@ import { SubHeading } from "../ui/typography";
 import { MOLLURE_HEADING_BODY_GAP_PX } from "../../theme/spacing";
 
 const sectionHeadingSx = {
-  fontSize: 30,
   fontWeight: 700,
   lineHeight: 1.2,
   textAlign: "center",

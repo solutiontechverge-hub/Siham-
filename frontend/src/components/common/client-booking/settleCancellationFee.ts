@@ -1,9 +1,15 @@
 import { roundBookingMoney as roundMoney } from "../../../data/bookingLinePricing";
 
+export type ProtectiveFeePolicyKind = "lateCancellation" | "lateReschedule" | "noShow";
+
 export type CancellationFeeSettlement = {
   bookingTotal: number;
   feePercent: number;
   cancellationFee: number;
+  /** Outstanding Rule-B late reschedule fine settled together with the cancel. */
+  rescheduleFee: number;
+  /** cancellationFee + rescheduleFee. */
+  feeTotal: number;
   prepaidPaid: number;
   appliedFromPrepaid: number;
   amountDueNow: number;
@@ -15,6 +21,52 @@ export type CancellationFeeSettlement = {
 function toNonNegativeNumber(value: number | null | undefined) {
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/**
+ * Rule A/B decision clock: was the appointment start already reached when the
+ * client/pro took the cancel / reschedule / no-show action? Unknown → future (B).
+ * Mirrored in backend `finance-sync.service.js`.
+ */
+export function isAppointmentPassedAt(
+  actionAtMs: number | null | undefined,
+  startMs: number | null | undefined,
+): boolean {
+  const action = Number(actionAtMs);
+  const start = Number(startMs);
+  if (actionAtMs == null || startMs == null) return false;
+  if (!Number.isFinite(action) || !Number.isFinite(start)) return false;
+  return action >= start;
+}
+
+/**
+ * Rule A (passed): every fee is deducted from prepaid.
+ * Rule B (future): late cancel still nets (booking ends, prepaid minus fee is refunded);
+ * late reschedule does NOT — the fine is added to the booking's final total.
+ * No-show is inherently after start → always nets.
+ */
+export function protectiveFeeNetsPrepaid(
+  kind: ProtectiveFeePolicyKind,
+  appointmentPassed: boolean | null | undefined,
+): boolean {
+  return kind !== "lateReschedule" || appointmentPassed === true;
+}
+
+/** Fee Total → Prepaid applied → Payment remainder (€0 when prepaid covers). */
+export function settleProtectiveFee(input: {
+  feeTotal: number;
+  prepaidAvailable: number;
+  netsPrepaid?: boolean;
+}): { feeTotal: number; prepaidApplied: number; amountDue: number } {
+  const feeTotal = roundMoney(toNonNegativeNumber(input.feeTotal));
+  const prepaid = roundMoney(toNonNegativeNumber(input.prepaidAvailable));
+  const prepaidApplied =
+    input.netsPrepaid === false ? 0 : roundMoney(Math.min(prepaid, feeTotal));
+  return {
+    feeTotal,
+    prepaidApplied,
+    amountDue: roundMoney(Math.max(0, feeTotal - prepaidApplied)),
+  };
 }
 
 /**
@@ -41,7 +93,7 @@ export function isLateCancellation(input: {
   return start - now < noticeMs;
 }
 
-/** Split cancellation fee against prepaid balance (adjust fee, refund remainder). */
+/** Split cancellation fee (+ outstanding LRF) against prepaid balance; refund the rest. */
 export function settleCancellationFee(input: {
   bookingTotal: number;
   feePercent: number;
@@ -50,6 +102,8 @@ export function settleCancellationFee(input: {
   noticeHours?: number | null;
   noticeMinutes?: number | null;
   nowMs?: number;
+  /** Rule-B late reschedule fine not yet invoiced — booking ends, so settle it now. */
+  outstandingRescheduleFee?: number;
 }): CancellationFeeSettlement {
   const late = isLateCancellation({
     appointmentStartMs: input.appointmentStartMs,
@@ -59,20 +113,25 @@ export function settleCancellationFee(input: {
   });
   const bookingTotal = Math.max(0, Number(input.bookingTotal) || 0);
   const feePercent = late ? Math.max(0, Number(input.feePercent) || 0) : 0;
-  const prepaidPaid = Math.max(0, Number(input.prepaidPaid) || 0);
+  const prepaidPaid = roundMoney(Math.max(0, Number(input.prepaidPaid) || 0));
   const cancellationFee = roundMoney((bookingTotal * feePercent) / 100);
-  const appliedFromPrepaid = roundMoney(Math.min(prepaidPaid, cancellationFee));
-  const amountDueNow = roundMoney(Math.max(0, cancellationFee - appliedFromPrepaid));
-  const refundAmount = roundMoney(Math.max(0, prepaidPaid - cancellationFee));
+  const rescheduleFee = roundMoney(toNonNegativeNumber(input.outstandingRescheduleFee));
+  const settled = settleProtectiveFee({
+    feeTotal: cancellationFee + rescheduleFee,
+    prepaidAvailable: prepaidPaid,
+    netsPrepaid: protectiveFeeNetsPrepaid("lateCancellation", null),
+  });
 
   return {
     bookingTotal,
     feePercent,
     cancellationFee,
+    rescheduleFee,
+    feeTotal: settled.feeTotal,
     prepaidPaid,
-    appliedFromPrepaid,
-    amountDueNow,
-    refundAmount,
+    appliedFromPrepaid: settled.prepaidApplied,
+    amountDueNow: settled.amountDue,
+    refundAmount: roundMoney(Math.max(0, prepaidPaid - settled.prepaidApplied)),
     isLateCancellation: late,
   };
 }

@@ -16,10 +16,10 @@ export default function NotFound() {
     >
       <Container maxWidth="sm">
         <Stack spacing={2} sx={{ textAlign: "center" }}>
-          <MainHeading sx={{ fontSize: 28, color: "text.primary" }}>
+          <MainHeading sx={{ fontSize: 20, color: "text.primary" }}>
             404
           </MainHeading>
-          <SubHeading sx={{ fontSize: 16, color: "text.primary" }}>
+          <SubHeading sx={{ color: "text.primary" }}>
             Page not found
           </SubHeading>
           <BodyText sx={{ color: "text.secondary", lineHeight: 1.7 }}>

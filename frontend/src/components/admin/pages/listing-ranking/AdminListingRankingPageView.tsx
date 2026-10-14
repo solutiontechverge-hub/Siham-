@@ -84,7 +84,7 @@ export default function AdminListingRankingPageView({
             <Typography
               variant="mainHeading"
               sx={{
-                fontSize: { xs: 24, md: 28 },
+                fontSize: 20,
                 color: tokens.textcolorgrey700,
                 mb: 0.5,
               }}

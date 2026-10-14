@@ -153,7 +153,7 @@ export default function VerifyOtpPageView() {
                 <Box textAlign="center">
                   <SubHeading
                     sx={{
-                      fontSize: { xs: "1.5rem", sm: "1.625rem" },
+                      fontSize: 20,
                       fontWeight: 700,
                       color: m.navy,
                       lineHeight: 1.2,

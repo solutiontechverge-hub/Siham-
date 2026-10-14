@@ -88,9 +88,7 @@ function teamMemberChipLabelForItems<T extends ChronologicalServiceLine>(
     ),
   ];
   if (ids.length !== 1) return undefined;
-  const fullName = teamMemberNameById.get(ids[0]);
-  if (!fullName) return undefined;
-  return fullName.split(/\s+/)[0];
+  return teamMemberNameById.get(ids[0]) || undefined;
 }
 
 export function groupTimedEntriesIntoBlocks<T extends ChronologicalServiceLine>(
@@ -153,7 +151,7 @@ export function groupTimedEntriesIntoBlocks<T extends ChronologicalServiceLine>(
       teamMemberLabel: entry.service
         ? teamMemberChipLabelForItems([entry.service], teamMemberNameById)
         : entry.teamMemberId
-          ? teamMemberNameById.get(entry.teamMemberId)?.split(/\s+/)[0]
+          ? teamMemberNameById.get(entry.teamMemberId)
           : undefined,
       teamMemberId: entry.service
         ? resolveLineTeamMemberId(entry.service)

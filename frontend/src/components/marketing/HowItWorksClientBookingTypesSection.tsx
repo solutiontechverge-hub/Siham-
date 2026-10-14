@@ -27,7 +27,7 @@ export function HowItWorksClientBookingTypesSection() {
         >
           <HowItWorksSectionTitle
             title={howItWorksData.sectionTitles.bookingTypesAndSetup}
-            sx={{ fontSize: 30, fontWeight: 700, lineHeight: 1.2 }}
+            sx={{ fontSize: 20, fontWeight: 700, lineHeight: 1.2 }}
           />
 
           <Stack spacing={4}>

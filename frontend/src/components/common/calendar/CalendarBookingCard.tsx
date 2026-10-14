@@ -118,9 +118,8 @@ function CalendarLocationLabel({
 }
 
 function firstNameLabel(value: string | undefined) {
-  const name = value?.trim();
-  if (!name) return "";
-  return name.split(/\s+/)[0] ?? "";
+  // Full professional-set name on calendar cards (was first-token only).
+  return value?.trim() || "";
 }
 
 function avatarInitials(name: string, avatarText?: string) {

@@ -519,9 +519,8 @@ export function layoutCalendarCardServiceLines(
 }
 
 function firstName(value: string | undefined) {
-  const name = value?.trim();
-  if (!name) return "";
-  return name.split(/\s+/)[0] ?? "";
+  // Full professional-set name (shared with CalendarBookingCard labels).
+  return value?.trim() || "";
 }
 
 function avatarFromName(name: string) {

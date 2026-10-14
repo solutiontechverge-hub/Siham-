@@ -77,7 +77,7 @@ export function ProfessionalFixedLocationForm({
         <Typography
           sx={{
             fontWeight: 700,
-            fontSize: { xs: 24, sm: 28, md: 30 },
+            fontSize: 20,
             color: alpha(m.navy, 0.9),
             lineHeight: 1.2,
             mt: 0.5,
@@ -265,7 +265,7 @@ export function ProfessionalDesiredLocationForm(props: ProfessionalDesiredLocati
             <Typography
               sx={{
                 fontWeight: 700,
-                fontSize: { xs: 24, sm: 28, md: 30 },
+                fontSize: 20,
                 color: alpha(m.navy, 0.9),
                 lineHeight: 1.2,
                 mt: 0.5,

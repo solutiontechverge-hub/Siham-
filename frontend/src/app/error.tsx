@@ -28,7 +28,7 @@ export default function GlobalErrorPage({
     >
       <Container maxWidth="sm">
         <Stack spacing={2} sx={{ textAlign: "center" }}>
-          <SubHeading sx={{ fontSize: 26, color: theme.palette.text.primary }}>
+          <SubHeading sx={{ color: theme.palette.text.primary }}>
             Something went wrong
           </SubHeading>
           <BodyText

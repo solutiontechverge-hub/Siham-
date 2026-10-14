@@ -171,6 +171,10 @@ export function matchFinanceHint(
       return phase === "addon" && (!hint.addonId || card.id.includes(hint.addonId) || hint.addonId === addonId);
     }
     if (phase === "prepay" || phase === "addon") return false;
+    // After-treatment / service cards must not bind LCF/LRF/NS (Fee Summary owns those).
+    if (!isProtectiveFeeCard && isProtectiveFeeEntryLabel(hint.entryLabel)) {
+      return false;
+    }
     if (hint.payerKey && card.payerKey && hint.payerKey !== card.payerKey) return false;
     return true;
   });

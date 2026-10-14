@@ -18,7 +18,7 @@ export function HowItWorksDiscardingRequestsSection({
             borderRadius: 3,
           }}
           title={howItWorksData.discardingRequests.title}
-          titleSx={{ fontSize: 30, fontWeight: 700, lineHeight: 1.2 }}
+          titleSx={{ fontSize: 20, fontWeight: 700, lineHeight: 1.2 }}
           description={howItWorksData.discardingRequests.description}
         />
       </Box>

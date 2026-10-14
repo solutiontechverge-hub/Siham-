@@ -269,11 +269,13 @@ export function findAvailableMemberForAllServices(
   services: Array<{ catalogServiceId: string; durationMins: number }>,
   fallbackCatalogIds: string[],
   startMin: number,
+  /** When set (Combine Services), check this window instead of summing durations. */
+  sharedWindowMins?: number,
 ) {
-  const totalDuration = services.reduce(
-    (sum, service) => sum + (service.durationMins || 0),
-    0,
-  );
+  const totalDuration =
+    sharedWindowMins != null && sharedWindowMins > 0
+      ? sharedWindowMins
+      : services.reduce((sum, service) => sum + (service.durationMins || 0), 0);
   if (totalDuration <= 0) return null;
 
   for (const memberId of sortMembersByLowestOccupancy(snapshot, candidateMemberIds)) {
@@ -314,6 +316,8 @@ export function autoAssignServicesByAvailability(input: {
   fallbackCatalogIds: string[];
   startMin: number;
   assignOneMemberForAll?: boolean;
+  /** Combine Services: occupancy window = max duration, not sum. */
+  sharedWindowMins?: number;
 }) {
   const {
     snapshot,
@@ -322,6 +326,7 @@ export function autoAssignServicesByAvailability(input: {
     fallbackCatalogIds,
     startMin,
     assignOneMemberForAll = false,
+    sharedWindowMins,
   } = input;
 
   if (!candidateMemberIds.length || !services.length) {
@@ -339,6 +344,10 @@ export function autoAssignServicesByAvailability(input: {
         service.id,
       durationMins: service.durationMins || 30,
     }));
+    const windowMins =
+      sharedWindowMins != null && sharedWindowMins > 0
+        ? sharedWindowMins
+        : normalized.reduce((sum, service) => sum + service.durationMins, 0);
     const existingMemberId = services.find((service) => service.teamMemberId)
       ?.teamMemberId;
     if (existingMemberId) {
@@ -358,13 +367,9 @@ export function autoAssignServicesByAvailability(input: {
           snapshot,
         );
         const busy = snapshot.busyByMember[existingMemberId] ?? [];
-        const totalDuration = normalized.reduce(
-          (sum, service) => sum + service.durationMins,
-          0,
-        );
         if (
           canPerformAll &&
-          isMemberAvailableAt(startMin, totalDuration, working, busy)
+          isMemberAvailableAt(startMin, windowMins, working, busy)
         ) {
           return services.map((service) => ({
             id: service.id,
@@ -379,10 +384,12 @@ export function autoAssignServicesByAvailability(input: {
       normalized,
       fallbackCatalogIds,
       startMin,
+      sharedWindowMins,
     );
+    // Keep prior assignment only when it was already validated as free above.
     return services.map((service) => ({
       id: service.id,
-      teamMemberId: sharedMember ?? service.teamMemberId ?? null,
+      teamMemberId: sharedMember,
     }));
   }
 
@@ -413,7 +420,8 @@ export function autoAssignServicesByAvailability(input: {
       ? candidateMemberIds.filter((id) => usedMemberIds.has(id))
       : candidateMemberIds;
 
-    let memberId = findAvailableMemberForService(
+    // Only assign members free at this slot — never fall back onto blocked/busy TMs.
+    const memberId = findAvailableMemberForService(
       assignSnapshot,
       preferredIds,
       catalogServiceId,
@@ -421,25 +429,6 @@ export function autoAssignServicesByAvailability(input: {
       cursor,
       durationMins,
     );
-
-    if (!memberId) {
-      // Nobody free → still assign: prefer already-used, else expand (under cap).
-      const fallbackPool = preferredIds.length
-        ? preferredIds
-        : atCap
-          ? [...usedMemberIds]
-          : candidateMemberIds;
-      memberId =
-        findLowestOccupancyMemberForService(
-          assignSnapshot,
-          fallbackPool,
-          catalogServiceId,
-          fallbackCatalogIds,
-        ) ??
-        (atCap
-          ? sortMembersByLowestOccupancy(assignSnapshot, fallbackPool)[0] ?? null
-          : null);
-    }
 
     if (memberId) {
       usedMemberIds.add(memberId);
@@ -451,7 +440,7 @@ export function autoAssignServicesByAvailability(input: {
     cursor += durationMins;
     return {
       id: service.id,
-      teamMemberId: memberId ?? service.teamMemberId ?? null,
+      teamMemberId: memberId,
     };
   });
 }

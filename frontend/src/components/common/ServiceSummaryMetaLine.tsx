@@ -51,9 +51,7 @@ function initialsFromName(name: string, override?: string) {
 }
 
 function firstName(value: string) {
-  const name = value.trim();
-  if (!name) return "";
-  return name.split(/\s+/)[0] ?? "";
+  return value.trim();
 }
 
 export function ServiceSummaryMetaLine({

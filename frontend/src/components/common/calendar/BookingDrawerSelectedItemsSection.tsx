@@ -92,9 +92,7 @@ function serviceStaffId(service: BookingServiceLineItem) {
 }
 
 function firstName(value: string | undefined) {
-  const name = value?.trim();
-  if (!name) return "";
-  return name.split(/\s+/)[0] ?? "";
+  return value?.trim() || "";
 }
 
 export default function BookingDrawerSelectedItemsSection({

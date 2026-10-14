@@ -28,7 +28,7 @@ export function HowItWorksProfessionalServiceLocationSection() {
         >
           <HowItWorksSectionTitle
             title={howItWorksData.professionalServiceLocationSetup.title}
-            sx={{ fontSize: 30, fontWeight: 700, lineHeight: 1.2 }}
+            sx={{ fontSize: 20, fontWeight: 700, lineHeight: 1.2 }}
           />
           <Typography
             variant="body2"

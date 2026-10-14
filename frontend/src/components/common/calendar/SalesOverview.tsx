@@ -15,6 +15,7 @@ import SalesEditCheckout from "./SalesEditCheckout";
 import SalesOverdueReissueModal from "./SalesOverdueReissueModal";
 import SalesOverviewCard from "./SalesOverviewCard";
 import RefundSalesDrawer from "../../sections/finance/RefundSalesDrawer";
+import { refundItemsFromSaleLines } from "../../sections/finance/refundSales.data";
 import {
   SALES_OVERVIEW_COPY,
   SALES_OVERVIEW_OVERDUE_COLOR,
@@ -90,16 +91,22 @@ export default function SalesOverview({
   });
 
   if (refundCard) {
+    // Booking-wide sale lines (prepay services + after-treatment + add-ons + fees),
+    // not only the active card — Fee Summary alone used to list LCF only.
+    const bookingSaleLines = cards
+      .filter(
+        (card) =>
+          String(card.bookingId) === String(refundCard.bookingId) ||
+          String(card.bookingCode) === String(refundCard.bookingCode),
+      )
+      .flatMap((card) => card.lines);
     return (
       <RefundSalesDrawer
         open
         transactions={refundTransactions}
-        fallbackItems={refundCard.lines.map((line) => ({
-          id: line.id,
-          name: line.label,
-          meta: `€${line.amount.toFixed(2)}`,
-          amount: line.amount,
-        }))}
+        fallbackItems={refundItemsFromSaleLines(
+          bookingSaleLines.length ? bookingSaleLines : refundCard.lines,
+        )}
         onClose={() => setRefundCard(null)}
         onSave={async () => {
           await handleRefundSales(refundCard);

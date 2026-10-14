@@ -21,7 +21,7 @@ export function HowItWorksProfessionalBookingTypesSection() {
         >
           <HowItWorksSectionTitle
             title={howItWorksData.sectionTitles.bookingTypes}
-            sx={{ fontSize: 30, fontWeight: 700, lineHeight: 1.2 }}
+            sx={{ fontSize: 20, fontWeight: 700, lineHeight: 1.2 }}
           />
 
           <Stack spacing={3}>
@@ -63,7 +63,7 @@ export function HowItWorksProfessionalBookingTypesSection() {
                 {howItWorksData.professionalBookingTypes.offline.intro}
               </Typography>
 
-              <Typography sx={{ ...cardTitleSx, mb: 1.5, fontSize: "1rem" }}>
+              <Typography sx={{ ...cardTitleSx, mb: 1.5 }}>
                 {
                   howItWorksData.professionalBookingTypes.offline.nonMollure
                     .title
@@ -77,7 +77,7 @@ export function HowItWorksProfessionalBookingTypesSection() {
               />
 
               <Typography
-                sx={{ ...cardTitleSx, mt: 2.5, mb: 1.5, fontSize: "1rem" }}
+                sx={{ ...cardTitleSx, mt: 2.5, mb: 1.5 }}
               >
                 {howItWorksData.professionalBookingTypes.offline.guest.title}
               </Typography>

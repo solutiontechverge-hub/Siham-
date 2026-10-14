@@ -777,7 +777,7 @@ export default function ClientBookingCreateSummaryView() {
               </IconButton>
               <Typography
                 sx={{
-                  fontSize: { xs: 26, md: 30 },
+                  fontSize: 20,
                   fontWeight: 700,
                   color: isDesired ? "#333333" : alpha(m.navy, 0.86),
                   lineHeight: 1.15,

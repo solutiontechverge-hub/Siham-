@@ -91,7 +91,7 @@ export function LogoMark() {
       </Box>
       <CardTitle
         sx={{
-          fontSize: 22,
+          fontSize: 20,
           color: tokens.logoText,
           letterSpacing: "-0.02em",
         }}

@@ -14,6 +14,11 @@ import {
   getTeamMemberReviewAggregatesForSetups,
 } from "../services/review.service.js";
 import { logError, sendCaughtError } from "../utils/httpError.js";
+import {
+  calendarEntryCoversDateSql,
+  pushBusyInterval,
+  wallClockTimeToMinutes,
+} from "../utils/teamMemberAvailability.js";
 
 function parseJsonField(value, fallback = {}) {
   if (value == null) return fallback;
@@ -45,30 +50,6 @@ function parseAssignedServiceIds(raw) {
       return String(item).trim();
     })
     .filter(Boolean);
-}
-
-function wallClockTimeToMinutes(value) {
-  if (!value) return null;
-  const text = String(value);
-  const wallClock = text.match(/T(\d{2}):(\d{2})/);
-  const hhmm = wallClock ? wallClock[1] : /^\d{2}:\d{2}/.test(text) ? text.slice(0, 5) : null;
-  if (!hhmm) return null;
-  const [h, m] = hhmm.split(":").map(Number);
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
-  return h * 60 + m;
-}
-
-function wallClockDateFromValue(value) {
-  if (!value) return null;
-  const match = String(value).match(/^(\d{4}-\d{2}-\d{2})/);
-  return match ? match[1] : null;
-}
-
-function pushBusyInterval(map, memberId, startMin, endMin) {
-  if (!memberId || startMin == null || endMin == null || endMin <= startMin) return;
-  const key = String(memberId);
-  if (!map[key]) map[key] = [];
-  map[key].push({ startMin, endMin });
 }
 
 export const getSetupAvailabilityForDate = async (req, res) => {
@@ -135,12 +116,12 @@ export const getSetupAvailabilityForDate = async (req, res) => {
           [setupId, date],
         ),
         query(
-          `SELECT team_member_id, start_time, end_time, blocked_time_start, blocked_time_end, status
+          `SELECT team_member_id, start_time, end_time, blocked_time_start, blocked_time_end, status, start_date, end_date
            FROM calendar_entries
            WHERE professional_profile_id = $1
-             AND substring(COALESCE(start_time::text, blocked_time_start::text, start_date::text) from 1 for 10)::date = $2::date
              AND team_member_id IS NOT NULL
-             AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'invalid')`,
+             AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'invalid')
+             AND ${calendarEntryCoversDateSql("calendar_entries", "$2")}`,
           [setup.professional_profile_id, date],
         ),
       ]);
@@ -163,11 +144,10 @@ export const getSetupAvailabilityForDate = async (req, res) => {
     for (const entry of entriesResult.rows) {
       const status = String(entry.status ?? "").toLowerCase();
       if (status === "cancelled" || status === "invalid") continue;
+      // Multi-day blocks: start_date…end_date already matched in SQL; use the
+      // daily wall-clock window from blocked_time_* (do not skip mid-range days).
       const startValue = entry.blocked_time_start ?? entry.start_time;
       const endValue = entry.blocked_time_end ?? entry.end_time;
-      const entryDate =
-        wallClockDateFromValue(startValue) ?? wallClockDateFromValue(endValue);
-      if (entryDate && entryDate !== date) continue;
       const startMin = wallClockTimeToMinutes(startValue);
       const endMin = wallClockTimeToMinutes(endValue);
       pushBusyInterval(busyByMember, entry.team_member_id, startMin, endMin);

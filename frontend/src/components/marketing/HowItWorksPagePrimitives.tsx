@@ -21,17 +21,17 @@ export const requestCardIconById = {
   editConfirmed: EditConfirmedIcon,
 } as const;
 
-/** Section headings: semibold (600); pair with `variant="h4"` */
+/** Section headings: semibold (600). */
 export const sectionHeadingSx = {
   fontWeight: 600,
-  fontSize: { xs: "1.5rem", sm: "1.75rem" },
+  fontSize: 20,
   color: "mollure.textcolorgrey700",
 } as const;
 
-/** In-card titles (Prepayment-style): semibold 600 */
+/** In-card titles (Prepayment-style): semibold 600. */
 export const cardTitleSx = {
   fontWeight: 600,
-  fontSize: "1.125rem",
+  fontSize: 20,
   lineHeight: 1.4,
   color: "mollure.textcolorgrey700",
 } as const;

@@ -95,7 +95,7 @@ export default function AboutSplitSection({
                 <SubHeading
                   id="about-split-heading"
                   sx={{
-                    fontSize: { xs: "1.65rem", md: "2rem" },
+                    fontSize: 20,
                     color: "common.white",
                     lineHeight: 1.2,
                   }}

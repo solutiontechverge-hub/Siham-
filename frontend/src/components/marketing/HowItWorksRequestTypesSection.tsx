@@ -26,7 +26,7 @@ export function HowItWorksRequestTypesSection() {
           <HowItWorksSectionTitle
             title={howItWorksData.typesOfRequests.title}
             sx={{
-              fontSize: "30px",
+              fontSize: 20,
               fontWeight: 700,
               lineHeight: 1.2,
               color: "mollure.textcolorgrey700",

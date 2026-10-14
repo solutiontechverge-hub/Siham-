@@ -68,6 +68,10 @@ import {
 } from "../helpers/bookingEditRequest.js";
 import { logError, sendCaughtError } from "../utils/httpError.js";
 import { responseDeadlineAtFromNotes } from "../utils/bookingResponseWindow.js";
+import {
+  isTeamMemberBusyInWindow,
+  wallClockTimeToMinutes,
+} from "../utils/teamMemberAvailability.js";
 
 const parseJsonValue = (value, fallback) => {
   if (value === undefined || value === null || value === "") {
@@ -1993,6 +1997,46 @@ const serviceIdsFromBookingNotes = (notes) => {
   }
 };
 
+/** Per-service team member windows from notes (for create-time busy checks). */
+const teamMemberWindowsFromBookingNotes = (notes, fallbackStartMin, fallbackEndMin) => {
+  try {
+    const raw = String(notes ?? "");
+    const marker = "---mollure-meta---";
+    const idx = raw.indexOf(marker);
+    if (idx < 0) return [];
+    const meta = JSON.parse(raw.slice(idx + marker.length).trim() || "{}");
+    const services = [
+      ...(Array.isArray(meta.services) ? meta.services : []),
+      ...(Array.isArray(meta.clientSnapshot?.services) ? meta.clientSnapshot.services : []),
+    ];
+    const rows = [];
+    for (const service of services) {
+      const teamMemberId = parseOptionalUuid(
+        service?.teamMemberId ?? service?.team_member_id ?? service?.staffResourceId,
+      );
+      if (!teamMemberId) continue;
+      const startMin =
+        wallClockTimeToMinutes(service?.startTime ?? service?.start_time) ?? fallbackStartMin;
+      let endMin =
+        wallClockTimeToMinutes(service?.endTime ?? service?.end_time) ?? fallbackEndMin;
+      const duration = Number(service?.durationMins ?? service?.duration_mins);
+      if (
+        (endMin == null || endMin <= startMin) &&
+        startMin != null &&
+        Number.isFinite(duration) &&
+        duration > 0
+      ) {
+        endMin = startMin + duration;
+      }
+      if (startMin == null || endMin == null || endMin <= startMin) continue;
+      rows.push({ teamMemberId, startMin, endMin });
+    }
+    return rows;
+  } catch {
+    return [];
+  }
+};
+
 const syncBookingServiceLinks = async (bookingId, serviceIds) => {
   const ids = [...new Set((serviceIds || []).map((id) => parseUuid(id)).filter(Boolean))];
   if (!bookingId || !ids.length) return;
@@ -2573,6 +2617,56 @@ export const createBooking = async (req, res) => {
         message: "service_id is required and must be a valid UUID.",
         data: null,
       });
+    }
+
+    const bookingDate = normalizeBookingDateInput(req.body.booking_date);
+    const bookingStartMin = wallClockTimeToMinutes(req.body.start_time);
+    const bookingEndMin = wallClockTimeToMinutes(req.body.end_time);
+    const primaryTeamMemberId = parseOptionalUuid(req.body.team_member_id);
+    const teamChecks = [];
+    if (primaryTeamMemberId && bookingStartMin != null && bookingEndMin != null) {
+      teamChecks.push({
+        teamMemberId: primaryTeamMemberId,
+        startMin: bookingStartMin,
+        endMin: bookingEndMin,
+      });
+    }
+    for (const row of teamMemberWindowsFromBookingNotes(notes, bookingStartMin, bookingEndMin)) {
+      teamChecks.push(row);
+    }
+    if (teamChecks.length && req.body.business_setup_id && bookingDate) {
+      const setupRow = await query(
+        `SELECT professional_profile_id
+         FROM business_setups
+         WHERE id = $1
+         LIMIT 1`,
+        [req.body.business_setup_id],
+      );
+      const professionalProfileId = setupRow.rows[0]?.professional_profile_id;
+      if (professionalProfileId) {
+        const seen = new Set();
+        for (const check of teamChecks) {
+          const key = `${check.teamMemberId}:${check.startMin}:${check.endMin}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          const busy = await isTeamMemberBusyInWindow(query, {
+            professionalProfileId,
+            businessSetupId: req.body.business_setup_id,
+            teamMemberId: check.teamMemberId,
+            date: bookingDate,
+            startMin: check.startMin,
+            endMin: check.endMin,
+          });
+          if (busy) {
+            return res.status(409).json({
+              success: false,
+              message:
+                "Selected team member is unavailable for this time (blocked or already booked).",
+              data: null,
+            });
+          }
+        }
+      }
     }
 
     const generatedCodePrefix =

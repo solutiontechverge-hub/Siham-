@@ -98,6 +98,7 @@ export function buildBookingSummarySections(
     }));
 }
 
+/** Full professional-set TM name (API `full_name` / draft name) — not first-name-only. */
 export function resolveTeamMemberFirstName(
   teamMemberId: string | null | undefined,
   teamMembers: ClientBookingDraft["teamMembers"],
@@ -108,8 +109,7 @@ export function resolveTeamMemberFirstName(
     (id
       ? teamMembers?.find((tm) => String(tm.id) === id)?.name
       : undefined) || fallbackName?.trim() || undefined;
-  if (!fullName) return undefined;
-  return fullName.split(/\s+/)[0];
+  return fullName || undefined;
 }
 
 /** Role label above a person card (Client / Model 2 / Guest). */

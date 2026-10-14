@@ -149,7 +149,7 @@ export default function AuthSignupShell({
                       component="h1"
                       sx={{
                         fontWeight: 700,
-                        fontSize: { xs: "1.5rem", sm: "1.75rem" },
+                        fontSize: 20,
                         lineHeight: 1.2,
                         color: m.navy,
                       }}

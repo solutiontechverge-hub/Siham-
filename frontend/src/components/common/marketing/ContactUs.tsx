@@ -134,7 +134,7 @@ export default function ContactUs({ illustrationSrc }: ContactUsProps) {
                   sx={{
                     color: m.navy,
                     letterSpacing: "-0.04em",
-                    fontSize: { xs: "1.6rem", sm: "2rem" },
+                    fontSize: 20,
                   }}
                 >
                   {contactUsData.headerTitle}

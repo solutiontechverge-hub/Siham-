@@ -1,8 +1,8 @@
 /** App-wide typography scale — Poppins for body and headings (weights differentiate hierarchy). */
-export const MOLLURE_FONT_HEADING_PX = 48;
-export const MOLLURE_FONT_HEADING_MOBILE_PX = 32;
-export const MOLLURE_FONT_SUBHEADING_PX = 28;
-export const MOLLURE_FONT_SUBHEADING_MOBILE_PX = 22;
+export const MOLLURE_FONT_HEADING_PX = 20;
+export const MOLLURE_FONT_HEADING_MOBILE_PX = 20;
+export const MOLLURE_FONT_SUBHEADING_PX = 20;
+export const MOLLURE_FONT_SUBHEADING_MOBILE_PX = 20;
 export const MOLLURE_FONT_CONTENT_PX = 16;
 
 /** Loaded in `app/layout.tsx` via next/font (`--font-poppins`). */

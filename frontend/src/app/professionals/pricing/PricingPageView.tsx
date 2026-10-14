@@ -126,7 +126,7 @@ export default function PricingPageView() {
               sx={{
                 fontWeight: 900,
                 letterSpacing: "-0.04em",
-                fontSize: { xs: "2.7rem", md: "4rem" },
+                fontSize: 20,
                 color: tokens.navy,
               }}
             >
@@ -173,7 +173,7 @@ export default function PricingPageView() {
                   <Typography
                     sx={{
                       fontWeight: 900,
-                      fontSize: { xs: 18, md: 20 },
+                      fontSize: 20,
                       color: alpha(tokens.navy, 0.92),
                       letterSpacing: "-0.02em",
                     }}

@@ -4,9 +4,12 @@ import { getDatabaseConnectionString } from "./connectionString.js";
 
 const { Pool, types } = pg;
 
-// Keep Postgres DATE as YYYY-MM-DD strings. Default Date parsing shifts
-// calendar days across timezones (e.g. 2026-07-09 -> 2026-07-08T19:00:00.000Z in UTC+5).
+// Keep Postgres DATE / timestamps as strings. Default Date parsing shifts
+// wall-clock times across timezones (e.g. 09:00Z -> 14:00 local in UTC+5),
+// which breaks busy/block matching for availability + createBooking.
 types.setTypeParser(types.builtins.DATE, (value) => value);
+types.setTypeParser(types.builtins.TIMESTAMP, (value) => value);
+types.setTypeParser(types.builtins.TIMESTAMPTZ, (value) => value);
 
 let pool;
 

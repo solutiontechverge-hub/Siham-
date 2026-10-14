@@ -147,7 +147,7 @@ export default function AdminAuthLoginShell() {
                   <Box>
                     <SubHeading
                       sx={{
-                        fontSize: { xs: "1.5rem", sm: "1.75rem" },
+                        fontSize: 20,
                         fontWeight: 700,
                         color: m.navy,
                       }}

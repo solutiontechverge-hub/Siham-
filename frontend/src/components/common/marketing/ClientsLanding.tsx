@@ -126,7 +126,7 @@ export default function ClientsLanding({
               component="h1"
               sx={{
                 maxWidth: 900,
-                fontSize: { xs: "2.1rem", md: "3.2rem" },
+                fontSize: 20,
                 lineHeight: 1.5,
                 fontWeight: 600,
                 color: tokens.textcolorgrey700,
@@ -268,7 +268,7 @@ export default function ClientsLanding({
         <Container maxWidth="lg">
           <MarketingSectionHeading
             title={whyChooseSection.title}
-            titleSx={{ fontSize: 30 }}
+            titleSx={{ fontSize: 20 }}
           />
           <Grid container spacing={2.5}>
             {whyChooseSection.items.map((item) => (
@@ -340,7 +340,7 @@ export default function ClientsLanding({
       <Container maxWidth="lg" sx={{ py: `${MOLLURE_SECTION_GAP_PX}px` }}>
         <MarketingSectionHeading
           title={stepsSection.title}
-          titleSx={{ fontSize: 30, mt: 4 }}
+          titleSx={{ fontSize: 20, mt: 4 }}
         />
         <Grid container spacing={2.5}>
           {stepsSection.items.map((step) => (
@@ -366,7 +366,7 @@ export default function ClientsLanding({
                   sx={{
                     mt: 2,
                     mb: 2,
-                    fontSize: 21,
+                    fontSize: 20,
                     fontWeight: 600,
                     color: tokens.textcolorgrey700,
                   }}
@@ -393,7 +393,7 @@ export default function ClientsLanding({
         <Container maxWidth="lg">
           <MarketingSectionHeading
             title={testimonialsSection.title}
-            titleSx={{ fontSize: 30 }}
+            titleSx={{ fontSize: 20 }}
           />
           <TestimonialsCarousel items={[...testimonialsSection.items]} />
         </Container>

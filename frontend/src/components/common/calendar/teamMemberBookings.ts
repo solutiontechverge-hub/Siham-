@@ -65,9 +65,7 @@ export function isTeamSharedBooking(
 export const SHARED_BOOKING_LANE_CONNECTOR_BG = "#C5CBD3";
 
 function firstTeamName(value: string | undefined) {
-  const name = value?.trim();
-  if (!name) return "";
-  return name.split(/\s+/)[0] ?? "";
+  return value?.trim() || "";
 }
 
 export function teamSharedBookingTooltip(

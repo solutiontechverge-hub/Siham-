@@ -121,25 +121,18 @@ export function useClientBookingCreateAvailability(
   ]);
 
   const availableTimes = React.useMemo(() => {
-    if (!availabilityBookableTimes?.length) return baseAvailableTimes;
-    const allowed = new Set(availabilityBookableTimes);
-    const filtered = baseAvailableTimes.filter((time) => allowed.has(time));
-    return filtered.length > 0 ? filtered : baseAvailableTimes;
+    // When live TM availability is loaded, never fall back to hours that ignore blocks/busy.
+    if (availabilityBookableTimes) {
+      if (!availabilityBookableTimes.length) return [];
+      const allowed = new Set(availabilityBookableTimes);
+      return baseAvailableTimes.filter((time) => allowed.has(time));
+    }
+    return baseAvailableTimes;
   }, [availabilityBookableTimes, baseAvailableTimes]);
 
-  const lastAutoAssignRef = React.useRef("");
-  const locationCatalogIdsKey = React.useMemo(
-    () => locationServiceCatalog.map((service) => service.id).join(","),
-    [locationServiceCatalog],
-  );
   const locationServiceCatalogRef = React.useRef(locationServiceCatalog);
   locationServiceCatalogRef.current = locationServiceCatalog;
   const selectedDateISO = toISO(selectedDate);
-  const servicesAssignKey = React.useMemo(
-    () =>
-      services.map((service) => `${service.id}:${service.durationMins}`).join(","),
-    [services],
-  );
 
   React.useEffect(() => {
     if (
@@ -155,13 +148,8 @@ export function useClientBookingCreateAvailability(
     if (!startMin) return;
 
     const catalogList = locationServiceCatalogRef.current;
-    const contextKey = [
-      selectedDateISO,
-      selectedTime,
-      servicesAssignKey,
-      locationCatalogIdsKey,
-    ].join("|");
-
+    // FL + Combine Services: one free member for the shared window.
+    // Always recalculate from live availability — never pin a hydration/default TM.
     const assignments = autoAssignServicesByAvailability({
       snapshot: availabilitySnapshot,
       services: services.map((service) => ({
@@ -169,22 +157,19 @@ export function useClientBookingCreateAvailability(
         catalogServiceId:
           service.catalogServiceId ?? extractUuidFromSyntheticId(service.id),
         durationMins: service.durationMins,
-        // Fixed Location must recalculate from live availability. A temporary
-        // first-member value should not pin every service to that person.
-        teamMemberId: isDesiredLocation ? service.teamMemberId : undefined,
+        teamMemberId: undefined,
       })),
       candidateMemberIds,
       fallbackCatalogIds: catalogList.map((service) => service.id),
       startMin,
-      assignOneMemberForAll: isDesiredLocation,
+      assignOneMemberForAll: isDesiredLocation || bookServicesAtSameTime,
+      sharedWindowMins: bookServicesAtSameTime
+        ? servicesDurationMins || undefined
+        : undefined,
     });
 
-    const assignKey = `${contextKey}|${assignments
-      .map((row) => `${row.id}:${row.teamMemberId ?? ""}`)
-      .join(",")}`;
-    if (lastAutoAssignRef.current === assignKey) return;
-    lastAutoAssignRef.current = assignKey;
-
+    // ponytail: no lastAutoAssignRef — that key ignored current teamMemberIds, so
+    // guest-assign re-stamping the default first TM after a clear never got undone.
     setServices((prev) => {
       let changed = false;
       const next = prev.map((service) => {
@@ -201,24 +186,24 @@ export function useClientBookingCreateAvailability(
       return changed ? next : prev;
     });
 
-    if (isDesiredLocation) {
+    if (isDesiredLocation || bookServicesAtSameTime) {
       const sharedMember =
         assignments.find((row) => row.teamMemberId)?.teamMemberId ?? "";
-      if (sharedMember && sharedMember !== selectedTeamMemberId) {
+      if (sharedMember !== selectedTeamMemberId) {
         setSelectedTeamMemberId(sharedMember);
       }
     }
   }, [
     availabilitySnapshot,
+    bookServicesAtSameTime,
     candidateMemberIds,
     hasAssignableTeamMembers,
     isDesiredLocation,
-    locationCatalogIdsKey,
     selectedDateISO,
     selectedTeamMemberId,
     selectedTime,
     services,
-    servicesAssignKey,
+    servicesDurationMins,
     setSelectedTeamMemberId,
     setServices,
   ]);
