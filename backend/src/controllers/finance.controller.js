@@ -202,6 +202,7 @@ const resolveFinanceClientParty = async ({
   let resolvedLegalName = String(clientName ?? "").trim() || "Guest";
   let resolvedAddress = null;
   let isMollure = clientType === "mollure";
+  const explicitNonMollure = clientType === "nonMollure";
 
   // Walk-in / one-time guests: name+email only — product has no guest professional_clients record.
   if (clientType === "guest") {
@@ -251,7 +252,10 @@ const resolveFinanceClientParty = async ({
       if (row.user_type === "company" && clientType === "guest") {
         // booking-linked company payer is business
       }
-      isMollure = isMollure || Boolean(row.customer_id);
+      // Explicit Non-Mollure payload must not be upgraded via booking.customer_id.
+      if (!explicitNonMollure) {
+        isMollure = isMollure || Boolean(row.customer_id);
+      }
     }
   }
 
@@ -270,7 +274,10 @@ const resolveFinanceClientParty = async ({
       const user = userLookup.rows[0];
       if (user) {
         customerId = user.id;
-        isMollure = true;
+        // Email collision with a platform user must not flip Non-Mollure → Mollure.
+        if (!explicitNonMollure) {
+          isMollure = true;
+        }
         if (!resolvedVat) resolvedVat = user.vat_number || null;
         if (!resolvedCoc) resolvedCoc = user.ccc_number || null;
         if (user.user_type === "company" && user.legal_name) {
@@ -291,13 +298,18 @@ const resolveFinanceClientParty = async ({
        WHERE professional_profile_id = $1
          AND (
            ($2::uuid IS NOT NULL AND mollure_user_id = $2)
-           OR ($3::text <> '' AND lower(email) = lower($3))
+           OR (
+             $3::text <> ''
+             AND lower(email) = lower($3)
+             AND (is_mollure = true OR $4::boolean)
+           )
          )
        ORDER BY
          CASE WHEN $2::uuid IS NOT NULL AND mollure_user_id = $2 THEN 0 ELSE 1 END,
+         CASE WHEN is_mollure THEN 0 ELSE 1 END,
          updated_at DESC NULLS LAST
        LIMIT 1`,
-      [professionalProfileId, customerId, email],
+      [professionalProfileId, customerId, email, explicitNonMollure],
     );
     const pc = clientRow.rows[0];
     if (pc) {
@@ -308,7 +320,8 @@ const resolveFinanceClientParty = async ({
         resolvedLegalName = pc.legal_name;
       }
       if (pc.business_address) resolvedAddress = pc.business_address;
-      if (pc.is_mollure) isMollure = true;
+      if (pc.is_mollure === true) isMollure = true;
+      else if (pc.is_mollure === false) isMollure = false;
     }
   }
 
@@ -647,7 +660,7 @@ const mapSalesAddonRow = (row) => ({
   id: row.id, bookingId: row.booking_id, bookingCode: row.booking_code,
   clientName: row.client_name, clientEmail: row.client_email ?? undefined,
   lines: normalizeMoneyJson(row.lines) ?? [], discount: normalizeMoneyJson(row.discount) ?? null,
-  discountAmount: Number(row.discount_amount ?? 0), totalPrice: Number(row.total_price ?? 0),
+  discountAmount: parseMoney(row.discount_amount), totalPrice: parseMoney(row.total_price),
   paymentMethod: row.payment_method, createdAt: row.created_at?.toISOString?.() ?? row.created_at,
   note: row.note ?? undefined, voided: row.voided, refunded: row.refunded,
 });
@@ -1049,16 +1062,20 @@ export const createFinanceTransaction = async (req, res) => {
       return res.status(400).json({ success: false, message: "Each line must include a valid source reference.", data: null });
     }
     const lineItems = submittedLines.length
-      ? submittedLines.map((line) => ({
-          description: line.name,
-          sourceReference: String(line.sourceReference),
-          sourceType: line.sourceType,
-          quantity: String(line.quantity ?? 1),
-          vat: "21%",
-          vatRate: 21,
-          pricePerUnit: moneyNumber(line.unitPrice),
-          totalPrice: moneyNumber((line.quantity ?? 1) * (line.unitPrice ?? 0)),
-        }))
+      ? submittedLines.map((line) => {
+          const quantity = parseMoney(line.quantity ?? 1, 1);
+          const unitPrice = moneyNumber(line.unitPrice);
+          return {
+            description: line.name,
+            sourceReference: String(line.sourceReference),
+            sourceType: line.sourceType,
+            quantity,
+            vat: "21%",
+            vatRate: 21,
+            pricePerUnit: unitPrice,
+            totalPrice: moneyNumber(quantity * unitPrice),
+          };
+        })
       : [];
 
     // Discounts and empty submissions are represented by transaction totals,
@@ -1209,7 +1226,7 @@ export const createFinanceTransaction = async (req, res) => {
         // booking code, so persist the resolved UUID while keeping the code in
         // the document/entry metadata above.
         bookingUuid || null,
-        JSON.stringify(document),
+        JSON.stringify(normalizeMoneyJson(document)),
         moneyNumber(body.discountAmount),
         moneyNumber(body.prepaymentAmount),
         isOnlineDirect || isNonDirect ? 0 : moneyNumber(gross),
@@ -1316,11 +1333,11 @@ export const updateFinanceTransaction = async (req, res) => {
         if (minted) {
           const nextDoc = { ...currentDoc, receiptNumber: minted };
           fields.push(`document = $${idx}::jsonb`);
-          values.push(JSON.stringify(nextDoc));
+          values.push(JSON.stringify(normalizeMoneyJson(nextDoc)));
           idx += 1;
           const issued = existing.rows[0].issued_document || currentDoc;
           fields.push(`issued_document = $${idx}::jsonb`);
-          values.push(JSON.stringify({ ...issued, receiptNumber: minted }));
+          values.push(JSON.stringify(normalizeMoneyJson({ ...issued, receiptNumber: minted })));
           idx += 1;
         }
       }
@@ -1449,7 +1466,7 @@ export const bulkFinanceTransactionAction = async (req, res) => {
                issued_at = NOW(),
                updated_at = NOW()
            WHERE id = $1 AND professional_profile_id = $2`,
-          [row.id, profile.id, JSON.stringify(creditDocument), moneyNumber(row.net_amount)],
+          [row.id, profile.id, JSON.stringify(normalizeMoneyJson(creditDocument)), moneyNumber(row.net_amount)],
         );
 
         if (row.booking_id) {
@@ -1820,16 +1837,20 @@ export const replaceFinanceTransaction = async (req, res) => {
         data: null,
       });
     }
-    const lineItems = submittedLines.map((line) => ({
-      description: line.name,
-      sourceReference: String(line.sourceReference ?? line.id ?? ""),
-      sourceType: line.sourceType ?? "uniqueItemCode",
-      quantity: String(line.quantity ?? 1),
-      vat: "21%",
-      vatRate: 21,
-      pricePerUnit: moneyNumber(line.unitPrice),
-      totalPrice: moneyNumber((line.quantity ?? 1) * (line.unitPrice ?? 0)),
-    }));
+    const lineItems = submittedLines.map((line) => {
+      const quantity = parseMoney(line.quantity ?? 1, 1);
+      const unitPrice = moneyNumber(line.unitPrice);
+      return {
+        description: line.name,
+        sourceReference: String(line.sourceReference ?? line.id ?? ""),
+        sourceType: line.sourceType ?? "uniqueItemCode",
+        quantity,
+        vat: "21%",
+        vatRate: 21,
+        pricePerUnit: unitPrice,
+        totalPrice: moneyNumber(quantity * unitPrice),
+      };
+    });
 
     const result = await query(
       `INSERT INTO finance_transactions (
@@ -1857,7 +1878,7 @@ export const replaceFinanceTransaction = async (req, res) => {
         isOnline ? "Online – direct" : "Offline – direct",
         "",
         isOnline ? "Pending" : "Paid",
-        JSON.stringify({
+        JSON.stringify(normalizeMoneyJson({
           documentNumber: `INV-RPL-${entryNum}`,
           receiptNumber: mintReceiptNumber(isOnline ? "Pending" : "Paid", `G${entryNum}`),
           serviceDate: today,
@@ -1873,7 +1894,7 @@ export const replaceFinanceTransaction = async (req, res) => {
             invoiceSettings: issuedInvoiceSettings,
             professionalBusiness: issuedProfessionalBusiness,
           },
-        }),
+        })),
       ],
     );
 
@@ -2074,7 +2095,7 @@ export const reissueFinanceInvoiceForBooking = async (req, res) => {
       [
         txId,
         `Reissue of ${prevNumber}`,
-        JSON.stringify(nextDoc),
+        JSON.stringify(normalizeMoneyJson(nextDoc)),
         nextAmount,
         clientEmail,
         clientName,

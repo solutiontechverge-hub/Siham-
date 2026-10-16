@@ -217,7 +217,7 @@ export function MarketingKpiSubtitle<C extends React.ElementType = "div">(
  * Prefer `MainHeading`, `SubHeading`, `Description`, `CardTitle`, `BodyText`.
  */
 export function Typography<C extends React.ElementType = "p">(
-  props: TypographyProps<C>,
+  props: TypographyProps<C> & { href?: unknown },
 ) {
   return <MuiTypography {...props} />;
 }

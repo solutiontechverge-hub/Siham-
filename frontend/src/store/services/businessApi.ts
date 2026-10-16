@@ -695,6 +695,7 @@ export type ApiProfessionalClient = {
   gender: string | null;
   date_of_birth: string | null;
   residential_address: string | null;
+  residential_area: string | null;
   legal_name: string | null;
   coc: string | null;
   vat: string | null;
@@ -734,6 +735,7 @@ export type CreateProfessionalClientRequest =
       gender?: string;
       date_of_birth?: string;
       residential_address?: string;
+      residential_area?: string;
       coc?: string;
       vat?: string;
       contact_person_name?: string;
@@ -753,6 +755,7 @@ export type UpdateProfessionalClientRequest = {
   gender?: string;
   date_of_birth?: string;
   residential_address?: string;
+  residential_area?: string;
   coc?: string;
   vat?: string;
   contact_person_name?: string;

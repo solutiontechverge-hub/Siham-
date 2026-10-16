@@ -19,7 +19,7 @@ import {
 } from "./financeEmail.service.js";
 import { dispatchInvoiceReissuedNotification } from "./bookingNotification.service.js";
 import { computeFinanceFees } from "../utils/financeFees.js";
-import { roundMoney } from "../utils/money.js";
+import { normalizeMoneyJson, parseMoney, roundMoney } from "../utils/money.js";
 import {
   protectiveFeeNetsPrepaid,
   settleProtectiveFee,
@@ -218,7 +218,7 @@ async function getBookingContext(bookingId) {
        ON pc.professional_profile_id = bs.professional_profile_id
       AND (
         pc.mollure_user_id = u.id
-        OR lower(pc.email) = lower(u.email)
+        OR (pc.is_mollure = true AND lower(pc.email) = lower(u.email))
       )
      LEFT JOIN subcategories s ON s.id = b.service_id
      WHERE b.id = $1
@@ -266,6 +266,7 @@ function buildFinanceClientParty(booking, { clientName, clientEmail, payerRole }
       .filter(Boolean)
       .join(", ") ||
     null;
+  // Explicit Non-Mollure PC wins; otherwise platform customer_id ⇒ Mollure.
   const isMollure =
     booking.pc_is_mollure === true ||
     (booking.pc_is_mollure !== false && Boolean(booking.customer_id));
@@ -395,7 +396,7 @@ function buildFallbackLineItems(booking, meta, invoiceSettings) {
           description: service.name || "Service",
           sourceReference,
           sourceType: "serviceId",
-          quantity: "1",
+          quantity: 1,
           ...vatFieldsForService(sourceReference, invoiceSettings),
           pricePerUnit: roundMoney(service.price),
           totalPrice: roundMoney(service.price),
@@ -413,7 +414,7 @@ function buildFallbackLineItems(booking, meta, invoiceSettings) {
         description: service.name || "Service",
         sourceReference,
         sourceType: "serviceId",
-        quantity: "1",
+        quantity: 1,
         ...vatFieldsForService(sourceReference, invoiceSettings),
         pricePerUnit: roundMoney(service.price),
         totalPrice: roundMoney(service.price),
@@ -426,7 +427,7 @@ function buildFallbackLineItems(booking, meta, invoiceSettings) {
         description: product.name || "Product",
         sourceReference,
         sourceType: "productId",
-        quantity: String(product.quantity || 1),
+        quantity: parseMoney(product.quantity || 1, 1),
         ...vatFieldsForProduct(sourceReference, invoiceSettings),
         pricePerUnit: roundMoney(product.unitPrice ?? product.price),
         totalPrice: roundMoney(product.price),
@@ -441,7 +442,7 @@ function buildFallbackLineItems(booking, meta, invoiceSettings) {
       description: booking.service_title || "Professional Service",
       sourceReference,
       sourceType: "serviceId",
-      quantity: "1",
+      quantity: 1,
       ...vatFieldsForService(sourceReference, invoiceSettings),
       pricePerUnit: roundMoney(booking.total_price),
       totalPrice: roundMoney(booking.total_price),
@@ -715,7 +716,7 @@ function resolveSplitPayers(booking, meta, invoiceSettings) {
         description: service.name || "Service",
         sourceReference,
         sourceType: "serviceId",
-        quantity: "1",
+        quantity: 1,
         ...vatFieldsForService(sourceReference, invoiceSettings),
         pricePerUnit: roundMoney(service.price),
         totalPrice: roundMoney(service.price),
@@ -795,7 +796,7 @@ function resolveSplitPayers(booking, meta, invoiceSettings) {
             description: s.name || "Service",
             sourceReference,
             sourceType: "serviceId",
-            quantity: "1",
+            quantity: 1,
             ...vatFieldsForService(sourceReference, invoiceSettings),
             pricePerUnit: roundMoney(s.price),
             totalPrice: roundMoney(s.price),
@@ -808,7 +809,7 @@ function resolveSplitPayers(booking, meta, invoiceSettings) {
             description: p.name || "Product",
             sourceReference,
             sourceType: "productId",
-            quantity: String(p.quantity || 1),
+            quantity: parseMoney(p.quantity || 1, 1),
             ...vatFieldsForProduct(sourceReference, invoiceSettings),
             pricePerUnit: roundMoney(p.unitPrice ?? p.price),
             totalPrice: roundMoney(p.price),
@@ -854,7 +855,7 @@ function resolveSplitPayers(booking, meta, invoiceSettings) {
             description: booking.service_title || "Service",
             sourceReference: String(booking.service_id),
             sourceType: "serviceId",
-            quantity: "1",
+            quantity: 1,
             ...vatFieldsForService(booking.service_id, invoiceSettings),
             pricePerUnit: roundMoney(mainSubtotal),
             totalPrice: roundMoney(mainSubtotal),
@@ -880,7 +881,7 @@ function resolveSplitPayers(booking, meta, invoiceSettings) {
               description: booking.service_title || "Service",
               sourceReference: String(booking.service_id),
               sourceType: "serviceId",
-              quantity: "1",
+              quantity: 1,
               ...vatFieldsForService(booking.service_id, invoiceSettings),
               pricePerUnit: roundMoney(total),
               totalPrice: roundMoney(total),
@@ -911,7 +912,7 @@ async function healEmptyDocumentLineItems(financeTransactionId, lineItems) {
          updated_at = NOW()
      WHERE id = $1
        AND jsonb_array_length(COALESCE(document->'lineItems', '[]'::jsonb)) = 0`,
-    [financeTransactionId, JSON.stringify(catalog)],
+    [financeTransactionId, JSON.stringify(normalizeMoneyJson(catalog))],
   );
 }
 
@@ -1236,7 +1237,7 @@ async function insertFinanceTransaction({
           ? `${payerLabel}: ${clientName}`
           : null,
       booking.unique_code,
-      JSON.stringify(document),
+      JSON.stringify(normalizeMoneyJson(document)),
       isPrepaymentDocument ? gross : feePrepaidApplied,
       isSettledFinanceStatus(status) ? gross : 0,
     ],
@@ -1686,7 +1687,7 @@ async function applySettingsBasedReissue(row, paymentTerms, level, options = {})
          payment_deadline = $5::date,
          updated_at = NOW()
      WHERE id = $1`,
-    [row.id, `Reissue of ${prevNumber}`, JSON.stringify(nextDoc), nextAmount, dueDate],
+    [row.id, `Reissue of ${prevNumber}`, JSON.stringify(normalizeMoneyJson(nextDoc)), nextAmount, dueDate],
   );
 
   const dueDateLabel = dueDate.split("-").reverse().join("/");

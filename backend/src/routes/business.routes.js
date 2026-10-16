@@ -628,6 +628,7 @@ router.post(
       .trim()
       .isLength({ max: 8 })
       .withMessage("country_code is too long."),
+    textBody("residential_area", { optional: true, max: LIMITS.textShort }),
     textBody("technical_note", {
       optional: true,
       min: LIMITS.notesMin,
@@ -660,6 +661,7 @@ router.patch(
     emailBody("detail_email", { optional: true }),
     textBody("business_address", { optional: true, max: LIMITS.textMedium }),
     textBody("residential_address", { optional: true, max: LIMITS.textMedium }),
+    textBody("residential_area", { optional: true, max: LIMITS.textShort }),
     textBody("street", { optional: true, max: LIMITS.textShort }),
     textBody("street_number", { optional: true, max: 20 }),
     textBody("postal_code", { optional: true, max: 12 }),

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import {
   Avatar,
   Box,
@@ -58,6 +59,7 @@ import {
   CLIENT_LIST_SORT_OPTIONS,
   CLIENT_TABLE_HEADERS,
   getClientRowMenuOptions,
+  getProfessionalClientHref,
 } from "./client.data";
 import { Typography } from "../../../../components/ui/typography";
 
@@ -117,6 +119,8 @@ export default function ClientPageView() {
     setIndPhone,
     indEmail,
     setIndEmail,
+    indResidentialArea,
+    setIndResidentialArea,
     indErrors,
     setIndErrors,
     nonMollureTypeError,
@@ -219,7 +223,6 @@ export default function ClientPageView() {
 
         {/* Toolbar */}
         <MollureListToolbar
-          searchPlaceholder="Search by name, email, or phone number"
           searchValue={query}
           onSearchChange={setQuery}
           onFilterClick={() => setFilterDrawerOpen(true)}
@@ -388,12 +391,19 @@ export default function ClientPageView() {
                   <TableBody>
                     {filtered.map((c) => {
                       const blocked = isClientBlocked(c);
+                      const hasTechnicalNote = Boolean(c.technicalNote?.trim());
                       return (
                         <TableRow
                           key={c.id}
                           hover={!blocked}
-                          sx={
-                            blocked
+                          onClick={() => {
+                            if (!hasTechnicalNote || !c.id) return;
+                            openClientDetailsView(c.id, {
+                              focusTechnicalNote: true,
+                            });
+                          }}
+                          sx={{
+                            ...(blocked
                               ? {
                                   bgcolor: alpha(
                                     theme.palette.error.main,
@@ -404,8 +414,11 @@ export default function ClientPageView() {
                                     borderBottom: `1px solid ${alpha(theme.palette.error.main, 0.18)}`,
                                   },
                                 }
-                              : undefined
-                          }
+                              : {}),
+                            ...(hasTechnicalNote
+                              ? { cursor: "pointer" }
+                              : {}),
+                          }}
                         >
                           <TableCell sx={{ py: 1.35 }}>
                             <Stack
@@ -438,15 +451,22 @@ export default function ClientPageView() {
                                   alignItems="center"
                                 >
                                   <Typography
+                                    component={Link}
+                                    href={getProfessionalClientHref(c.id)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (c.id) openClientDetailsView(c.id);
+                                    }}
                                     sx={{
                                       fontWeight: 900,
                                       fontSize: 13,
                                       color: blocked
                                         ? alpha(theme.palette.error.main, 0.88)
-                                        : alpha(m.navy, 0.88),
-                                      textDecoration: blocked
-                                        ? "line-through"
-                                        : "none",
+                                        : theme.palette.primary.main,
+                                      textDecoration: "none",
+                                      "&:hover": {
+                                        textDecoration: "underline",
+                                      },
                                     }}
                                   >
                                     {c.name}
@@ -499,7 +519,7 @@ export default function ClientPageView() {
                                       }}
                                     />
                                   ) : null}
-                                  {c.technicalNote?.trim() ? (
+                                  {hasTechnicalNote ? (
                                     <Tooltip title="View technical note" arrow>
                                       <IconButton
                                         size="small"
@@ -567,12 +587,13 @@ export default function ClientPageView() {
                           <TableCell align="right">
                             <IconButton
                               size="small"
-                              onClick={(e) =>
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setRowMenu({
                                   id: c.id,
                                   anchor: e.currentTarget,
-                                })
-                              }
+                                });
+                              }}
                               sx={{
                                 width: 30,
                                 height: 30,
@@ -795,11 +816,7 @@ export default function ClientPageView() {
             ) : (
               <ClientDetailsViewPanel
                 client={viewClient}
-                onEdit={
-                  viewClient.tags.includes("Mollure")
-                    ? undefined
-                    : openClientDetailsEdit
-                }
+                onEdit={openClientDetailsEdit}
                 onSaveTechnicalNote={saveClientTechnicalNote}
                 focusTechnicalNote={focusTechnicalNoteOnOpen}
                 onTechnicalNoteFocused={clearTechnicalNoteFocus}
@@ -842,6 +859,8 @@ export default function ClientPageView() {
         setIndPhone={setIndPhone}
         indEmail={indEmail}
         setIndEmail={setIndEmail}
+        indResidentialArea={indResidentialArea}
+        setIndResidentialArea={setIndResidentialArea}
         indErrors={indErrors}
         setIndErrors={setIndErrors}
         coLegalName={coLegalName}

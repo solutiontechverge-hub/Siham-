@@ -218,18 +218,14 @@ export default function MessagingConversationSidebar({
         </Box>
 
         {showBulkActions ? (
-          <Stack
-            direction="row"
-            alignItems="center"
-            justifyContent="space-between"
-            sx={{ mt: { xs: 1.25, sm: 1.5 } }}
-          >
+          <Stack spacing={1} sx={{ mt: { xs: 1.25, sm: 1.5 } }}>
             <AppButton
               variant="outlined"
               size="small"
               disabled={!canUseListActions}
               onClick={onRequestDelete}
               sx={{
+                alignSelf: "flex-start",
                 textTransform: "none",
                 fontWeight: 800,
                 fontSize: 12,
@@ -275,6 +271,7 @@ export default function MessagingConversationSidebar({
                   Select All
                 </Typography>
               }
+              sx={{ mr: 0, ml: 0, alignSelf: "flex-end" }}
             />
           </Stack>
         ) : null}

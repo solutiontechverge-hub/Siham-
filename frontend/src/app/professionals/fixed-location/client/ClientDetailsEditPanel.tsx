@@ -60,6 +60,7 @@ export default function ClientDetailsEditPanel({
 }: Props) {
   const m = useTheme().palette.mollure;
   const genderSelectProps = useEmptySelectRenderProps("Select gender");
+  const fieldsLocked = isMollureClient(client);
 
   if (client.kind === "company") {
     return (
@@ -131,6 +132,7 @@ export default function ClientDetailsEditPanel({
       <MollureFormField
         placeholder="Legal Name"
         value={editCompanyForm.legalName}
+        disabled={fieldsLocked}
         onChange={(e) =>
           setEditCompanyForm((p) => ({
             ...p,
@@ -142,6 +144,7 @@ export default function ClientDetailsEditPanel({
       <MollureFormField
         placeholder="COC"
         value={editCompanyForm.coc}
+        disabled={fieldsLocked}
         onChange={(e) =>
           setEditCompanyForm((p) => ({
             ...p,
@@ -153,6 +156,7 @@ export default function ClientDetailsEditPanel({
       <MollureFormField
         placeholder="VAT"
         value={editCompanyForm.vat}
+        disabled={fieldsLocked}
         onChange={(e) =>
           setEditCompanyForm((p) => ({
             ...p,
@@ -164,6 +168,7 @@ export default function ClientDetailsEditPanel({
       <MollureFormField
         placeholder="Contact Person's First Name"
         value={editCompanyForm.contactFirst}
+        disabled={fieldsLocked}
         onChange={(e) =>
           setEditCompanyForm((p) => ({
             ...p,
@@ -175,6 +180,7 @@ export default function ClientDetailsEditPanel({
       <MollureFormField
         placeholder="Contact Person's Last Name"
         value={editCompanyForm.contactLast}
+        disabled={fieldsLocked}
         onChange={(e) =>
           setEditCompanyForm((p) => ({
             ...p,
@@ -187,6 +193,7 @@ export default function ClientDetailsEditPanel({
         select
         label="Gender"
         value={editCompanyForm.gender}
+        disabled={fieldsLocked}
         onChange={(e) =>
           setEditCompanyForm((p) => ({
             ...p,
@@ -211,6 +218,7 @@ export default function ClientDetailsEditPanel({
       <AppCountryPhoneFields
         countryCode={editCompanyForm.countryCode}
         phone={editCompanyForm.phone}
+        disabled={fieldsLocked}
         onCountryCodeChange={(dialCode) =>
           setEditCompanyForm((p) => ({
             ...p,
@@ -241,6 +249,7 @@ export default function ClientDetailsEditPanel({
           <MollureFormField
             placeholder="Street"
             value={editCompanyForm.street}
+            disabled={fieldsLocked}
             onChange={(e) =>
               setEditCompanyForm((p) => ({
                 ...p,
@@ -254,6 +263,7 @@ export default function ClientDetailsEditPanel({
           <MollureFormField
             placeholder="Number"
             value={editCompanyForm.streetNumber}
+            disabled={fieldsLocked}
             onChange={(e) =>
               setEditCompanyForm((p) => ({
                 ...p,
@@ -267,6 +277,7 @@ export default function ClientDetailsEditPanel({
           <MollureFormField
             placeholder="Postal Code"
             value={editCompanyForm.postal}
+            disabled={fieldsLocked}
             onChange={(e) =>
               setEditCompanyForm((p) => ({
                 ...p,
@@ -280,6 +291,7 @@ export default function ClientDetailsEditPanel({
           <MollureFormField
             select
             value={editCompanyForm.province || "Province"}
+            disabled={fieldsLocked}
             onChange={(e) =>
               setEditCompanyForm((p) => ({
                 ...p,
@@ -299,6 +311,7 @@ export default function ClientDetailsEditPanel({
           <MollureFormField
             select
             value={editCompanyForm.municipality || "Municipality"}
+            disabled={fieldsLocked}
             onChange={(e) =>
               setEditCompanyForm((p) => ({
                 ...p,
@@ -322,6 +335,7 @@ export default function ClientDetailsEditPanel({
       <MollureFormField
         placeholder="Email Address"
         value={editCompanyForm.email}
+        disabled={fieldsLocked}
         onChange={(e) =>
           setEditCompanyForm((p) => ({
             ...p,
@@ -424,6 +438,7 @@ export default function ClientDetailsEditPanel({
       <MollureFormField
         placeholder="First Name"
         value={editIndividualForm.firstName}
+        disabled={fieldsLocked}
         onChange={(e) =>
           setEditIndividualForm((p) => ({
             ...p,
@@ -435,6 +450,7 @@ export default function ClientDetailsEditPanel({
       <MollureFormField
         placeholder="Last Name"
         value={editIndividualForm.lastName}
+        disabled={fieldsLocked}
         onChange={(e) =>
           setEditIndividualForm((p) => ({
             ...p,
@@ -447,6 +463,7 @@ export default function ClientDetailsEditPanel({
         select
         label="Gender"
         value={editIndividualForm.gender}
+        disabled={fieldsLocked}
         onChange={(e) =>
           setEditIndividualForm((p) => ({
             ...p,
@@ -484,12 +501,14 @@ export default function ClientDetailsEditPanel({
             setEditIndividualForm((p) => ({ ...p, dob: iso }))
           }
           max={getTodayIsoDate()}
+          disabled={fieldsLocked}
           fullWidth
         />
       </Box>
       <AppCountryPhoneFields
         countryCode={editIndividualForm.countryCode}
         phone={editIndividualForm.phone}
+        disabled={fieldsLocked}
         onCountryCodeChange={(dialCode) =>
           setEditIndividualForm((p) => ({
             ...p,
@@ -504,9 +523,20 @@ export default function ClientDetailsEditPanel({
         onClearErrors={() => setEditPhoneErrors({})}
         phonePlaceholder="+316xxxxxxxx"
       />
+      <Typography
+        sx={{
+          fontSize: 11.5,
+          fontWeight: 700,
+          color: alpha(m.navy, 0.62),
+          pt: 0.5,
+        }}
+      >
+        Address
+      </Typography>
       <MollureFormField
         placeholder="Residential Address"
         value={editIndividualForm.residentialAddress}
+        disabled={fieldsLocked}
         onChange={(e) =>
           setEditIndividualForm((p) => ({
             ...p,
@@ -516,8 +546,21 @@ export default function ClientDetailsEditPanel({
         sx={mollureWhiteFieldInputSx}
       />
       <MollureFormField
+        placeholder="Residential Area"
+        value={editIndividualForm.residentialArea}
+        disabled={fieldsLocked}
+        onChange={(e) =>
+          setEditIndividualForm((p) => ({
+            ...p,
+            residentialArea: e.target.value,
+          }))
+        }
+        sx={mollureWhiteFieldInputSx}
+      />
+      <MollureFormField
         placeholder="Email Address"
         value={editIndividualForm.email}
+        disabled={fieldsLocked}
         onChange={(e) =>
           setEditIndividualForm((p) => ({
             ...p,

@@ -38,11 +38,28 @@ export function platformLabel(client: ClientRecord): "Mollure" | "Non-Mollure" {
   return isMollureClient(client) ? "Mollure" : "Non-Mollure";
 }
 
+/** Case-insensitive substring OR across name parts + email. Empty query = match all. */
 export function matchesClientSearch(client: ClientRecord, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  const haystack = `${client.name} ${client.email} ${client.detailEmail ?? ""} ${client.phone}`.toLowerCase();
-  return haystack.includes(q);
+  return [
+    client.firstName,
+    client.lastName,
+    client.name,
+    client.contactPersonName,
+    client.email,
+  ].some((v) => String(v ?? "").toLowerCase().includes(q));
+}
+
+/** Deep-link: prefer `q`; legacy `firstName`/`lastName` join into one query. */
+export function parseClientSearchQuery(params: {
+  get: (name: string) => string | null;
+}): string {
+  const q = params.get("q")?.trim() || "";
+  if (q) return q;
+  const first = params.get("firstName")?.trim() || "";
+  const last = params.get("lastName")?.trim() || "";
+  return [first, last].filter(Boolean).join(" ");
 }
 
 export function matchesClientFilters(client: ClientRecord, activeFilters: ReadonlySet<ClientListFilterKey>): boolean {

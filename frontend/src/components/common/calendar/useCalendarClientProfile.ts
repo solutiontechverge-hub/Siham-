@@ -10,7 +10,6 @@ import type { CalendarEvent } from "../../../app/professionals/fixed-location/ca
 import type { ApiProfessionalClient } from "../../../store/services/businessApi";
 import {
   useCreateProfessionalClientMutation,
-  useLazyLookupMollureClientByEmailQuery,
   useUpdateProfessionalClientTechnicalNoteMutation,
 } from "../../../store/services/businessApi";
 import {
@@ -34,7 +33,6 @@ export function useCalendarClientProfile(
     useCreateProfessionalClientMutation();
   const [updateProfessionalClientTechnicalNote] =
     useUpdateProfessionalClientTechnicalNoteMutation();
-  const [lookupMollureClientByEmail] = useLazyLookupMollureClientByEmailQuery();
 
   const [viewClientId, setViewClientId] = React.useState<string | null>(null);
   const [notInListPopover, setNotInListPopover] =
@@ -107,18 +105,8 @@ export function useCalendarClientProfile(
       }
 
       try {
-        let mollureUserId = String(identity.customerId ?? "").trim();
-
-        if (!mollureUserId && identity.email?.trim()) {
-          try {
-            const lookup = await lookupMollureClientByEmail({
-              email: identity.email.trim(),
-            }).unwrap();
-            mollureUserId = lookup.data?.id ?? "";
-          } catch {
-            mollureUserId = "";
-          }
-        }
+        // Only trust booking customerId for Mollure — email lookup promoted Non-Mollure to Mollure.
+        const mollureUserId = String(identity.customerId ?? "").trim();
 
         if (mollureUserId) {
           const created = await createProfessionalClient({
@@ -186,12 +174,7 @@ export function useCalendarClientProfile(
         return false;
       }
     },
-    [
-      createProfessionalClient,
-      lookupMollureClientByEmail,
-      openListedClient,
-      showSnackbar,
-    ],
+    [createProfessionalClient, openListedClient, showSnackbar],
   );
 
   const saveClientTechnicalNote = React.useCallback(

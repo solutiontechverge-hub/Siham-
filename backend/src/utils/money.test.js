@@ -17,14 +17,17 @@ assert.equal(roundMoney("€1,234.567"), 1234.57);
 assert.deepEqual(
   normalizeMoneyJson({
     totalPrice: "€1,111,111",
-    lineItems: [{ pricePerUnit: "€10,00", totalPrice: 20, vat: "21%" }],
+    lineItems: [{ pricePerUnit: "€10,00", totalPrice: 20, quantity: "2", vat: "21%" }],
     note: "keep me",
   }),
   {
     totalPrice: 1111111,
-    lineItems: [{ pricePerUnit: 10, totalPrice: 20, vat: "21%" }],
+    lineItems: [{ pricePerUnit: 10, totalPrice: 20, quantity: 2, vat: "21%" }],
     note: "keep me",
   },
 );
+
+assert.equal(normalizeMoneyJson({ quantity: "1" }).quantity, 1);
+assert.equal(normalizeMoneyJson({ bookings: "5" }).bookings, 5);
 
 console.log("money.test.js: ok");

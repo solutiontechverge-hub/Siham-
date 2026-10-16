@@ -6,16 +6,52 @@ const SALES_BOOKING_STATUSES = ["confirmed", "completed", "in_progress"];
 
 const normalizeEmail = (value) => String(value ?? "").trim().toLowerCase();
 
+// Email match only for Mollure PCs — Non-Mollure must not inherit Mollure bookings by coincidence.
 const CLIENT_BOOKING_MATCH_SQL = `
   (
     (pc.mollure_user_id IS NOT NULL AND b.customer_id = pc.mollure_user_id)
-    OR EXISTS (
-      SELECT 1 FROM users u
-      WHERE u.id = b.customer_id
-        AND LOWER(TRIM(u.email)) = LOWER(TRIM(pc.email))
+    OR (
+      pc.is_mollure = true
+      AND EXISTS (
+        SELECT 1 FROM users u
+        WHERE u.id = b.customer_id
+          AND LOWER(TRIM(u.email)) = LOWER(TRIM(pc.email))
+      )
     )
   )
 `;
+
+/** Non-Mollure rows stay Non-Mollure when a Mollure user shares the same email. */
+export function shouldPromoteProfessionalClientToMollure(existing) {
+  if (!existing) return true;
+  if (existing.is_mollure === false && !existing.mollure_user_id) return false;
+  return true;
+}
+
+export const MOLLURE_EMAIL_ALREADY_REGISTERED =
+  "This email is already registered as a Mollure client.";
+
+/** Conflict message when a Non-Mollure create email matches an active Mollure user. */
+export function mollureClientEmailCreateConflict(existingMollureUser) {
+  return existingMollureUser ? MOLLURE_EMAIL_ALREADY_REGISTERED : null;
+}
+
+/** Active Mollure platform user (individual/company) by exact email — same scope as lookup. */
+export async function findActiveMollureClientByEmail(email) {
+  const normalized = normalizeEmail(email);
+  if (!normalized) return null;
+
+  const result = await query(
+    `SELECT u.id
+     FROM users u
+     WHERE LOWER(TRIM(u.email)) = $1
+       AND u.user_type = ANY($2::text[])
+       AND COALESCE(u.is_active, true) = true
+     LIMIT 1`,
+    [normalized, ELIGIBLE_CLIENT_TYPES],
+  );
+  return result.rows[0] ?? null;
+}
 
 const formatBusinessAddress = (row) => {
   const parts = [
@@ -113,7 +149,7 @@ export const ensureProfessionalClientFromBooking = async (bookingId) => {
   const vat = isCompany ? String(row.vat_number ?? "").trim() || null : null;
 
   const existing = await query(
-    `SELECT id, last_booking_date
+    `SELECT id, last_booking_date, is_mollure, mollure_user_id
      FROM professional_clients
      WHERE professional_profile_id = $1
        AND (
@@ -125,6 +161,10 @@ export const ensureProfessionalClientFromBooking = async (bookingId) => {
   );
 
   if (existing.rowCount) {
+    const ex = existing.rows[0];
+    // ponytail: email collision with Non-Mollure — leave row alone (unique email blocks a 2nd Mollure row).
+    if (!shouldPromoteProfessionalClientToMollure(ex)) return ex;
+
     await query(
       `UPDATE professional_clients
        SET last_booking_date = CASE
@@ -144,7 +184,7 @@ export const ensureProfessionalClientFromBooking = async (bookingId) => {
            updated_at = NOW()
        WHERE id = $1`,
       [
-        existing.rows[0].id,
+        ex.id,
         row.booking_date ?? null,
         row.customer_id,
         phone || null,
@@ -156,8 +196,8 @@ export const ensureProfessionalClientFromBooking = async (bookingId) => {
         businessAddress,
       ],
     );
-    await refreshProfessionalClientSalesStats(row.professional_profile_id, existing.rows[0].id);
-    return existing.rows[0];
+    await refreshProfessionalClientSalesStats(row.professional_profile_id, ex.id);
+    return ex;
   }
 
   const inserted = await query(

@@ -51,10 +51,18 @@ export const MONEY_JSON_KEYS = new Set([
   "total",
 ]);
 
+/** Counts/qty that must stay JSON numbers (never digit strings). */
+export const COUNT_JSON_KEYS = new Set([
+  "quantity",
+  "count",
+  "bookings",
+  "vatRate",
+]);
+
 /**
  * Read compatibility for legacy JSON snapshots. New persistence already writes
- * numbers; this converts old formatted money strings before API responses.
- * Also used at write boundaries so inbound string amounts never land in JSONB.
+ * numbers; this converts old formatted money / quantity strings before API
+ * responses. Also used at write boundaries so string digits never land in JSONB.
  */
 export function normalizeMoneyJson(value, parentKey = "") {
   if (Array.isArray(value)) {
@@ -71,6 +79,10 @@ export function normalizeMoneyJson(value, parentKey = "") {
   if (typeof value === "string" && MONEY_JSON_KEYS.has(parentKey)) {
     const parsed = parseMoney(value, Number.NaN);
     return Number.isFinite(parsed) ? roundMoney(parsed) : value;
+  }
+  if (typeof value === "string" && COUNT_JSON_KEYS.has(parentKey)) {
+    const parsed = parseMoney(value, Number.NaN);
+    return Number.isFinite(parsed) ? parsed : value;
   }
   return value;
 }

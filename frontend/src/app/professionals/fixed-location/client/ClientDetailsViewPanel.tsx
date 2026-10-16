@@ -15,6 +15,7 @@ import {
   IconButton,
   Paper,
   Stack,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -35,8 +36,19 @@ type ClientDetailsViewPanelProps = {
   onTechnicalNoteFocused?: () => void;
 };
 
+const CONCEALED_TIP = "(This info is concealed)";
+
 function InfoFieldCell({ label, value }: InfoField) {
   const m = useTheme().palette.mollure;
+  const display = value?.trim() || "—";
+  const concealed = display === "—" || display === "-" || display === "–";
+  const valueNode = (
+    <Typography
+      sx={mollureBodySx(m.navy, { color: alpha(m.navy, 0.86), mt: 0.4, lineHeight: 1.35 })}
+    >
+      {display}
+    </Typography>
+  );
   return (
     <Grid item xs={6}>
       <Typography
@@ -49,11 +61,15 @@ function InfoFieldCell({ label, value }: InfoField) {
       >
         {label}
       </Typography>
-      <Typography
-        sx={mollureBodySx(m.navy, { color: alpha(m.navy, 0.86), mt: 0.4, lineHeight: 1.35 })}
-      >
-        {value || "—"}
-      </Typography>
+      {concealed ? (
+        <Tooltip title={CONCEALED_TIP}>
+          <Box component="span" sx={{ display: "inline-block" }}>
+            {valueNode}
+          </Box>
+        </Tooltip>
+      ) : (
+        valueNode
+      )}
     </Grid>
   );
 }
@@ -130,6 +146,7 @@ export default function ClientDetailsViewPanel({
     { label: "Date of Birth", value: client.dateOfBirth ?? "—" },
     { label: "Contact Number", value: client.phone },
     { label: "Residential Address", value: client.residentialAddress ?? "—" },
+    { label: "Residential Area", value: client.residentialArea ?? "—" },
     { label: "Email Address", value: client.email },
   ];
 

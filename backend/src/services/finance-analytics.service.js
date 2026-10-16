@@ -118,7 +118,7 @@ export function aggregateFinanceAnalytics(rows) {
 
     for (const line of lines) {
       const name = line.description || "Item";
-      const qty = Number(line.quantity) || 1;
+      const qty = parseMoney(line.quantity, 1) || 1;
       const lineSales = roundMoney(line.totalPrice ?? line.pricePerUnit) || amount;
       const category = lineCategory(line);
 
