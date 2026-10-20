@@ -98,6 +98,8 @@ export function resolveIssuedInvoiceSettings(
   return {
     ...live,
     ...partial,
+    // Null/empty snap logo must not wipe the live Finance Settings logo.
+    logoDataUrl: partial.logoDataUrl || live.logoDataUrl || null,
     paymentTerms: {
       ...live.paymentTerms,
       ...(partial.paymentTerms ?? {}),
@@ -207,7 +209,6 @@ export function professionalBusinessInfoLines(
 ) {
   if (invoiceType !== "company") return [`Professional: ${display.shopName}`];
   return [
-    `Professional Name: ${display.shopName}`,
     `Legal Name: ${display.legalName}`,
     `Professional Address: ${display.location}`,
     `Professional VAT No: ${display.vat}`,
@@ -314,15 +315,15 @@ export function getInvoiceLineItemColumns(
       },
     ];
   }
-  // BC mock: Description | Quantity | VAT % | Price Per Unit | Total Price
+  // BC: Description | Quantity | VAT % | Price Per Unit | Total Price
   return [
-    { key: "description", label: "Description", pdfWidth: 160 },
-    { key: "unit", label: "Quantity", pdfWidth: 55, align: "right" },
-    { key: "vat", label: "VAT %", pdfWidth: 50 },
+    { key: "description", label: "Description", pdfWidth: 140 },
+    { key: "unit", label: "Quantity", pdfWidth: 70 },
+    { key: "vat", label: "VAT %", pdfWidth: 60 },
     {
       key: "pricePerUnit",
       label: "Price Per Unit",
-      pdfWidth: 100,
+      pdfWidth: 105,
       align: "right",
     },
     { key: "totalPrice", label: "Total Price", pdfWidth: 90, align: "right" },
@@ -507,11 +508,16 @@ export function buildBookingItems(row: TransactionRow | null, lineItems: Preview
   if (document?.bookingItems?.length) {
     return document.bookingItems.filter((item) => item.label.toLowerCase() !== "prepayment");
   }
-  if (hasStoredDocumentSnapshot(row)) return [];
-  return lineItems.map((item) => ({
-    label: item.description,
-    value: parseCurrencyValue(item.totalPrice),
-  }));
+  // Issued docs often omit bookingItems — fall back to invoice line items (services/products).
+  return lineItems
+    .filter((item) => {
+      const label = String(item.description || "").trim().toLowerCase();
+      return label && label !== "prepayment";
+    })
+    .map((item) => ({
+      label: item.description,
+      value: parseCurrencyValue(item.totalPrice),
+    }));
 }
 
 export function formatPaymentMethod(row?: TransactionRow | null) {

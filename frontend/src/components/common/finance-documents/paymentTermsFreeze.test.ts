@@ -70,6 +70,29 @@ const liveWithReminders: FinanceInvoiceSettings = {
   },
 };
 
+const liveWithLogo = {
+  ...liveWithReminders,
+  logoDataUrl: "data:image/jpeg;base64,LIVE",
+};
+const snapWipesLogo = {
+  ...issuedRow,
+  issuedDocument: {
+    ...issuedRow.issuedDocument!,
+    issuedSnapshot: {
+      ...issuedRow.issuedDocument!.issuedSnapshot!,
+      invoiceSettings: {
+        ...issuedRow.issuedDocument!.issuedSnapshot!.invoiceSettings!,
+        logoDataUrl: null,
+      },
+    },
+  },
+};
+assert.equal(
+  resolveIssuedInvoiceSettings(snapWipesLogo, liveWithLogo).logoDataUrl,
+  "data:image/jpeg;base64,LIVE",
+  "null snap logo must not wipe live Finance Settings logo",
+);
+
 const resolved = resolveIssuedInvoiceSettings(issuedRow, liveWithReminders);
 assert.equal(resolved.paymentTerms.originalDueValue, "2");
 assert.equal(resolved.paymentTerms.originalDueUnit, "Weeks");

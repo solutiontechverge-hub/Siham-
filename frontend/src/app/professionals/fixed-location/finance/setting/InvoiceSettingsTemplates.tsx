@@ -17,6 +17,10 @@ import AppModal, {
   AppModalCancelButton,
   AppModalPrimaryButton,
 } from "../../../../../components/common/AppModal";
+import {
+  INVOICE_LOGO_ACCEPT,
+  INVOICE_LOGO_HINT,
+} from "../../../../../lib/invoiceLogoUpload";
 import type { InvoiceSettingsSx } from "./invoiceSettings.styles";
 
 type Settings = {
@@ -105,14 +109,14 @@ export function InvoiceSettingsTemplates(props: {
                           : "Upload logo for invoice"}
                       </BodyText>
                       <BodyText sx={mollureBodyMutedSx(m.navy, { fontSize: 10.5 })}>
-                        PNG, JPG, SVG up to 5MB
+                        {INVOICE_LOGO_HINT}
                       </BodyText>
                     </Stack>
                   </Box>
                   <input
                     ref={logoInputRef}
                     type="file"
-                    accept="image/*"
+                    accept={INVOICE_LOGO_ACCEPT}
                     style={{ display: "none" }}
                     onChange={handleLogoChange}
                   />

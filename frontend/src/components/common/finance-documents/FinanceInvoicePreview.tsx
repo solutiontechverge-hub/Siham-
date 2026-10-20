@@ -206,9 +206,7 @@ export default function FinanceInvoicePreview({
   const clientLines = React.useMemo(
     () => [
       `Legal Name: ${clientParty?.legalName || row?.clientName || ""}`,
-      ...(clientParty?.address
-        ? [`Client Address: ${clientParty.address}`]
-        : []),
+      `Client Address: ${clientParty?.address?.trim() || "-"}`,
     ],
     [clientParty, row?.clientName],
   );
@@ -305,9 +303,15 @@ export default function FinanceInvoicePreview({
       doc.setFontSize(10);
       let x = left;
       cols.forEach((col) => {
-        doc.text(col.label, col.align === "right" ? x + col.pdfWidth : x, tableTop, {
-          align: col.align === "right" ? "right" : "left",
-        });
+        const centered = col.key === "vat" || col.key === "unit";
+        const align = col.align === "right" ? "right" : centered ? "center" : "left";
+        const tx =
+          align === "right"
+            ? x + col.pdfWidth
+            : align === "center"
+              ? x + col.pdfWidth / 2
+              : x;
+        doc.text(col.label, tx, tableTop, { align });
         x += col.pdfWidth;
       });
       doc.setFont("helvetica", "normal");
@@ -317,38 +321,58 @@ export default function FinanceInvoicePreview({
         const rowY = tableTop + 26 + index * 18;
         cols.forEach((col) => {
           const cell = getInvoiceLineItemCellValue(item, col.key);
-          doc.text(String(cell), col.align === "right" ? cursorX + col.pdfWidth : cursorX, rowY, {
-            align: col.align === "right" ? "right" : "left",
-          });
+          const centered = col.key === "vat" || col.key === "unit";
+          const align = col.align === "right" ? "right" : centered ? "center" : "left";
+          const tx =
+            align === "right"
+              ? cursorX + col.pdfWidth
+              : align === "center"
+                ? cursorX + col.pdfWidth / 2
+                : cursorX;
+          doc.text(String(cell), tx, rowY, { align });
           cursorX += col.pdfWidth;
         });
         doc.setDrawColor(220);
         doc.line(left, rowY + 6, left + tableWidth, rowY + 6);
       });
-      doc.setFont("helvetica", "bold");
       let totalsY = tableTop + 26 + displayLineItems.length * 18 + 22;
-      doc.text(INVOICE_TOTAL_VAT_INCLUDED_LABEL, left, totalsY);
-      doc.text(formatCurrencyDisplay(totalPriceLabel), left + usableWidth - 20, totalsY, {
-        align: "right",
-      });
-      if (prepaidAmountLabel && prepaidAmountValue > 0) {
-        totalsY += 18;
-        doc.setFont("helvetica", "normal");
-        if (prepaymentCollected) doc.setTextColor(0x22, 0xb5, 0x73);
-        doc.text(prepaymentCollected ? "Prepaid" : "Prepayment", left, totalsY);
+      const drawTotalRow = (
+        label: string,
+        value: string,
+        opts?: { bold?: boolean; green?: boolean },
+      ) => {
+        doc.setFont("helvetica", opts?.bold ? "bold" : "normal");
+        if (opts?.green) doc.setTextColor(0x22, 0xb5, 0x73);
+        else doc.setTextColor(0);
+        doc.text(label, left, totalsY);
         doc.setTextColor(0);
-        doc.text(formatCurrencyDisplay(prepaidAmountLabel), left + usableWidth - 20, totalsY, {
-          align: "right",
-        });
+        doc.text(value, left + usableWidth - 20, totalsY, { align: "right" });
+        totalsY += 18;
+      };
+      if (row?.grossAmount) {
+        drawTotalRow("Gross amount", formatCurrencyDisplay(row.grossAmount));
+      }
+      if (row?.stripeFee) {
+        drawTotalRow("Stripe fee", formatCurrencyDisplay(row.stripeFee));
+      }
+      if (row?.mollureFee) {
+        drawTotalRow("Mollure fee", formatCurrencyDisplay(row.mollureFee));
+      }
+      if (prepaidAmountLabel && prepaidAmountValue > 0) {
+        drawTotalRow(
+          prepaymentCollected ? "Prepaid" : "Prepayment",
+          formatCurrencyDisplay(prepaidAmountLabel),
+          { green: prepaymentCollected },
+        );
         if (remainingAfterPrepayment) {
-          totalsY += 18;
-          doc.setFont("helvetica", "bold");
-          doc.text("Remaining", left, totalsY);
-          doc.text(remainingAfterPrepayment, left + usableWidth - 20, totalsY, {
-            align: "right",
-          });
+          drawTotalRow("Remaining", remainingAfterPrepayment, { bold: true });
         }
       }
+      drawTotalRow(
+        INVOICE_TOTAL_VAT_INCLUDED_LABEL,
+        formatCurrencyDisplay(totalPriceLabel),
+        { bold: true },
+      );
 
       doc.save(`invoice-${documentNumber}.pdf`);
       showSnackbar({
@@ -379,16 +403,14 @@ export default function FinanceInvoicePreview({
     prepaymentCollected,
     professionalLines,
     remainingAfterPrepayment,
+    row?.grossAmount,
+    row?.mollureFee,
+    row?.stripeFee,
     serviceDate,
     logoDataUrl,
     showSnackbar,
     totalPriceLabel,
   ]);
-
-  const professionalName =
-    professionalDisplay.shopName !== "—"
-      ? professionalDisplay.shopName
-      : professionalDisplay.legalName;
 
   return (
     <Box sx={financePreviewCardSx(m.navy, 2)}>
@@ -481,14 +503,7 @@ export default function FinanceInvoicePreview({
               ))}
             </FinanceInfoBlock>
           </Stack>
-        ) : (
-          <BodyText sx={financeMutedTextSx(m.navy, { mt: 1 })}>
-            <Box component="span" sx={{ fontWeight: 600 }}>
-              Professional Name:
-            </Box>{" "}
-            {professionalName}
-          </BodyText>
-        )}
+        ) : null}
       </Box>
 
       <Box sx={{ mt: 2 }}>
@@ -505,69 +520,87 @@ export default function FinanceInvoicePreview({
         >
           <TableHead>
             <TableRow>
-              {lineItemColumns.map((column) => (
+              {lineItemColumns.map((column) => {
+                const isVat = column.key === "vat";
+                const isQty = column.key === "unit";
+                const cellAlign =
+                  column.align === "right"
+                    ? "right"
+                    : isVat || isQty
+                      ? "center"
+                      : "left";
+                return (
                 <TableCell
                   key={column.key}
-                  align={column.align === "right" ? "right" : "left"}
+                  align={cellAlign}
                   sx={{
                     ...mollureTableHeaderSx(m.navy),
                     borderBottom: "none",
                     pb: 0.5,
-                    width:
-                      lineItemLayout === "simplified"
-                        ? column.key === "description"
-                          ? "70%"
-                          : "30%"
-                        : column.key === "description"
-                          ? "36%"
-                          : column.key === "unit"
-                            ? "10%"
-                            : column.key === "vat"
-                              ? "12%"
-                              : "21%",
+                    whiteSpace: "nowrap",
+                    // Qty/VAT: px widths so "Quantity" cannot overflow into "VAT %".
+                    ...(lineItemLayout === "simplified"
+                      ? {
+                          width:
+                            column.key === "description" ? "70%" : "30%",
+                        }
+                      : column.key === "unit"
+                        ? { width: 88, minWidth: 88, px: 1 }
+                        : column.key === "vat"
+                          ? { width: 72, minWidth: 72, px: 1 }
+                          : column.key === "description"
+                            ? { width: "36%" }
+                            : { width: "22%" }),
                     ...(column.align === "right"
-                      ? { ...financePriceTextSx, whiteSpace: "nowrap" }
+                      ? financePriceTextSx
                       : null),
                   }}
                 >
                   {column.label}
                 </TableCell>
-              ))}
+                );
+              })}
             </TableRow>
           </TableHead>
           <TableBody>
             {displayLineItems.map((item, index) => (
               <TableRow key={`${item.displayDescription}-${index}`} hover>
-                {lineItemColumns.map((column) => (
+                {lineItemColumns.map((column) => {
+                  const isVat = column.key === "vat";
+                  const isQty = column.key === "unit";
+                  const cellAlign =
+                    column.align === "right"
+                      ? "right"
+                      : isVat || isQty
+                        ? "center"
+                        : "left";
+                  return (
                   <TableCell
                     key={column.key}
-                    align={column.align === "right" ? "right" : "left"}
+                    align={cellAlign}
                     sx={mollureBodyMutedSx(m.navy, {
                       color: alpha(m.navy, 0.75),
                       // Divider under service row(s), not under Description header.
                       borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
                       py: 3,
-                      ...(column.align === "right"
-                        ? { ...financePriceTextSx, whiteSpace: "nowrap" }
-                        : { wordBreak: "break-word" }),
+                      ...(isQty
+                        ? { width: 88, minWidth: 88, px: 1, whiteSpace: "nowrap" }
+                        : isVat
+                          ? { width: 72, minWidth: 72, px: 1, whiteSpace: "nowrap" }
+                          : column.align === "right"
+                            ? { ...financePriceTextSx, whiteSpace: "nowrap" }
+                            : { wordBreak: "break-word" }),
                     })}
                   >
                     {getInvoiceLineItemCellValue(item, column.key)}
                   </TableCell>
-                ))}
+                  );
+                })}
               </TableRow>
             ))}
           </TableBody>
         </Table>
         <Stack spacing={0.75} sx={{ mt: 1.5 }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <BodyText sx={mollureBodyMutedSx(m.navy, { color: alpha(m.navy, 0.65) })}>
-              {INVOICE_TOTAL_VAT_INCLUDED_LABEL}
-            </BodyText>
-            <BodyText sx={mollureLabelSx(m.navy, financePriceTextSx)}>
-              {formatCurrencyDisplay(totalPriceLabel)}
-            </BodyText>
-          </Stack>
           {row?.grossAmount ? (
             <Stack direction="row" justifyContent="space-between" alignItems="center">
               <BodyText sx={mollureBodyMutedSx(m.navy, { color: alpha(m.navy, 0.65) })}>Gross amount</BodyText>
@@ -623,6 +656,14 @@ export default function FinanceInvoicePreview({
               ) : null}
             </>
           ) : null}
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <BodyText sx={mollureBodyMutedSx(m.navy, { color: alpha(m.navy, 0.65) })}>
+              {INVOICE_TOTAL_VAT_INCLUDED_LABEL}
+            </BodyText>
+            <BodyText sx={mollureLabelSx(m.navy, financePriceTextSx)}>
+              {formatCurrencyDisplay(totalPriceLabel)}
+            </BodyText>
+          </Stack>
         </Stack>
       </Box>
 
