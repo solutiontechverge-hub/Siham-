@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Dialog, DialogContent, DialogTitle, IconButton, Stack, Typography } from "@mui/material";
+import { Chip, Dialog, DialogContent, DialogTitle, IconButton, Stack, Typography } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { useGetBookingActivityQuery } from "../../../store/services/businessApi";
 import {
@@ -10,6 +10,9 @@ import {
   formatTransactionStatusLabel,
   type TransactionRow,
 } from "../../../app/professionals/fixed-location/finance/data/transactions";
+import { useBookingFinance } from "../../common/booking-finance/useBookingFinance";
+import { bookingFinanceBadgeLabel } from "../../common/booking-finance/mapBookingFinance";
+import { formatFinanceEuro } from "../../common/booking-finance/formatBookingFinance";
 
 export default function FinanceBookingHistoryModal({
   row,
@@ -23,6 +26,7 @@ export default function FinanceBookingHistoryModal({
     { bookingId: row?.bookingId ?? null },
     { skip: !open },
   );
+  const { finance } = useBookingFinance(row?.bookingId, { skip: !open });
   const items = data?.data ?? [];
   const entryDisplay = row
     ? formatEntryIdDisplay(row.entryType, row.entryId, row.entryLabel)
@@ -44,6 +48,39 @@ export default function FinanceBookingHistoryModal({
             <Typography>Amount: {formatNetAmountEur(row.grossAmount ?? row.netAmount)}</Typography>
             <Typography>
               Status: {formatTransactionStatusLabel(row.status, row.entryLabel)}
+            </Typography>
+          </Stack>
+        ) : null}
+        {finance ? (
+          <Stack spacing={0.5} sx={{ mb: 2 }}>
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <Typography fontWeight={600}>Ledger balance</Typography>
+              <Chip size="small" label={bookingFinanceBadgeLabel(finance.badge)} />
+            </Stack>
+            <Typography>Base Price: {formatFinanceEuro(finance.basePrice)}</Typography>
+            {finance.addOnLines.map((line) => (
+              <Typography key={line.id}>
+                {line.label}: {formatFinanceEuro(line.amount)}
+              </Typography>
+            ))}
+            {finance.cancellationFee > 0 ? (
+              <Typography>
+                Cancellation Fee: {formatFinanceEuro(finance.cancellationFee)}
+              </Typography>
+            ) : null}
+            <Typography>Total Paid: {formatFinanceEuro(finance.totalPaid)}</Typography>
+            {finance.prepaymentTotal > 0 ? (
+              <Typography>
+                Prepayment: {formatFinanceEuro(finance.prepaymentTotal)}
+              </Typography>
+            ) : null}
+            {finance.totalRefunded > 0 ? (
+              <Typography>
+                Total Refunded: {formatFinanceEuro(finance.totalRefunded)}
+              </Typography>
+            ) : null}
+            <Typography fontWeight={700}>
+              Amount Due: {formatFinanceEuro(finance.amountDue)}
             </Typography>
           </Stack>
         ) : null}

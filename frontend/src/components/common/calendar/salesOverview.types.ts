@@ -10,7 +10,8 @@ export type SalesCardKind =
   | "prepayment"
   | "after_treatment"
   | "addon"
-  | "reissued_invoice";
+  | "reissued_invoice"
+  | "refund";
 
 export type SalesPayerRole = "main_client" | "guest" | "model";
 
@@ -80,8 +81,13 @@ export type SalesSubCardData = {
   payerRole: SalesPayerRole;
   payerLabel: string;
   payerName: string;
+  /** Split-bill payer key — matches finance_transactions / sales card meta. */
+  payerKey?: string;
+  clientEmail?: string;
   lines: SalesLineItem[];
   total: number;
+  totalLabel?: string;
+  secondaryRows?: SalesLineItem[];
   highlightLabel: string;
   highlightAmount: number;
   statusBadge?: string;
@@ -96,6 +102,8 @@ export type SalesSubCardData = {
   limitedMenu?: boolean;
   /** Parent client name for context on invoices. */
   parentClientName?: string;
+  /** Linked finance_transactions.id when matched. */
+  financeTransactionId?: string;
 };
 
 export type SalesOverviewCardData = {
@@ -192,6 +200,13 @@ export type SalesCardMetaRecord = {
   totalPrice?: number;
   paid?: boolean;
   addon?: SalesAddonRecord;
+  /** Refund Summary card — item vs amount + method from finance refund. */
+  refundMode?: "item" | "amount" | null;
+  refundMethod?: string | null;
+  refundReason?: string | null;
+  bookingCode?: string;
+  clientName?: string;
+  clientEmail?: string;
 };
 
 export type SalesAddOnCheckoutPayload = {

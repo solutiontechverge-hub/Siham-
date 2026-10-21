@@ -475,6 +475,7 @@ export function useClientBookingCreatePage() {
     setSelectedTeamMemberId,
     selectedPersonId,
     bookServicesAtSameTime,
+    excludeActiveBookingBusy: isEbrSuggest,
   });
 
   const {
@@ -749,15 +750,13 @@ export function useClientBookingCreatePage() {
   }, [people, selectedPersonId]);
 
   React.useEffect(() => {
+    // Empty is valid ("Any team member" / auto-assign found nobody). Do not
+    // refill — that ping-pongs with availability auto-assign clearing to "".
+    if (!selectedTeamMemberId) return;
     if (filteredTeamMembers.some((tm) => tm.id === selectedTeamMemberId))
       return;
-    // Picker default only — never stamp services with first TM (may be off-schedule).
-    const fallbackId = filteredTeamMembers[0]?.id ?? "";
-    if (!fallbackId) {
-      if (selectedTeamMemberId) setSelectedTeamMemberId("");
-      return;
-    }
-    setSelectedTeamMemberId(fallbackId);
+    // Stale id only (mode/roster change) — never stamp services with first TM.
+    setSelectedTeamMemberId(filteredTeamMembers[0]?.id ?? "");
   }, [filteredTeamMembers, selectedTeamMemberId]);
 
   const { onContinue } = useClientBookingCreateContinue({

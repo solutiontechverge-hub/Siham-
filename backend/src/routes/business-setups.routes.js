@@ -33,6 +33,11 @@ router.get(
       .trim()
       .isIn(["FL", "DL", "fl", "dl"])
       .withMessage("location must be FL or DL."),
+    query("excludeBookingId")
+      .optional({ values: "falsy" })
+      .trim()
+      .isUUID()
+      .withMessage("excludeBookingId must be a UUID."),
   ],
   validateRequest,
   getSetupAvailabilityForDate,

@@ -20,6 +20,7 @@ type BookingDrawerTotalPriceCardProps = {
   prepaymentPercent?: number;
   prepaymentAmount?: number;
   remainingAmount?: number;
+  remainingLabel?: string;
   prepaidAction?: ReactNode;
   extraRows?: readonly BookingPriceBreakdownRow[];
 };
@@ -38,6 +39,7 @@ export default function BookingDrawerTotalPriceCard({
   prepaymentPercent = 0,
   prepaymentAmount = 0,
   remainingAmount,
+  remainingLabel,
   prepaidAction,
   extraRows = [],
 }: BookingDrawerTotalPriceCardProps) {
@@ -54,6 +56,7 @@ export default function BookingDrawerTotalPriceCard({
       prepaidPercent={showPrepayment ? prepaymentPercent : 0}
       prepaidAmount={showPrepayment ? prepaymentAmount : 0}
       remainingAmount={showPrepayment ? remainingAmount : undefined}
+      remainingLabel={remainingLabel}
       prepaymentPaid={prepaymentPaid}
       prepaidAction={prepaidAction}
       extraRows={extraRows}

@@ -96,6 +96,63 @@ export const buildInvoiceReissuedEmail = (ctx) => {
   return { html, text };
 };
 
+const refundModeLabel = (mode) => {
+  if (mode === "item") return "By item";
+  if (mode === "amount") return "By amount";
+  return "";
+};
+
+const formatRefundItemsLine = (items) => {
+  if (!Array.isArray(items) || !items.length) return "";
+  return items
+    .map((item) => {
+      const name = String(item?.name || "").trim() || "Item";
+      const amount = Number(item?.amount);
+      return Number.isFinite(amount) ? `${name} (${formatEuro(amount)})` : name;
+    })
+    .join(", ");
+};
+
+export const buildRefundCompletedEmail = (ctx) => {
+  const mode = refundModeLabel(ctx.refundMode);
+  const itemsLine = formatRefundItemsLine(ctx.refundItems);
+  const detailRows = [
+    { label: "Credit note", value: ctx.documentNumber || "—" },
+    { label: "Refund amount", value: formatEuro(ctx.amount) },
+    { label: "Booking / sale", value: ctx.bookingId || "—" },
+    ...(mode ? [{ label: "Refund type", value: mode }] : []),
+    ...(ctx.refundMethod
+      ? [{ label: "Refund method", value: ctx.refundMethod }]
+      : []),
+    ...(itemsLine && ctx.refundMode === "item"
+      ? [{ label: "Refunded items", value: itemsLine }]
+      : []),
+    ...(ctx.refundReason
+      ? [{ label: "Reason", value: ctx.refundReason }]
+      : []),
+    { label: "Salon", value: ctx.salonName || "—" },
+  ];
+  const html = wrapEmail(`
+    <h1 style="margin:0 0 8px;font-size:24px;color:#1a2b42;">Payment refunded</h1>
+    <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#5c6778;">
+      ${escapeHtml(ctx.clientName || "Hello")}, your payment has been refunded by ${escapeHtml(ctx.salonName || "your salon")}.
+    </p>
+    ${detailsBox(detailRows)}
+  `);
+  const textLines = [
+    "Payment refunded",
+    `Amount: ${formatEuro(ctx.amount)}`,
+    `Booking / sale: ${ctx.bookingId || "—"}`,
+    ctx.documentNumber ? `Credit note: ${ctx.documentNumber}` : null,
+    mode ? `Refund type: ${mode}` : null,
+    ctx.refundMethod ? `Refund method: ${ctx.refundMethod}` : null,
+    itemsLine && ctx.refundMode === "item" ? `Items: ${itemsLine}` : null,
+    ctx.refundReason ? `Reason: ${ctx.refundReason}` : null,
+    `Salon: ${ctx.salonName || "—"}`,
+  ].filter(Boolean);
+  return { html, text: textLines.join("\n") };
+};
+
 export const buildRespondToRequestReminderEmail = (ctx) =>
   simpleEmail({
     title: "Reminder: respond to booking request",

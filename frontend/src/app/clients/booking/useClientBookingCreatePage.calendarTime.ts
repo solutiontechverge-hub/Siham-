@@ -98,9 +98,8 @@ export function useClientBookingCreateCalendarTime() {
   };
 
   const allDayTimes = React.useMemo(() => {
-    // Public Hours are display-only; slot grid uses a wide day window, then
-    // Schedule availability (availabilityBookableTimes) filters real bookable times.
-    const hours = { startMin: 9 * 60, endMin: 18 * 60 + 1 };
+    // Full-day candidate grid; live Schedule availability filters real bookable times.
+    const hours = { startMin: 0, endMin: 24 * 60 };
     const slots: string[] = [];
     for (
       let minutes = hours.startMin;
@@ -150,7 +149,7 @@ export function useClientBookingCreateCalendarTime() {
   const getBookableTimesForDate = React.useCallback(
     (d: Date) => {
       if (isPastDay(d)) return [] as string[];
-      const hours = { startMin: 9 * 60, endMin: 18 * 60 + 1 };
+      const hours = { startMin: 0, endMin: 24 * 60 };
       const slots: string[] = [];
       for (
         let minutes = hours.startMin;

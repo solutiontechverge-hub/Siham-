@@ -191,11 +191,10 @@ export function useClientBookingCreatePeopleServices(
     }
     return true;
   }, [requiresPersonAssignment, selectedTeamMemberId, services]);
+  // Per-service blanks only — shared picker empty is fine when every service has a TM.
   const needsTeamMemberProvidedByPro = React.useMemo(
-    () =>
-      services.length > 0 &&
-      (!selectedTeamMemberId || servicesMissingTeamMember(services)),
-    [services, selectedTeamMemberId],
+    () => services.length > 0 && servicesMissingTeamMember(services),
+    [services],
   );
 
   /** Services already given to the selected person (Jane / Model / Guest). */
@@ -559,8 +558,8 @@ export function useClientBookingCreatePeopleServices(
         return {
           ...s,
           guestId: selectedPersonId,
-          // Keep existing TM only; auto-assign fills/clears from availability.
-          teamMemberId: s.teamMemberId || null,
+          // Keep row TM, else shared picker, else blank for backend assign.
+          teamMemberId: s.teamMemberId || selectedTeamMemberId || null,
         };
       }),
     );
@@ -653,26 +652,49 @@ export function useClientBookingCreatePeopleServices(
     setAddServiceCatalogQty({});
   };
 
-  /** Desired: one team member for the whole booking. Fixed: picker for Unassigned assign only. */
+  /** Desired: stamp all. FL shared picker: unassigned only (keep Guest/CLIENT picks). */
   const applySharedTeamMember = (teamMemberId: string) => {
     if (teamMemberId.startsWith("__")) return;
     setSelectedTeamMemberId(teamMemberId);
-    if (!isDesiredLocation) return;
-    setServices((prev) =>
-      prev.map((s) => ({ ...s, teamMemberId: teamMemberId || null })),
-    );
+    const nextId = teamMemberId || null;
+    setServices((prev) => {
+      let changed = false;
+      const next = prev.map((s) => {
+        if (!isDesiredLocation && s.guestId) return s;
+        if ((s.teamMemberId ?? null) === nextId) return s;
+        changed = true;
+        return { ...s, teamMemberId: nextId };
+      });
+      return changed ? next : prev;
+    });
   };
 
-  const updateServiceTeamMember = (serviceId: string, teamMemberId: string) => {
-    if (!teamMemberId || teamMemberId.startsWith("__")) return;
+  const updateServiceTeamMember = (
+    serviceId: string,
+    teamMemberId: string,
+    guestId?: string | null,
+  ) => {
+    if (teamMemberId.startsWith("__")) return;
+    // "" = Any — optional per service; backend create assigns blanks.
+    const nextId = teamMemberId || null;
     if (isDesiredLocation) {
       setSelectedTeamMemberId(teamMemberId);
-      setServices((prev) => prev.map((s) => ({ ...s, teamMemberId })));
+      setServices((prev) => {
+        if (prev.every((s) => (s.teamMemberId ?? null) === nextId)) return prev;
+        return prev.map((s) => ({ ...s, teamMemberId: nextId }));
+      });
       return;
     }
-    setServices((prev) =>
-      prev.map((s) => (s.id === serviceId ? { ...s, teamMemberId } : s)),
-    );
+    // Scope by guestId so CLIENT+Guest rows with the same catalog service id
+    // do not steal each other's teamMemberId updates.
+    const matches = (s: Service) =>
+      s.id === serviceId &&
+      (guestId === undefined || (s.guestId ?? null) === (guestId ?? null));
+    setServices((prev) => {
+      const row = prev.find(matches);
+      if (!row || (row.teamMemberId ?? null) === nextId) return prev;
+      return prev.map((s) => (matches(s) ? { ...s, teamMemberId: nextId } : s));
+    });
   };
 
   const toggleServiceSelection = (serviceId: string, checked: boolean) => {

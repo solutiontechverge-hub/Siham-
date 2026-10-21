@@ -176,6 +176,8 @@ export function matchFinanceHint(
       return false;
     }
     if (hint.payerKey && card.payerKey && hint.payerKey !== card.payerKey) return false;
+    // Shell parents (no payerKey) must not bind payer-scoped finance rows.
+    if (hint.payerKey && !card.payerKey) return false;
     return true;
   });
   // Prefer live rows; fall back to voided/refunded when that is the only match.

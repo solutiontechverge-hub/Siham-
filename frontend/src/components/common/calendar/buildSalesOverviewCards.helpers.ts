@@ -8,7 +8,9 @@ import {
 import {
   parseApiCalendarEventId,
   parseCalendarEntryNotes,
+  parseBookingFinancialsFromNotes,
   resolveKilometerAllowanceAmount,
+  type BookingFinancialsSnapshot,
 } from "./bookingEventDetails";
 import { isBookingRequestRejected } from "./bookingStatus";
 import { getSalesCardMeta, resolveLiveCardId } from "./salesOverview.storage";
@@ -31,6 +33,10 @@ import {
   formatFinanceDueDate,
   prepaidBreakdownLabel,
 } from "../booking-finance/formatBookingFinance";
+import {
+  bookingFinanceBadgeLabel,
+  deriveBookingFinanceBadge,
+} from "../booking-finance/mapBookingFinance";
 import { roundBookingMoney as roundMoney } from "../../../data/bookingLinePricing";
 import { computeBookingPrice } from "./bookingTotal";
 import {
@@ -39,6 +45,24 @@ import {
   LATE_CANCELLATION_BOOKING_FEE,
   LATE_RESCHEDULING_FEE,
 } from "../finance-documents/protectiveFeeInvoice";
+import {
+  applyVisualState,
+  discountLine,
+  formatDateTimeLabel,
+  formatMethodDateTime,
+  isInvoicePaymentMethod,
+  isOnlineBookingType,
+  isOnlineDirectPayment,
+  isAutomaticTrigger,
+  isDueDatePast,
+  matchFinanceHint,
+  paymentMethodLabel,
+  resolvePenaltyPrompt,
+  deriveDueDate,
+  toIsoDateOnly,
+  addDaysToIsoDate,
+  durationToDays,
+} from "./buildSalesOverviewCards.format";
 
 function isSettledProtectiveFeeStatus(status?: string | null): boolean {
   const s = String(status ?? "").toLowerCase();
@@ -70,30 +94,14 @@ function recoverBookingBaseFromFeeHints(
   }
   return best;
 }
-import {
-  applyVisualState,
-  discountLine,
-  formatDateTimeLabel,
-  formatMethodDateTime,
-  isInvoicePaymentMethod,
-  isOnlineBookingType,
-  isOnlineDirectPayment,
-  isAutomaticTrigger,
-  isDueDatePast,
-  matchFinanceHint,
-  paymentMethodLabel,
-  resolvePenaltyPrompt,
-  deriveDueDate,
-  toIsoDateOnly,
-  addDaysToIsoDate,
-  durationToDays,
-} from "./buildSalesOverviewCards.format";
 
 export type BuilderCtx = {
   financeHints: SalesFinanceHint[];
   paymentTerms?: SalesPaymentTermsInput;
   /** Business setup `late_cancellation_fee_percentage` — heal Fee Summary when booking stamp/LCF missing. */
   lateCancellationFeePercentDefault?: string | number | null;
+  /** Live GET /bookings/:id/financials — preferred over notes.financials stamp. */
+  liveFinancials?: BookingFinancialsSnapshot | null;
 };
 function buildLinesFromEvent(event: CalendarEvent): { lines: SalesLineItem[]; subtotal: number } {
   const details = event.details;
@@ -185,7 +193,162 @@ function sumLineAmounts(lines: SalesLineItem[]): number {
   return roundMoney(lines.reduce((sum, line) => sum + line.amount, 0));
 }
 
-/** Fold saved add-ons into the live booking summary (not a separate add-ons-only card). */
+/** Align Sales summary cards with server ledger aggregates (notes.financials / live GET). */
+export function applyLedgerFinancialsToCards(
+  cards: SalesOverviewCardData[],
+  financials: BookingFinancialsSnapshot | null | undefined,
+  opts?: { bookingStatus?: string | null },
+): SalesOverviewCardData[] {
+  if (!financials) return cards;
+  const net = financials.net_total;
+  const outstanding = financials.outstanding_balance;
+  const refunded = financials.total_refunded ?? 0;
+  const prepay = financials.prepayment_total;
+  const paid = financials.total_paid ?? 0;
+  const cancelFee = financials.cancellation_fee ?? 0;
+  const basePrice = financials.basePrice;
+  const addOns = financials.add_ons ?? 0;
+
+  const badge = deriveBookingFinanceBadge({
+    paymentStatus: financials.payment_status,
+    cancellationPaymentStatus: financials.cancellation_payment_status,
+    bookingStatus: opts?.bookingStatus,
+    totalPaid: paid,
+    totalRefunded: refunded,
+    amountDue: outstanding ?? 0,
+    netTotal: net ?? 0,
+  });
+  const badgeLabel = bookingFinanceBadgeLabel(badge);
+  const paymentState = (() => {
+    switch (badge) {
+      case "PAID":
+        return "paid" as const;
+      case "PREPAID":
+        return "prepaid" as const;
+      case "PARTIALLY_PAID":
+        return "pending" as const;
+      case "UNPAID":
+      case "PENDING_FEE":
+        return "unpaid" as const;
+      case "REFUNDED":
+      case "PARTIALLY_REFUNDED":
+        return "refunded" as const;
+      case "CANCELLED":
+        return "voided" as const;
+      default:
+        return undefined;
+    }
+  })();
+
+  return cards.map((card) => {
+    // Prepayment card = phase document only (don't stamp booking-level PARTIALLY_PAID).
+    if (card.kind === "prepayment" && prepay != null && prepay >= 0) {
+      const prepayPaid =
+        card.paymentState === "paid" ||
+        card.paymentState === "prepaid" ||
+        Boolean(card.paidAt);
+      return {
+        ...card,
+        total: roundMoney(prepay),
+        highlightAmount: roundMoney(prepay),
+        documentAmount: roundMoney(prepay),
+        statusBadge: prepayPaid ? "Prepaid" : card.statusBadge || "Prepayment Due",
+        paymentState: prepayPaid ? ("prepaid" as const) : card.paymentState,
+      };
+    }
+
+    if (card.kind !== "after_treatment" && card.title !== "Summary") return card;
+
+    const next: SalesOverviewCardData = { ...card };
+    if (typeof net === "number" && Number.isFinite(net)) {
+      next.total = roundMoney(net);
+      if (typeof next.documentAmount === "number") {
+        next.documentAmount = roundMoney(net);
+      }
+    }
+    if (typeof outstanding === "number" && Number.isFinite(outstanding)) {
+      next.highlightAmount = roundMoney(Math.max(0, outstanding));
+      next.highlightLabel = outstanding > 0 ? "Amount Due" : next.highlightLabel;
+    }
+    if (paymentState) next.paymentState = paymentState;
+    next.statusBadge = badgeLabel;
+
+    // Subcards keep their own share totals (guest/model ≠ booking outstanding).
+    // Booking Amount Due stays on the payable footer only.
+    if (next.subCards?.length) {
+      next.subCards = next.subCards.map((sub) => {
+        const shareTotal = roundMoney(
+          (sub.lines ?? []).reduce((sum, line) => sum + (Number(line.amount) || 0), 0),
+        );
+        return {
+          ...sub,
+          statusBadge: badgeLabel,
+          paymentState: paymentState ?? sub.paymentState,
+          highlightAmount: shareTotal > 0 ? shareTotal : sub.highlightAmount,
+          highlightLabel: "Total",
+        };
+      });
+    }
+
+    const rows = [...(next.secondaryRows ?? [])];
+    const upsert = (id: string, label: string, amount: number) => {
+      if (amount === 0) return;
+      const idx = rows.findIndex((row) => row.id === id);
+      const line = { id, label, amount: roundMoney(amount) };
+      if (idx >= 0) rows[idx] = line;
+      else rows.push(line);
+    };
+    if (typeof basePrice === "number" && basePrice > 0) {
+      upsert("ledger-base", "Base Price", basePrice);
+    }
+    if (addOns > 0) upsert("ledger-addons", "Add-ons", addOns);
+    if (cancelFee > 0) upsert("ledger-cancel-fee", "Cancellation Fee", cancelFee);
+    if (paid > 0) upsert("ledger-paid", "Total Paid", paid);
+    if (refunded > 0) upsert("ledger-refunded", "Refunded", -roundMoney(refunded));
+    if (typeof outstanding === "number" && outstanding > 0) {
+      upsert("ledger-due", "Amount Due", outstanding);
+    }
+    next.secondaryRows = rows;
+    return next;
+  });
+}
+
+/** Same product/total within 60s = accidental multi-save, not a second checkout. */
+const ADDON_BURST_DEDUPE_MS = 60_000;
+
+function addonRecordFingerprint(record: SalesAddonRecord): string {
+  const lines = [...(record.lines ?? [])]
+    .map((line) => `${line.name}|${line.quantity}|${line.unitPrice}`)
+    .sort()
+    .join(";");
+  return `${lines}|${record.paymentMethod}|${record.totalPrice}|${Boolean(record.voided)}|${Boolean(record.refunded)}`;
+}
+
+/** Drop burst-duplicate sales_addon rows (same booking + fingerprint within 60s). */
+export function collapseBurstDuplicateAddons(
+  records: SalesAddonRecord[],
+): SalesAddonRecord[] {
+  const sorted = [...records].sort(
+    (a, b) =>
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
+  const kept: SalesAddonRecord[] = [];
+  for (const record of sorted) {
+    const fp = addonRecordFingerprint(record);
+    const t = new Date(record.createdAt).getTime();
+    const burstDup = kept.some(
+      (prev) =>
+        String(prev.bookingId) === String(record.bookingId) &&
+        addonRecordFingerprint(prev) === fp &&
+        Math.abs(new Date(prev.createdAt).getTime() - t) < ADDON_BURST_DEDUPE_MS,
+    );
+    if (burstDup) continue;
+    kept.push(record);
+  }
+  return kept;
+}
+
+/** Fold saved add-ons into after-treatment summary totals/lines; keep addon cards for pay/cancel. */
 export function mergeAddonRecordsIntoCards(
   cards: SalesOverviewCardData[],
   addonRecords: SalesAddonRecord[],
@@ -193,8 +356,9 @@ export function mergeAddonRecordsIntoCards(
 ): SalesOverviewCardData[] {
   // Keep one add-ons card per booking. New add-ons are folded into the same
   // card, so the summary and total never repeat for the same booking.
+  const collapsed = collapseBurstDuplicateAddons(addonRecords);
   const grouped = new Map<string, SalesAddonRecord>();
-  for (const record of addonRecords) {
+  for (const record of collapsed) {
     const key = String(record.bookingId);
     const previous = grouped.get(key);
     if (!previous) {
@@ -211,9 +375,57 @@ export function mergeAddonRecordsIntoCards(
       discountAmount: roundMoney(previous.discountAmount + record.discountAmount),
       totalPrice: roundMoney(previous.totalPrice + record.totalPrice),
       createdAt: latest.createdAt,
+      voided: Boolean(previous.voided && record.voided),
+      refunded: Boolean(previous.refunded || record.refunded),
     });
   }
-  return [...cards, ...[...grouped.values()].map((record) => buildAddonCard(record, ctx))];
+
+  const foldTargetIds = new Set<string>();
+  for (const bookingKey of grouped.keys()) {
+    const forBooking = cards.filter((c) => String(c.bookingId) === bookingKey);
+    const target =
+      forBooking.find((c) => c.kind === "after_treatment") ??
+      forBooking.find((c) => c.title === "Summary") ??
+      forBooking.find((c) => c.showAddOns) ??
+      forBooking.find(
+        (c) => c.kind !== "prepayment" && c.kind !== "refund" && c.kind !== "addon",
+      );
+    if (target) foldTargetIds.add(target.id);
+  }
+
+  const withFoldedTotals = cards.map((card) => {
+    if (!foldTargetIds.has(card.id)) return card;
+    const group = grouped.get(String(card.bookingId));
+    if (!group || group.voided || group.refunded) return card;
+    const addonLines: SalesLineItem[] = group.lines.map((line) => ({
+      id: `addon-${group.id}-${line.id}`,
+      label: line.quantity > 1 ? `${line.name} ×${line.quantity}` : line.name,
+      amount: roundMoney(lineTotal(line)),
+    }));
+    if (group.discountAmount > 0) {
+      addonLines.push({
+        id: `addon-${group.id}-discount`,
+        label: "Discount",
+        amount: -roundMoney(group.discountAmount),
+      });
+    }
+    const addonNet = roundMoney(group.totalPrice);
+    return {
+      ...card,
+      lines: [...card.lines, ...addonLines],
+      total: roundMoney(card.total + addonNet),
+      highlightAmount: roundMoney((card.highlightAmount ?? card.total) + addonNet),
+      documentAmount:
+        typeof card.documentAmount === "number"
+          ? roundMoney(card.documentAmount + addonNet)
+          : card.documentAmount,
+    };
+  });
+
+  return [
+    ...withFoldedTotals,
+    ...[...grouped.values()].map((record) => buildAddonCard(record, ctx)),
+  ];
 }
 
 function applyPenaltyAmount<T extends {
@@ -319,7 +531,7 @@ function applyEditedLines<T extends {
   if (!meta.editedLines?.length) return;
   next.lines = meta.editedLines.map((line) => ({
     id: line.id,
-    label: line.quantity > 1 ? `${line.name} Ã—${line.quantity}` : line.name,
+    label: line.quantity > 1 ? `${line.name} ×${line.quantity}` : line.name,
     amount: roundMoney(lineTotal(line)),
   }));
   if (meta.discountAmount && meta.discountAmount > 0) {
@@ -631,7 +843,14 @@ function applySubMeta(
     paidHint?: boolean;
   },
 ): SalesSubCardData {
-  const meta = getSalesCardMeta(sub.id);
+  // Main nested under after-treatment may still have meta on the parent card id.
+  const parentId =
+    sub.payerRole === "main_client" && sub.id.includes("-sub-")
+      ? sub.id.slice(0, sub.id.lastIndexOf("-sub-"))
+      : null;
+  const meta =
+    getSalesCardMeta(sub.id) ||
+    (parentId ? getSalesCardMeta(parentId) : null);
   if (meta?.canceled && !meta.voided) {
     return { ...sub, statusBadge: undefined, paymentState: sub.paymentState };
   }
@@ -750,7 +969,7 @@ function applyMeta(
             isOnlineBooking: extras.isOnlineBooking,
             occurredAt: next.occurredAt,
             isAfterTreatment: extras.isAfterTreatment,
-            paidHint: sub.paymentState === "paid",
+            paidHint: sub.paymentState === "paid" || Boolean(sub.paidAt),
           }),
         )
         .filter((sub) => {
@@ -758,6 +977,25 @@ function applyMeta(
           return !subMeta?.canceled || Boolean(subMeta.voided);
         }),
     };
+    // After-treatment shell: main lives in subCards — strip parent body, keep badge from main.
+    const subCards = next.subCards ?? [];
+    if (subCards.some((sub) => sub.payerRole === "main_client")) {
+      const mainSub = subCards.find((sub) => sub.payerRole === "main_client");
+      next = {
+        ...next,
+        lines: [],
+        secondaryRows: undefined,
+        highlightedLineIds: undefined,
+        financeTransactionId: undefined,
+        total: 0,
+        highlightAmount: 0,
+        documentAmount: 0,
+        methodDateLine: undefined,
+        dueDate: null,
+        statusBadge: mainSub?.statusBadge,
+        paymentState: mainSub?.paymentState,
+      };
+    }
   }
 
   return next;
@@ -766,7 +1004,7 @@ function applyMeta(
 export function buildAddonCard(record: SalesAddonRecord, ctx: BuilderCtx): SalesOverviewCardData {
   const lines: SalesLineItem[] = record.lines.map((line) => ({
     id: line.id,
-    label: line.quantity > 1 ? `${line.name} Ã—${line.quantity}` : line.name,
+    label: line.quantity > 1 ? `${line.name} ×${line.quantity}` : line.name,
     amount: roundMoney(lineTotal(line)),
   }));
   if (record.discountAmount > 0) {
@@ -812,6 +1050,108 @@ export function buildAddonCard(record: SalesAddonRecord, ctx: BuilderCtx): Sales
       paidHint: !record.voided && !record.refunded && !isOnlinePay,
     },
   );
+}
+
+function refundMethodDisplayLabel(method?: string | null): string {
+  const value = String(method ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, "-");
+  if (!value) return paymentMethodLabel(null);
+  if (value === "online-non-direct" || value === "onlinenondirect") {
+    return "Online transfer / bank";
+  }
+  if (value === "offline-direct" || value === "offlinedirect") {
+    return "Offline Direct";
+  }
+  if (value === "offline-non-direct" || value === "offlinenondirect") {
+    return "Offline transfer / bank";
+  }
+  if (value === "online-direct" || value === "onlinedirect") return "Online Direct";
+  return paymentMethodLabel(method as SalesCheckoutPaymentMethod);
+}
+
+/** Backend-created credit-note / refund receipt card (separate from the original sale). */
+export function buildRefundCard(
+  meta: SalesCardMetaRecord,
+  ctx: BuilderCtx,
+): SalesOverviewCardData {
+  const lines: SalesLineItem[] = (meta.editedLines ?? []).map((line) => ({
+    id: line.id,
+    label: line.quantity > 1 ? `${line.name} ×${line.quantity}` : line.name,
+    amount: roundMoney(lineTotal(line)),
+  }));
+  const total = roundMoney(
+    Number(meta.totalPrice) ||
+      lines.reduce((sum, line) => sum + line.amount, 0),
+  );
+  const methodLabel = refundMethodDisplayLabel(
+    meta.refundMethod || meta.paymentMethod,
+  );
+  const modeLabel =
+    meta.refundMode === "item"
+      ? "Refund by item"
+      : meta.refundMode === "amount"
+        ? "Refund by amount"
+        : "Refund";
+  const occurredAt = new Date().toISOString();
+  const card: SalesOverviewCardData = {
+    id: meta.cardId,
+    bookingId: meta.bookingId,
+    bookingCode: meta.bookingCode || meta.bookingId,
+    kind: "refund",
+    title: "Refund Summary",
+    clientName: meta.clientName || "Client",
+    clientEmail: meta.clientEmail,
+    lines: lines.length
+      ? lines
+      : [{ id: `${meta.cardId}-amount`, label: "Refund", amount: total }],
+    total,
+    totalLabel: "Total",
+    highlightLabel: "Refunded",
+    highlightAmount: total,
+    methodDateLine: formatMethodDateTime(methodLabel, occurredAt),
+    metaLines: [
+      modeLabel,
+      ...(meta.refundReason ? [`Reason: ${meta.refundReason}`] : []),
+    ],
+    showAddOns: false,
+    limitedMenu: true,
+    refunded: true,
+    paymentMethod: meta.paymentMethod,
+    paymentMethodLabel: methodLabel,
+    documentAmount: total,
+    occurredAt,
+    financeTransactionId: meta.financeTransactionId,
+    statusBadge: "Refunded",
+    paymentState: "refunded",
+  };
+  const next = applyMeta(card, ctx, {
+    isOnlineBooking: false,
+    paidHint: false,
+  });
+  // Keep refund-method wording (transfer/bank) — applyMeta remaps paymentMethod labels.
+  next.paymentMethodLabel = methodLabel;
+  next.methodDateLine = formatMethodDateTime(methodLabel, next.occurredAt);
+  next.metaLines = card.metaLines;
+  next.title = "Refund Summary";
+  next.kind = "refund";
+  next.refunded = true;
+  next.limitedMenu = true;
+  return next;
+}
+
+export function mergeRefundMetaIntoCards(
+  cards: SalesOverviewCardData[],
+  refundMetas: SalesCardMetaRecord[],
+  ctx: BuilderCtx,
+): SalesOverviewCardData[] {
+  if (!refundMetas.length) return cards;
+  const existing = new Set(cards.map((card) => card.id));
+  const extras = refundMetas
+    .filter((meta) => !existing.has(meta.cardId))
+    .map((meta) => buildRefundCard(meta, ctx));
+  return extras.length ? [...cards, ...extras] : cards;
 }
 
 function bookingEndIso(event: CalendarEvent, booking?: CalendarBooking): string | null {
@@ -1137,9 +1477,13 @@ export function buildCardsForEvent(input: {
     lines.filter((line) => line.amount >= 0).reduce((sum, line) => sum + line.amount, 0),
   );
   const totalFromBooking = Number(booking?.total_price);
-  const rawBaseTotal = lines.length
-    ? subtotal
-    : roundMoney(Number.isFinite(totalFromBooking) ? totalFromBooking : 0);
+  const bookingFinancials =
+    ctx.liveFinancials ?? parseBookingFinancialsFromNotes(booking?.notes);
+  const rawBaseTotal = bookingFinancials?.basePrice != null
+    ? roundMoney(bookingFinancials.basePrice)
+    : lines.length
+      ? subtotal
+      : roundMoney(Number.isFinite(totalFromBooking) ? totalFromBooking : 0);
 
   // Prefer live event details; fall back to booking.notes when calendar state is stale.
   const notesFee = protectiveFeeFlagsFromBooking(booking);
@@ -1194,18 +1538,21 @@ export function buildCardsForEvent(input: {
     prepayStatus === "failed" ||
     prepayStatus === "confirmed";
   const prepaymentPercent = Number(event.details?.prepaymentPercent) || 0;
+  // Prefer ledger prepayment_total so refunds/repayments do not resurrect stale %.
   const prepaidAmount =
-    showPrepayment && prepaymentPercent > 0
-      ? roundMoney((baseTotal * prepaymentPercent) / 100)
-      : showPrepayment && isPrepayPaid
-        ? roundMoney(baseTotal * 0.25)
-        : showPrepayment
-          ? roundMoney(
-              prepaymentPercent > 0
-                ? (baseTotal * prepaymentPercent) / 100
-                : baseTotal * 0.5,
-            )
-          : 0;
+    bookingFinancials?.prepayment_total != null && bookingFinancials.prepayment_total > 0
+      ? roundMoney(bookingFinancials.prepayment_total)
+      : showPrepayment && prepaymentPercent > 0
+        ? roundMoney((baseTotal * prepaymentPercent) / 100)
+        : showPrepayment && isPrepayPaid
+          ? roundMoney(baseTotal * 0.25)
+          : showPrepayment
+            ? roundMoney(
+                prepaymentPercent > 0
+                  ? (baseTotal * prepaymentPercent) / 100
+                  : baseTotal * 0.5,
+              )
+            : 0;
   const onlineBooking = isOnlineBookingType(booking, event);
 
   const feeSpecInput = {
@@ -1490,11 +1837,16 @@ export function buildCardsForEvent(input: {
 
   const withProtectiveFeeSummary = (list: SalesOverviewCardData[]) => {
     const feeCard = buildProtectiveFeeSummaryCard();
-    if (!feeCard) return list;
-    if (list.some((c) => c.id === feeCard.id || c.title === feeCard.title)) {
-      return list;
+    let next = list;
+    if (
+      feeCard &&
+      !list.some((c) => c.id === feeCard.id || c.title === feeCard.title)
+    ) {
+      next = [...list, feeCard];
     }
-    return [...list, feeCard];
+    return applyLedgerFinancialsToCards(next, bookingFinancials, {
+      bookingStatus: status,
+    });
   };
 
   if (isPendingRequest) {
@@ -1605,8 +1957,61 @@ export function buildCardsForEvent(input: {
           mainListedTotal - (isPrepayPaid && prepaidAmount > 0 ? prepaidAmount : 0),
         ),
       );
+      const guestSubs: SalesSubCardData[] = guestModelShares.map((share) => {
+        const subPaid = isSplitPayerPaid(splitState, share.key);
+        const payer = splitState?.payers.find((row) => row.key === share.key);
+        return {
+          id: `${afterId}-sub-${share.key}`,
+          bookingId,
+          bookingCode,
+          payerRole: share.role,
+          payerLabel: share.label,
+          payerName: share.displayName,
+          payerKey: share.key,
+          lines: share.lines,
+          total: share.subtotal,
+          highlightLabel: "Total Amount",
+          highlightAmount: share.paymentAmount,
+          paidAt: payer?.paidAt ?? (subPaid ? occurredAt : null),
+          paymentState: subPaid ? ("paid" as const) : undefined,
+          dueDate: invoiceDueFromNotes,
+          methodDateLine: method,
+          showAddOns: true,
+          parentClientName: name,
+        };
+      });
 
-      // Split bill: one After Treatment card per payer (main + each guest/model).
+      // Split: parent shell + main + guest/model subCards (Add-Ons on subCards only).
+      // Solo main: flat parent card (no subCards) keeps Add-Ons.
+      const mainPayer = splitState?.payers.find((row) => row.key === mainShare.key);
+      const subCards: SalesSubCardData[] | undefined = hasGuestSubs
+        ? [
+            {
+              id: `${afterId}-sub-${mainShare.key}`,
+              bookingId,
+              bookingCode,
+              payerRole: "main_client",
+              payerLabel: mainShare.label || name,
+              payerName: mainShare.displayName || name,
+              payerKey: mainShare.key,
+              clientEmail: email,
+              lines: mainLines,
+              total: mainListedTotal,
+              totalLabel: "Total Amount",
+              secondaryRows: secondaryRows.length ? secondaryRows : undefined,
+              highlightLabel: "Payment",
+              highlightAmount: mainPayable,
+              paidAt: mainPayer?.paidAt ?? (mainPaid ? occurredAt : null),
+              paymentState: mainPaid ? ("paid" as const) : undefined,
+              dueDate: invoiceDueFromNotes,
+              methodDateLine: method,
+              showAddOns: true,
+              parentClientName: name,
+            },
+            ...guestSubs,
+          ]
+        : undefined;
+
       cards.push(
         applyMeta(
           {
@@ -1617,22 +2022,25 @@ export function buildCardsForEvent(input: {
             title: "After treatment Summary",
             clientName: name,
             payerRole: "main_client",
-            payerKey: mainShare.key,
+            payerKey: hasGuestSubs ? undefined : mainShare.key,
             clientEmail: email,
             clientPhone: phone,
             clientKind,
-            lines: mainLines,
-            highlightedLineIds: mainLines.map((line) => line.id),
-            total: hasGuestSubs ? total : mainListedTotal,
+            lines: hasGuestSubs ? [] : mainLines,
+            highlightedLineIds: hasGuestSubs
+              ? undefined
+              : mainLines.map((line) => line.id),
+            subCards,
+            total: hasGuestSubs ? 0 : mainListedTotal,
             totalLabel: "Total Amount",
-            secondaryRows,
+            secondaryRows: hasGuestSubs ? undefined : secondaryRows,
             highlightLabel: "Payment",
-            highlightAmount: mainPayable,
+            highlightAmount: hasGuestSubs ? 0 : mainPayable,
             dueDate: invoiceDueFromNotes,
-            showAddOns: true,
+            showAddOns: !hasGuestSubs,
             paymentMethod: eventPaymentMethod,
             paymentMethodLabel: method,
-            documentAmount: mainPayable,
+            documentAmount: hasGuestSubs ? 0 : mainPayable,
             occurredAt,
             bookingEndAt: endAt,
           },
@@ -1640,51 +2048,10 @@ export function buildCardsForEvent(input: {
           {
             ...applyExtras,
             isAfterTreatment: true,
-            paidHint: mainPaid,
+            paidHint: hasGuestSubs ? false : mainPaid,
           },
         ),
       );
-
-      for (const share of guestModelShares) {
-        const subPaid = isSplitPayerPaid(splitState, share.key);
-        const payer = splitState?.payers.find((row) => row.key === share.key);
-        cards.push(
-          applyMeta(
-            {
-              id: `${afterId}-sub-${share.key}`,
-              bookingId,
-              bookingCode,
-              kind: "after_treatment",
-              title: "After treatment Summary",
-              clientName: share.displayName,
-              payerLabel: share.label,
-              payerRole: share.role,
-              payerKey: share.key,
-              lines: share.lines,
-              highlightedLineIds: share.lines.map((line) => line.id),
-              total: share.subtotal,
-              totalLabel: "Total Amount",
-              highlightLabel: "Total Amount",
-              highlightAmount: share.paymentAmount,
-              paidAt: payer?.paidAt ?? null,
-              dueDate: invoiceDueFromNotes,
-              methodDateLine: method,
-              showAddOns: true,
-              paymentMethod: eventPaymentMethod,
-              paymentMethodLabel: method,
-              documentAmount: share.paymentAmount,
-              occurredAt,
-              bookingEndAt: endAt,
-            },
-            ctx,
-            {
-              ...applyExtras,
-              isAfterTreatment: true,
-              paidHint: subPaid,
-            },
-          ),
-        );
-      }
     }
   }
 

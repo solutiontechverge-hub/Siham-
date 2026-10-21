@@ -13,6 +13,7 @@ import {
   listSalesAddons,
   upsertSalesAddon,
   deleteSalesAddon,
+  getBookingFinancials,
   getPublicInvoiceSettings,
   getPublicTransactionOptions,
   listFinanceTransactions,
@@ -52,6 +53,7 @@ router.put(
   upsertSalesCardMetadata,
 );
 router.get("/sales-addons", requireProfessional, listSalesAddons);
+router.get("/bookings/:bookingId/financials", requireProfessional, getBookingFinancials);
 router.put(
   "/sales-addons",
   requireProfessional,
@@ -181,7 +183,18 @@ router.post(
     textBody("clientName", { optional: true, max: LIMITS.personName }),
     emailBody("clientEmail", { optional: true }),
     textBody("clientType", { optional: true, max: 32 }),
-    enumBody("paymentMethod", ["onlineDirect", "offlineDirect"], { optional: true }),
+    enumBody(
+      "paymentMethod",
+      [
+        "onlineDirect",
+        "offlineDirect",
+        "onlineNonDirect",
+        "offlineNonDirect",
+        "onlineInvoice",
+        "offlineInvoice",
+      ],
+      { optional: true },
+    ),
     numericBody("totalPrice", { min: 0 }),
     numericBody("discountAmount", { optional: true, min: 0 }),
     body("lines").optional().isArray({ max: 100 }).withMessage("lines must be an array."),
@@ -240,6 +253,16 @@ router.post(
     body("ids").isArray({ min: 1, max: 200 }).withMessage("ids must be a non-empty array."),
     body("ids.*").isUUID().withMessage("each id must be a UUID."),
     enumBody("action", ["refund", "void", "cancel", "delete"]),
+    textBody("refundMethod", { optional: true, max: 64 }),
+    textBody("reason", { optional: true, max: 500 }),
+    body("refundMode")
+      .optional({ nullable: true })
+      .isIn(["item", "amount"])
+      .withMessage("refundMode must be item or amount."),
+    body("refundItems").optional({ nullable: true }).isArray({ max: 200 }),
+    body("bankDetails").optional({ nullable: true }).isObject(),
+    textBody("bankDetails.accountHolder", { optional: true, max: 200 }),
+    textBody("bankDetails.iban", { optional: true, max: 64 }),
   ],
   validateRequest,
   bulkFinanceTransactionAction,

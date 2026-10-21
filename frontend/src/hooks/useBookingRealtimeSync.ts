@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import { businessApi } from "../store/services/businessApi";
+import { financeApi } from "../store/services/financeApi";
 import { getPersistedAuthSession } from "../lib/auth-storage";
 import {
   ensureBookingRealtimeRooms,
@@ -48,6 +49,8 @@ export function useBookingRealtimeSync(options?: Options) {
 
     const handleBookingChanged = (payload: BookingChangedPayload) => {
       dispatch(businessApi.util.invalidateTags(["Calendar", "Bookings", "ProfessionalClients"]));
+      // Keep Finances + Sale Drawer useBookingFinance in sync with ledger writes.
+      dispatch(financeApi.util.invalidateTags(["FinanceTransactions", "Bookings"]));
       void dispatch(
         businessApi.endpoints.getMyBookings.initiate(undefined, {
           forceRefetch: true,

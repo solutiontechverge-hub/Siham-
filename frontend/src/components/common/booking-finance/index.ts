@@ -1,5 +1,8 @@
 export type {
   BookingFinanceTone,
+  BookingFinanceBadge,
+  BookingFinanceViewModel,
+  BookingFinancialsSnapshot,
   BookingPriceBreakdownRow,
   BookingPaymentSummaryLine,
   BookingPaymentSummarySection,
@@ -13,5 +16,11 @@ export {
   formatOfflinePrepaymentVisitNote,
   OFFLINE_PREPAYMENT_VISIT_NOTE,
 } from "./formatBookingFinance";
+export {
+  deriveBookingFinanceBadge,
+  bookingFinanceBadgeLabel,
+  mapBookingFinanceResponse,
+} from "./mapBookingFinance";
+export { useBookingFinance } from "./useBookingFinance";
 export { default as BookingPriceBreakdown } from "./BookingPriceBreakdown";
 export { default as BookingPaymentSummaryCard } from "./BookingPaymentSummaryCard";

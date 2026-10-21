@@ -101,9 +101,9 @@ export function useClientBookingPaymentDisplay(input: {
         products: paymentProducts,
         extrasAmount: showKilometerAllowance ? kilometerAllowanceAmount : 0,
         discount: input.bookingNotesMeta?.totalDiscount ?? null,
-        showLateCancellation: Boolean(
-          input.bookingNotesMeta?.showLateCancellation,
-        ),
+        showLateCancellation:
+          Boolean(input.bookingNotesMeta?.showLateCancellation) &&
+          !input.isCancelled,
         lateCancellationFeePercent:
           input.bookingNotesMeta?.lateCancellationFeePercent,
         showLateRescheduling: Boolean(
@@ -127,6 +127,7 @@ export function useClientBookingPaymentDisplay(input: {
       input.bookingNotesMeta?.showLateRescheduling,
       input.bookingNotesMeta?.showNoShowFee,
       input.bookingNotesMeta?.totalDiscount,
+      input.isCancelled,
       input.displayDraft?.people,
       input.displayDraft?.services,
       input.draft?.people,
@@ -195,8 +196,10 @@ export function useClientBookingPaymentDisplay(input: {
         isOfflinePay: input.isOfflinePay,
         isCompleted: input.isCompleted,
         isPaymentDue: input.isPaymentDue,
+        isCancelled: input.isCancelled,
       }),
     [
+      input.isCancelled,
       input.isCompleted,
       input.isOfflinePay,
       input.isPaymentDue,
@@ -207,7 +210,8 @@ export function useClientBookingPaymentDisplay(input: {
 
   const showPaymentSummary =
     visiblePaymentSummarySections.length > 0 &&
-    (input.isPrepaymentPaid ||
+    (input.isCancelled ||
+      input.isPrepaymentPaid ||
       input.activeBooking?.paid === true ||
       Boolean(input.paidProtectiveFees?.length) ||
       (input.isOfflinePay &&

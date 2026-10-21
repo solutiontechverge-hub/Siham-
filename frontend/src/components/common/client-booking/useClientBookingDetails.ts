@@ -20,6 +20,7 @@ import { useBookingEditRequest } from "./useBookingEditRequest";
 import { parseCalendarEntryNotes } from "../calendar/bookingEventDetails";
 import { clientShouldAck } from "../calendar/bookingAcknowledgment";
 import { usePublicFinanceSettings } from "../finance-documents/usePublicFinanceSettings";
+import { isProtectiveFeeEntryLabel } from "../finance-documents/protectiveFeeInvoice";
 import {
   useCreateBookingMutation,
   useGetAllBusinessSetupsQuery,
@@ -375,12 +376,7 @@ export function useClientBookingDetails({
         .filter((row) => {
           const status = String(row.status ?? "").toLowerCase();
           if (status !== "paid" && status !== "prepaid") return false;
-          const label = String(row.entryLabel ?? "");
-          return (
-            label === "Late Cancellation Booking Fee" ||
-            label === "Late Rescheduling Fee" ||
-            label.toLowerCase() === "no-show fee"
-          );
+          return isProtectiveFeeEntryLabel(row.entryLabel);
         })
         .map((row) => ({
           entryLabel: row.entryLabel,
@@ -500,6 +496,7 @@ export function useClientBookingDetails({
     persistBookingPatch,
     refreshActiveBooking,
     updateMyBooking: updateMyBooking as never,
+    businessProfile,
   });
 
   const detailsContentKey = `${bookingRef}-${editRequest.status ?? "none"}-${bookingStatus}`;

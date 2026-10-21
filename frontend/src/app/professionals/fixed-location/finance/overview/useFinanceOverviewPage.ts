@@ -29,6 +29,8 @@ import {
   useGetFinanceTransactionsQuery,
   useUpdateFinanceTransactionMutation,
 } from "../../../../../store/services/financeApi";
+import { getApiErrorMessage } from "../../../../../lib/api-error";
+import type { RefundSalesSavePayload } from "../../../../../components/sections/finance/refundSales.data";
 import { INITIAL_VISIBLE, buildActionMenuItems } from "./overview.data";
 import { useStripePayoutGuard } from "../useStripePayoutGuard";
 
@@ -244,23 +246,53 @@ export function useFinanceOverviewPage() {
     showSnackbar,
   ]);
 
-  const confirmRefund = React.useCallback(async () => {
-    const ids = selectedRows.map((r) => r.id);
-    try {
-      await bulkAction({ ids, action: "refund" }).unwrap();
-      setRefundDrawerOpen(false);
-      setSelected({});
-      showSnackbar({
-        severity: "success",
-        message: `Refunded ${ids.length} transaction${ids.length === 1 ? "" : "s"}.`,
-      });
-    } catch {
-      showSnackbar({
-        severity: "error",
-        message: "Could not refund transactions.",
-      });
-    }
-  }, [bulkAction, selectedRows, showSnackbar]);
+  const confirmRefund = React.useCallback(
+    async (payload?: RefundSalesSavePayload) => {
+      const ids = selectedRows.map((r) => r.id);
+      if (!ids.length) {
+        showSnackbar({
+          severity: "warning",
+          message: "Select at least one transaction first.",
+        });
+        throw new Error("No transactions selected");
+      }
+      try {
+        await bulkAction({
+          ids,
+          action: "refund",
+          refundMethod: payload?.method,
+          reason: payload?.reason,
+          bankDetails: payload?.bankDetails,
+          refundMode: payload?.mode,
+          refundItems:
+            payload?.mode === "item"
+              ? (payload.items ?? [])
+                  .filter((item) => payload.itemIds.includes(item.id))
+                  .map((item) => ({
+                    id: item.id,
+                    name: item.name,
+                    amount: item.amount,
+                  }))
+              : payload?.amount != null
+                ? [{ name: "Refund", amount: Number(payload.amount) }]
+                : undefined,
+        }).unwrap();
+        setRefundDrawerOpen(false);
+        setSelected({});
+        showSnackbar({
+          severity: "success",
+          message: `Refunded ${ids.length} transaction${ids.length === 1 ? "" : "s"}.`,
+        });
+      } catch (error) {
+        showSnackbar({
+          severity: "error",
+          message: getApiErrorMessage(error, "Could not refund transactions."),
+        });
+        throw error;
+      }
+    },
+    [bulkAction, selectedRows, showSnackbar],
+  );
 
   const openManualEntryDrawer = React.useCallback(() => {
     closeAddMenus();

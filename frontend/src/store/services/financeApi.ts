@@ -126,6 +126,12 @@ export type BulkFinanceTransactionAction = {
   action: "refund" | "void" | "cancel" | "delete" | "markUnpaid" | "markPaid";
   /** YYYY-MM-DD — required by backend when marking offline invoices Paid. */
   transactionDate?: string;
+  /** Refund routing metadata (bulk refund only). */
+  refundMethod?: string;
+  reason?: string;
+  refundMode?: "item" | "amount";
+  refundItems?: Array<{ id?: string; name: string; amount?: number }>;
+  bankDetails?: { accountHolder: string; iban: string };
 };
 
 export type UpdateFinanceStripeRequest = {
@@ -143,17 +149,45 @@ export type UpdateFinanceStripeRequest = {
 
 const financeApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
+    getBookingFinancials: builder.query<
+      ApiEnvelope<{
+        bookingId: string;
+        uniqueCode?: string | null;
+        financials: Record<string, unknown>;
+        statuses?: {
+          payment_status?: string | null;
+          prepayment_status?: string | null;
+          booking_status?: string | null;
+        };
+        ledger: Array<{
+          id: string;
+          type: string;
+          amount: number;
+          status: string;
+          createdAt?: string | null;
+          metadata?: Record<string, unknown> | null;
+        }>;
+      }>,
+      string
+    >({
+      query: (bookingId) => `/api/finance/bookings/${encodeURIComponent(bookingId)}/financials`,
+      providesTags: (_result, _error, bookingId) => [
+        "FinanceTransactions",
+        "Bookings",
+        { type: "FinanceTransactions", id: `booking-fin-${bookingId}` },
+      ],
+    }),
     getSalesCardMetadata: builder.query<ApiEnvelope<SalesCardMetadata[]>, void>({
       query: () => "/api/finance/sales-card-metadata",
       providesTags: ["FinanceTransactions"],
     }),
     upsertSalesCardMetadata: builder.mutation<ApiEnvelope<SalesCardMetadata>, SalesCardMetadata>({
       query: (body) => ({ url: "/api/finance/sales-card-metadata", method: "PUT", body }),
-      invalidatesTags: ["FinanceTransactions"],
+      invalidatesTags: ["FinanceTransactions", "Bookings"],
     }),
     getSalesAddons: builder.query<ApiEnvelope<SalesAddonRecord[]>, void>({ query: () => "/api/finance/sales-addons", providesTags: ["FinanceTransactions"] }),
-    upsertSalesAddon: builder.mutation<ApiEnvelope<SalesAddonRecord>, SalesAddonRecord>({ query: (body) => ({ url: "/api/finance/sales-addons", method: "PUT", body }), invalidatesTags: ["FinanceTransactions"] }),
-    deleteSalesAddon: builder.mutation<ApiEnvelope<null>, string>({ query: (id) => ({ url: `/api/finance/sales-addons/${id}`, method: "DELETE" }), invalidatesTags: ["FinanceTransactions"] }),
+    upsertSalesAddon: builder.mutation<ApiEnvelope<SalesAddonRecord>, SalesAddonRecord>({ query: (body) => ({ url: "/api/finance/sales-addons", method: "PUT", body }), invalidatesTags: ["FinanceTransactions", "Bookings"] }),
+    deleteSalesAddon: builder.mutation<ApiEnvelope<null>, string>({ query: (id) => ({ url: `/api/finance/sales-addons/${id}`, method: "DELETE" }), invalidatesTags: ["FinanceTransactions", "Bookings"] }),
     getFinanceSettings: builder.query<ApiEnvelope<FinanceSettings>, void>({
       query: () => "/api/finance/settings",
       providesTags: ["FinanceSettings"],
@@ -246,6 +280,7 @@ const financeApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: (_result, _error, arg) => [
         "FinanceTransactions",
+        "Bookings",
         { type: "FinanceTransactions", id: arg.id },
       ],
     }),
@@ -271,7 +306,7 @@ const financeApi = baseApi.injectEndpoints({
         method: "POST",
         body,
       }),
-      invalidatesTags: ["FinanceTransactions"],
+      invalidatesTags: ["FinanceTransactions", "Bookings"],
     }),
 
     syncFinanceTransactionFromBooking: builder.mutation<
@@ -290,7 +325,7 @@ const financeApi = baseApi.injectEndpoints({
         method: "POST",
         body,
       }),
-      invalidatesTags: ["FinanceTransactions"],
+      invalidatesTags: ["FinanceTransactions", "Bookings"],
     }),
 
     getPublicTransactionOptions: builder.query<
@@ -311,7 +346,7 @@ const financeApi = baseApi.injectEndpoints({
         url: "/api/finance/invoices/process-reissues",
         method: "POST",
       }),
-      invalidatesTags: ["FinanceTransactions"],
+      invalidatesTags: ["FinanceTransactions", "Bookings"],
     }),
 
     reissueFinanceInvoice: builder.mutation<
@@ -338,7 +373,7 @@ const financeApi = baseApi.injectEndpoints({
         method: "POST",
         body,
       }),
-      invalidatesTags: ["FinanceTransactions", "Notifications"],
+      invalidatesTags: ["FinanceTransactions", "Bookings", "Notifications"],
     }),
 
     restartPrepaymentDue: builder.mutation<
@@ -421,6 +456,8 @@ export const {
   useGetFinanceTransactionsQuery,
   useGetFinanceAnalyticsQuery,
   useLazyGetFinanceTransactionsQuery,
+  useGetBookingFinancialsQuery,
+  useLazyGetBookingFinancialsQuery,
   useCreateFinanceTransactionMutation,
   useUpdateFinanceTransactionMutation,
   useBulkFinanceTransactionActionMutation,

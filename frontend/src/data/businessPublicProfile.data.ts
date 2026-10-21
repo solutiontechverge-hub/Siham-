@@ -192,6 +192,12 @@ export type BusinessPublicProfileData = {
   /** Minimum notice window from `cancellation_before_minutes`. */
   cancellationNoticeMinutes: number;
   cancellationPolicyInstruction: string;
+  /** Late reschedule fee % (`late_reschedule_fee_percentage`). */
+  rescheduleFeePercent: number;
+  /** Reschedule notice from `appointment_before_hours`. */
+  rescheduleNoticeHours: number;
+  /** Reschedule notice from `appointment_before_minutes`. */
+  rescheduleNoticeMinutes: number;
   kilometerAllowanceLabel: string;
   kilometerAllowanceInstructions: string;
   policySections: BusinessPublicProfilePolicySection[];
@@ -736,6 +742,9 @@ export function mapListingCardToPublicProfile(card: ListingCardData): BusinessPu
     cancellationNoticeMinutes: 0,
     cancellationPolicyInstruction:
       "Cancellations may be subject to a fee of 2% of the service cost per the professional's policy.",
+    rescheduleFeePercent: 2,
+    rescheduleNoticeHours: 5,
+    rescheduleNoticeMinutes: 0,
     kilometerAllowanceLabel: "10 EUR / km",
     kilometerAllowanceInstructions:
       "Travel costs apply for customer location appointments outside the listed service areas.",

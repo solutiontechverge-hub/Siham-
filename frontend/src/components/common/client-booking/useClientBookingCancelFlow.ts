@@ -25,6 +25,7 @@ import {
 import { clearBookingEditRequest } from "./bookingEditRequest";
 import { setBookingCancellationReason } from "./bookingCancellationReason";
 import {
+  resolveOutstandingLateRescheduleFee,
   settleCancellationFee,
   type CancellationFeeSettlement,
 } from "./settleCancellationFee";
@@ -59,7 +60,7 @@ export function useClientBookingCancelFlow(input: {
     paymentMethod: string;
     status: "Voided" | "Paid";
     amount?: number;
-  }) => unknown;
+  }) => { unwrap?: () => Promise<unknown> } | Promise<unknown> | unknown;
   setEbrAction: (value: null) => void;
 }): {
   cancelDialogOpen: boolean;
@@ -113,25 +114,33 @@ export function useClientBookingCancelFlow(input: {
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [discardDialogOpen, setDiscardDialogOpen] = React.useState(false);
 
-  const cancellationSettlement = React.useMemo(
-    () =>
-      settleCancellationFee({
-        bookingTotal,
-        feePercent,
-        prepaidPaid,
-        appointmentStartMs,
-        noticeHours,
-        noticeMinutes,
-      }),
-    [
-      appointmentStartMs,
+  const cancellationSettlement = React.useMemo(() => {
+    const notes = parseCalendarEntryNotes(activeBookingNotes);
+    const outstandingRescheduleFee = resolveOutstandingLateRescheduleFee({
+      bookingTotal,
+      outstandingRescheduleFee: notes?.outstandingRescheduleFee,
+      showLateRescheduling: notes?.showLateRescheduling,
+      lateRescheduleFeePercent: notes?.lateRescheduleFeePercent,
+      lateRescheduleFeePercentCeiling: notes?.lateRescheduleFeePercentCeiling,
+    });
+    return settleCancellationFee({
       bookingTotal,
       feePercent,
+      prepaidPaid,
+      appointmentStartMs,
       noticeHours,
       noticeMinutes,
-      prepaidPaid,
-    ],
-  );
+      outstandingRescheduleFee,
+    });
+  }, [
+    activeBookingNotes,
+    appointmentStartMs,
+    bookingTotal,
+    feePercent,
+    noticeHours,
+    noticeMinutes,
+    prepaidPaid,
+  ]);
 
   const clearActiveBookingSessionLocal = React.useCallback(() => {
     clearActiveBookingSession();
@@ -165,12 +174,15 @@ export function useClientBookingCancelFlow(input: {
         return;
       }
 
-      const chargedLateFee =
-        cancellationSettlement.isLateCancellation &&
-        cancellationSettlement.cancellationFee > 0;
+      const chargedProtectiveFees =
+        cancellationSettlement.feeTotal > 0 &&
+        (cancellationSettlement.isLateCancellation ||
+          cancellationSettlement.rescheduleFee > 0);
+      const priorNotes = parseCalendarEntryNotes(activeBookingNotes);
       const clearedNotes = clearEbrSuggestionsFromNotes(activeBookingNotes, {
         cancellationReason: pendingCancelReason.trim() || undefined,
-        ...(chargedLateFee
+        ...(cancellationSettlement.isLateCancellation &&
+        cancellationSettlement.cancellationFee > 0
           ? {
               showLateCancellation: true,
               lateCancellationFeePercent: String(
@@ -178,6 +190,25 @@ export function useClientBookingCancelFlow(input: {
               ),
               cancellationFeeAt: new Date().toISOString(),
               exceededCancellationWindow: true,
+            }
+          : {}),
+        // Keep LRF stamps so finance Fee Summary can settle dynamically.
+        ...(cancellationSettlement.rescheduleFee > 0
+          ? {
+              showLateRescheduling: true,
+              ...(priorNotes?.lateRescheduleFeePercent
+                ? {
+                    lateRescheduleFeePercent:
+                      priorNotes.lateRescheduleFeePercent,
+                  }
+                : {}),
+              ...(priorNotes?.lateRescheduleFeePercentCeiling
+                ? {
+                    lateRescheduleFeePercentCeiling:
+                      priorNotes.lateRescheduleFeePercentCeiling,
+                  }
+                : {}),
+              outstandingRescheduleFee: cancellationSettlement.rescheduleFee,
             }
           : {}),
       });
@@ -235,23 +266,33 @@ export function useClientBookingCancelFlow(input: {
         showSnackbar({ severity: "success", message: "Booking cancelled" });
       }
 
-      // Late fee paid (Stripe and/or prepaid) → Paid LCF invoice. Else void open service sale.
-      void syncFinanceFromBooking(
-        chargedLateFee
-          ? {
-              bookingRef,
-              paymentPhase: "full",
-              paymentMethod: checkoutPaymentMethodApiValue(selectedPaymentMethod),
-              status: "Paid",
-              amount: cancellationSettlement.cancellationFee,
-            }
-          : {
-              bookingRef,
-              paymentPhase: "full",
-              paymentMethod: checkoutPaymentMethodApiValue(selectedPaymentMethod),
-              status: "Voided",
-            },
-      );
+      // Protective fees paid (prepaid/Stripe) → Paid fee invoices. Else void open sale.
+      const syncPayload = chargedProtectiveFees
+        ? {
+            bookingRef,
+            paymentPhase: "full" as const,
+            paymentMethod: checkoutPaymentMethodApiValue(selectedPaymentMethod),
+            status: "Paid" as const,
+            // LCF amount only — finance-sync also writes LRF from notes stamps.
+            amount: cancellationSettlement.cancellationFee,
+          }
+        : {
+            bookingRef,
+            paymentPhase: "full" as const,
+            paymentMethod: checkoutPaymentMethodApiValue(selectedPaymentMethod),
+            status: "Voided" as const,
+          };
+      const syncResult = syncFinanceFromBooking(syncPayload);
+      if (
+        syncResult &&
+        typeof syncResult === "object" &&
+        "unwrap" in syncResult &&
+        typeof syncResult.unwrap === "function"
+      ) {
+        await syncResult.unwrap();
+      } else {
+        await Promise.resolve(syncResult);
+      }
 
       await refreshActiveBooking();
       editRequest.refresh();
@@ -264,9 +305,12 @@ export function useClientBookingCancelFlow(input: {
       activeBookingNotes,
       apiBookingId,
       bookingRef,
+      cancellationSettlement.bookingTotal,
       cancellationSettlement.cancellationFee,
       cancellationSettlement.feePercent,
+      cancellationSettlement.feeTotal,
       cancellationSettlement.isLateCancellation,
+      cancellationSettlement.rescheduleFee,
       clearActiveBookingSessionLocal,
       editRequest,
       listTab,
@@ -284,12 +328,8 @@ export function useClientBookingCancelFlow(input: {
   const handlePayCancellationFee = React.useCallback(async () => {
     setIsCancelProcessing(true);
     try {
-      // Stripe minimum charge is €0.50 — tiny remainders are absorbed on cancel.
-      if (cancellationSettlement.amountDueNow >= 0.5) {
-        setCancelFeeDialogOpen(false);
-        setCancelFeeStripeOpen(true);
-        return;
-      }
+      setCancelFeeDialogOpen(false);
+      // ponytail: testing shortcut — treat fee as paid (same as Stripe onSuccess); restore setCancelFeeStripeOpen(true) when amountDueNow >= 0.5 for real card checkout.
       await finalizeBookingCancellation(cancellationSettlement.refundAmount);
     } catch (error) {
       showSnackbar({

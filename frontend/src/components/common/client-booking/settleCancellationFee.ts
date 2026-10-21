@@ -93,6 +93,27 @@ export function isLateCancellation(input: {
   return start - now < noticeMs;
 }
 
+/**
+ * Outstanding late-reschedule fine from booking notes stamps (not hardcoded).
+ * Prefer explicit `outstandingRescheduleFee`; else % × booking total when flagged.
+ */
+export function resolveOutstandingLateRescheduleFee(input: {
+  bookingTotal: number;
+  outstandingRescheduleFee?: number | null;
+  showLateRescheduling?: boolean | null;
+  lateRescheduleFeePercent?: string | number | null;
+  lateRescheduleFeePercentCeiling?: string | number | null;
+}): number {
+  const stamped = toNonNegativeNumber(input.outstandingRescheduleFee);
+  if (stamped > 0) return roundMoney(stamped);
+  if (!input.showLateRescheduling) return 0;
+  let pct = Math.max(0, Number(input.lateRescheduleFeePercent) || 0);
+  const ceiling = Number(input.lateRescheduleFeePercentCeiling);
+  if (Number.isFinite(ceiling) && ceiling >= 0) pct = Math.min(pct, ceiling);
+  if (pct <= 0) return 0;
+  return roundMoney((Math.max(0, Number(input.bookingTotal) || 0) * pct) / 100);
+}
+
 /** Split cancellation fee (+ outstanding LRF) against prepaid balance; refund the rest. */
 export function settleCancellationFee(input: {
   bookingTotal: number;

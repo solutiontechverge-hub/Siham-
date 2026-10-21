@@ -75,6 +75,7 @@ export default function SalesAddOnCheckout({
   const businessSetup = businessSetupResponse?.data ?? null;
 
   const [step, setStep] = React.useState<Step>("items");
+  const [saving, setSaving] = React.useState(false);
   const [lines, setLines] = React.useState<ManualEntryLine[]>([]);
   const [discount, setDiscount] = React.useState<ManualEntryDiscount | null>(
     null,
@@ -262,14 +263,18 @@ export default function SalesAddOnCheckout({
       setStep("summary");
       return;
     }
-    onSave({
-      lines,
-      discount,
-      discountAmount,
-      totalPrice,
-      paymentMethod,
-      clientEmail: guestEmail.trim() || clientEmail || null,
-    });
+    if (saving) return;
+    setSaving(true);
+    void Promise.resolve(
+      onSave({
+        lines,
+        discount,
+        discountAmount,
+        totalPrice,
+        paymentMethod,
+        clientEmail: guestEmail.trim() || clientEmail || null,
+      }),
+    ).finally(() => setSaving(false));
   };
 
   const paymentLabel =
@@ -698,7 +703,8 @@ export default function SalesAddOnCheckout({
         </AppButton>
         <AppButton
           tone="primary"
-          disabled={step === "items" && !hasItems}
+          disabled={(step === "items" && !hasItems) || saving}
+          isLoading={saving}
           onClick={handleNext}
           sx={{
             px: 2.5,

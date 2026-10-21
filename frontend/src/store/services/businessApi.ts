@@ -941,13 +941,22 @@ export const businessApi = baseApi.injectEndpoints({
           Array<{ startMin: number; endMin: number }>
         >;
       }>,
-      { setupId: string; date: string; location: "FL" | "DL" }
+      {
+        setupId: string;
+        date: string;
+        location: "FL" | "DL";
+        /** Reschedule: omit this booking from busy so its own slot stays selectable. */
+        excludeBookingId?: string | null;
+      }
     >({
       async queryFn(arg, _api, _extraOptions, fetchWithBQ) {
         const params = new URLSearchParams({
           date: arg.date,
           location: arg.location,
         });
+        if (arg.excludeBookingId) {
+          params.set("excludeBookingId", arg.excludeBookingId);
+        }
         const response = await fetchWithBQ({
           url: `/api/business-setups/${encodeURIComponent(arg.setupId)}/availability?${params.toString()}`,
           method: "GET",

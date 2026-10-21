@@ -130,13 +130,15 @@ export function computeFreeSlotStarts(
   minStartMin?: number,
 ) {
   const free = subtractIntervals(workingIntervals, busyIntervals);
+  const step = Math.max(1, slotStepMins || 1);
   const slots: string[] = [];
   for (const window of free) {
-    for (
-      let min = window.startMin;
-      min + durationMins <= window.endMin;
-      min += slotStepMins
-    ) {
+    // Snap to slot grid so labels match the :00/:30 strip (off-grid busy ends
+    // must not produce only :15/:45 starts that never appear as buttons).
+    let min = window.startMin;
+    const rem = ((min % step) + step) % step;
+    if (rem !== 0) min += step - rem;
+    for (; min + durationMins <= window.endMin; min += step) {
       if (minStartMin != null && min < minStartMin) continue;
       slots.push(fmtMinutesToTimeLabel(min));
     }
@@ -336,6 +338,8 @@ export function autoAssignServicesByAvailability(input: {
     }));
   }
 
+  // Keep free client picks; clear busy/invalid. Never fill blanks — backend
+  // createBooking assigns free TMs for null teamMemberId.
   if (assignOneMemberForAll) {
     const normalized = services.map((service) => ({
       catalogServiceId:
@@ -348,54 +352,36 @@ export function autoAssignServicesByAvailability(input: {
       sharedWindowMins != null && sharedWindowMins > 0
         ? sharedWindowMins
         : normalized.reduce((sum, service) => sum + service.durationMins, 0);
-    const existingMemberId = services.find((service) => service.teamMemberId)
-      ?.teamMemberId;
-    if (existingMemberId) {
-      const member = snapshot.teamMembers.find((row) => row.id === existingMemberId);
-      if (member) {
-        const canPerformAll = normalized.every((service) =>
-          memberCanPerformService(
-            member,
-            service.catalogServiceId,
-            fallbackCatalogIds,
-          ),
-        );
-        const working = getMemberWorkingIntervals(
-          existingMemberId,
-          snapshot.date,
-          snapshot.location,
-          snapshot,
-        );
-        const busy = snapshot.busyByMember[existingMemberId] ?? [];
-        if (
-          canPerformAll &&
-          isMemberAvailableAt(startMin, windowMins, working, busy)
-        ) {
-          return services.map((service) => ({
-            id: service.id,
-            teamMemberId: existingMemberId,
-          }));
-        }
-      }
-    }
-    const sharedMember = findAvailableMemberForAllServices(
-      snapshot,
-      candidateMemberIds,
-      normalized,
-      fallbackCatalogIds,
-      startMin,
-      sharedWindowMins,
-    );
-    // Keep prior assignment only when it was already validated as free above.
-    return services.map((service) => ({
-      id: service.id,
-      teamMemberId: sharedMember,
-    }));
+
+    // Slot freeness only for explicit picks. Skill checks wiped Guest specialist
+    // picks (assignedServiceIds id-space ≠ row catalogServiceId) even after
+    // dropping canPerformAll — dropdown already offered the member.
+    const isFreeSharedPick = (memberId: string) => {
+      if (!candidateMemberIds.includes(memberId)) return false;
+      if (!snapshot.teamMembers.some((row) => row.id === memberId)) return false;
+      const working = getMemberWorkingIntervals(
+        memberId,
+        snapshot.date,
+        snapshot.location,
+        snapshot,
+      );
+      const busy = snapshot.busyByMember[memberId] ?? [];
+      return isMemberAvailableAt(startMin, windowMins, working, busy);
+    };
+
+    // Apply by index — callers must not find()-by-id when CLIENT+Guest share a
+    // catalog line id (duplicate ids); that kept only the first row's result.
+    return services.map((service) => {
+      const existingId = String(service.teamMemberId ?? "").trim() || null;
+      if (!existingId) return { id: service.id, teamMemberId: null };
+      return {
+        id: service.id,
+        teamMemberId: isFreeSharedPick(existingId) ? existingId : null,
+      };
+    });
   }
 
-  // Fixed Location: choose the least busy capable member per service. Each
-  // provisional assignment counts immediately, so concurrent work can spread.
-  const usedMemberIds = new Set<string>();
+  // Fixed Location (per service): keep a free client pick; leave blanks null.
   const plannedBusyByMember: Record<string, Interval[]> = Object.fromEntries(
     Object.entries(snapshot.busyByMember).map(([memberId, intervals]) => [
       memberId,
@@ -409,38 +395,39 @@ export function autoAssignServicesByAvailability(input: {
       service.id.split("-")[0] ||
       service.id;
     const durationMins = service.durationMins || 30;
+    const existingId = String(service.teamMemberId ?? "").trim() || null;
 
-    const atCap =
-      usedMemberIds.size >= FIXED_LOCATION_MAX_DISTINCT_TEAM_MEMBERS;
-    const assignSnapshot: SetupAvailabilitySnapshot = {
-      ...snapshot,
-      busyByMember: plannedBusyByMember,
-    };
-    const preferredIds = atCap
-      ? candidateMemberIds.filter((id) => usedMemberIds.has(id))
-      : candidateMemberIds;
+    const keepExisting = (() => {
+      if (!existingId || !candidateMemberIds.includes(existingId)) return null;
+      const member = snapshot.teamMembers.find((row) => row.id === existingId);
+      if (
+        !member ||
+        !memberCanPerformService(member, catalogServiceId, fallbackCatalogIds)
+      ) {
+        return null;
+      }
+      const working = getMemberWorkingIntervals(
+        existingId,
+        snapshot.date,
+        snapshot.location,
+        snapshot,
+      );
+      const busy = plannedBusyByMember[existingId] ?? [];
+      return isMemberAvailableAt(cursor, durationMins, working, busy)
+        ? existingId
+        : null;
+    })();
 
-    // Only assign members free at this slot — never fall back onto blocked/busy TMs.
-    const memberId = findAvailableMemberForService(
-      assignSnapshot,
-      preferredIds,
-      catalogServiceId,
-      fallbackCatalogIds,
-      cursor,
-      durationMins,
-    );
-
-    if (memberId) {
-      usedMemberIds.add(memberId);
-      plannedBusyByMember[memberId] = [
-        ...(plannedBusyByMember[memberId] ?? []),
+    if (keepExisting) {
+      plannedBusyByMember[keepExisting] = [
+        ...(plannedBusyByMember[keepExisting] ?? []),
         { startMin: cursor, endMin: cursor + durationMins },
       ];
     }
     cursor += durationMins;
     return {
       id: service.id,
-      teamMemberId: memberId,
+      teamMemberId: keepExisting,
     };
   });
 }

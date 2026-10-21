@@ -20,6 +20,7 @@ import {
   useGetSalesAddonsQuery,
   useUpsertSalesAddonMutation,
 } from "../../../store/services/financeApi";
+import { useBookingFinance } from "../booking-finance/useBookingFinance";
 import {
   parseApiCalendarEventId,
   parseStoredEbrFromNotes,
@@ -40,9 +41,18 @@ import {
   buildClientBookingTransactionRow,
   findIssuedFinanceTransaction,
   hasStoredDocumentSnapshot,
+  matchesFinanceBooking,
   salesCardKindToPaymentPhase,
   useProfessionalBusinessOverride,
 } from "../finance-documents";
+import {
+  filterRefundableCardRows,
+  isOnlineRefundMethod,
+  isOriginalOnlineCharge,
+  resolvePreferredRefundMethod,
+  resolveRefundTargetIds,
+  type RefundSalesSavePayload,
+} from "../../sections/finance/refundSales.data";
 import {
   checkoutPaymentMethodDetail,
   checkoutPaymentMethodTitle,
@@ -80,6 +90,7 @@ import {
   toFinanceHints,
 } from "./useSalesOverview.helpers";
 import { auditSalesCardFinanceReconcile } from "./auditSalesCardFinanceReconcile";
+import { getApiErrorMessage } from "../../../lib/api-error";
 
 export type SalesDocumentType = "invoice" | "receipt";
 
@@ -134,6 +145,8 @@ export function useSalesOverview({
   >(null);
   const [refundCard, setRefundCard] = React.useState<SalesOverviewCardData | null>(null);
   const [refundTransactions, setRefundTransactions] = React.useState<TransactionRow[]>([]);
+  const [refundTransactionsLoading, setRefundTransactionsLoading] =
+    React.useState(false);
   const [processFinanceInvoiceReissues] = useProcessFinanceInvoiceReissuesMutation();
   const { data: salesMetadataResponse } = useGetSalesCardMetadataQuery();
   const { data: salesAddonsResponse } = useGetSalesAddonsQuery(undefined, {
@@ -192,6 +205,9 @@ export function useSalesOverview({
     () => toFinanceHints(financeResponse?.data?.rows ?? []),
     [financeResponse?.data?.rows],
   );
+  const { finance: liveBookingFinance } = useBookingFinance(financeBookingId, {
+    skip: !financeBookingId,
+  });
 
   const [revision, setRevision] = React.useState(0);
   // Hydrate/save emit this; without it, API refetch updates storage but cards stay stale.
@@ -248,9 +264,8 @@ export function useSalesOverview({
         financeHints,
         paymentTerms: financeSettings.paymentTerms,
         lateCancellationFeePercentDefault,
+        liveFinancials: liveBookingFinance?.financials ?? null,
       }),
-    // revision forces rebuild after backend-backed sales mutations
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       bookings,
       currentEvent,
@@ -262,6 +277,7 @@ export function useSalesOverview({
       financeHints,
       financeSettings.paymentTerms,
       lateCancellationFeePercentDefault,
+      liveBookingFinance?.financials,
       revision,
     ],
   );
@@ -327,12 +343,17 @@ export function useSalesOverview({
       clientName: sub.payerName,
       payerLabel: sub.payerLabel,
       payerRole: sub.payerRole,
-      payerKey: sub.id,
+      payerKey: sub.payerKey,
+      clientEmail: sub.clientEmail || parent.clientEmail,
       lines: sub.lines,
       highlightedLineIds: sub.lines.map((line) => line.id),
       total: sub.total,
-      totalLabel: SALES_OVERVIEW_COPY.totalAmount,
-      highlightLabel: SALES_OVERVIEW_COPY.payment,
+      totalLabel: sub.totalLabel || SALES_OVERVIEW_COPY.totalAmount,
+      secondaryRows: sub.secondaryRows,
+      highlightLabel:
+        sub.payerRole === "main_client"
+          ? sub.highlightLabel || SALES_OVERVIEW_COPY.payment
+          : sub.highlightLabel || SALES_OVERVIEW_COPY.totalAmount,
       highlightAmount: sub.highlightAmount,
       methodDateLine: sub.methodDateLine,
       dueDate: sub.dueDate,
@@ -343,6 +364,7 @@ export function useSalesOverview({
       paidAt: sub.paidAt,
       penaltyPrompt: sub.penaltyPrompt,
       overdueKind: sub.overdueKind,
+      financeTransactionId: sub.financeTransactionId,
       documentAmount: sub.highlightAmount,
       occurredAt: parent.occurredAt,
       paymentMethodLabel: parent.paymentMethodLabel,
@@ -568,41 +590,144 @@ export function useSalesOverview({
     [resolveIssuedFinanceRow, showSnackbar],
   );
 
-  const handleRefundSales = async (card: SalesOverviewCardData) => {
-    if (card.refunded || card.voided || card.canceled) return;
+  const handleRefundSales = async (
+    card: SalesOverviewCardData,
+    payload?: RefundSalesSavePayload,
+  ): Promise<boolean> => {
+    if (card.refunded || card.voided || card.canceled) {
+      showSnackbar({
+        severity: "warning",
+        message: SALES_OVERVIEW_COPY.refundFailed,
+      });
+      return false;
+    }
 
     try {
-      const bookingRef = card.bookingCode || card.bookingId;
-      const financeResult = await fetchFinanceTransactions({
-        q: bookingRef,
-        limit: 50,
-      }).unwrap();
-      const rows = financeResult.data?.rows ?? [];
-      const refundable = rows.filter((row) => {
-        if (row.status !== "Paid" && row.status !== "Prepaid") return false;
-        const matchesBooking =
-          row.bookingId === card.bookingCode ||
-          row.bookingId === card.bookingId ||
-          row.entryId === card.bookingCode;
-        if (!matchesBooking) return false;
-        const phase = (row.document as { paymentPhase?: string; addonId?: string } | undefined)
-          ?.paymentPhase;
-        if (card.kind === "addon") {
-          // The UI groups every add-on for a booking into one summary card;
-          // refund every add-on transaction represented by that card.
-          return phase === "addon";
-        }
-        if (card.kind === "prepayment") return phase === "prepay" || !phase;
-        if (card.kind === "after_treatment") return phase === "full" || !phase;
-        return true;
+      const bookingScope = card.bookingId || card.bookingCode;
+      let rows = refundTransactions.length
+        ? refundTransactions
+        : (financeResponse?.data?.rows ?? []).filter((row) =>
+            matchesFinanceBooking(row, card.bookingId, card.bookingCode),
+          );
+      if (!rows.length && bookingScope) {
+        const financeResult = await fetchFinanceTransactions({
+          bookingId: String(bookingScope),
+          limit: 50,
+        }).unwrap();
+        rows = financeResult.data?.rows ?? [];
+        setRefundTransactions(rows);
+      }
+
+      const refundable = filterRefundableCardRows(rows, {
+        bookingId: card.bookingId,
+        bookingCode: card.bookingCode,
+        kind: card.kind,
+        financeTransactionId: card.financeTransactionId,
+        title: card.title,
       });
 
-      if (refundable.length) {
-        await bulkFinanceAction({
-          ids: refundable.map((row) => row.id),
-          action: "refund",
-        }).unwrap();
+      const resolved = payload
+        ? resolveRefundTargetIds({
+            mode: payload.mode,
+            itemIds: payload.itemIds,
+            amount: payload.amount,
+            items: payload.items,
+            refundableRows: refundable,
+          })
+        : refundable.length
+          ? { ids: refundable.map((row) => String(row.id)) }
+          : { error: SALES_OVERVIEW_COPY.refundNoTransactions };
+
+      if ("error" in resolved) {
+        showSnackbar({ severity: "error", message: resolved.error });
+        return false;
       }
+      if (!resolved.ids.length) {
+        showSnackbar({
+          severity: "error",
+          message: SALES_OVERVIEW_COPY.refundNoTransactions,
+        });
+        return false;
+      }
+
+      const preferredMethod =
+        payload?.method ||
+        resolvePreferredRefundMethod(refundable, card.paymentMethod);
+      const originalOnline = isOriginalOnlineCharge(
+        refundable,
+        card.paymentMethod,
+      );
+      if (
+        !originalOnline &&
+        isOnlineRefundMethod(preferredMethod) &&
+        !payload?.bankDetails?.iban
+      ) {
+        showSnackbar({
+          severity: "error",
+          message:
+            "Enter bank details (account holder + IBAN) to refund online for an offline payment.",
+        });
+        return false;
+      }
+
+      // Online-direct original charge: reuse Stripe refund-prepayment (same PI path).
+      const bookingRef = String(card.bookingCode || "").trim();
+      const refundAmount = Number(
+        payload?.amount ??
+          refundable
+            .filter((row) => resolved.ids.includes(String(row.id)))
+            .reduce((sum, row) => sum + (Number(row.netAmount) || 0), 0),
+      );
+      if (
+        originalOnline &&
+        preferredMethod === "online-direct" &&
+        bookingRef &&
+        Number.isFinite(refundAmount) &&
+        refundAmount > 0
+      ) {
+        try {
+          const stripeRes = await fetch("/api/stripe/refund-prepayment", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ bookingRef, amount: refundAmount }),
+          });
+          if (!stripeRes.ok && stripeRes.status !== 404) {
+            const stripeBody = (await stripeRes.json().catch(() => null)) as {
+              error?: string;
+            } | null;
+            showSnackbar({
+              severity: "error",
+              message:
+                stripeBody?.error ||
+                "Stripe could not refund this online payment.",
+            });
+            return false;
+          }
+        } catch {
+          // ponytail: no PI / network — still mark finance refund + email; upgrade to hard-fail when Connect payouts land
+        }
+      }
+
+      await bulkFinanceAction({
+        ids: resolved.ids,
+        action: "refund",
+        refundMethod: preferredMethod || undefined,
+        reason: payload?.reason,
+        bankDetails: payload?.bankDetails,
+        refundMode: payload?.mode,
+        refundItems:
+          payload?.mode === "item"
+            ? (payload.items ?? [])
+                .filter((item) => payload.itemIds.includes(item.id))
+                .map((item) => ({
+                  id: item.id,
+                  name: item.name,
+                  amount: item.amount,
+                }))
+            : payload?.amount != null
+              ? [{ name: "Refund", amount: Number(payload.amount) }]
+              : undefined,
+      }).unwrap();
 
       if (card.kind === "addon") {
         listSalesAddons(card.bookingId)
@@ -619,6 +744,7 @@ export function useSalesOverview({
           canceled: card.canceled,
           paymentMethod: card.paymentMethod,
           dueDate: card.dueDate,
+          financeTransactionId: card.financeTransactionId,
         });
       }
 
@@ -673,10 +799,11 @@ export function useSalesOverview({
     } catch (error) {
       showSnackbar({
         severity: "error",
-        message: SALES_OVERVIEW_COPY.refundFailed,
+        message: getApiErrorMessage(error, SALES_OVERVIEW_COPY.refundFailed),
       });
-      throw error;
+      return false;
     }
+    return true;
   };
 
   const handleMenuAction = async (
@@ -692,12 +819,40 @@ export function useSalesOverview({
       return;
     }
     if (action === "refundSales") {
-      const result = await fetchFinanceTransactions({
-        q: card.bookingCode || card.bookingId,
-        limit: 50,
-      }).unwrap();
-      setRefundTransactions(result.data?.rows ?? []);
+      const bookingScope = String(card.bookingId || card.bookingCode || "");
+      const seeded = (financeResponse?.data?.rows ?? []).filter((row) =>
+        matchesFinanceBooking(row, card.bookingId, card.bookingCode),
+      );
+      setRefundTransactions(seeded);
       setRefundCard(card);
+      // Seeded poll rows already paint the drawer — only spin when empty.
+      // Forced refetch can hang against the live poll subscription; prefer cache.
+      setRefundTransactionsLoading(seeded.length === 0 && Boolean(bookingScope));
+      if (!bookingScope) {
+        if (!seeded.length) {
+          showSnackbar({
+            severity: "error",
+            message: SALES_OVERVIEW_COPY.refundNoTransactions,
+          });
+        }
+        return;
+      }
+      try {
+        const result = await fetchFinanceTransactions(
+          { bookingId: bookingScope, limit: 50 },
+          seeded.length > 0,
+        ).unwrap();
+        setRefundTransactions(result.data?.rows ?? []);
+      } catch {
+        if (!seeded.length) {
+          showSnackbar({
+            severity: "error",
+            message: SALES_OVERVIEW_COPY.refundNoTransactions,
+          });
+        }
+      } finally {
+        setRefundTransactionsLoading(false);
+      }
       return;
     }
     if (
@@ -950,7 +1105,11 @@ export function useSalesOverview({
     setCheckoutCardId(null);
   };
 
+  // Blocks multi-save storms (same checkout firing create+upsert many times).
+  const addonSaveLockRef = React.useRef<string | null>(null);
+
   const openAddOns = (bookingId: string, bookingCode: string, cardId: string) => {
+    addonSaveLockRef.current = null;
     setCheckoutBookingId(bookingId);
     setCheckoutBookingCode(bookingCode);
     setCheckoutCardId(cardId);
@@ -958,6 +1117,9 @@ export function useSalesOverview({
 
   const handleSaveAddon = async (payload: SalesAddOnCheckoutPayload) => {
     if (!checkoutContext) return;
+    const lockKey = String(checkoutContext.bookingId);
+    if (addonSaveLockRef.current === lockKey) return;
+    addonSaveLockRef.current = lockKey;
     const addonId = `addon-${Date.now()}`;
     try {
       await createFinanceTransaction({
@@ -1008,6 +1170,7 @@ export function useSalesOverview({
         message: SALES_OVERVIEW_COPY.addonCreated,
       });
     } catch (error) {
+      addonSaveLockRef.current = null;
       const apiError = error as {
         data?: { message?: string };
         error?: string;
@@ -1354,7 +1517,9 @@ export function useSalesOverview({
     handleRefundSales,
     refundCard,
     refundTransactions,
+    refundTransactionsLoading,
     setRefundCard,
+    setRefundTransactionsLoading,
     noteCard,
     openAddOns,
     openDocument,

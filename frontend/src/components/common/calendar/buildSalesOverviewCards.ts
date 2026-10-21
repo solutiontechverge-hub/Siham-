@@ -2,7 +2,10 @@ import type { CalendarBooking } from "../../../store/services/businessApi";
 import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import { mapCalendarBookingToEvent } from "./calendar-overview.mappers";
 import { parseApiCalendarEventId } from "./bookingEventDetails";
-import { listSalesAddonsForBookings } from "./salesOverview.storage";
+import {
+  listRefundSalesCardMetaForBookings,
+  listSalesAddonsForBookings,
+} from "./salesOverview.storage";
 import type {
   SalesClientKind,
   SalesFinanceHint,
@@ -14,6 +17,7 @@ import {
   buildCardsForEvent,
   findProtectiveFeeFinanceHint,
   mergeAddonRecordsIntoCards,
+  mergeRefundMetaIntoCards,
   protectiveFeeFlagsFromBooking,
 } from "./buildSalesOverviewCards.helpers";
 
@@ -29,6 +33,8 @@ export type BuildSalesOverviewInput = {
   paymentTerms?: SalesPaymentTermsInput;
   /** Business setup late-cancel % — heal Fee Summary for old cancels missing the stamp. */
   lateCancellationFeePercentDefault?: string | number | null;
+  /** Live ledger aggregates from useBookingFinance — keeps Sale cards aligned with Finances. */
+  liveFinancials?: import("./bookingEventDetails").BookingFinancialsSnapshot | null;
 };
 
 export function buildSalesOverviewCards(input: BuildSalesOverviewInput): SalesOverviewCardData[] {
@@ -43,11 +49,13 @@ export function buildSalesOverviewCards(input: BuildSalesOverviewInput): SalesOv
     financeHints = [],
     paymentTerms,
     lateCancellationFeePercentDefault,
+    liveFinancials = null,
   } = input;
   const ctx: BuilderCtx = {
     financeHints,
     paymentTerms,
     lateCancellationFeePercentDefault,
+    liveFinancials,
   };
 
   const cards: SalesOverviewCardData[] = [];
@@ -148,8 +156,10 @@ export function buildSalesOverviewCards(input: BuildSalesOverviewInput): SalesOv
 
   const addonRecords = listSalesAddonsForBookings([...seenBookingIds]);
   const withAddons = mergeAddonRecordsIntoCards(cards, addonRecords, ctx);
+  const refundMetas = listRefundSalesCardMetaForBookings([...seenBookingIds]);
+  const withRefunds = mergeRefundMetaIntoCards(withAddons, refundMetas, ctx);
 
-  return withAddons
+  return withRefunds
     // Cancel Sales keeps voided cards visible (grey Voided badge); supersede-only canceled hide.
     .filter((card) => !card.canceled || card.voided)
     .sort((a, b) => {
@@ -165,7 +175,8 @@ export function buildSalesOverviewCards(input: BuildSalesOverviewInput): SalesOv
         if (card.kind === "after_treatment") return 2;
         if (card.kind === "addon") return 3;
         if (card.kind === "reissued_invoice") return 4;
-        return 5;
+        if (card.kind === "refund") return 5;
+        return 6;
       };
       const rankDiff = kindRank(a) - kindRank(b);
       if (rankDiff !== 0) return rankDiff;

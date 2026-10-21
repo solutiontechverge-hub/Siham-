@@ -4,6 +4,7 @@
 import assert from "node:assert/strict";
 import {
   intervalsOverlap,
+  pickFreeTeamMemberId,
   wallClockDateFromValue,
   wallClockTimeToMinutes,
 } from "./teamMemberAvailability.js";
@@ -38,5 +39,40 @@ assert.equal(
   ),
   false,
 );
+
+{
+  // pickFreeTeamMemberId: skips busy + provisional, respects assigned_services.
+  const members = [
+    { id: "busy", assigned_services: ["svc-1"] },
+    { id: "wrong-skill", assigned_services: ["other"] },
+    { id: "free", assigned_services: ["svc-1"] },
+  ];
+  const queryFn = async (sql, params) => {
+    if (String(sql).includes("business_team_members")) {
+      return { rows: members };
+    }
+    // isTeamMemberBusyInWindow bookings query
+    if (String(sql).includes("FROM bookings")) {
+      const memberId = params[2];
+      if (memberId === "busy") {
+        return {
+          rows: [{ start_time: "2026-10-15T10:00:00", end_time: "2026-10-15T11:00:00" }],
+        };
+      }
+      return { rows: [] };
+    }
+    return { rows: [] };
+  };
+  const picked = await pickFreeTeamMemberId(queryFn, {
+    professionalProfileId: "prof-1",
+    businessSetupId: "setup-1",
+    date: "2026-10-15",
+    startMin: 10 * 60,
+    endMin: 10 * 60 + 30,
+    serviceId: "svc-1",
+    provisionalBusy: {},
+  });
+  assert.equal(picked, "free", "skips busy and wrong-skill members");
+}
 
 console.log("teamMemberAvailability.test.js: ok");

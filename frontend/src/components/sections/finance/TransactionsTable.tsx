@@ -37,6 +37,11 @@ import {
 import ClientPlatformTag from "../../common/ClientPlatformTag";
 import { BodyText } from "../../ui/typography";
 import { displayReceiptNumber } from "../../common/finance-documents/financeDocumentUtils";
+import {
+  bookingFinanceBadgeLabel,
+  deriveBookingFinanceBadge,
+} from "../../common/booking-finance/mapBookingFinance";
+import { formatFinanceEuro } from "../../common/booking-finance/formatBookingFinance";
 
 function statusChipSx(
   status: TransactionStatus,
@@ -92,7 +97,7 @@ export type TransactionsTableProps = {
   pageCount: number;
   onPageChange: (page: number) => void;
   theme: Theme;
-  m: { navy: string; teal: string };
+  m: Theme["palette"]["mollure"];
 };
 
 export default function TransactionsTable({
@@ -433,25 +438,118 @@ export default function TransactionsTable({
                   </TableCell>
                   <TableCell>
                     <Stack spacing={0.35}>
-                      <Chip
-                        label={formatTransactionStatusLabel(row.status, row.entryLabel)}
-                        size="small"
-                        variant="filled"
-                        sx={{
-                          height: 18,
-                          borderRadius: "6px",
-                          fontWeight: 700,
-                          width: "fit-content",
-                          border: 0,
-                          "& .MuiChip-label": {
-                            fontSize: 10,
-                            px: 0.75,
-                            py: 0,
-                            lineHeight: 1.2,
-                          },
-                          ...statusChipSx(row.status, theme, row.entryLabel),
-                        }}
-                      />
+                      {row.bookingFinancials ? (
+                        (() => {
+                          const fin = row.bookingFinancials;
+                          const badge = deriveBookingFinanceBadge({
+                            paymentStatus: fin.payment_status,
+                            cancellationPaymentStatus:
+                              fin.cancellation_payment_status,
+                            bookingStatus: row.bookingStatus,
+                            totalPaid: fin.total_paid,
+                            totalRefunded: fin.total_refunded,
+                            amountDue: fin.outstanding_balance,
+                            netTotal: fin.net_total,
+                          });
+                          const due = Number(fin.outstanding_balance) || 0;
+                          const label = bookingFinanceBadgeLabel(badge);
+                          const chipTone =
+                            badge === "PAID" || badge === "PREPAID"
+                              ? {
+                                  color: m.statusGreenFg,
+                                  bgcolor: m.statusGreenBg,
+                                }
+                              : badge === "UNPAID"
+                                ? {
+                                    color: m.statusRedFg,
+                                    bgcolor: m.statusRedBg,
+                                  }
+                                : badge === "PARTIALLY_PAID" ||
+                                    badge === "PENDING_FEE"
+                                  ? {
+                                      color: m.statusOrangeFg,
+                                      bgcolor: m.statusOrangeBg,
+                                    }
+                                  : {
+                                      color: m.statusGreyFg,
+                                      bgcolor: m.fxGrayF2F4F7,
+                                    };
+                          return (
+                            <>
+                              <Chip
+                                label={label}
+                                size="small"
+                                variant="filled"
+                                sx={{
+                                  height: 18,
+                                  borderRadius: "6px",
+                                  fontWeight: 700,
+                                  width: "fit-content",
+                                  border: 0,
+                                  "& .MuiChip-label": {
+                                    fontSize: 10,
+                                    px: 0.75,
+                                    py: 0,
+                                    lineHeight: 1.2,
+                                  },
+                                  ...chipTone,
+                                }}
+                              />
+                              {due > 0 ? (
+                                <BodyText
+                                  component="span"
+                                  sx={{
+                                    fontSize: 10.5,
+                                    fontWeight: 700,
+                                    color: alpha(m.navy, 0.62),
+                                    maxWidth: 180,
+                                  }}
+                                >
+                                  Due {formatFinanceEuro(due)}
+                                </BodyText>
+                              ) : null}
+                              <BodyText
+                                component="span"
+                                sx={{
+                                  fontSize: 10,
+                                  fontWeight: 600,
+                                  color: alpha(m.navy, 0.42),
+                                  maxWidth: 180,
+                                }}
+                              >
+                                Doc:{" "}
+                                {formatTransactionStatusLabel(
+                                  row.status,
+                                  row.entryLabel,
+                                )}
+                              </BodyText>
+                            </>
+                          );
+                        })()
+                      ) : (
+                        <Chip
+                          label={formatTransactionStatusLabel(
+                            row.status,
+                            row.entryLabel,
+                          )}
+                          size="small"
+                          variant="filled"
+                          sx={{
+                            height: 18,
+                            borderRadius: "6px",
+                            fontWeight: 700,
+                            width: "fit-content",
+                            border: 0,
+                            "& .MuiChip-label": {
+                              fontSize: 10,
+                              px: 0.75,
+                              py: 0,
+                              lineHeight: 1.2,
+                            },
+                            ...statusChipSx(row.status, theme, row.entryLabel),
+                          }}
+                        />
+                      )}
                       {row.statusDetail ? (
                         <BodyText
                           component="span"

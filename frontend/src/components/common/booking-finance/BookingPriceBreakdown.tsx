@@ -27,6 +27,8 @@ type BookingPriceBreakdownProps = {
   prepaidPercent?: number;
   prepaidAmount?: number;
   remainingAmount?: number;
+  /** Override Remaining label (e.g. ledger "Amount Due"). */
+  remainingLabel?: string;
   prepaymentPaid?: boolean;
   prepaidAction?: ReactNode;
   extraRows?: readonly BookingPriceBreakdownRow[];
@@ -111,6 +113,7 @@ export default function BookingPriceBreakdown({
   prepaidPercent = 0,
   prepaidAmount = 0,
   remainingAmount,
+  remainingLabel,
   prepaymentPaid = false,
   prepaidAction,
   extraRows = [],
@@ -119,24 +122,22 @@ export default function BookingPriceBreakdown({
 }: BookingPriceBreakdownProps) {
   const m = useTheme().palette.mollure;
   const isPlain = variant === "plain";
+  const round2 = (n: number) =>
+    Math.round((n + Number.EPSILON) * 100) / 100;
+  // totalPrice must be what the client pays (services + protective fees).
+  const grandTotal = round2(totalPrice);
   const showPrepay = prepaidAmount > 0 || prepaidPercent > 0;
   const remaining =
-    remainingAmount ??
-    Math.round((totalPrice - prepaidAmount + Number.EPSILON) * 100) / 100;
-  const remainingDiffersFromTotal =
-    Math.round((remaining + Number.EPSILON) * 100) / 100 !==
-    Math.round((totalPrice + Number.EPSILON) * 100) / 100;
+    remainingAmount != null
+      ? round2(remainingAmount)
+      : round2(grandTotal - prepaidAmount);
+  const remainingDiffersFromTotal = round2(remaining) !== round2(grandTotal);
   const renderRemaining = showRemaining && remainingDiffersFromTotal;
-  const hasAddonBreakdown =
-    lineDiscountAmount > 0 ||
-    bookingDiscountAmount > 0 ||
-    lateCancellationFeeAmount > 0 ||
-    lateRescheduleFeeAmount > 0 ||
-    noShowFeeAmount > 0;
   const showStrike =
-    originalPrice != null &&
-    Math.round((originalPrice + Number.EPSILON) * 100) / 100 !==
-      Math.round((totalPrice + Number.EPSILON) * 100) / 100;
+    originalPrice != null && round2(originalPrice) !== round2(grandTotal);
+  const discountHints =
+    lineDiscountAmount > 0 ||
+    (bookingDiscountAmount > 0 && Boolean(bookingTotalDiscount));
   const extraAfterDivider = extraRows.filter((row) => row.amount !== 0);
 
   const totalRow = (
@@ -144,7 +145,7 @@ export default function BookingPriceBreakdown({
       emphasize
       label="Total Price:"
       value={
-        hasAddonBreakdown || showStrike ? (
+        showStrike || discountHints ? (
           <Stack alignItems="flex-end" spacing={0.35} sx={{ minWidth: 0 }}>
             {showStrike && originalPrice != null ? (
               <BodyText
@@ -171,87 +172,50 @@ export default function BookingPriceBreakdown({
                 color: alpha(m.navy, 0.88),
               }}
             >
-              {formatFinanceEuro(totalPrice)}
+              {formatFinanceEuro(grandTotal)}
             </BodyText>
-            <Stack
-              direction="row"
-              spacing={0.75}
-              flexWrap="wrap"
-              justifyContent="flex-end"
-              useFlexGap
-              sx={{ alignItems: "center" }}
-            >
-              {lineDiscountAmount > 0 ? (
-                <BodyText
-                  component="span"
-                  sx={{
-                    m: 0,
-                    fontSize: 12,
-                    fontWeight: 800,
-                    color: m.teal,
-                  }}
-                >
-                  −{formatFinanceEuro(lineDiscountAmount)} Discount
-                </BodyText>
-              ) : null}
-              {bookingDiscountAmount > 0 && bookingTotalDiscount ? (
-                <BodyText
-                  component="span"
-                  sx={{
-                    m: 0,
-                    fontSize: 12,
-                    fontWeight: 800,
-                    color: m.teal,
-                  }}
-                >
-                  {bookingTotalDiscount.type === "percentage"
-                    ? `${bookingTotalDiscount.amount}% Discount`
-                    : `${formatManualEntryDiscountLabel(bookingTotalDiscount)} Discount`}
-                </BodyText>
-              ) : null}
-              {lateCancellationFeeAmount > 0 ? (
-                <BodyText
-                  component="span"
-                  sx={{
-                    m: 0,
-                    fontSize: 12,
-                    fontWeight: 800,
-                    color: alpha(m.navy, 0.55),
-                  }}
-                >
-                  +{formatFinanceEuro(lateCancellationFeeAmount)} Cancel fee
-                </BodyText>
-              ) : null}
-              {lateRescheduleFeeAmount > 0 ? (
-                <BodyText
-                  component="span"
-                  sx={{
-                    m: 0,
-                    fontSize: 12,
-                    fontWeight: 800,
-                    color: alpha(m.navy, 0.55),
-                  }}
-                >
-                  +{formatFinanceEuro(lateRescheduleFeeAmount)} Late fee
-                </BodyText>
-              ) : null}
-              {noShowFeeAmount > 0 ? (
-                <BodyText
-                  component="span"
-                  sx={{
-                    m: 0,
-                    fontSize: 12,
-                    fontWeight: 800,
-                    color: alpha(m.navy, 0.55),
-                  }}
-                >
-                  +{formatFinanceEuro(noShowFeeAmount)} No-show fee
-                </BodyText>
-              ) : null}
-            </Stack>
+            {discountHints ? (
+              <Stack
+                direction="row"
+                spacing={0.75}
+                flexWrap="wrap"
+                justifyContent="flex-end"
+                useFlexGap
+                sx={{ alignItems: "center" }}
+              >
+                {lineDiscountAmount > 0 ? (
+                  <BodyText
+                    component="span"
+                    sx={{
+                      m: 0,
+                      fontSize: 12,
+                      fontWeight: 800,
+                      color: m.teal,
+                    }}
+                  >
+                    −{formatFinanceEuro(lineDiscountAmount)} Discount
+                  </BodyText>
+                ) : null}
+                {bookingDiscountAmount > 0 && bookingTotalDiscount ? (
+                  <BodyText
+                    component="span"
+                    sx={{
+                      m: 0,
+                      fontSize: 12,
+                      fontWeight: 800,
+                      color: m.teal,
+                    }}
+                  >
+                    {bookingTotalDiscount.type === "percentage"
+                      ? `${bookingTotalDiscount.amount}% Discount`
+                      : `${formatManualEntryDiscountLabel(bookingTotalDiscount)} Discount`}
+                  </BodyText>
+                ) : null}
+              </Stack>
+            ) : null}
           </Stack>
         ) : (
-          formatFinanceEuro(totalPrice)
+          formatFinanceEuro(grandTotal)
         )
       }
     />
@@ -290,18 +254,24 @@ export default function BookingPriceBreakdown({
           />
           {renderRemaining ? (
             <FinanceRow
-              label={remainingBreakdownLabel(
-                prepaidPercent,
-                remaining,
-                totalPrice,
-              )}
+              label={
+                remainingLabel ||
+                remainingBreakdownLabel(
+                  prepaidPercent,
+                  remaining,
+                  totalPrice,
+                )
+              }
               value={formatFinanceEuro(remaining)}
             />
           ) : null}
         </Stack>
       ) : null}
 
-      {extraAfterDivider.length ? (
+      {extraAfterDivider.length ||
+      lateCancellationFeeAmount > 0 ||
+      lateRescheduleFeeAmount > 0 ||
+      noShowFeeAmount > 0 ? (
         <Stack spacing={1} sx={{ mb: 1.25 }}>
           {extraAfterDivider.map((row) => (
             <FinanceRow
@@ -310,6 +280,24 @@ export default function BookingPriceBreakdown({
               value={formatFinanceEuro(row.amount)}
             />
           ))}
+          {lateRescheduleFeeAmount > 0 ? (
+            <FinanceRow
+              label="Late Reschedule Fee"
+              value={formatFinanceEuro(lateRescheduleFeeAmount)}
+            />
+          ) : null}
+          {lateCancellationFeeAmount > 0 ? (
+            <FinanceRow
+              label="Cancellation Fee"
+              value={formatFinanceEuro(lateCancellationFeeAmount)}
+            />
+          ) : null}
+          {noShowFeeAmount > 0 ? (
+            <FinanceRow
+              label="No-show Fee"
+              value={formatFinanceEuro(noShowFeeAmount)}
+            />
+          ) : null}
         </Stack>
       ) : null}
 

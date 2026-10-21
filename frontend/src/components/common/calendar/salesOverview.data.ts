@@ -32,6 +32,8 @@ export const SALES_OVERVIEW_COPY = {
   editTransactionDateFailed: "Could not update transaction date.",
   refunded: "Sale refunded.",
   refundFailed: "Unable to refund this sale.",
+  refundNoTransactions:
+    "No Paid/Prepaid finance transactions found for this sale yet.",
   canceled: "Sale canceled. Payment link deactivated.",
   cancelFailed: "Failed to cancel sale.",
   addonCreated: "New add-on sale created.",

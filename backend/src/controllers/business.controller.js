@@ -21,6 +21,7 @@ import {
   pickSectionDraft,
 } from "../utils/business-setup-draft.js";
 import { syncBookingToFinanceTransaction } from "../services/finance-sync.service.js";
+import { applyCancellationFinancialsOnCancel } from "../services/cancellationFee.service.js";
 import {
   listBookingActivityEvents,
   logBookingCreatedActivity,
@@ -70,6 +71,7 @@ import { logError, sendCaughtError } from "../utils/httpError.js";
 import { responseDeadlineAtFromNotes } from "../utils/bookingResponseWindow.js";
 import {
   isTeamMemberBusyInWindow,
+  pickFreeTeamMemberId,
   wallClockTimeToMinutes,
 } from "../utils/teamMemberAvailability.js";
 
@@ -2037,6 +2039,163 @@ const teamMemberWindowsFromBookingNotes = (notes, fallbackStartMin, fallbackEndM
   }
 };
 
+/**
+ * Fill blank teamMemberId / team_member_id on create from availability.
+ * Preserves client picks; provisional busy avoids double-booking within the request.
+ */
+const assignBlankTeamMembersOnCreate = async ({
+  notes,
+  businessSetupId,
+  professionalProfileId,
+  primaryTeamMemberId,
+  primaryServiceId,
+  bookingDate,
+  bookingStartMin,
+  bookingEndMin,
+}) => {
+  if (!businessSetupId || !professionalProfileId || !bookingDate) {
+    return { notes, teamMemberId: primaryTeamMemberId ?? null };
+  }
+  if (bookingStartMin == null || bookingEndMin == null || bookingEndMin <= bookingStartMin) {
+    return { notes, teamMemberId: primaryTeamMemberId ?? null };
+  }
+
+  const marker = "---mollure-meta---";
+  const raw = String(notes ?? "");
+  const idx = raw.indexOf(marker);
+  let meta = null;
+  let humanPrefix = raw;
+  if (idx >= 0) {
+    humanPrefix = raw.slice(0, idx + marker.length);
+    try {
+      meta = JSON.parse(raw.slice(idx + marker.length).trim() || "{}");
+    } catch {
+      meta = null;
+    }
+  }
+
+  const snapshotServices = Array.isArray(meta?.clientSnapshot?.services)
+    ? meta.clientSnapshot.services
+    : [];
+  const topServices = Array.isArray(meta?.services) ? meta.services : [];
+  // Prefer clientSnapshot.services (create payload); fall back to top-level.
+  const targetList = snapshotServices.length ? snapshotServices : topServices;
+  const provisionalBusy = {};
+
+  const remember = (teamMemberId, startMin, endMin) => {
+    if (!teamMemberId || startMin == null || endMin == null) return;
+    const key = String(teamMemberId);
+    if (!provisionalBusy[key]) provisionalBusy[key] = [];
+    provisionalBusy[key].push({ startMin, endMin });
+  };
+
+  // Seed provisional with existing picks so blanks don't collide.
+  for (const service of targetList) {
+    const existing = parseOptionalUuid(
+      service?.teamMemberId ?? service?.team_member_id ?? service?.staffResourceId,
+    );
+    if (!existing) continue;
+    const startMin =
+      wallClockTimeToMinutes(service?.startTime ?? service?.start_time) ?? bookingStartMin;
+    let endMin =
+      wallClockTimeToMinutes(service?.endTime ?? service?.end_time) ?? bookingEndMin;
+    const duration = Number(service?.durationMins ?? service?.duration_mins);
+    if (
+      (endMin == null || endMin <= startMin) &&
+      startMin != null &&
+      Number.isFinite(duration) &&
+      duration > 0
+    ) {
+      endMin = startMin + duration;
+    }
+    remember(existing, startMin, endMin);
+  }
+  if (primaryTeamMemberId) {
+    remember(primaryTeamMemberId, bookingStartMin, bookingEndMin);
+  }
+
+  let changed = false;
+  for (const service of targetList) {
+    const existing = parseOptionalUuid(
+      service?.teamMemberId ?? service?.team_member_id ?? service?.staffResourceId,
+    );
+    if (existing) continue;
+
+    const startMin =
+      wallClockTimeToMinutes(service?.startTime ?? service?.start_time) ?? bookingStartMin;
+    let endMin =
+      wallClockTimeToMinutes(service?.endTime ?? service?.end_time) ?? bookingEndMin;
+    const duration = Number(service?.durationMins ?? service?.duration_mins);
+    if (
+      (endMin == null || endMin <= startMin) &&
+      startMin != null &&
+      Number.isFinite(duration) &&
+      duration > 0
+    ) {
+      endMin = startMin + duration;
+    }
+    if (startMin == null || endMin == null || endMin <= startMin) continue;
+
+    const catalogServiceId = parseOptionalUuid(
+      service?.catalogServiceId ?? service?.service_id ?? service?.id,
+    );
+    const picked = await pickFreeTeamMemberId(query, {
+      professionalProfileId,
+      businessSetupId,
+      date: bookingDate,
+      startMin,
+      endMin,
+      serviceId: catalogServiceId,
+      provisionalBusy,
+    });
+    if (!picked) continue;
+    service.teamMemberId = picked;
+    if ("team_member_id" in service) service.team_member_id = picked;
+    remember(picked, startMin, endMin);
+    changed = true;
+  }
+
+  let resolvedPrimary = primaryTeamMemberId ?? null;
+  if (!resolvedPrimary) {
+    const fromServices = targetList
+      .map((service) =>
+        parseOptionalUuid(
+          service?.teamMemberId ?? service?.team_member_id ?? service?.staffResourceId,
+        ),
+      )
+      .find(Boolean);
+    if (fromServices) {
+      resolvedPrimary = fromServices;
+    } else {
+      resolvedPrimary = await pickFreeTeamMemberId(query, {
+        professionalProfileId,
+        businessSetupId,
+        date: bookingDate,
+        startMin: bookingStartMin,
+        endMin: bookingEndMin,
+        serviceId: primaryServiceId,
+        provisionalBusy,
+      });
+    }
+  }
+
+  if (!changed && !meta) {
+    return { notes, teamMemberId: resolvedPrimary };
+  }
+
+  let nextNotes = notes;
+  if (meta && changed) {
+    if (snapshotServices.length) {
+      meta.clientSnapshot = { ...meta.clientSnapshot, services: targetList };
+    } else if (topServices.length) {
+      meta.services = targetList;
+    }
+    nextNotes = `${humanPrefix}\n${JSON.stringify(meta)}`;
+  }
+
+  return { notes: nextNotes, teamMemberId: resolvedPrimary };
+};
+
 const syncBookingServiceLinks = async (bookingId, serviceIds) => {
   const ids = [...new Set((serviceIds || []).map((id) => parseUuid(id)).filter(Boolean))];
   if (!bookingId || !ids.length) return;
@@ -2360,8 +2519,22 @@ const parseBookingsSearchTerm = (raw) => {
     .trim();
 };
 
+const parseFinancialsFromNotes = (notes) => {
+  if (!notes || typeof notes !== "string") return null;
+  const marker = "---mollure-meta---";
+  const idx = notes.indexOf(marker);
+  if (idx === -1) return null;
+  try {
+    const meta = JSON.parse(notes.slice(idx + marker.length).trim());
+    return meta?.financials && typeof meta.financials === "object" ? meta.financials : null;
+  } catch {
+    return null;
+  }
+};
+
 const mapBookingListRow = (booking) => {
   const bookingDate = toIsoDate(booking.booking_date || booking.start_time);
+  const financials = parseFinancialsFromNotes(booking.notes);
   return {
     ...booking,
     booking_date: bookingDate,
@@ -2372,6 +2545,7 @@ const mapBookingListRow = (booking) => {
       booking.booking_type ||
       (normalizeBookingStatus(booking.status, "confirmed") === "requested" ? "request" : "online"),
     unique_code: fallbackUniqueCode(booking),
+    ...(financials ? { financials } : {}),
   };
 };
 
@@ -2622,7 +2796,35 @@ export const createBooking = async (req, res) => {
     const bookingDate = normalizeBookingDateInput(req.body.booking_date);
     const bookingStartMin = wallClockTimeToMinutes(req.body.start_time);
     const bookingEndMin = wallClockTimeToMinutes(req.body.end_time);
-    const primaryTeamMemberId = parseOptionalUuid(req.body.team_member_id);
+    let primaryTeamMemberId = parseOptionalUuid(req.body.team_member_id);
+
+    let professionalProfileId = null;
+    if (req.body.business_setup_id) {
+      const setupRow = await query(
+        `SELECT professional_profile_id
+         FROM business_setups
+         WHERE id = $1
+         LIMIT 1`,
+        [req.body.business_setup_id],
+      );
+      professionalProfileId = setupRow.rows[0]?.professional_profile_id ?? null;
+    }
+
+    if (professionalProfileId && req.body.business_setup_id && bookingDate) {
+      const assigned = await assignBlankTeamMembersOnCreate({
+        notes,
+        businessSetupId: req.body.business_setup_id,
+        professionalProfileId,
+        primaryTeamMemberId,
+        primaryServiceId: serviceId,
+        bookingDate,
+        bookingStartMin,
+        bookingEndMin,
+      });
+      notes = assigned.notes;
+      primaryTeamMemberId = parseOptionalUuid(assigned.teamMemberId);
+    }
+
     const teamChecks = [];
     if (primaryTeamMemberId && bookingStartMin != null && bookingEndMin != null) {
       teamChecks.push({
@@ -2634,37 +2836,27 @@ export const createBooking = async (req, res) => {
     for (const row of teamMemberWindowsFromBookingNotes(notes, bookingStartMin, bookingEndMin)) {
       teamChecks.push(row);
     }
-    if (teamChecks.length && req.body.business_setup_id && bookingDate) {
-      const setupRow = await query(
-        `SELECT professional_profile_id
-         FROM business_setups
-         WHERE id = $1
-         LIMIT 1`,
-        [req.body.business_setup_id],
-      );
-      const professionalProfileId = setupRow.rows[0]?.professional_profile_id;
-      if (professionalProfileId) {
-        const seen = new Set();
-        for (const check of teamChecks) {
-          const key = `${check.teamMemberId}:${check.startMin}:${check.endMin}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          const busy = await isTeamMemberBusyInWindow(query, {
-            professionalProfileId,
-            businessSetupId: req.body.business_setup_id,
-            teamMemberId: check.teamMemberId,
-            date: bookingDate,
-            startMin: check.startMin,
-            endMin: check.endMin,
+    if (teamChecks.length && req.body.business_setup_id && bookingDate && professionalProfileId) {
+      const seen = new Set();
+      for (const check of teamChecks) {
+        const key = `${check.teamMemberId}:${check.startMin}:${check.endMin}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const busy = await isTeamMemberBusyInWindow(query, {
+          professionalProfileId,
+          businessSetupId: req.body.business_setup_id,
+          teamMemberId: check.teamMemberId,
+          date: bookingDate,
+          startMin: check.startMin,
+          endMin: check.endMin,
+        });
+        if (busy) {
+          return res.status(409).json({
+            success: false,
+            message:
+              "Selected team member is unavailable for this time (blocked or already booked).",
+            data: null,
           });
-          if (busy) {
-            return res.status(409).json({
-              success: false,
-              message:
-                "Selected team member is unavailable for this time (blocked or already booked).",
-              data: null,
-            });
-          }
         }
       }
     }
@@ -2709,7 +2901,7 @@ export const createBooking = async (req, res) => {
         req.body.business_setup_id,
         req.user.id,
         serviceId,
-        req.body.team_member_id ?? null,
+        primaryTeamMemberId,
         req.body.start_time ?? null,
         req.body.end_time ?? null,
         req.body.location_type ?? null,
@@ -3292,7 +3484,22 @@ export const updateMyBooking = async (req, res) => {
       });
     }
 
-    const booking = result.rows[0];
+    let booking = result.rows[0];
+    // When ledger events exist, total_price comes from recalculateBookingFinancials — not the client body.
+    try {
+      const { reconcileBookingTotalFromLedger } = await import(
+        "../services/bookingTransactionLedger.service.js"
+      );
+      const snap = await reconcileBookingTotalFromLedger(booking.id);
+      if (snap) {
+        const refreshed = await query(`SELECT * FROM bookings WHERE id = $1`, [
+          booking.id,
+        ]);
+        if (refreshed.rows[0]) booking = refreshed.rows[0];
+      }
+    } catch {
+      /* best-effort — booking update still succeeds */
+    }
 
     // Keep mirrored calendar_entries in sync when the client accepts / rejects / suggests.
     if (booking.unique_code) {
@@ -3342,6 +3549,25 @@ export const updateMyBooking = async (req, res) => {
       }
     }
 
+    let cancellationFinancials = null;
+    const becameCancelled =
+      String(booking.status).toLowerCase() === "cancelled" &&
+      String(previousStatus).toLowerCase() !== "cancelled";
+    if (becameCancelled) {
+      try {
+        cancellationFinancials = await applyCancellationFinancialsOnCancel(booking.id, {
+          actor: "client",
+          performedByUserId: req.user?.id ?? null,
+          cancelledAt: Date.now(),
+        });
+      } catch (cancelErr) {
+        console.error(
+          "[cancel-fee] client cancel financials failed:",
+          cancelErr?.message || cancelErr,
+        );
+      }
+    }
+
     if (previousStatus !== booking.status || existing.prepayment_status !== booking.prepayment_status) {
       void dispatchBookingUpdatedNotifications(booking, previousStatus, existing.prepayment_status, {
         notificationEvent: req.body.notification_event,
@@ -3362,7 +3588,17 @@ export const updateMyBooking = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Booking updated successfully.",
-      data: booking,
+      data: {
+        ...booking,
+        status: cancellationFinancials ? "cancelled" : booking.status,
+        ...(cancellationFinancials
+          ? {
+              financials: cancellationFinancials.financials,
+              cancellationSettlement: cancellationFinancials.evaluation,
+              payment_status: cancellationFinancials.statuses.payment_status,
+            }
+          : {}),
+      },
     });
   } catch (error) {
     return sendCaughtError(res, error, { fallbackMessage: "Failed to update booking." });
@@ -3546,7 +3782,22 @@ export const updateBookingStatus = async (req, res) => {
       });
     }
 
-    const booking = result.rows[0];
+    let booking = result.rows[0];
+    // When ledger events exist, total_price comes from recalculateBookingFinancials — not the client body.
+    try {
+      const { reconcileBookingTotalFromLedger } = await import(
+        "../services/bookingTransactionLedger.service.js"
+      );
+      const snap = await reconcileBookingTotalFromLedger(booking.id);
+      if (snap) {
+        const refreshed = await query(`SELECT * FROM bookings WHERE id = $1`, [
+          booking.id,
+        ]);
+        if (refreshed.rows[0]) booking = refreshed.rows[0];
+      }
+    } catch {
+      /* best-effort — booking update still succeeds */
+    }
 
     // Keep mirrored calendar_entries in sync (pro BR edits on b-* events).
     if (booking.unique_code) {
@@ -3630,6 +3881,25 @@ export const updateBookingStatus = async (req, res) => {
       }
     }
 
+    let cancellationFinancials = null;
+    const becameCancelled =
+      String(booking.status).toLowerCase() === "cancelled" &&
+      String(previousStatus).toLowerCase() !== "cancelled";
+    if (becameCancelled) {
+      try {
+        cancellationFinancials = await applyCancellationFinancialsOnCancel(booking.id, {
+          actor: "professional",
+          performedByUserId: req.user?.id ?? null,
+          cancelledAt: Date.now(),
+        });
+      } catch (cancelErr) {
+        console.error(
+          "[cancel-fee] professional cancel financials failed:",
+          cancelErr?.message || cancelErr,
+        );
+      }
+    }
+
     // Flag the client record when they booked but did not show up.
     if (booking.status === "no_show" && customerId) {
       try {
@@ -3673,7 +3943,17 @@ export const updateBookingStatus = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Booking status updated successfully.",
-      data: booking,
+      data: {
+        ...booking,
+        status: cancellationFinancials ? "cancelled" : booking.status,
+        ...(cancellationFinancials
+          ? {
+              financials: cancellationFinancials.financials,
+              cancellationSettlement: cancellationFinancials.evaluation,
+              payment_status: cancellationFinancials.statuses.payment_status,
+            }
+          : {}),
+      },
     });
   } catch (error) {
     return sendCaughtError(res, error, { fallbackMessage: "Failed to update booking status." });
