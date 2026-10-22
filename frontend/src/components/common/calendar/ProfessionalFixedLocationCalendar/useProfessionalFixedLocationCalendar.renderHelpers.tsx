@@ -49,6 +49,8 @@ export type UseProfessionalFixedLocationCalendarRenderHelpersArgs = {
   teamHeaderNeedsScroll: boolean;
   activeDateIso: string;
   getDailyBookingRatio: (resourceId: string, iso: string) => number;
+  /** Schedule/override hours only — false → empty load bar (not 0% utilization). */
+  hasScheduleWindowsOnDate: (resourceId: string, iso: string) => boolean;
   handleTeamMemberBadgeClick: (
     resourceId: string,
     anchor: HTMLElement,
@@ -88,6 +90,7 @@ export function useProfessionalFixedLocationCalendarRenderHelpers(
     teamHeaderNeedsScroll,
     activeDateIso,
     getDailyBookingRatio,
+    hasScheduleWindowsOnDate,
     handleTeamMemberBadgeClick,
     weekTeamHeaderScrollRef,
     onTeamHeaderScroll,
@@ -219,7 +222,9 @@ export function useProfessionalFixedLocationCalendarRenderHelpers(
                 avatarText={resource.avatarText}
                 photoSrc={resource.photoSrc}
                 bookedPercent={
-                  getDailyBookingRatio(resource.id, activeDateIso) * 100
+                  hasScheduleWindowsOnDate(resource.id, activeDateIso)
+                    ? getDailyBookingRatio(resource.id, activeDateIso) * 100
+                    : null
                 }
                 selected={highlighted}
                 fullWidth={isDayColumnHeader}

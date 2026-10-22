@@ -6,11 +6,74 @@ import { Avatar, Box, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../../ui/typography";
 
+export type TeamMemberLoadBarProps = {
+  /** null = no schedule that day → empty track, no fill / no % utilization. */
+  bookedPercent: number | null;
+  fullWidth?: boolean;
+  selected?: boolean;
+};
+
+/** Thin busy÷available track used by calendar badges and listing team rows. */
+export function TeamMemberLoadBar({
+  bookedPercent,
+  fullWidth = false,
+  selected = false,
+}: TeamMemberLoadBarProps) {
+  const m = useTheme().palette.mollure;
+  const hasHours = bookedPercent != null;
+  const percent = hasHours
+    ? Math.max(0, Math.min(100, Math.round(bookedPercent)))
+    : 0;
+
+  return (
+    <Stack direction="row" alignItems="center" spacing={0.6} sx={{ minWidth: 0, width: "100%" }}>
+      <Box
+        sx={{
+          height: 3,
+          width: "100%",
+          maxWidth: fullWidth ? "100%" : 62,
+          minWidth: 24,
+          borderRadius: "999px",
+          bgcolor: m.fxGrayF2F4F7,
+          overflow: "hidden",
+          flex: fullWidth ? 1 : undefined,
+        }}
+      >
+        {hasHours ? (
+          <Box
+            sx={{
+              height: "100%",
+              width: `${percent}%`,
+              bgcolor: m.teal,
+              borderRadius: "999px",
+              transition: "width 0.2s ease",
+            }}
+          />
+        ) : null}
+      </Box>
+      {hasHours ? (
+        <BodyText
+          sx={{
+            fontSize: 9,
+            fontWeight: 800,
+            color: selected ? alpha(m.tealDark, 0.72) : alpha(m.navy, 0.48),
+            lineHeight: 1,
+            flexShrink: 0,
+          }}
+        >
+          {percent}%
+        </BodyText>
+      ) : null}
+    </Stack>
+  );
+}
+
 export type CalendarTeamMemberBadgeProps = {
   name: string;
   avatarText: string;
   photoSrc?: string | null;
-  bookedPercent: number;
+  /** null = no schedule that day → show empty track, no fill / no % utilization. */
+  bookedPercent: number | null;
   selected?: boolean;
   /** Stretch across a day-view resource column instead of a compact centered pill. */
   fullWidth?: boolean;
@@ -27,14 +90,19 @@ export default function CalendarTeamMemberBadge({
   onClick,
 }: CalendarTeamMemberBadgeProps) {
   const m = useTheme().palette.mollure;
-  const percent = Math.max(0, Math.min(100, Math.round(bookedPercent)));
+  const hasHours = bookedPercent != null;
+  const percent = hasHours
+    ? Math.max(0, Math.min(100, Math.round(bookedPercent)))
+    : 0;
   const initial = (avatarText || name).trim().slice(0, 1).toUpperCase() || "T";
 
   return (
     <Box
       role="button"
       tabIndex={0}
-      aria-label={`${name}, ${percent}% booked`}
+      aria-label={
+        hasHours ? `${name}, ${percent}% booked` : `${name}, no schedule`
+      }
       aria-pressed={selected}
       onClick={(event) => onClick?.(event.currentTarget)}
       onKeyDown={(event) => {
@@ -113,45 +181,13 @@ export default function CalendarTeamMemberBadge({
             }}
           />
         </Stack>
-        <Stack
-          direction="row"
-          alignItems="center"
-          spacing={0.6}
-          sx={{ mt: 0.35 }}
-        >
-          <Box
-            sx={{
-              height: 3,
-              width: "100%",
-              maxWidth: fullWidth ? "100%" : 62,
-              minWidth: 24,
-              borderRadius: "999px",
-              bgcolor: m.fxGrayF2F4F7,
-              overflow: "hidden",
-              flex: fullWidth ? 1 : undefined,
-            }}
-          >
-            <Box
-              sx={{
-                height: "100%",
-                width: `${percent}%`,
-                bgcolor: m.teal,
-                borderRadius: "999px",
-                transition: "width 0.2s ease",
-              }}
-            />
-          </Box>
-          <BodyText
-            sx={{
-              fontSize: 9,
-              fontWeight: 800,
-              color: selected ? alpha(m.tealDark, 0.72) : alpha(m.navy, 0.48),
-              lineHeight: 1,
-            }}
-          >
-            {percent}%
-          </BodyText>
-        </Stack>
+        <Box sx={{ mt: 0.35 }}>
+          <TeamMemberLoadBar
+            bookedPercent={bookedPercent}
+            fullWidth={fullWidth}
+            selected={selected}
+          />
+        </Box>
       </Box>
     </Box>
   );

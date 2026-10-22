@@ -9,7 +9,6 @@ import type {
   CalendarEvent,
   CalendarResource,
 } from "../../../../app/professionals/fixed-location/calendar/calendar.data";
-import { resourceHasScheduleOrBlockOnAnyDate } from "../calendar-schedule.utils";
 import type { ScheduleAvailabilityRow } from "../calendar-settings.types";
 
 export function filterEventsMatchingDrawerFilters(
@@ -40,33 +39,9 @@ export function filterResourcesForVisibleDates(input: {
   blocks: readonly CalendarBlock[];
   eventsMatchingDrawerFilters: readonly CalendarEvent[];
 }): CalendarResource[] {
-  const {
-    teamAll,
-    filterDrawerResources,
-    visibleDates,
-    scheduleRows,
-    blocks,
-    eventsMatchingDrawerFilters,
-  } = input;
-  // Filter "All" → keep every team member in the nav set.
-  if (teamAll) return filterDrawerResources as CalendarResource[];
-  return filterDrawerResources.filter((resource) => {
-    if (
-      resourceHasScheduleOrBlockOnAnyDate(
-        resource.id,
-        visibleDates,
-        scheduleRows,
-        blocks,
-      )
-    ) {
-      return true;
-    }
-    return eventsMatchingDrawerFilters.some(
-      (event) =>
-        visibleDates.includes(event.date) &&
-        eventBelongsToTeamMember(event, resource.id),
-    );
-  });
+  // Drawer selection is authoritative: keep specifically selected leave members
+  // (rule 4). Day banner leave sort happens in team.layout ranking.
+  return input.filterDrawerResources as CalendarResource[];
 }
 
 /** Month grid: unassigned bookings stay on the fallback (first) team member. */

@@ -190,6 +190,35 @@ export function hasAvailabilityOnDate(
   return relevant.some((row) => rowMatchesDate(row, iso));
 }
 
+/**
+ * Schedule/override working windows for a day (not busy/booked).
+ * `locations` empty/omitted → any location; otherwise FL/DL checked separately.
+ */
+export function hasScheduleWindowsOnDate(
+  resourceId: string,
+  iso: string,
+  rows: readonly ScheduleAvailabilityRow[],
+  overrides: readonly ScheduleDateOverride[],
+  locations?: readonly CalendarBookingLocation[] | null,
+): boolean {
+  if (locations?.length) {
+    return locations.some(
+      (location) =>
+        getLocationAvailabilityIntervals(
+          resourceId,
+          iso,
+          location,
+          rows,
+          overrides,
+        ).length > 0,
+    );
+  }
+  return (
+    getCombinedAvailabilityIntervals(resourceId, iso, rows, overrides).length >
+    0
+  );
+}
+
 /** Mark availability rows archived when their full Date–Date range is before today. */
 export function archiveFullyPastScheduleRows(
   rows: readonly ScheduleAvailabilityRow[],

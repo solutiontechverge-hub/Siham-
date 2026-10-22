@@ -12,6 +12,7 @@ import type {
 } from "../../../components/common/calendar/calendar-settings.types";
 import type { CalendarBookingLocation } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import {
+  dailyBookingOccupancyRatio,
   intervalsOverlap,
   subtractIntervals,
   type Interval,
@@ -197,6 +198,76 @@ export function memberOccupancyRatio(
   );
   if (availableMins <= 0) return 1;
   return Math.min(1, busyMins / availableMins);
+}
+
+/** null = no schedule hours → empty load track (no fill / no fake %). */
+export function memberBookedPercent(
+  snapshot: SetupAvailabilitySnapshot,
+  memberId: string,
+): number | null {
+  const working = getMemberWorkingIntervals(
+    memberId,
+    snapshot.date,
+    snapshot.location,
+    snapshot,
+  );
+  if (!working.length) return null;
+  return (
+    dailyBookingOccupancyRatio(
+      snapshot.busyByMember[memberId] ?? [],
+      working,
+    ) * 100
+  );
+}
+
+/** On leave = no Schedule/override windows for snapshot date+location (not "fully booked"). */
+export function isMemberOnLeave(
+  snapshot: Pick<
+    SetupAvailabilitySnapshot,
+    "date" | "location" | "scheduleAvailability" | "dateOverrides"
+  >,
+  memberId: string,
+) {
+  return (
+    getMemberWorkingIntervals(
+      memberId,
+      snapshot.date,
+      snapshot.location,
+      snapshot,
+    ).length === 0
+  );
+}
+
+/** Drop leave TMs from client booking / calendar rosters (not public listing). */
+export function filterMembersNotOnLeave<T extends { id: string }>(
+  members: readonly T[],
+  snapshot: Pick<
+    SetupAvailabilitySnapshot,
+    "date" | "location" | "scheduleAvailability" | "dateOverrides"
+  >,
+): T[] {
+  return members.filter((member) => !isMemberOnLeave(snapshot, member.id));
+}
+
+/** Keep services offered by at least one not-on-leave capable team member. */
+export function filterServicesOfferedByAvailableMembers<T extends { id: string }>(
+  services: readonly T[],
+  snapshot: SetupAvailabilitySnapshot,
+  candidateMemberIds: readonly string[],
+  fallbackCatalogIds: readonly string[],
+): T[] {
+  const availableMembers = candidateMemberIds
+    .map((id) => snapshot.teamMembers.find((row) => row.id === id))
+    .filter((member): member is SetupAvailabilityTeamMember => Boolean(member))
+    .filter((member) => !isMemberOnLeave(snapshot, member.id));
+
+  if (!availableMembers.length) return [];
+
+  return services.filter((service) =>
+    availableMembers.some((member) =>
+      memberCanPerformService(member, service.id, [...fallbackCatalogIds]),
+    ),
+  );
 }
 
 export function sortMembersByLowestOccupancy(

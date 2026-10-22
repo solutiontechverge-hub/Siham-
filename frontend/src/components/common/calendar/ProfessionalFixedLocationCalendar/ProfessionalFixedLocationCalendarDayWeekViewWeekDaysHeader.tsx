@@ -237,12 +237,11 @@ export default function ProfessionalFixedLocationCalendarDayWeekViewWeekDaysHead
                                       <Box
                                         sx={{
                                           height: "100%",
-                                          width: `${ratio}%`,
-                                          bgcolor: showClosed
-                                            ? m.blockedTimeFg
-                                            : isActiveDay
-                                              ? m.teal
-                                              : alpha(m.navy, 0.24),
+                                          // No schedule → empty track (not a fake 0%/filled look).
+                                          width: showClosed ? "0%" : `${ratio}%`,
+                                          bgcolor: isActiveDay
+                                            ? m.teal
+                                            : alpha(m.navy, 0.24),
                                         }}
                                       />
                                     </Box>

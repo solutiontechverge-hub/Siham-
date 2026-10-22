@@ -6,6 +6,10 @@ import assert from "node:assert/strict";
 import {
   FIXED_LOCATION_MAX_DISTINCT_TEAM_MEMBERS,
   autoAssignServicesByAvailability,
+  filterMembersNotOnLeave,
+  filterServicesOfferedByAvailableMembers,
+  isMemberOnLeave,
+  memberBookedPercent,
   type SetupAvailabilitySnapshot,
 } from "./clientAvailability.utils";
 
@@ -205,6 +209,67 @@ const fourServices = [
     false,
     "must not introduce a 4th distinct member",
   );
+}
+
+{
+  const leaveOnly: SetupAvailabilitySnapshot = {
+    date: DATE,
+    location: "FL",
+    slotStepMinutes: 15,
+    scheduleAvailability: [],
+    dateOverrides: [openOverride("b")],
+    teamMembers: [
+      { id: "a", name: "A", assignedServiceIds: ["s1"] },
+      { id: "b", name: "B", assignedServiceIds: ["s2"] },
+    ],
+    busyByMember: {},
+  };
+  assert.equal(isMemberOnLeave(leaveOnly, "a"), true);
+  assert.equal(isMemberOnLeave(leaveOnly, "b"), false);
+  assert.deepEqual(
+    filterMembersNotOnLeave(
+      [
+        { id: "a", name: "A" },
+        { id: "b", name: "B" },
+      ],
+      leaveOnly,
+    ).map((m) => m.id),
+    ["b"],
+    "hide leave TMs from roster",
+  );
+  const kept = filterServicesOfferedByAvailableMembers(
+    [
+      { id: "s1", name: "Cut" },
+      { id: "s2", name: "Color" },
+    ],
+    leaveOnly,
+    ["a", "b"],
+    ["s1", "s2"],
+  );
+  assert.deepEqual(
+    kept.map((s) => s.id),
+    ["s2"],
+    "hide service when only leave TM offers it",
+  );
+  assert.equal(
+    memberBookedPercent(leaveOnly, "a"),
+    null,
+    "no hours → null (empty track, no fake %)",
+  );
+  assert.equal(
+    memberBookedPercent(leaveOnly, "b"),
+    0,
+    "hours + no busy → 0%",
+  );
+}
+
+{
+  // 09:00–17:00 = 480 mins; 120 busy → 25%
+  const partial = makeSnapshot(
+    [{ id: "a", name: "A", assignedServiceIds: ["s1"] }],
+    { a: [{ startMin: 9 * 60, endMin: 11 * 60 }] },
+  );
+  assert.equal(memberBookedPercent(partial, "a"), 25);
 }
 
 console.log("clientAvailability.utils.test.ts: ok");

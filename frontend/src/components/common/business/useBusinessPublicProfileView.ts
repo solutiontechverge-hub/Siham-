@@ -86,13 +86,13 @@ export function useBusinessPublicProfileView({
     Record<string, string>
   >({});
 
-  const activeServices = React.useMemo(
-    () => getServicesForLocationMode(data, effectiveLocationMode),
-    [data, effectiveLocationMode],
-  );
-
+  // Public listing: full location team/services from setups API (no leave/load filter).
   const visibleTeamMembers = React.useMemo(
     () => getTeamForLocationMode(data, effectiveLocationMode),
+    [data, effectiveLocationMode],
+  );
+  const activeServices = React.useMemo(
+    () => getServicesForLocationMode(data, effectiveLocationMode),
     [data, effectiveLocationMode],
   );
 
@@ -119,7 +119,16 @@ export function useBusinessPublicProfileView({
         next[`${member.id}:${slot.id}`] = slot.defaultValue;
       }
     }
-    setMemberSlotSelections(next);
+    setMemberSlotSelections((prev) => {
+      const keys = Object.keys(next);
+      if (
+        keys.length === Object.keys(prev).length &&
+        keys.every((key) => prev[key] === next[key])
+      ) {
+        return prev;
+      }
+      return next;
+    });
   }, [visibleTeamMembers]);
 
   React.useEffect(() => {

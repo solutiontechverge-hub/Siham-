@@ -17,7 +17,12 @@ export function BusinessPublicProfileTeamBlock(props: {
   memberSlotSelections: Record<string, string>;
   setMemberSlotSelections: React.Dispatch<React.SetStateAction<Record<string, string>>>;
 }) {
-  const { data, visibleTeamMembers, memberSlotSelections, setMemberSlotSelections } = props;
+  const {
+    data,
+    visibleTeamMembers,
+    memberSlotSelections,
+    setMemberSlotSelections,
+  } = props;
   const m = useTheme().palette.mollure;
   const router = useRouter();
   return (
@@ -150,7 +155,7 @@ export function BusinessPublicProfileTeamBlock(props: {
                     sx={{
                       flex: 1,
                       minWidth: 0,
-                      px: { md: 2 },
+                      px: { md: 1 },
                       py: { xs: 0, md: 0.25 },
                     }}
                   >

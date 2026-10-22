@@ -1,6 +1,10 @@
 import * as React from "react";
 import { alpha } from "@mui/material/styles";
-import { getCombinedAvailabilityIntervals } from "../calendar-schedule.utils";
+import type { CalendarBookingLocation } from "../../../../app/professionals/fixed-location/calendar/calendar.data";
+import {
+  getCombinedAvailabilityIntervals,
+  hasScheduleWindowsOnDate,
+} from "../calendar-schedule.utils";
 import {
   dailyBookingOccupancyRatio,
   getDefaultCalendarResourceId,
@@ -23,6 +27,15 @@ import {
 } from "./useProfessionalFixedLocationCalendar.helpers.dayView";
 import type { UseProfessionalFixedLocationCalendarTeamArgs } from "./useProfessionalFixedLocationCalendar.team";
 
+function locationScopeForLeave(
+  locationAll: boolean | undefined,
+  locations: Readonly<Record<"FL" | "DL", boolean>> | undefined,
+): CalendarBookingLocation[] | null {
+  if (locationAll !== false || !locations) return null;
+  const selected = (["FL", "DL"] as const).filter((loc) => locations[loc]);
+  return selected.length ? [...selected] : null;
+}
+
 /** Resource filter/rank + column layout (ponytail: subdomain of team). */
 export function useProfessionalFixedLocationCalendarTeamLayout({
   resources,
@@ -37,6 +50,8 @@ export function useProfessionalFixedLocationCalendarTeamLayout({
   visibleDates,
   viewMode,
   activeDateIso,
+  locationAll,
+  locations,
   navy,
   laneHeaderPx = 48,
 }: UseProfessionalFixedLocationCalendarTeamArgs) {
@@ -81,6 +96,20 @@ export function useProfessionalFixedLocationCalendarTeamLayout({
     [filteredResources],
   );
   const dayRankedResources = React.useMemo(() => {
+    // Solo / empty team: unassigned lane only — do not apply leave hide/sort.
+    if (resources.length === 0) return filteredResources;
+
+    const leaveLocations = locationScopeForLeave(locationAll, locations);
+    const overrides = dateOverrides ?? [];
+    const isOnLeave = (resourceId: string) =>
+      !hasScheduleWindowsOnDate(
+        resourceId,
+        activeDateIso,
+        scheduleRows,
+        overrides,
+        leaveLocations,
+      );
+
     // Same occupancy source as header % bars (busy ÷ availability).
     const getOccupancyRatio = (resourceId: string) => {
       const busy = buildBusyIntervalsForResource({
@@ -95,7 +124,7 @@ export function useProfessionalFixedLocationCalendarTeamLayout({
         resourceId,
         activeDateIso,
         scheduleRows,
-        dateOverrides ?? [],
+        overrides,
       );
       if (fromSchedule.length) {
         return dailyBookingOccupancyRatio(busy, mergeIntervals(fromSchedule));
@@ -123,7 +152,12 @@ export function useProfessionalFixedLocationCalendarTeamLayout({
         ),
       );
     };
-    return rankResourcesForCalendarDay(filteredResources, getOccupancyRatio);
+
+    // Confirmed rule 3: available busiest→freest→alpha, leave last (All + specific).
+    // Rule 4: selected leave stay in roster via filterResourcesForVisibleDates.
+    return rankResourcesForCalendarDay(filteredResources, getOccupancyRatio, {
+      isOnLeave,
+    });
   }, [
     activeDateIso,
     blocks,
@@ -133,6 +167,9 @@ export function useProfessionalFixedLocationCalendarTeamLayout({
     fallbackTeamMemberId,
     filteredResources,
     knownTeamMemberIds,
+    locationAll,
+    locations,
+    resources.length,
     scheduleRows,
   ]);
   const teamNavResources =

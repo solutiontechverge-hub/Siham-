@@ -264,12 +264,30 @@ export function countTeamMemberBookingsOnDate(
 export function rankResourcesForCalendarDay(
   resources: readonly CalendarResource[],
   getOccupancyRatio: (resourceId: string) => number,
+  options?: { isOnLeave?: (resourceId: string) => boolean },
 ): CalendarResource[] {
-  return [...resources].sort((a, b) => {
-    const diff = getOccupancyRatio(b.id) - getOccupancyRatio(a.id);
-    if (diff !== 0) return diff;
-    return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
-  });
+  const byBusyThenAlpha = (list: readonly CalendarResource[]) =>
+    [...list].sort((a, b) => {
+      const diff = getOccupancyRatio(b.id) - getOccupancyRatio(a.id);
+      if (diff !== 0) return diff;
+      return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    });
+
+  const isOnLeave = options?.isOnLeave;
+  if (!isOnLeave) return byBusyThenAlpha(resources);
+
+  // Available (busiest→freest→alpha) first; leave/unavailable last (alpha).
+  const available: CalendarResource[] = [];
+  const leave: CalendarResource[] = [];
+  for (const resource of resources) {
+    (isOnLeave(resource.id) ? leave : available).push(resource);
+  }
+  return [
+    ...byBusyThenAlpha(available),
+    ...[...leave].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+    ),
+  ];
 }
 
 export function getTeamMemberBookings(

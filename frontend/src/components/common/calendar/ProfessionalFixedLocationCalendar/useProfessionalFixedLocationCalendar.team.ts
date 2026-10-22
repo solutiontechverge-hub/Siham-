@@ -27,6 +27,9 @@ export type UseProfessionalFixedLocationCalendarTeamArgs = {
   visibleDates: readonly string[];
   viewMode: CalendarViewMode;
   activeDateIso: string;
+  /** Location filter for leave checks (FL/DL separately). */
+  locationAll?: boolean;
+  locations?: Readonly<Record<"FL" | "DL", boolean>>;
   setViewMode: React.Dispatch<React.SetStateAction<CalendarViewMode>>;
   navy: string;
   laneHeaderPx?: number;

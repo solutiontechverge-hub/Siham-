@@ -455,6 +455,8 @@ export function useClientBookingCreatePage() {
     sharedTeamMemberOptions,
     getServiceTeamMemberOptions,
     addServiceTeamMemberId,
+    scheduleAvailableTeamMembers,
+    bookableServiceCatalog,
   } = useClientBookingCreateAvailability({
     setupIdForHours,
     selectedDate,
@@ -476,6 +478,9 @@ export function useClientBookingCreatePage() {
     selectedPersonId,
     bookServicesAtSameTime,
   });
+
+  /** Leave-filtered roster for UI (Any / dropdowns); solo path untouched when empty. */
+  const visibleTeamMembers = scheduleAvailableTeamMembers;
 
   const {
     addServiceCatalog,
@@ -547,7 +552,7 @@ export function useClientBookingCreatePage() {
     isPlanningPerson,
     isPlanningCardSelected,
     selectedPerson,
-    locationServiceCatalog,
+    locationServiceCatalog: bookableServiceCatalog,
     hasAssignableTeamMembers,
     addServiceTeamMemberId,
     profileHydrated,
@@ -586,7 +591,7 @@ export function useClientBookingCreatePage() {
     shopTeamMembers,
     availabilitySnapshot,
     selectedTeamMemberId,
-    filteredTeamMembers,
+    filteredTeamMembers: visibleTeamMembers,
     selectedDate,
     selectedTime,
     bookServicesAtSameTime,
@@ -749,16 +754,16 @@ export function useClientBookingCreatePage() {
   }, [people, selectedPersonId]);
 
   React.useEffect(() => {
-    if (filteredTeamMembers.some((tm) => tm.id === selectedTeamMemberId))
+    if (visibleTeamMembers.some((tm) => tm.id === selectedTeamMemberId))
       return;
     // Picker default only — never stamp services with first TM (may be off-schedule).
-    const fallbackId = filteredTeamMembers[0]?.id ?? "";
+    const fallbackId = visibleTeamMembers[0]?.id ?? "";
     if (!fallbackId) {
       if (selectedTeamMemberId) setSelectedTeamMemberId("");
       return;
     }
     setSelectedTeamMemberId(fallbackId);
-  }, [filteredTeamMembers, selectedTeamMemberId]);
+  }, [visibleTeamMembers, selectedTeamMemberId]);
 
   const { onContinue } = useClientBookingCreateContinue({
     router,
@@ -951,7 +956,7 @@ export function useClientBookingCreatePage() {
     isPlanningCardSelected,
     isNotesCardSelected,
     hasNotesPerson,
-    filteredTeamMembers,
+    filteredTeamMembers: visibleTeamMembers,
     sharedTeamMemberOptions,
     getServiceTeamMemberOptions,
     hasAssignableTeamMembers,

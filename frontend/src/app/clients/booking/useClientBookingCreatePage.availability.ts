@@ -12,6 +12,8 @@ import type {
 import {
   autoAssignServicesByAvailability,
   computeUnionBookableSlots,
+  filterMembersNotOnLeave,
+  filterServicesOfferedByAvailableMembers,
   getMemberSlotStatus,
   type SetupAvailabilitySnapshot,
 } from "./clientAvailability.utils";
@@ -94,10 +96,44 @@ export function useClientBookingCreateAvailability(
     };
   }, [setupAvailabilityResponse?.data]);
 
+  /** Hide leave (no schedule that day+location) from client team picks / Any. */
+  const scheduleAvailableTeamMembers = React.useMemo(() => {
+    if (!availabilitySnapshot || !hasAssignableTeamMembers) {
+      return filteredTeamMembers;
+    }
+    return filterMembersNotOnLeave(filteredTeamMembers, availabilitySnapshot);
+  }, [
+    availabilitySnapshot,
+    filteredTeamMembers,
+    hasAssignableTeamMembers,
+  ]);
+
   const candidateMemberIds = React.useMemo(
-    () => filteredTeamMembers.map((member) => member.id),
-    [filteredTeamMembers],
+    () => scheduleAvailableTeamMembers.map((member) => member.id),
+    [scheduleAvailableTeamMembers],
   );
+
+  const bookableServiceCatalog = React.useMemo(() => {
+    if (
+      !availabilitySnapshot ||
+      !hasAssignableTeamMembers ||
+      !locationServiceCatalog.length
+    ) {
+      return locationServiceCatalog;
+    }
+    const fallbackIds = locationServiceCatalog.map((service) => service.id);
+    return filterServicesOfferedByAvailableMembers(
+      locationServiceCatalog,
+      availabilitySnapshot,
+      candidateMemberIds,
+      fallbackIds,
+    );
+  }, [
+    availabilitySnapshot,
+    candidateMemberIds,
+    hasAssignableTeamMembers,
+    locationServiceCatalog,
+  ]);
 
   const availabilityBookableTimes = React.useMemo(() => {
     if (!availabilitySnapshot || !hasAssignableTeamMembers) return null;
@@ -189,8 +225,18 @@ export function useClientBookingCreateAvailability(
     if (isDesiredLocation || bookServicesAtSameTime) {
       const sharedMember =
         assignments.find((row) => row.teamMemberId)?.teamMemberId ?? "";
-      if (sharedMember !== selectedTeamMemberId) {
-        setSelectedTeamMemberId(sharedMember);
+      // Sync picker when assign finds someone. Do NOT clear to "" while the
+      // current pick is still on the leave-filtered roster (just busy) — that
+      // fought the ""→first repair effect and caused max update depth.
+      if (sharedMember) {
+        if (sharedMember !== selectedTeamMemberId) {
+          setSelectedTeamMemberId(sharedMember);
+        }
+      } else if (
+        selectedTeamMemberId &&
+        !candidateMemberIds.includes(selectedTeamMemberId)
+      ) {
+        setSelectedTeamMemberId("");
       }
     }
   }, [
@@ -231,7 +277,7 @@ export function useClientBookingCreateAvailability(
     ): TeamMemberSlotOption[] => {
       const options: TeamMemberSlotOption[] = [];
       const slotById = new Map(
-        filteredTeamMembers.map((tm) => [
+        scheduleAvailableTeamMembers.map((tm) => [
           tm.id,
           availabilitySnapshot && startMin > 0
             ? getMemberSlotStatus(
@@ -245,7 +291,7 @@ export function useClientBookingCreateAvailability(
       );
       const anyWorking = [...slotById.values()].some((slot) => slot.withinWorking);
 
-      for (const tm of filteredTeamMembers) {
+      for (const tm of scheduleAvailableTeamMembers) {
         const slot = slotById.get(tm.id) ?? {
           withinWorking: true,
           booked: false,
@@ -273,7 +319,7 @@ export function useClientBookingCreateAvailability(
       }
       return options;
     },
-    [availabilitySnapshot, filteredTeamMembers],
+    [availabilitySnapshot, scheduleAvailableTeamMembers],
   );
 
   const sharedTeamMemberOptions = React.useMemo(
@@ -312,7 +358,7 @@ export function useClientBookingCreateAvailability(
     if (!hasAssignableTeamMembers) return "";
 
     const isValidMember = (id: string | null | undefined) =>
-      Boolean(id && filteredTeamMembers.some((tm) => tm.id === id));
+      Boolean(id && scheduleAvailableTeamMembers.some((tm) => tm.id === id));
 
     const personAssigned = services.filter(
       (s) => s.guestId === selectedPersonId && s.teamMemberId,
@@ -339,9 +385,9 @@ export function useClientBookingCreateAvailability(
     const bookingAssigned = services.find((s) => isValidMember(s.teamMemberId));
     if (bookingAssigned?.teamMemberId) return bookingAssigned.teamMemberId;
 
-    return filteredTeamMembers[0]?.id ?? "";
+    return scheduleAvailableTeamMembers[0]?.id ?? "";
   }, [
-    filteredTeamMembers,
+    scheduleAvailableTeamMembers,
     hasAssignableTeamMembers,
     selectedPersonId,
     selectedTeamMemberId,
@@ -355,5 +401,7 @@ export function useClientBookingCreateAvailability(
     sharedTeamMemberOptions,
     getServiceTeamMemberOptions,
     addServiceTeamMemberId,
+    scheduleAvailableTeamMembers,
+    bookableServiceCatalog,
   };
 }

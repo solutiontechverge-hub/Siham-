@@ -11,7 +11,11 @@ import { useCalendarFilters } from "../useCalendarFilters";
 import {
   getBookingServiceEditErrors,
 } from "../../../../data/bookingServiceEdit.data";
-import { getCombinedAvailabilityIntervals, shopNotAcceptingBookingTooltip } from "../calendar-schedule.utils";
+import {
+  getCombinedAvailabilityIntervals,
+  hasScheduleWindowsOnDate as resourceHasScheduleWindowsOnDate,
+  shopNotAcceptingBookingTooltip,
+} from "../calendar-schedule.utils";
 import {
   fmtMinToTime,
   formatMdyDate,
@@ -1029,6 +1033,8 @@ export function useProfessionalFixedLocationCalendar({
     visibleDates,
     viewMode,
     activeDateIso,
+    locationAll: appliedFilters.locationAll,
+    locations: appliedFilters.locations,
     setViewMode,
     navy: m.navy,
     laneHeaderPx: 48,
@@ -1228,6 +1234,30 @@ export function useProfessionalFixedLocationCalendar({
       getLocationAvailability,
       slotLocation,
     });
+
+  const hasScheduleWindowsOnDate = React.useCallback(
+    (resourceId: string, iso: string) => {
+      const selected =
+        appliedFilters.locationAll === false
+          ? (["FL", "DL"] as const).filter(
+              (loc) => appliedFilters.locations[loc],
+            )
+          : null;
+      return resourceHasScheduleWindowsOnDate(
+        resourceId,
+        iso,
+        scheduleRows,
+        dateOverrides ?? [],
+        selected?.length ? selected : null,
+      );
+    },
+    [
+      appliedFilters.locationAll,
+      appliedFilters.locations,
+      dateOverrides,
+      scheduleRows,
+    ],
+  );
 
   const resourceById = React.useMemo(() => {
     const map = new Map<string, (typeof data.resources)[number]>();
@@ -1915,6 +1945,7 @@ export function useProfessionalFixedLocationCalendar({
     teamHeaderNeedsScroll,
     activeDateIso,
     getDailyBookingRatio,
+    hasScheduleWindowsOnDate,
     handleTeamMemberBadgeClick,
     weekTeamHeaderScrollRef,
     onTeamHeaderScroll,

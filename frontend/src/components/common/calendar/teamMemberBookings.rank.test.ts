@@ -41,4 +41,15 @@ assert.deepEqual(
   ["ali", "aliza", "hama", "umer"],
 );
 
+// Leave last even when occupancy would otherwise interleave with free members.
+const withLeave = rankResourcesForCalendarDay(
+  resources,
+  (id) => occupancy[id] ?? 0,
+  { isOnLeave: (id) => id === "ali" || id === "umer" },
+);
+assert.deepEqual(
+  withLeave.map((r) => r.id),
+  ["aliza", "hama", "ali", "umer"],
+);
+
 console.log("teamMemberBookings.rank.test.ts passed");
