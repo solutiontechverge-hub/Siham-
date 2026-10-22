@@ -33,6 +33,8 @@ export type BuildClientBookingTransactionRowInput = {
   prepaymentPaid?: boolean;
   /** Receipt for a prepayment: line item is labeled Prepayment. */
   asPrepaymentReceipt?: boolean;
+  /** Desired-location km allowance — invoice Description line when > 0. */
+  kilometerAllowanceAmount?: number;
   clientType?: TransactionClientType;
   methodTitle?: string;
   methodDetail?: string;
@@ -49,6 +51,7 @@ export function buildClientBookingTransactionRow({
   prepaymentAmount,
   prepaymentPaid,
   asPrepaymentReceipt = false,
+  kilometerAllowanceAmount = 0,
   clientType = "mollure",
   methodTitle = "Online - Direct",
   methodDetail = "Stripe",
@@ -105,6 +108,26 @@ export function buildClientBookingTransactionRow({
     };
   });
 
+  const kmAmount =
+    Number.isFinite(kilometerAllowanceAmount) && kilometerAllowanceAmount > 0
+      ? kilometerAllowanceAmount
+      : 0;
+  const kilometerLineItems =
+    kmAmount > 0
+      ? [
+          {
+            description: "Kilometer Allowance",
+            sourceReference: "kilometer-allowance",
+            sourceType: "uniqueItemCode" as const,
+            quantity: 1,
+            vat: "0%",
+            vatRate: 0,
+            pricePerUnit: kmAmount,
+            totalPrice: kmAmount,
+          },
+        ]
+      : [];
+
   const lineItems =
     asPrepaymentReceipt && prepaidValue > 0
       ? [
@@ -117,7 +140,7 @@ export function buildClientBookingTransactionRow({
             totalPrice: prepaidValue,
           },
         ]
-      : [...serviceLineItems, ...productLineItems];
+      : [...serviceLineItems, ...productLineItems, ...kilometerLineItems];
 
   const bookingItems = (asPrepaymentReceipt && prepaidValue > 0
     ? [{ label: "Prepayment", value: prepaidValue }]
@@ -130,12 +153,16 @@ export function buildClientBookingTransactionRow({
           label: product.name,
           value: product.price,
         })),
+        ...(kmAmount > 0
+          ? [{ label: "Kilometer Allowance", value: kmAmount }]
+          : []),
       ]
   );
 
   const totalFromServices =
     draft.services.reduce((sum, s) => sum + s.price, 0) +
-    (draft.products ?? []).reduce((sum, product) => sum + product.price, 0);
+    (draft.products ?? []).reduce((sum, product) => sum + product.price, 0) +
+    kmAmount;
   const totalAmount = documentAmount ?? draft.total ?? totalFromServices;
   const document: TransactionDocument = {
     // Invoice/receipt numbers are server-issued only. Keep these absent until

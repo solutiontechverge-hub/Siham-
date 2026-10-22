@@ -31,32 +31,9 @@ type PendingNegotiationEvent = {
   status?: string | null;
   bookingScenario?: string | null;
   details?: ResponseDeadlineFields | null;
-  /** Calendar appointment date `YYYY-MM-DD` — fallback overdue when no stamped window. */
   date?: string | null;
-  /** Calendar appointment start `HH:MM` — fallback overdue when no stamped window. */
   start?: string | null;
 } | null | undefined;
-
-/** Appointment start instant from calendar date + HH:MM (local). */
-export function resolveBookingStartMs(
-  event?: Pick<NonNullable<PendingNegotiationEvent>, "date" | "start"> | null,
-): number | null {
-  const date = String(event?.date ?? "").trim();
-  const start = String(event?.start ?? "").trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !start) return null;
-  const clock = /^\d{1,2}:\d{2}$/.test(start) ? `${start}:00` : start;
-  const ms = Date.parse(`${date}T${clock}`);
-  return Number.isFinite(ms) ? ms : null;
-}
-
-/** True when now is past the booking's scheduled start. */
-export function isBookingStartPast(
-  event?: Pick<NonNullable<PendingNegotiationEvent>, "date" | "start"> | null,
-  now: Date = new Date(),
-): boolean {
-  const startMs = resolveBookingStartMs(event);
-  return startMs != null && now.getTime() > startMs;
-}
 
 /** True when the business actually configured a response window (not blank/zero). */
 export function isResponseTimeConfigured(
@@ -188,18 +165,19 @@ export function isPendingResponseNegotiation(
   return event.status === "Confirmed" && event.bookingScenario === "ER";
 }
 
-/** Expiry banner: pending BR/EBR/ER/prepay whose live window (or booking start) has elapsed. */
+/**
+ * Expiry banner: pending BR/EBR/ER/prepay only when the stamped response
+ * deadline has elapsed (`now > respondBy`). Never use appointment start as a
+ * proxy — that falsely warns on new Requested BRs whose slot is already past.
+ */
 export function shouldShowExpiredResponseBanner(
   event: PendingNegotiationEvent,
   responseTimeInput?: ResponseWindowInput | null,
   now: Date = new Date(),
 ): boolean {
   if (!isPendingResponseNegotiation(event)) return false;
-  if (hasStoredResponseDeadline(event?.details)) {
-    return isResponseWindowOverdue(event?.details, now, responseTimeInput);
-  }
-  // No stamped response window — overdue once the appointment start has passed.
-  return isBookingStartPast(event, now);
+  if (!hasStoredResponseDeadline(event?.details)) return false;
+  return isResponseWindowOverdue(event?.details, now, responseTimeInput);
 }
 
 export function isResponseWindowOverdue(

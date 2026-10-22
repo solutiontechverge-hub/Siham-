@@ -15,6 +15,10 @@ import {
   parseStoredErFromNotes,
   serializeCalendarEntryNotes,
 } from "../bookingEventDetails";
+import {
+  buildResponseDeadline,
+  hasStoredResponseDeadline,
+} from "../bookingResponseDeadline";
 import { resolveOfflineBookingPrepayAction } from "../bookingCheckout";
 import {
   buildProtectiveFeeActivation,
@@ -542,6 +546,17 @@ export function useProfessionalFixedLocationCalendarPersistBookingFromDrawer({
           canUseBookingProject,
           bookingProjectEnabled,
         });
+
+      // Stamp BR response clock on first Requested persist (client create already does).
+      if (
+        resolvedStatus === "Requested" &&
+        !hasStoredResponseDeadline(details)
+      ) {
+        Object.assign(
+          details,
+          buildResponseDeadline(businessResponseWindowInput),
+        );
+      }
 
       const buildLocalEvent = (id: string, bookingCode: string): CalendarEvent =>
         buildLocalPersistEvent({

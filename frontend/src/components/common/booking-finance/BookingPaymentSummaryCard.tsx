@@ -2,16 +2,12 @@
 
 import { Box, Paper, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import {
-  mollureLabelSx,
-  mollureSectionTitleSx,
-} from "../../../theme/mollureHierarchy";
+import { mollureLabelSx } from "../../../theme/mollureHierarchy";
 import { financePriceTextSx } from "../finance-documents/financeDocumentUtils";
 import type { BookingPaymentSummarySection } from "./bookingFinance.types";
 import { formatFinanceEuro } from "./formatBookingFinance";
 
 type BookingPaymentSummaryCardProps = {
-  headerTotal: number;
   sections: readonly BookingPaymentSummarySection[];
   onViewInvoice?: (lineId: string) => void;
   onViewReceipt?: (lineId: string) => void;
@@ -54,7 +50,6 @@ function SummaryLink({
 }
 
 export default function BookingPaymentSummaryCard({
-  headerTotal,
   sections,
   onViewInvoice,
   onViewReceipt,
@@ -65,32 +60,18 @@ export default function BookingPaymentSummaryCard({
 
   return (
     <Box>
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        alignItems="center"
-        sx={{ mb: 1, px: 1.6 }}
+      <Typography
+        sx={{
+          fontWeight: 700,
+          fontSize: 14,
+          color: alpha(m.navy, 0.82),
+          lineHeight: 1,
+          mb: 1,
+          px: 1.6,
+        }}
       >
-        <Typography
-          sx={{
-            fontWeight: 700,
-            fontSize: 14,
-            color: alpha(m.navy, 0.82),
-            lineHeight: 1,
-          }}
-        >
-          Payment Summary
-        </Typography>
-        <Typography
-          sx={mollureSectionTitleSx(m.navy, {
-            ...financePriceTextSx,
-            color: alpha(m.navy, 0.9),
-            lineHeight: 1,
-          })}
-        >
-          {formatFinanceEuro(headerTotal)}
-        </Typography>
-      </Stack>
+        Payment Summary
+      </Typography>
 
       <Stack spacing={1.15}>
         {sections.map((section) => (

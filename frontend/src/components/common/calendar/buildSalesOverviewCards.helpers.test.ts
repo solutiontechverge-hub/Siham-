@@ -4,6 +4,7 @@
 import assert from "node:assert/strict";
 import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import {
+  applyLedgerFinancialsToCards,
   buildCancellationFeeInvoiceMetaLines,
   buildCardsForEvent,
   collapseBurstDuplicateAddons,
@@ -1112,6 +1113,99 @@ hydrateSalesCardMetadata([]);
   assert.equal(feeCard?.highlightLabel, "Payment");
   assert.equal(feeCard?.highlightAmount, 10, "Payment = 35 − 25");
   assert.equal(feeCard?.showAddOns, true, "Add-Ons on stacked Fee Summary");
+}
+
+// Unpaid ledger prepayment_total=0 must not zero Prepayment Summary Total / %.
+{
+  const listed = applyLedgerFinancialsToCards(
+    [
+      {
+        id: "b1-prepayment",
+        bookingId: "b1",
+        bookingCode: "BK1",
+        kind: "prepayment",
+        title: "Prepayment Summary",
+        clientName: "aliza",
+        payerRole: "main_client",
+        payerKey: "main-client",
+        lines: [
+          { id: "s1", label: "hair dye", amount: 44 },
+          { id: "s2", label: "buzz cutt", amount: 44 },
+          { id: "kilometer-allowance", label: "Kilometer Allowance", amount: 50 },
+        ],
+        total: 138,
+        totalLabel: "Total",
+        highlightLabel: "Prepayment (20%)",
+        highlightAmount: 27.6,
+        documentAmount: 27.6,
+        showAddOns: false,
+        paymentState: "payment_due",
+        statusBadge: "Prepayment Due",
+        occurredAt: "2026-10-22T10:00:00.000Z",
+      } satisfies SalesOverviewCardData,
+    ],
+    { prepayment_total: 0, basePrice: 88, net_total: 88, outstanding_balance: 88 },
+  );
+  const card = listed[0];
+  assert.equal(card.total, 138, "Total = sum(services + allowance), not prepayment_total");
+  assert.equal(card.highlightAmount, 27.6, "Prepayment % kept when ledger deposit is 0");
+  assert.equal(card.documentAmount, 27.6, "documentAmount kept when unpaid");
+
+  const paid = applyLedgerFinancialsToCards(
+    listed,
+    { prepayment_total: 27.6, basePrice: 88 },
+  );
+  assert.equal(paid[0].total, 138, "paid ledger still keeps listed Total");
+  assert.equal(paid[0].highlightAmount, 27.6, "paid ledger syncs Prepayment highlight");
+}
+
+// End-to-end: live financials with unpaid prepay still sum lines for Prepayment Summary.
+{
+  const cards = buildCardsForEvent({
+    event: {
+      id: "b-aliza-prepay",
+      bookingCode: "BK-ALIZA",
+      title: "Cut",
+      start: "2026-10-22T10:00:00.000Z",
+      end: "2026-10-22T11:00:00.000Z",
+      status: "Confirmed",
+      details: {
+        showPrepayment: true,
+        prepaymentPercent: "20",
+        prepaymentStatus: "pending",
+        paymentMethod: "onlineDirect",
+        kilometerAllowance: { eurPerKm: "50", totalKilometer: "1" },
+        clientSnapshot: {
+          services: [
+            { id: "s1", name: "hair dye", price: 44, durationMins: 30 },
+            { id: "s2", name: "buzz cutt", price: 44, durationMins: 30 },
+          ],
+        },
+      },
+    } as unknown as CalendarEvent,
+    booking: {
+      id: "b-aliza-prepay",
+      unique_code: "BK-ALIZA",
+      status: "confirmed",
+      prepayment_status: "pending",
+      total_price: 138,
+    } as never,
+    clientName: "aliza",
+    clientEmail: "alizaclient@yopmail.com",
+    ctx: {
+      financeHints: [],
+      liveFinancials: {
+        prepayment_total: 0,
+        basePrice: 88,
+        net_total: 88,
+        outstanding_balance: 88,
+      },
+    },
+  });
+  const prepayCard = cards.find((c) => c.title === "Prepayment Summary");
+  assert.ok(prepayCard, "Prepayment Summary for unpaid deposit");
+  assert.equal(prepayCard?.total, 138, "e2e Total = 44+44+50");
+  assert.equal(prepayCard?.highlightAmount, 27.6, "e2e Prepayment = 20% of 138");
 }
 
 console.log("buildSalesOverviewCards.helpers.test.ts: all assertions passed");

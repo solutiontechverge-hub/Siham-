@@ -5,6 +5,7 @@ import type { TransactionRow } from "../../../app/professionals/fixed-location/f
 import {
   buildClientBookingTransactionRow,
   buildProfessionalBusinessOverride,
+  ensureKilometerAllowanceOnTransactionRow,
   findIssuedFinanceTransaction,
   hasStoredDocumentSnapshot,
 } from "../finance-documents";
@@ -57,6 +58,10 @@ export function useClientBookingInvoiceDocs(input: {
   isPrepaymentPaid: boolean;
   prepaidAmount: number;
   isOfflinePay: boolean;
+  /** Desired-location km allowance — invoice Description + inclusive totals. */
+  kilometerAllowanceAmount?: number;
+  /** Services + km booking total when known (aligns PRE Total with payment card). */
+  bookingTotal?: number;
 }) {
   const [activeDocument, setActiveDocument] =
     React.useState<ClientBookingDetailsActiveDocument>(null);
@@ -120,6 +125,31 @@ export function useClientBookingInvoiceDocs(input: {
   const methodTitle = checkoutPaymentMethodTitle(input.selectedPaymentMethod);
   const methodDetail = checkoutPaymentMethodDetail(input.selectedPaymentMethod);
 
+  const kmOpts = React.useMemo(
+    () => ({
+      kilometerAllowanceAmount: input.kilometerAllowanceAmount ?? 0,
+      bookingTotal:
+        input.bookingTotal ??
+        (input.draft?.total != null && input.draft.total > 0
+          ? input.draft.total
+          : undefined),
+      prepaidAmount:
+        input.prepaidAmount > 0 ? input.prepaidAmount : undefined,
+    }),
+    [
+      input.bookingTotal,
+      input.draft?.total,
+      input.kilometerAllowanceAmount,
+      input.prepaidAmount,
+    ],
+  );
+
+  const withKm = React.useCallback(
+    (row: TransactionRow | null) =>
+      ensureKilometerAllowanceOnTransactionRow(row, kmOpts),
+    [kmOpts],
+  );
+
   /** After-treatment / non-fee full invoice — never bind LCF when opening service docs. */
   const bookingTransactionRow = React.useMemo(() => {
     const issued = findIssuedFinanceTransaction(financeRows, {
@@ -128,25 +158,28 @@ export function useClientBookingInvoiceDocs(input: {
       phase: "full",
       protectiveFee: false,
     });
-    if (issued && hasStoredDocumentSnapshot(issued)) return issued;
+    if (issued && hasStoredDocumentSnapshot(issued)) return withKm(issued);
 
     if (!input.draft?.services?.length) return null;
-    return buildClientBookingTransactionRow({
-      bookingRef: input.bookingRef,
-      draft: input.draft,
-      requesterName: input.requesterName,
-      requesterEmail: input.requesterEmail ?? undefined,
-      financeSettings: input.financeSettings as never,
-      methodTitle,
-      methodDetail,
-      prepaymentAmount:
-        (input.requiresPrepayment || input.isPrepaymentPaid) &&
-        input.prepaidAmount > 0
-          ? input.prepaidAmount
-          : undefined,
-      prepaymentPaid: input.isPrepaymentPaid,
-      clientParty,
-    });
+    return withKm(
+      buildClientBookingTransactionRow({
+        bookingRef: input.bookingRef,
+        draft: input.draft,
+        requesterName: input.requesterName,
+        requesterEmail: input.requesterEmail ?? undefined,
+        financeSettings: input.financeSettings as never,
+        methodTitle,
+        methodDetail,
+        prepaymentAmount:
+          (input.requiresPrepayment || input.isPrepaymentPaid) &&
+          input.prepaidAmount > 0
+            ? input.prepaidAmount
+            : undefined,
+        prepaymentPaid: input.isPrepaymentPaid,
+        kilometerAllowanceAmount: input.kilometerAllowanceAmount,
+        clientParty,
+      }),
+    );
   }, [
     clientParty,
     financeRows,
@@ -155,12 +188,14 @@ export function useClientBookingInvoiceDocs(input: {
     input.draft,
     input.financeSettings,
     input.isPrepaymentPaid,
+    input.kilometerAllowanceAmount,
     input.prepaidAmount,
     input.requesterEmail,
     input.requesterName,
     input.requiresPrepayment,
     methodDetail,
     methodTitle,
+    withKm,
   ]);
 
   /** PRE invoice — services + prepaid amount; never fee lines. */
@@ -171,24 +206,27 @@ export function useClientBookingInvoiceDocs(input: {
       phase: "prepay",
       protectiveFee: false,
     });
-    if (issued && hasStoredDocumentSnapshot(issued)) return issued;
+    if (issued && hasStoredDocumentSnapshot(issued)) return withKm(issued);
 
     if (!input.draft?.services?.length) return null;
     if (!input.isPrepaymentPaid && !input.isOfflinePay) return null;
     if (!(input.prepaidAmount > 0)) return null;
-    return buildClientBookingTransactionRow({
-      bookingRef: `${input.bookingRef}-prepay`,
-      draft: input.draft,
-      requesterName: input.requesterName,
-      requesterEmail: input.requesterEmail ?? undefined,
-      financeSettings: input.financeSettings as never,
-      documentAmount: input.prepaidAmount,
-      prepaymentAmount: input.prepaidAmount,
-      prepaymentPaid: true,
-      methodTitle,
-      methodDetail,
-      clientParty,
-    });
+    return withKm(
+      buildClientBookingTransactionRow({
+        bookingRef: `${input.bookingRef}-prepay`,
+        draft: input.draft,
+        requesterName: input.requesterName,
+        requesterEmail: input.requesterEmail ?? undefined,
+        financeSettings: input.financeSettings as never,
+        // PRE total = full booking; prepaid is separate (matches finance-sync).
+        prepaymentAmount: input.prepaidAmount,
+        prepaymentPaid: true,
+        kilometerAllowanceAmount: input.kilometerAllowanceAmount,
+        methodTitle,
+        methodDetail,
+        clientParty,
+      }),
+    );
   }, [
     clientParty,
     financeRows,
@@ -198,11 +236,13 @@ export function useClientBookingInvoiceDocs(input: {
     input.financeSettings,
     input.isOfflinePay,
     input.isPrepaymentPaid,
+    input.kilometerAllowanceAmount,
     input.prepaidAmount,
     input.requesterEmail,
     input.requesterName,
     methodDetail,
     methodTitle,
+    withKm,
   ]);
 
   const prepaymentReceiptRow = React.useMemo(() => {
@@ -212,24 +252,27 @@ export function useClientBookingInvoiceDocs(input: {
       phase: "prepay",
       protectiveFee: false,
     });
-    if (issued && hasStoredDocumentSnapshot(issued)) return issued;
+    if (issued && hasStoredDocumentSnapshot(issued)) return withKm(issued);
 
     if (!input.draft?.services?.length) return null;
     if (!input.isPrepaymentPaid && !input.isOfflinePay) return null;
     if (!(input.prepaidAmount > 0)) return null;
-    return buildClientBookingTransactionRow({
-      bookingRef: `${input.bookingRef}-prepay`,
-      draft: input.draft,
-      requesterName: input.requesterName,
-      requesterEmail: input.requesterEmail ?? undefined,
-      financeSettings: input.financeSettings as never,
-      documentAmount: input.prepaidAmount,
-      prepaymentAmount: input.prepaidAmount,
-      asPrepaymentReceipt: true,
-      methodTitle,
-      methodDetail,
-      clientParty,
-    });
+    return withKm(
+      buildClientBookingTransactionRow({
+        bookingRef: `${input.bookingRef}-prepay`,
+        draft: input.draft,
+        requesterName: input.requesterName,
+        requesterEmail: input.requesterEmail ?? undefined,
+        financeSettings: input.financeSettings as never,
+        documentAmount: input.prepaidAmount,
+        prepaymentAmount: input.prepaidAmount,
+        asPrepaymentReceipt: true,
+        kilometerAllowanceAmount: input.kilometerAllowanceAmount,
+        methodTitle,
+        methodDetail,
+        clientParty,
+      }),
+    );
   }, [
     clientParty,
     financeRows,
@@ -239,11 +282,13 @@ export function useClientBookingInvoiceDocs(input: {
     input.financeSettings,
     input.isOfflinePay,
     input.isPrepaymentPaid,
+    input.kilometerAllowanceAmount,
     input.prepaidAmount,
     input.requesterEmail,
     input.requesterName,
     methodDetail,
     methodTitle,
+    withKm,
   ]);
 
   /** Fee Summary invoice — LCF/LRF/NS only. */

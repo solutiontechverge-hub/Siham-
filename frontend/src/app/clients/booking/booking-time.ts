@@ -1,21 +1,15 @@
+import { parseClockToMinutes } from "../../../components/common/calendar/calendar.utils";
+
 /** Same-day bookings must start at least this many minutes from now. */
 export const CLIENT_BOOKING_MIN_LEAD_MINUTES = 15;
 
 export const CLIENT_BOOKING_MIN_LEAD_ERROR =
   "Please select a time at least 15 minutes from now.";
 
+/** Minutes from midnight for client AM/PM labels or professional/API `HH:mm`. */
 export function parseTimeLabelToMinutes(label: string) {
-  const m = label.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-  if (!m) return 0;
-  let hh = Number(m[1]);
-  const mm = Number(m[2]);
-  const ampm = m[3].toUpperCase();
-  if (ampm === "AM") {
-    if (hh === 12) hh = 0;
-  } else if (hh !== 12) {
-    hh += 12;
-  }
-  return hh * 60 + mm;
+  // Shared clock parser: AM/PM-only used to return 0 for "09:30" → "12:00 AM" on client.
+  return parseClockToMinutes(label) ?? 0;
 }
 
 export function getNowMinutesFromMidnight(date = new Date()) {
