@@ -50,6 +50,7 @@ export function toFinanceHints(rows: TransactionRow[]): SalesFinanceHint[] {
           penaltyAmount?: number;
           payerKey?: string;
           reissueLevel?: number;
+          reissuedAt?: string;
           issuedSnapshot?: {
             invoiceSettings?: { paymentTerms?: SalesFinanceHint["paymentTerms"] };
           };
@@ -78,6 +79,10 @@ export function toFinanceHints(rows: TransactionRow[]): SalesFinanceHint[] {
         row.paymentDeadline || doc?.dueDate || row.document?.dueDate || null,
       penaltyAmount: doc?.penaltyAmount,
       reissueLevel: Number(doc?.reissueLevel ?? row.document?.reissueLevel ?? 0) || 0,
+      reissuedAt:
+        doc?.reissuedAt ||
+        (row.document as { reissuedAt?: string } | undefined)?.reissuedAt ||
+        undefined,
       ...(paymentTerms ? { paymentTerms } : {}),
       entryLabel: row.entryLabel,
       amount: Number.isFinite(amount) ? amount : undefined,

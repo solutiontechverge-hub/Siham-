@@ -326,10 +326,15 @@ export function useClientBookingCancelFlow(input: {
   );
 
   const handlePayCancellationFee = React.useCallback(async () => {
+    // Remaining fee must be paid before cancel — do not finalize until Stripe succeeds.
+    if (cancellationSettlement.amountDueNow >= 0.5) {
+      setCancelFeeDialogOpen(false);
+      setCancelFeeStripeOpen(true);
+      return;
+    }
     setIsCancelProcessing(true);
     try {
       setCancelFeeDialogOpen(false);
-      // ponytail: testing shortcut — treat fee as paid (same as Stripe onSuccess); restore setCancelFeeStripeOpen(true) when amountDueNow >= 0.5 for real card checkout.
       await finalizeBookingCancellation(cancellationSettlement.refundAmount);
     } catch (error) {
       showSnackbar({

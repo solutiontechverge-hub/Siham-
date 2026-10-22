@@ -27,9 +27,25 @@ export default function SalesDrawerPayableFooter({
     skip: !financeBookingId,
   });
 
+  const bookingStatus = String(
+    viewingBookingEvent?.status ?? finance?.bookingStatus ?? "",
+  ).toLowerCase();
+  // Cancel / no-show Sales: Fee Summary card owns the fee UI — hide PAYABLE SUMMARY.
+  const hidePayableFooter =
+    bookingStatus === "cancelled" ||
+    bookingStatus === "canceled" ||
+    bookingStatus === "no_show" ||
+    bookingStatus === "no show";
+
   const summary = React.useMemo(
-    () => buildSalesPayableSummary(finance),
-    [finance],
+    () =>
+      hidePayableFooter
+        ? null
+        : buildSalesPayableSummary(finance, {
+            bookingStatus:
+              viewingBookingEvent?.status ?? finance?.bookingStatus ?? null,
+          }),
+    [finance, hidePayableFooter, viewingBookingEvent?.status],
   );
 
   if (!summary) return null;

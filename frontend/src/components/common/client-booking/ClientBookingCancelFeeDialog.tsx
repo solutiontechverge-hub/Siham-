@@ -42,11 +42,33 @@ export default function ClientBookingCancelFeeDialog({
   const cancellationSections = policySections.filter((section) =>
     /cancel/i.test(section.title),
   );
-  const feeApplies = settlement.isLateCancellation && settlement.cancellationFee > 0;
-  const primaryLabel =
-    settlement.amountDueNow >= 0.5
-      ? `Pay now ${money(settlement.amountDueNow)}`
-      : "Confirm cancellation";
+  const feeApplies =
+    settlement.isLateCancellation && settlement.feeTotal > 0;
+  const mustPayBeforeCancel = settlement.amountDueNow >= 0.5;
+  const primaryLabel = mustPayBeforeCancel
+    ? `Pay ${money(settlement.amountDueNow)} to cancel`
+    : "Confirm cancellation";
+
+  const settlementExplainer = (() => {
+    if (!feeApplies) {
+      return settlement.prepaidPaid > 0
+        ? `No cancellation fee applies. Your prepayment of ${money(settlement.prepaidPaid)} will be refunded.`
+        : "No cancellation fee applies for this booking.";
+    }
+    if (settlement.prepaidPaid > 0 && settlement.refundAmount > 0) {
+      return `Your prepayment of ${money(settlement.prepaidPaid)} covers the fee of ${money(settlement.feeTotal)}. The remaining ${money(settlement.refundAmount)} will be refunded to you.`;
+    }
+    if (settlement.prepaidPaid > 0 && mustPayBeforeCancel) {
+      return `Your prepayment of ${money(settlement.prepaidPaid)} will be applied to the fee of ${money(settlement.feeTotal)}. Pay the remaining ${money(settlement.amountDueNow)} to complete cancellation — the booking stays active until this payment succeeds.`;
+    }
+    if (settlement.prepaidPaid > 0) {
+      return `Your prepayment of ${money(settlement.prepaidPaid)} covers the full cancellation fee of ${money(settlement.feeTotal)}.`;
+    }
+    if (mustPayBeforeCancel) {
+      return `A cancellation fee of ${money(settlement.feeTotal)} is due. Pay it now to cancel — the booking stays active until payment succeeds.`;
+    }
+    return `A cancellation fee of ${money(settlement.feeTotal)} applies.`;
+  })();
 
   return (
     <AppModal
@@ -83,6 +105,17 @@ export default function ClientBookingCancelFeeDialog({
           {feeApplies
             ? "This cancellation is inside the professional's minimum notice window, so a fee applies."
             : "This cancellation is outside the professional's minimum notice window, so no fee is charged."}
+        </Typography>
+        <Typography
+          sx={{
+            mt: 1,
+            fontWeight: 700,
+            fontSize: 12.5,
+            color: alpha(m.navy, 0.62),
+            lineHeight: 1.55,
+          }}
+        >
+          {settlementExplainer}
         </Typography>
 
         <Stack spacing={1.25} sx={{ mt: 1.75 }}>
@@ -176,14 +209,35 @@ export default function ClientBookingCancelFeeDialog({
             />
             <FinancePreviewLabelValueRow
               label={
-                feeApplies
+                feeApplies && settlement.feePercent > 0
                   ? `Cancellation fee (${settlement.feePercent}%)`
                   : "Cancellation fee"
               }
               value={money(settlement.cancellationFee)}
               variant="feeEmphasize"
             />
+            {settlement.rescheduleFee > 0 ? (
+              <FinancePreviewLabelValueRow
+                label="Late reschedule fee"
+                value={money(settlement.rescheduleFee)}
+                variant="fee"
+              />
+            ) : null}
+            {settlement.feeTotal > settlement.cancellationFee ? (
+              <FinancePreviewLabelValueRow
+                label="Fee total"
+                value={money(settlement.feeTotal)}
+                variant="fee"
+              />
+            ) : null}
             {settlement.prepaidPaid > 0 ? (
+              <FinancePreviewLabelValueRow
+                label="Your prepayment"
+                value={money(settlement.prepaidPaid)}
+                variant="fee"
+              />
+            ) : null}
+            {settlement.appliedFromPrepaid > 0 ? (
               <FinancePreviewLabelValueRow
                 label="Applied from prepayment"
                 value={`− ${money(settlement.appliedFromPrepaid)}`}
@@ -199,9 +253,11 @@ export default function ClientBookingCancelFeeDialog({
             ) : null}
             <FinancePreviewLabelValueRow
               label={
-                settlement.amountDueNow > 0
-                  ? "Amount to pay now"
-                  : "Amount due now"
+                mustPayBeforeCancel
+                  ? "You pay now (to cancel)"
+                  : settlement.refundAmount > 0
+                    ? "You pay now"
+                    : "Amount due now"
               }
               value={money(settlement.amountDueNow)}
               variant="feeEmphasize"
@@ -218,14 +274,12 @@ export default function ClientBookingCancelFeeDialog({
             }),
           }}
         >
-          Keep booking leaves this booking unchanged. Confirming cancels the
-          booking
-          {settlement.amountDueNow >= 0.5
-            ? " and charges any remaining fee"
-            : ""}
-          .
+          Keep booking leaves this booking unchanged.
+          {mustPayBeforeCancel
+            ? " Cancellation only completes after the remaining fee is paid."
+            : " Confirming cancels the booking."}
           {settlement.refundAmount > 0
-            ? ` Any unused prepayment (${money(settlement.refundAmount)}) will be refunded.`
+            ? ` Unused prepayment (${money(settlement.refundAmount)}) will be refunded to you.`
             : ""}
         </Typography>
       </Box>

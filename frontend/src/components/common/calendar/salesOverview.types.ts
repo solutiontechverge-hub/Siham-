@@ -49,6 +49,8 @@ export type SalesFinanceHint = {
   penaltyAmount?: number;
   /** document.reissueLevel — gates Manual/Automatic overdue banners */
   reissueLevel?: number;
+  /** document.reissuedAt — compare with sales-card meta for fresh due-date wins */
+  reissuedAt?: string;
   /** Snapshotted paymentTerms from issued document (freeze for reissue prompts). */
   paymentTerms?: SalesPaymentTermsInput;
   /** Finance `entry_label` — used to heal protective-fee Sales cards. */
@@ -191,6 +193,8 @@ export type SalesCardMetaRecord = {
   invoiceSeq?: number;
   paymentMethod?: SalesCheckoutPaymentMethod;
   dueDate?: string | null;
+  /** Edit Sales due change (not a reissue) — preferMetaDue uses this over finance deadline. */
+  dueDateSetAt?: string;
   penaltyAmount?: number;
   penaltyType?: "fixed" | "percentage";
   reissuedAt?: string;

@@ -145,7 +145,12 @@ export default function SalesEditCheckout({
   const [checkoutEmail, setCheckoutEmail] = React.useState(
     () => card.clientEmail?.trim() || "",
   );
-  const [dueDate, setDueDate] = React.useState(card.dueDate || tomorrowIso());
+  const [dueDate, setDueDate] = React.useState(
+    () =>
+      card.dueDate ||
+      card.subCards?.find((sub) => sub.dueDate)?.dueDate ||
+      tomorrowIso(),
+  );
   const [dueDateAnchor, setDueDateAnchor] = React.useState<null | HTMLElement>(
     null,
   );
@@ -760,9 +765,9 @@ export default function SalesEditCheckout({
             <Typography
               sx={mollureSectionTitleSx(m.navy)}
             >
-              {needsDueDate
+              {card.kind === "reissued_invoice"
                 ? "Reissued Invoice Summary"
-                : "After treatment Summary"}
+                : card.title || "After treatment Summary"}
             </Typography>
             <Box
               sx={{
@@ -775,7 +780,9 @@ export default function SalesEditCheckout({
               <Typography
                 sx={{ fontSize: 11, fontWeight: 800, color: "#B54708" }}
               >
-                {needsDueDate ? "Payment Due" : "Pending"}
+                {needsDueDate || card.kind === "reissued_invoice"
+                  ? "Payment Due"
+                  : "Pending"}
               </Typography>
             </Box>
           </Stack>

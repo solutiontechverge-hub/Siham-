@@ -179,15 +179,26 @@ const financeApi = baseApi.injectEndpoints({
     }),
     getSalesCardMetadata: builder.query<ApiEnvelope<SalesCardMetadata[]>, void>({
       query: () => "/api/finance/sales-card-metadata",
-      providesTags: ["FinanceTransactions"],
+      // Isolated tag — do not refetch on every FinanceTransactions mutation.
+      providesTags: ["SalesCardMetadata"],
     }),
     upsertSalesCardMetadata: builder.mutation<ApiEnvelope<SalesCardMetadata>, SalesCardMetadata>({
       query: (body) => ({ url: "/api/finance/sales-card-metadata", method: "PUT", body }),
-      invalidatesTags: ["FinanceTransactions", "Bookings"],
+      // Local storage already updated; only refresh this list (not Bookings/Finance).
+      invalidatesTags: ["SalesCardMetadata"],
     }),
-    getSalesAddons: builder.query<ApiEnvelope<SalesAddonRecord[]>, void>({ query: () => "/api/finance/sales-addons", providesTags: ["FinanceTransactions"] }),
-    upsertSalesAddon: builder.mutation<ApiEnvelope<SalesAddonRecord>, SalesAddonRecord>({ query: (body) => ({ url: "/api/finance/sales-addons", method: "PUT", body }), invalidatesTags: ["FinanceTransactions", "Bookings"] }),
-    deleteSalesAddon: builder.mutation<ApiEnvelope<null>, string>({ query: (id) => ({ url: `/api/finance/sales-addons/${id}`, method: "DELETE" }), invalidatesTags: ["FinanceTransactions", "Bookings"] }),
+    getSalesAddons: builder.query<ApiEnvelope<SalesAddonRecord[]>, void>({
+      query: () => "/api/finance/sales-addons",
+      providesTags: ["SalesAddons"],
+    }),
+    upsertSalesAddon: builder.mutation<ApiEnvelope<SalesAddonRecord>, SalesAddonRecord>({
+      query: (body) => ({ url: "/api/finance/sales-addons", method: "PUT", body }),
+      invalidatesTags: ["SalesAddons"],
+    }),
+    deleteSalesAddon: builder.mutation<ApiEnvelope<null>, string>({
+      query: (id) => ({ url: `/api/finance/sales-addons/${id}`, method: "DELETE" }),
+      invalidatesTags: ["SalesAddons"],
+    }),
     getFinanceSettings: builder.query<ApiEnvelope<FinanceSettings>, void>({
       query: () => "/api/finance/settings",
       providesTags: ["FinanceSettings"],
@@ -366,6 +377,9 @@ const financeApi = baseApi.injectEndpoints({
         clientEmail?: string;
         clientName?: string;
         paymentMethod?: string;
+        /** Target one after-treatment payer invoice (main / guest / model). */
+        payerKey?: string;
+        financeTransactionId?: string;
       }
     >({
       query: (body) => ({

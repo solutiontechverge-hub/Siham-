@@ -1,9 +1,13 @@
 import * as React from "react";
-import { listSalesCardMetaForBooking, SALES_META_CHANGED_EVENT } from "./salesOverview.storage";
+import {
+  listSalesCardMetaForBooking,
+  SALES_META_CHANGED_EVENT,
+} from "./salesOverview.storage";
 import type { SalesCardMetaRecord } from "./salesOverview.types";
 import { parseApiCalendarEventId } from "./bookingEventDetails";
 import { extractBookingId } from "./calendar.utils";
 import { formatFinanceDueDate } from "../booking-finance/formatBookingFinance";
+import { useHydrateSalesCardMetadata } from "./useHydrateSalesCardMetadata";
 
 export type BookingPaymentDueMeta = {
   dueDateIso: string;
@@ -87,8 +91,11 @@ export function resolveBookingPaymentDueMeta(input: {
 export function useBookingPaymentDueMeta(event: {
   id: string;
   bookingCode?: string;
+  details?: { invoiceDueDate?: string } | null;
 } | null): BookingPaymentDueMeta | null {
   const [revision, setRevision] = React.useState(0);
+  // Booking tab may open before Sales — shared hydrate (calendar root also calls this).
+  useHydrateSalesCardMetadata();
 
   React.useEffect(() => {
     if (typeof window === "undefined") return;
@@ -103,12 +110,22 @@ export function useBookingPaymentDueMeta(event: {
 
   return React.useMemo(() => {
     if (!event) return null;
-    return resolveBookingPaymentDueMeta({
+    const fromMeta = resolveBookingPaymentDueMeta({
       bookingId: parseApiCalendarEventId(event.id)?.id ?? event.id,
       bookingCode: event.bookingCode,
       eventId: event.id,
     });
+    if (fromMeta) return fromMeta;
+    // Fallback while API meta is still loading / empty for this booking.
+    const noteDue = String(event.details?.invoiceDueDate ?? "").trim();
+    if (!noteDue) return null;
+    return {
+      dueDateIso: noteDue,
+      dateLabel: formatFinanceDueDate(noteDue),
+      reissued: false,
+      paymentDue: true,
+    };
     // revision intentionally included so in-memory sales meta updates re-resolve
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [event?.id, event?.bookingCode, revision]);
+  }, [event?.id, event?.bookingCode, event?.details?.invoiceDueDate, revision]);
 }

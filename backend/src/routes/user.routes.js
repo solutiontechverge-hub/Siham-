@@ -1,6 +1,13 @@
 import express from "express";
 import { body, param } from "express-validator";
-import { getProfile, requestChangeEmail, setProfessionalValidation, updateProfile } from "../controllers/user.controller.js";
+import {
+  getProfile,
+  getUiPrefs,
+  putUiPrefs,
+  requestChangeEmail,
+  setProfessionalValidation,
+  updateProfile,
+} from "../controllers/user.controller.js";
 import {
   listUserFavorites,
   putUserFavorites,
@@ -26,6 +33,9 @@ import {
 const router = express.Router();
 
 router.get("/profile", authenticateUser, getProfile);
+
+router.get("/ui-prefs", authenticateUser, getUiPrefs);
+router.put("/ui-prefs", authenticateUser, putUiPrefs);
 
 router.post(
   "/change-email",

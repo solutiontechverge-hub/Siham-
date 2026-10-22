@@ -99,4 +99,57 @@ assert.equal(
 );
 
 assert.equal(buildSalesPayableSummary(null), null);
+
+// Cancelled: drop services; payable = fees − prepaid credit only.
+const cancelled = buildSalesPayableSummary({
+  ...baseFinance,
+  basePrice: 111,
+  addOnsTotal: 0,
+  cancellationFee: 11.32,
+  prepaymentTotal: 11.1,
+  totalPaid: 11.1,
+  prepaidRefunded: 0,
+  netPrepaymentCredit: 11.1,
+  totalRefunded: 0,
+  amountDue: 111.22,
+  bookingStatus: "cancelled",
+  badge: "PENDING_FEE",
+  ledger: [
+    {
+      id: "1",
+      type: "CANCELLATION_FEE",
+      amount: 11.32,
+      status: "completed",
+      metadata: { reason: "late_cancellation" },
+    },
+  ],
+});
+assert.ok(cancelled);
+assert.ok(!cancelled!.lines.some((l) => l.id === "services"), "no services after cancel");
+assert.ok(
+  cancelled!.lines.some((l) => l.label === "Cancellation Fee" && l.amount === 11.32),
+);
+assert.equal(cancelled!.payable, 0.22, "due = fee − prepaid only");
+
+const earlyCancel = buildSalesPayableSummary({
+  ...baseFinance,
+  basePrice: 111,
+  addOnsTotal: 0,
+  cancellationFee: 0,
+  amountDue: 99.9,
+  bookingStatus: "cancelled",
+  badge: "REFUNDED",
+  ledger: [],
+  netPrepaymentCredit: 0,
+  prepaymentTotal: 11.1,
+  totalPaid: 11.1,
+  prepaidRefunded: 11.1,
+  totalRefunded: 11.1,
+});
+assert.equal(
+  earlyCancel,
+  null,
+  "early cancel: no services/fees → no payable footer",
+);
+
 console.log("buildSalesPayableSummary.test.ts: all assertions passed");

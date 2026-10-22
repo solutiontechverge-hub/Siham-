@@ -13,7 +13,11 @@ import { hasListingSearchParams } from "./listingSearchParams";
 import { listingPageData, type ListingCardData } from "./listing.data";
 import { useClientFavorites } from "../../../hooks/useClientFavorites";
 import { useAppSelector } from "../../../store/hooks";
-import { CLIENT_PROFILE_KEY } from "../../../lib/auth-storage";
+import {
+  useGetProfileQuery,
+  type CompanyProfile,
+  type IndividualProfile,
+} from "../../../store/services/profileApi";
 
 export type ListingSortValue =
   "recommended" | "alpha_asc" | "alpha_desc" | "rating_desc";
@@ -70,6 +74,9 @@ export function useClientListingState(
     React.useState<null | HTMLElement>(null);
   const { favorites, toggleFavorite } = useClientFavorites();
   const user = useAppSelector((s) => s.auth.user);
+  const { data: profileEnvelope } = useGetProfileQuery(undefined, {
+    skip: !user,
+  });
   const displayName =
     ((user as { display_name?: string })?.display_name as string | undefined) ||
     `${(user as { first_name?: string })?.first_name ?? ""} ${(user as { last_name?: string })?.last_name ?? ""}`.trim();
@@ -87,23 +94,18 @@ export function useClientListingState(
   }, [searchKey, urlFilters]);
 
   React.useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(CLIENT_PROFILE_KEY);
-      if (!raw) return;
-      const data = JSON.parse(raw) as {
-        avatar_url?: string | null;
-        email?: string;
-      };
-      const authedEmail = user?.email?.trim().toLowerCase();
-      const persistedEmail = data?.email?.trim().toLowerCase();
-      if (authedEmail && persistedEmail && authedEmail === persistedEmail) {
-        if (typeof data.avatar_url === "string" && data.avatar_url)
-          setAvatarUrl(data.avatar_url);
-      }
-    } catch {
-      // ignore
+    const profile = profileEnvelope?.data;
+    if (!profile) return;
+    if (profile.user_type === "company") {
+      const logo = (profile.profile as CompanyProfile | null)?.logo;
+      if (logo) setAvatarUrl(logo);
+      return;
     }
-  }, [user?.email]);
+    if (profile.user_type === "individual") {
+      const pic = (profile.profile as IndividualProfile | null)?.profile_picture;
+      if (pic) setAvatarUrl(pic);
+    }
+  }, [profileEnvelope?.data]);
 
   const filtered = React.useMemo(() => {
     return cards.filter((card) =>

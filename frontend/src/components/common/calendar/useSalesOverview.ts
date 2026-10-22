@@ -15,11 +15,11 @@ import {
   useCreateFinanceTransactionMutation,
   useUpdateFinanceTransactionMutation,
   useProcessFinanceInvoiceReissuesMutation,
-  useGetSalesCardMetadataQuery,
   useUpsertSalesCardMetadataMutation,
   useGetSalesAddonsQuery,
   useUpsertSalesAddonMutation,
 } from "../../../store/services/financeApi";
+import { useHydrateSalesCardMetadata } from "./useHydrateSalesCardMetadata";
 import { useBookingFinance } from "../booking-finance/useBookingFinance";
 import {
   parseApiCalendarEventId,
@@ -69,8 +69,8 @@ import {
   saveSalesAddon,
   updateSalesAddon,
   upsertSalesCardMeta,
+  getSalesCardMeta,
   configureSalesCardMetadataPersistence,
-  hydrateSalesCardMetadata,
   hydrateSalesAddons,
   listSalesAddons,
   configureSalesAddonPersistence,
@@ -148,7 +148,7 @@ export function useSalesOverview({
   const [refundTransactionsLoading, setRefundTransactionsLoading] =
     React.useState(false);
   const [processFinanceInvoiceReissues] = useProcessFinanceInvoiceReissuesMutation();
-  const { data: salesMetadataResponse } = useGetSalesCardMetadataQuery();
+  const salesMetadataResponse = useHydrateSalesCardMetadata();
   const { data: salesAddonsResponse } = useGetSalesAddonsQuery(undefined, {
     refetchOnMountOrArgChange: true,
     // ponytail: same 12s cadence as finance poll so Add-ons Summary tracks API.
@@ -157,10 +157,6 @@ export function useSalesOverview({
   const [saveSalesCardMetadata] = useUpsertSalesCardMetadataMutation();
   // Do not shadow storage `saveSalesAddon` — local list must update before cards rebuild.
   const [upsertSalesAddonApi] = useUpsertSalesAddonMutation();
-
-  React.useEffect(() => {
-    hydrateSalesCardMetadata((salesMetadataResponse?.data ?? []) as never[] as import("./salesOverview.types").SalesCardMetaRecord[]);
-  }, [salesMetadataResponse?.data]);
 
   React.useEffect(() => {
     hydrateSalesAddons((salesAddonsResponse?.data ?? []) as never[] as import("./salesOverview.types").SalesAddonRecord[]);
@@ -334,42 +330,58 @@ export function useSalesOverview({
     (
       sub: SalesSubCardData,
       parent: SalesOverviewCardData,
-    ): SalesOverviewCardData => ({
-      id: sub.id,
-      bookingId: sub.bookingId || parent.bookingId,
-      bookingCode: sub.bookingCode || parent.bookingCode,
-      kind: "after_treatment",
-      title: SALES_OVERVIEW_COPY.afterTreatmentSummary,
-      clientName: sub.payerName,
-      payerLabel: sub.payerLabel,
-      payerRole: sub.payerRole,
-      payerKey: sub.payerKey,
-      clientEmail: sub.clientEmail || parent.clientEmail,
-      lines: sub.lines,
-      highlightedLineIds: sub.lines.map((line) => line.id),
-      total: sub.total,
-      totalLabel: sub.totalLabel || SALES_OVERVIEW_COPY.totalAmount,
-      secondaryRows: sub.secondaryRows,
-      highlightLabel:
-        sub.payerRole === "main_client"
-          ? sub.highlightLabel || SALES_OVERVIEW_COPY.payment
-          : sub.highlightLabel || SALES_OVERVIEW_COPY.totalAmount,
-      highlightAmount: sub.highlightAmount,
-      methodDateLine: sub.methodDateLine,
-      dueDate: sub.dueDate,
-      showAddOns: sub.showAddOns,
-      paymentState: sub.paymentState,
-      statusBadge: sub.statusBadge,
-      markedUnpaid: sub.markedUnpaid,
-      paidAt: sub.paidAt,
-      penaltyPrompt: sub.penaltyPrompt,
-      overdueKind: sub.overdueKind,
-      financeTransactionId: sub.financeTransactionId,
-      documentAmount: sub.highlightAmount,
-      occurredAt: parent.occurredAt,
-      paymentMethodLabel: parent.paymentMethodLabel,
-      paymentMethod: parent.paymentMethod,
-    }),
+    ): SalesOverviewCardData => {
+      // Per-payer reissue only — sibling guest/model must not inherit each other.
+      const subMeta =
+        getSalesCardMeta(sub.id) ||
+        (sub.payerRole === "main_client"
+          ? getSalesCardMeta(parent.id)
+          : null);
+      const kind =
+        subMeta?.cardKind === "reissued_invoice" || Boolean(subMeta?.reissuedAt)
+          ? "reissued_invoice"
+          : "after_treatment";
+      return {
+        id: sub.id,
+        bookingId: sub.bookingId || parent.bookingId,
+        bookingCode: sub.bookingCode || parent.bookingCode,
+        kind,
+        title:
+          kind === "reissued_invoice"
+            ? "Reissued Invoice Summary"
+            : SALES_OVERVIEW_COPY.afterTreatmentSummary,
+        clientName: sub.payerName,
+        payerLabel: sub.payerLabel,
+        payerRole: sub.payerRole,
+        payerKey: sub.payerKey,
+        clientEmail: sub.clientEmail || parent.clientEmail,
+        lines: sub.lines,
+        highlightedLineIds: sub.lines.map((line) => line.id),
+        total: sub.total,
+        totalLabel: sub.totalLabel || SALES_OVERVIEW_COPY.totalAmount,
+        secondaryRows: sub.secondaryRows,
+        highlightLabel:
+          sub.payerRole === "main_client"
+            ? sub.highlightLabel || SALES_OVERVIEW_COPY.payment
+            : sub.highlightLabel || SALES_OVERVIEW_COPY.totalAmount,
+        highlightAmount: sub.highlightAmount,
+        methodDateLine: sub.methodDateLine,
+        dueDate: sub.dueDate,
+        showAddOns: sub.showAddOns,
+        paymentState: sub.paymentState,
+        statusBadge: sub.statusBadge,
+        markedUnpaid: sub.markedUnpaid,
+        paidAt: sub.paidAt,
+        penaltyPrompt: sub.penaltyPrompt,
+        overdueKind: sub.overdueKind,
+        financeTransactionId: sub.financeTransactionId,
+        documentAmount: sub.highlightAmount,
+        occurredAt: parent.occurredAt,
+        paymentMethodLabel: parent.paymentMethodLabel,
+        paymentMethod: parent.paymentMethod,
+        limitedMenu: sub.limitedMenu,
+      };
+    },
     [],
   );
 
@@ -544,17 +556,40 @@ export function useSalesOverview({
 
   const bump = () => setRevision((n) => n + 1);
 
-  const overdueManualCard = React.useMemo(
-    () => cards.find((card) => card.penaltyPrompt === "manual") ?? null,
-    [cards],
+  const overdueManualCard = React.useMemo(() => {
+    // Prefer a specific overdue payer (main / guest / model) so reissue is per-invoice.
+    for (const card of cards) {
+      if (card.subCards?.some((sub) => sub.payerRole === "main_client")) {
+        for (const sub of card.subCards) {
+          if (sub.penaltyPrompt !== "manual") continue;
+          return subToCard(sub, card);
+        }
+        continue;
+      }
+      if (
+        card.penaltyPrompt === "manual" &&
+        (card.kind === "after_treatment" || card.kind === "reissued_invoice")
+      ) {
+        return card;
+      }
+    }
+    return null;
+  }, [cards, subToCard]);
+  const isAfterTreatmentReissueCard = (card: { kind?: string }) =>
+    card.kind === "after_treatment" || card.kind === "reissued_invoice";
+  const needsAutomaticReissue = cards.some(
+    (card) =>
+      card.penaltyPrompt === "automatic" && isAfterTreatmentReissueCard(card),
   );
-  const needsAutomaticReissue = cards.some((card) => card.penaltyPrompt === "automatic");
   const autoReissueKeyRef = React.useRef<string>("");
 
   React.useEffect(() => {
     if (!needsAutomaticReissue) return;
     const key = cards
-      .filter((card) => card.penaltyPrompt === "automatic")
+      .filter(
+        (card) =>
+          card.penaltyPrompt === "automatic" && isAfterTreatmentReissueCard(card),
+      )
       .map((card) => card.id)
       .join("|");
     if (!key || autoReissueKeyRef.current === key) return;
@@ -1198,6 +1233,8 @@ export function useSalesOverview({
     clientEmail?: string;
     clientName?: string;
     paymentMethod?: string;
+    payerKey?: string;
+    financeTransactionId?: string;
   }) => {
     try {
       const result = await reissueFinanceInvoice({
@@ -1209,6 +1246,8 @@ export function useSalesOverview({
         clientEmail: input.clientEmail || clientEmail || undefined,
         clientName: input.clientName || clientName || undefined,
         paymentMethod: input.paymentMethod,
+        payerKey: input.payerKey,
+        financeTransactionId: input.financeTransactionId,
       }).unwrap();
 
       if (result.data?.emailSent) {
@@ -1232,26 +1271,39 @@ export function useSalesOverview({
 
   const handleSaveEdit = async (payload: SalesEditCheckoutPayload) => {
     if (!editingCard) return;
-    const isReissue =
-      payload.paymentMethod === "onlineNonDirect" ||
-      payload.paymentMethod === "offlineNonDirect";
+    // Non-Direct + due date = first invoice issue on After treatment — not a reissue.
+    // Reissued Invoice Summary only comes from overdue reissue (handleReissue).
+    // Stamp dueDateSetAt (not reissuedAt) so preferMetaDue paints the new due on this payer.
+    const dueDateSetAt = payload.dueDate ? new Date().toISOString() : undefined;
 
     upsertSalesCardMeta({
       bookingId: editingCard.bookingId,
-      cardKind: isReissue ? "reissued_invoice" : editingCard.kind,
+      cardKind: editingCard.kind,
       cardId: editingCard.id,
       note: editingCard.note,
       paymentMethod: payload.paymentMethod,
       dueDate: payload.dueDate ?? null,
+      ...(dueDateSetAt ? { dueDateSetAt } : {}),
       editedLines: payload.lines,
       discount: payload.discount,
       discountAmount: payload.discountAmount,
       totalPrice: payload.totalPrice,
       markedUnpaid: false,
-      ...(isReissue && payload.dueDate
-        ? { reissuedAt: new Date().toISOString() }
-        : {}),
     });
+    // Split-bill / shell: push due date onto each open sub so MethodDateLine updates.
+    if (payload.dueDate && editingCard.subCards?.length) {
+      for (const sub of editingCard.subCards) {
+        if (sub.paymentState === "paid" || sub.paymentState === "voided") continue;
+        upsertSalesCardMeta({
+          bookingId: editingCard.bookingId,
+          cardKind: editingCard.kind,
+          cardId: sub.id,
+          paymentMethod: payload.paymentMethod,
+          dueDate: payload.dueDate,
+          dueDateSetAt,
+        });
+      }
+    }
     setEditingCard(null);
     bump();
     showSnackbar({
@@ -1315,18 +1367,6 @@ export function useSalesOverview({
         });
       }
     }
-
-    if (isReissue && payload.dueDate) {
-      await notifyClientInvoiceReissue({
-        bookingId: editingCard.bookingId,
-        bookingCode: editingCard.bookingCode,
-        dueDate: payload.dueDate,
-        totalPrice: payload.totalPrice,
-        clientEmail: editingCard.clientEmail,
-        clientName: editingCard.clientName,
-        paymentMethod: payload.paymentMethod,
-      });
-    }
   };
 
   const handleReissue = async (payload: {
@@ -1336,7 +1376,16 @@ export function useSalesOverview({
     dueDate: string;
   }) => {
     if (!overdueCard) return;
+    // Per-payer after-treatment invoice only (main / guest / model — not prepay/addon).
+    if (
+      overdueCard.kind !== "after_treatment" &&
+      overdueCard.kind !== "reissued_invoice"
+    ) {
+      return;
+    }
     const card = overdueCard;
+    const reissuedAt = new Date().toISOString();
+    // One payer invoice at a time — do not blast sibling guest/model subs.
     upsertSalesCardMeta({
       bookingId: card.bookingId,
       cardKind: "reissued_invoice",
@@ -1346,15 +1395,34 @@ export function useSalesOverview({
       dueDate: payload.dueDate,
       penaltyAmount: payload.penaltyAmount,
       penaltyType: payload.penaltyType,
-      reissuedAt: new Date().toISOString(),
+      reissuedAt,
       totalPrice: card.total + payload.penaltyAmount,
+      financeTransactionId: card.financeTransactionId,
     });
-    setOverdueCard(null);
-    bump();
-    showSnackbar({
-      severity: "success",
-      message: SALES_OVERVIEW_COPY.invoiceReissued,
-    });
+
+    // Persist due date on booking notes so calendar rebuilds stay in sync.
+    if (currentEvent) {
+      const nextDetails = {
+        ...(currentEvent.details ?? {}),
+        waitingForPayment: true,
+        invoiceDueDate: payload.dueDate,
+      } as CalendarBookingDetails;
+      const nextNotes = serializeCalendarEntryNotes(
+        nextDetails.internalNote ?? "",
+        nextDetails,
+        parseStoredEbrFromNotes(currentEvent.notes),
+        parseStoredErFromNotes(currentEvent.notes),
+      );
+      try {
+        await updateBookingStatus({
+          id: card.bookingId,
+          status: "in_progress",
+          notes: nextNotes,
+        }).unwrap();
+      } catch {
+        // Finance reissue is authoritative; notes sync is best-effort.
+      }
+    }
 
     await notifyClientInvoiceReissue({
       bookingId: card.bookingId,
@@ -1365,6 +1433,14 @@ export function useSalesOverview({
       clientEmail: card.clientEmail,
       clientName: card.clientName,
       paymentMethod: card.paymentMethod || "onlineNonDirect",
+      payerKey: card.payerKey,
+      financeTransactionId: card.financeTransactionId,
+    });
+    setOverdueCard(null);
+    bump();
+    showSnackbar({
+      severity: "success",
+      message: SALES_OVERVIEW_COPY.invoiceReissued,
     });
   };
 

@@ -267,7 +267,7 @@ export function useClientBookingCreateAvailability(
         sharedWindowMins,
       });
       const sharedMember =
-        assignments.find((row) => row.teamMemberId)?.teamMemberId ?? "";
+        mirror.find((row) => row.teamMemberId)?.teamMemberId ?? "";
       // Sync picker when assign finds someone. Do NOT clear to "" while the
       // current pick is still on the leave-filtered roster (just busy) — that
       // fought the ""→first repair effect and caused max update depth.

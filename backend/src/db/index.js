@@ -31,12 +31,21 @@ function getPool() {
     process.env.PGSSLMODE === "require" ||
     connectionString.includes("supabase.co");
 
+  const statementTimeoutMs = Number(process.env.DB_STATEMENT_TIMEOUT_MS || 20_000);
   pool = new Pool({
     connectionString,
     ssl: shouldUseSsl ? { rejectUnauthorized: false } : undefined,
     max: Number(process.env.DB_POOL_MAX || 10),
     idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS || 30_000),
     connectionTimeoutMillis: Number(process.env.DB_CONNECTION_TIMEOUT_MS || 15_000),
+    // Detect half-closed Supabase/pooler sockets instead of hanging forever.
+    keepAlive: true,
+    keepAliveInitialDelayMillis: Number(
+      process.env.DB_KEEPALIVE_DELAY_MS || 10_000,
+    ),
+    // Set via startup options — never client.query() in pool "connect" (races
+    // the first checkout query and can hang the connection).
+    options: `-c statement_timeout=${Math.max(1000, statementTimeoutMs)}`,
     allowExitOnIdle: false,
   });
 

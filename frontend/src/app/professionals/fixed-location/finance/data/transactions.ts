@@ -362,6 +362,11 @@ export type TransactionRow = {
   /** Booking ID for navigation to calendar */
   bookingId?: string;
   createdAt?: string;
+  /** Overview UI only: guest/model names nested under Client name (same booking). */
+  guestNames?: string[];
+  /** Booker from bookings.customer_* when finance rows are guest-only. */
+  bookerName?: string | null;
+  bookerEmail?: string | null;
   /** Shared ledger snapshot (same source as Sale Drawer / useBookingFinance). */
   bookingFinancials?: {
     net_total?: number;

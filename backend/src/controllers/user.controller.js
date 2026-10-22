@@ -436,3 +436,72 @@ export const setProfessionalValidation = async (req, res) => {
     return sendCaughtError(res, error, { fallbackMessage: "Failed to update professional validation." });
   }
 };
+
+/** Cross-device UI prefs (messaging hide/block, booking update-seen, …). */
+export const getUiPrefs = async (req, res) => {
+  try {
+    const result = await query(
+      `SELECT COALESCE(ui_prefs, '{}'::jsonb) AS ui_prefs
+       FROM users
+       WHERE id = $1
+       LIMIT 1`,
+      [req.user.id],
+    );
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+        data: null,
+      });
+    }
+    return res.status(200).json({
+      success: true,
+      message: "UI preferences fetched.",
+      data: result.rows[0].ui_prefs ?? {},
+    });
+  } catch (error) {
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to fetch UI preferences." });
+  }
+};
+
+/** Deep-merge patch into users.ui_prefs (object keys only; arrays replace). */
+export const putUiPrefs = async (req, res) => {
+  try {
+    const patch =
+      req.body && typeof req.body === "object" && !Array.isArray(req.body)
+        ? req.body
+        : null;
+    if (!patch) {
+      return res.status(400).json({
+        success: false,
+        message: "Request body must be a JSON object.",
+        data: null,
+      });
+    }
+
+    const result = await query(
+      `UPDATE users
+       SET ui_prefs = COALESCE(ui_prefs, '{}'::jsonb) || $2::jsonb,
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING COALESCE(ui_prefs, '{}'::jsonb) AS ui_prefs`,
+      [req.user.id, JSON.stringify(patch)],
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+        data: null,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "UI preferences saved.",
+      data: result.rows[0].ui_prefs ?? {},
+    });
+  } catch (error) {
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to save UI preferences." });
+  }
+};

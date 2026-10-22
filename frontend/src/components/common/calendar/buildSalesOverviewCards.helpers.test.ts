@@ -303,6 +303,33 @@ assert.equal(
   "Payment = fee €50 − prepaid €20",
 );
 assert.equal(feeSummaryCard?.showAddOns, true, "Add-Ons on Fee Summary");
+assert.equal(
+  cancelledPrepaidFeeCards.some((c) => c.title === "After treatment Summary"),
+  false,
+  "cancelled path never builds After treatment Summary",
+);
+
+// Stamp-only Fee Summary (no finance fee row yet) — still dynamic, no localStorage.
+const stampOnlyFeeCards = buildCardsForEvent({
+  event: cancelledPrepaidFeeEvent,
+  booking: {
+    id: "cancel-stamp-1",
+    status: "cancelled",
+    prepayment_status: "paid",
+  } as never,
+  clientName: "aliza",
+  clientEmail: "aliza@example.com",
+  ctx: { financeHints: [] },
+});
+assert.ok(
+  stampOnlyFeeCards.some((c) => c.title === "Fee Summary"),
+  "Fee Summary from late-cancel stamp without finance row",
+);
+assert.equal(
+  stampOnlyFeeCards.some((c) => c.title === "After treatment Summary"),
+  false,
+  "stamp-only cancel: no After treatment",
+);
 
 const plainCancelCards = buildCardsForEvent({
   event: {
@@ -909,6 +936,45 @@ upsertSalesCardMeta({
   assert.equal(after?.paymentState, "payment_due");
   assert.equal(after?.statusBadge, "Payment Due");
   assert.equal(after?.dueDate, "2026-12-31");
+}
+hydrateSalesCardMetadata([]);
+
+// Edit Sales dueDateSetAt (guest/main Non-Direct) wins over stale finance deadline.
+hydrateSalesCardMetadata([]);
+upsertSalesCardMeta({
+  bookingId: "status-sync-1",
+  cardKind: "after_treatment",
+  cardId: "status-sync-1-after-treatment",
+  dueDate: "2026-10-25",
+  dueDateSetAt: "2026-10-22T12:00:00.000Z",
+  paymentMethod: "onlineNonDirect",
+});
+{
+  const cards = buildCardsForEvent({
+    event: {
+      ...statusSyncEvent,
+      details: {
+        ...statusSyncEvent.details,
+        paymentMethod: "onlineNonDirect",
+      },
+    } as unknown as CalendarEvent,
+    clientName: "Bea",
+    ctx: {
+      financeHints: [
+        {
+          transactionId: "tx-deadline-edit",
+          bookingId: "status-sync-1",
+          bookingCode: "BK-STATUS",
+          phase: "full",
+          status: "Payment due",
+          dueDate: "2026-10-23",
+          lineItems: [{ id: "s1", label: "Cut", amount: 40 }],
+        },
+      ],
+    },
+  });
+  const after = cards.find((c) => c.kind === "after_treatment");
+  assert.equal(after?.dueDate, "2026-10-25", "dueDateSetAt prefers Edit Sales due");
 }
 hydrateSalesCardMetadata([]);
 

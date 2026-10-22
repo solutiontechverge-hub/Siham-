@@ -2037,6 +2037,9 @@ export async function processOverdueInvoiceReissues(professionalProfileId) {
   let created = 0;
   for (const row of overdue.rows) {
     const doc = row.document ?? {};
+    const phase = String(doc.paymentPhase ?? "").toLowerCase();
+    // Reissue only after-treatment (full) invoices — never prepay/addon.
+    if (phase === "prepay" || phase === "addon") continue;
     const paymentTerms = resolveDocumentPaymentTerms(doc, settings.paymentTerms);
     const level = Number(doc.reissueLevel) || 0;
     const action = resolveOverdueReissueAction(level, paymentTerms);
@@ -2183,6 +2186,12 @@ export async function processAutomaticInvoiceReissues() {
   for (const row of overdue.rows) {
     const settings = mergeInvoiceSettings(row.invoice_settings);
     const doc = row.document ?? {};
+    const phase = String(doc.paymentPhase ?? "").toLowerCase();
+    // Reissue only after-treatment (full) invoices — never prepay/addon.
+    if (phase === "prepay" || phase === "addon") {
+      outcomes.push({ applied: false, reason: "phase_not_reissuable" });
+      continue;
+    }
     const level = Number(doc.reissueLevel) || 0;
     const action = resolveOverdueReissueAction(level, settings.paymentTerms);
     if (action === "close") {
