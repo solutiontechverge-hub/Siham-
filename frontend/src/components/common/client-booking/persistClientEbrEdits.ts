@@ -21,6 +21,11 @@ import {
   serializeCalendarEntryNotes,
 } from "../calendar/bookingEventDetails";
 import {
+  buildProtectiveFeeActivation,
+  shouldTriggerLateRescheduleFee,
+} from "../calendar/bookingFeeTriggers";
+import { summarizeClientBookingPrice } from "../calendar/bookingTotal";
+import {
   clientSuggestEbrChanges,
   consumeConfirmedEditGrant,
   type BookingEditSuggestedProduct,
@@ -28,6 +33,18 @@ import {
 import { guestsFromPeopleAndServices } from "./clientBookingDetails.helpers";
 import type { ClientBookingDraft } from "./types";
 import type { UpdateMyBookingRequest } from "../../../store/services/businessApi";
+
+function readEbrBaselineSchedule() {
+  if (typeof window === "undefined") return { dateISO: "", time: "" };
+  try {
+    const raw = window.sessionStorage.getItem("mollure:ebr_baseline_schedule");
+    if (!raw) return { dateISO: "", time: "" };
+    const parsed = JSON.parse(raw) as { dateISO?: string; time?: string };
+    return { dateISO: parsed.dateISO ?? "", time: parsed.time ?? "" };
+  } catch {
+    return { dateISO: "", time: "" };
+  }
+}
 
 type EditRequestSlice = {
   editedServiceIds?: string[];
@@ -361,6 +378,10 @@ export async function persistConfirmedGrantEdit(params: {
     severity: "success" | "error";
     message: string;
   }) => void;
+  /** From business profile — late reschedule fee % (optional until wired). */
+  rescheduleFeePercent?: number | null;
+  rescheduleNoticeHours?: number | null;
+  rescheduleNoticeMinutes?: number | null;
 }) {
   const {
     bookingRef,
@@ -471,11 +492,16 @@ export async function persistConfirmedGrantEdit(params: {
     teamMembers:
       sessionDraft.teamMembers ?? activeBooking?.draft?.teamMembers ?? [],
   };
+  // Draft is overwritten on "Save changes" before this persist — compare to
+  // editor-open baseline (sessionStorage), not the already-updated draft.
+  const baselineSchedule = readEbrBaselineSchedule();
+  const baselineDate =
+    baselineSchedule.dateISO || activeBooking?.draft?.selectedDateISO || "";
+  const baselineTime =
+    baselineSchedule.time || activeBooking?.draft?.selectedTime || "";
   const scheduleEdited =
-    (sessionDraft.selectedDateISO ?? "") !==
-      (activeBooking?.draft?.selectedDateISO ?? "") ||
-    (sessionDraft.selectedTime ?? "") !==
-      (activeBooking?.draft?.selectedTime ?? "");
+    (sessionDraft.selectedDateISO ?? "") !== baselineDate ||
+    (sessionDraft.selectedTime ?? "") !== baselineTime;
   const priorDesired = priorNotes?.desiredLocation;
   const locationEdited = Boolean(
     nextDesiredLocation &&
@@ -539,11 +565,80 @@ export async function persistConfirmedGrantEdit(params: {
     currentProducts: productLines,
     scheduleChanged: scheduleEdited || locationEdited,
   });
+
+  const baselineStartMs = baselineDate
+    ? Date.parse(
+        buildWallClockDateTimeIso(
+          baselineDate,
+          parseTimeLabelToMinutes(baselineTime || "12:00 AM"),
+        ),
+      )
+    : NaN;
+  let showLateRescheduling = Boolean(priorNotes?.showLateRescheduling);
+  let lateRescheduleFeePercent = String(
+    priorNotes?.lateRescheduleFeePercent ?? "",
+  );
+  let lateRescheduleFeePercentCeiling =
+    priorNotes?.lateRescheduleFeePercentCeiling;
+  if (
+    scheduleEdited &&
+    shouldTriggerLateRescheduleFee({
+      policyPercent: params.rescheduleFeePercent,
+      scheduleEdited: true,
+      alreadyShown: showLateRescheduling,
+      appointmentStartMs: Number.isFinite(baselineStartMs)
+        ? baselineStartMs
+        : null,
+      noticeHours: params.rescheduleNoticeHours,
+      noticeMinutes: params.rescheduleNoticeMinutes,
+    })
+  ) {
+    const activation = buildProtectiveFeeActivation(
+      params.rescheduleFeePercent,
+      { kind: "lateReschedule" },
+    );
+    if (activation) {
+      showLateRescheduling = true;
+      lateRescheduleFeePercent = activation.percent;
+      lateRescheduleFeePercentCeiling = activation.ceiling;
+    }
+  }
+
+  const priced = summarizeClientBookingPrice({
+    services: serviceLines,
+    products: productLines,
+    people: lockedPeople,
+    showLateRescheduling,
+    lateRescheduleFeePercent,
+    lateRescheduleFeePercentCeiling,
+    showLateCancellation: priorNotes?.showLateCancellation,
+    lateCancellationFeePercent: priorNotes?.lateCancellationFeePercent,
+    showPrepayment: priorNotes?.showPrepayment,
+    prepaymentPercent: priorNotes?.prepaymentPercent,
+  });
+  const lateFeeFields = {
+    showLateRescheduling,
+    lateRescheduleFeePercent,
+    ...(lateRescheduleFeePercentCeiling
+      ? { lateRescheduleFeePercentCeiling }
+      : {}),
+    ...(showLateRescheduling && priced.breakdown.lateRescheduleFeeAmount > 0
+      ? { outstandingRescheduleFee: priced.breakdown.lateRescheduleFeeAmount }
+      : {}),
+  };
+  const totalPriceToSave =
+    priced.breakdown.bookingTotal > 0
+      ? priced.breakdown.bookingTotal
+      : (activeBooking?.draft?.total ??
+        priorNotes?.services?.reduce((sum, s) => sum + (s.price || 0), 0) ??
+        sessionDraft.total);
+
   const nextNotes = serializeCalendarEntryNotes(
     priorNotes?.internalNote ?? "",
     silentSafeOnly
       ? {
           ...priorNotes,
+          ...lateFeeFields,
           clientSnapshot,
           services: serviceLines,
           products: productLines,
@@ -579,6 +674,7 @@ export async function persistConfirmedGrantEdit(params: {
         }
       : {
           ...priorNotes,
+          ...lateFeeFields,
           clientSnapshot,
           services: serviceLines,
           products: productLines,
@@ -619,10 +715,7 @@ export async function persistConfirmedGrantEdit(params: {
     id: apiBookingId,
     status: "confirmed",
     notes: nextNotes,
-    total_price:
-      activeBooking?.draft?.total ??
-      priorNotes?.services?.reduce((sum, s) => sum + (s.price || 0), 0) ??
-      sessionDraft.total,
+    total_price: totalPriceToSave,
     booking_date: sessionDraft.selectedDateISO,
     start_time: buildWallClockDateTimeIso(
       sessionDraft.selectedDateISO,
@@ -634,6 +727,9 @@ export async function persistConfirmedGrantEdit(params: {
     ),
   }).unwrap();
 
+  if (typeof window !== "undefined") {
+    window.sessionStorage.removeItem("mollure:ebr_baseline_schedule");
+  }
   consumeConfirmedEditGrant(bookingRef);
   unlockEbrDraft();
   if (sessionRecord) {
@@ -641,7 +737,10 @@ export async function persistConfirmedGrantEdit(params: {
       ...sessionRecord,
       status: "confirmed",
       notes: nextNotes,
-      draft: sessionDraft,
+      draft: {
+        ...sessionDraft,
+        total: totalPriceToSave,
+      },
     });
   }
   await refreshActiveBooking();

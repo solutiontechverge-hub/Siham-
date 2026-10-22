@@ -24,6 +24,19 @@ import {
 } from "../../finance-documents/protectiveFeeInvoice";
 import type { UseProfessionalFixedLocationCalendarBookingPersistArgs } from "./useProfessionalFixedLocationCalendar.bookingPersist";
 
+/** Payload clientType for finance create — must not map Mollure IC → nonMollure via "individual". */
+export function resolveCheckoutFinanceClientType(
+  selectedClient?: {
+    clientKind?: "individual" | "company" | null;
+    isMollure?: boolean;
+    mollureUserId?: string | null;
+  } | null,
+): "mollure" | "nonMollure" | "business" {
+  if (selectedClient?.clientKind === "company") return "business";
+  if (selectedClient?.isMollure || selectedClient?.mollureUserId) return "mollure";
+  return "nonMollure";
+}
+
 function resolveCheckoutEntryLabel(input: {
   mode: string;
   payerLabel?: string;
@@ -209,8 +222,7 @@ export function useProfessionalFixedLocationCalendarBookingPersistCheckout(
         await createFinanceTransaction({
           clientName: result.payerName || selectedClient?.name || "Client",
           clientEmail: result.clientEmail || selectedClient?.email || "",
-          clientType:
-            selectedClient?.clientKind === "company" ? "company" : "individual",
+          clientType: resolveCheckoutFinanceClientType(selectedClient),
           paymentMethod: result.paymentMethod,
           totalPrice: result.amount,
           dueDate: result.dueDate,

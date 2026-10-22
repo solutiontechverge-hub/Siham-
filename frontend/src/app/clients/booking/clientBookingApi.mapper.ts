@@ -247,9 +247,10 @@ export function buildClientBookingApiPayload(input: {
   const catalogId = firstService.catalogServiceId || firstService.id;
   const serviceId = resolveSubcategoryServiceId(input.setup, catalogId, firstService.name);
   if (!serviceId) return null;
+  // Blank / Any → null so backend can leave unassigned for pro/auto-assign.
   const teamMemberId = resolveTeamMemberId(
     input.setup,
-    firstService.teamMemberId ?? input.draft.teamMembers?.[0]?.id ?? null,
+    firstService.teamMemberId ?? null,
   );
 
   const projectUploads = input.draft.projectDetails?.uploads ?? [];

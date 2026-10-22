@@ -134,9 +134,17 @@ export function useFinanceInvoiceSettings() {
   );
 
   const setSettings = React.useCallback(
-    (updater: FinanceInvoiceSettings | ((prev: FinanceInvoiceSettings) => FinanceInvoiceSettings)) => {
+    (
+      updater:
+        | FinanceInvoiceSettings
+        | ((prev: FinanceInvoiceSettings) => FinanceInvoiceSettings),
+    ): Promise<void> => {
+      let normalized: FinanceInvoiceSettings = defaultFinanceInvoiceSettings;
       setLocalDraft((prev) => {
-        const raw = prev ?? settingsResponse?.data?.invoiceSettings ?? defaultFinanceInvoiceSettings;
+        const raw =
+          prev ??
+          settingsResponse?.data?.invoiceSettings ??
+          defaultFinanceInvoiceSettings;
         const base: FinanceInvoiceSettings = {
           ...defaultFinanceInvoiceSettings,
           ...raw,
@@ -153,24 +161,32 @@ export function useFinanceInvoiceSettings() {
           },
         };
         const next = typeof updater === "function" ? updater(base) : updater;
-        const normalized: FinanceInvoiceSettings = {
+        normalized = {
           ...defaultFinanceInvoiceSettings,
           ...next,
           products: normalizeProducts(next.products),
           uniqueItems: normalizeProducts(next.uniqueItems),
           services: next.services ?? [],
+          logoDataUrl: next.logoDataUrl ?? null,
         };
-        void updateInvoiceSettings({ invoiceSettings: normalized });
         return normalized;
       });
+      return updateInvoiceSettings({ invoiceSettings: normalized })
+        .unwrap()
+        .then(() => undefined);
     },
     [settingsResponse?.data?.invoiceSettings, updateInvoiceSettings],
   );
 
+  // Keep draft until server catches up (logo uploads race with refetch).
   React.useEffect(() => {
-    if (settingsResponse?.data?.invoiceSettings) {
-      setLocalDraft(null);
-    }
+    const server = settingsResponse?.data?.invoiceSettings;
+    if (!server) return;
+    setLocalDraft((prev) => {
+      if (!prev) return null;
+      if (prev.logoDataUrl && !server.logoDataUrl) return prev;
+      return null;
+    });
   }, [settingsResponse?.data?.invoiceSettings]);
 
   return {

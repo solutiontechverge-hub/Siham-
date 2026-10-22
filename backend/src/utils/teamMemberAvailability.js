@@ -121,3 +121,77 @@ export async function isTeamMemberBusyInWindow(queryFn, args) {
 
   return false;
 }
+
+function parseAssignedServiceIds(raw) {
+  let items = raw;
+  if (typeof raw === "string") {
+    try {
+      items = JSON.parse(raw);
+    } catch {
+      items = [];
+    }
+  }
+  if (!Array.isArray(items)) return [];
+  return items
+    .map((item) => {
+      if (item == null) return "";
+      if (typeof item === "object") {
+        return String(item.service_id ?? item.serviceId ?? "").trim();
+      }
+      return String(item).trim();
+    })
+    .filter(Boolean);
+}
+
+/**
+ * First free team member for a window (display_order). Skips busy/blocked.
+ * optional serviceId: prefer members who can perform it (empty assigned = all).
+ * provisionalBusy: in-request intervals already claimed (same create).
+ */
+export async function pickFreeTeamMemberId(queryFn, args) {
+  const {
+    professionalProfileId,
+    businessSetupId,
+    date,
+    startMin,
+    endMin,
+    serviceId = null,
+    provisionalBusy = {},
+  } = args;
+  if (!businessSetupId || !date || startMin == null || endMin == null || endMin <= startMin) {
+    return null;
+  }
+
+  const membersResult = await queryFn(
+    `SELECT id, assigned_services
+     FROM business_team_members
+     WHERE business_setup_id = $1
+     ORDER BY display_order ASC, id ASC`,
+    [businessSetupId],
+  );
+
+  const catalogId = serviceId ? String(serviceId) : null;
+  const window = { startMin, endMin };
+
+  for (const member of membersResult.rows) {
+    const teamMemberId = String(member.id);
+    if (catalogId) {
+      const assigned = parseAssignedServiceIds(member.assigned_services);
+      if (assigned.length > 0 && !assigned.includes(catalogId)) continue;
+    }
+    const claimed = provisionalBusy[teamMemberId] ?? [];
+    if (claimed.some((busy) => intervalsOverlap(window, busy))) continue;
+
+    const busy = await isTeamMemberBusyInWindow(queryFn, {
+      professionalProfileId,
+      businessSetupId,
+      teamMemberId,
+      date,
+      startMin,
+      endMin,
+    });
+    if (busy) continue;
+    return teamMemberId;
+  }
+  return null;
+}

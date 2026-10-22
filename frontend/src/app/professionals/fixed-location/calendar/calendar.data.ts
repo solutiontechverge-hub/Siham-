@@ -8,6 +8,7 @@ export type CalendarBookingStatus =
   | "Confirmed"
   | "In Progress"
   | "Completed"
+  | "Refunded"
   | "No Show"
   | "Invalid";
 
@@ -159,6 +160,8 @@ export type CalendarBookingDetails = {
   showLateRescheduling?: boolean;
   /** Policy ceiling when late-reschedule section was enabled (decrease-only). */
   lateRescheduleFeePercentCeiling?: string;
+  /** Settled-on-cancel LRF amount (dynamic; from % × base when stamped). */
+  outstandingRescheduleFee?: number;
   noShowFeePercent?: string;
   showNoShowFee?: boolean;
   /** Policy ceiling when no-show fee section was enabled (decrease-only). */

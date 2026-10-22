@@ -1,6 +1,8 @@
 import { query } from "../db/index.js";
 import { parseUuid } from "../utils/uuid.js";
 import {
+  findActiveMollureClientByEmail,
+  mollureClientEmailCreateConflict,
   refreshProfessionalClientSalesStats,
   syncProfessionalClientsFromConfirmedBookings,
   syncProfessionalClientProfilesFromMollure,
@@ -83,6 +85,7 @@ const mapClientRow = (row) => ({
   gender: row.gender,
   date_of_birth: row.date_of_birth ? formatDmy(row.date_of_birth) : null,
   residential_address: row.residential_address,
+  residential_area: row.residential_area,
   legal_name: row.legal_name,
   coc: row.coc,
   vat: row.vat,
@@ -407,6 +410,13 @@ export const createProfessionalClient = async (req, res) => {
       return res.status(400).json({ success: false, message: "Email is required.", data: null });
     }
 
+    const mollureEmailConflict = mollureClientEmailCreateConflict(
+      await findActiveMollureClientByEmail(email),
+    );
+    if (mollureEmailConflict) {
+      return res.status(409).json({ success: false, message: mollureEmailConflict, data: null });
+    }
+
     const displayName =
       clientKind === "company"
         ? String(req.body.legal_name ?? "").trim()
@@ -421,10 +431,10 @@ export const createProfessionalClient = async (req, res) => {
     const insert = await query(
       `INSERT INTO professional_clients (
          professional_profile_id, client_kind, is_mollure, display_name, email, phone, technical_note,
-         first_name, last_name, gender, date_of_birth, residential_address,
+         first_name, last_name, gender, date_of_birth, residential_address, residential_area,
          legal_name, coc, vat, contact_person_name, business_address, detail_email
        )
-       VALUES ($1, $2, false, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+       VALUES ($1, $2, false, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
        RETURNING *`,
       [
         profile.id,
@@ -438,6 +448,7 @@ export const createProfessionalClient = async (req, res) => {
         req.body.gender || null,
         req.body.date_of_birth || null,
         req.body.residential_address?.trim() || null,
+        req.body.residential_area?.trim() || null,
         req.body.legal_name?.trim() || null,
         req.body.coc?.trim() || null,
         req.body.vat?.trim() || null,
@@ -513,12 +524,13 @@ export const updateProfessionalClient = async (req, res) => {
          gender = $9,
          date_of_birth = COALESCE($10::date, date_of_birth),
          residential_address = $11,
-         legal_name = $12,
-         coc = $13,
-         vat = $14,
-         contact_person_name = $15,
-         business_address = $16,
-         detail_email = $17,
+         residential_area = $12,
+         legal_name = $13,
+         coc = $14,
+         vat = $15,
+         contact_person_name = $16,
+         business_address = $17,
+         detail_email = $18,
          updated_at = NOW()
        WHERE id = $1 AND professional_profile_id = $2
        RETURNING *`,
@@ -534,6 +546,7 @@ export const updateProfessionalClient = async (req, res) => {
         req.body.gender ?? row.gender,
         req.body.date_of_birth || null,
         req.body.residential_address?.trim() ?? row.residential_address,
+        req.body.residential_area?.trim() ?? row.residential_area,
         req.body.legal_name?.trim() ?? row.legal_name,
         req.body.coc?.trim() ?? row.coc,
         req.body.vat?.trim() ?? row.vat,

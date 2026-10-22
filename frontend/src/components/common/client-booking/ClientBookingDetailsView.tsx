@@ -183,7 +183,9 @@ export default function ClientBookingDetailsView({
     showKilometerAllowance,
     kilometerAllowanceAmount,
     discount: bookingNotesMeta?.totalDiscount ?? null,
-    showLateCancellation: Boolean(bookingNotesMeta?.showLateCancellation),
+    // Cancelled: LCF settled at cancel — hide from booking Total Price.
+    showLateCancellation:
+      Boolean(bookingNotesMeta?.showLateCancellation) && !isCancelled,
     lateCancellationFeePercent: bookingNotesMeta?.lateCancellationFeePercent,
     showLateRescheduling: Boolean(bookingNotesMeta?.showLateRescheduling),
     lateRescheduleFeePercent: bookingNotesMeta?.lateRescheduleFeePercent,

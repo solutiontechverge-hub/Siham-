@@ -651,6 +651,9 @@ export function mapBusinessSetupToPublicProfile(setup: BusinessSetupListing): Bu
     cancellationNoticeHours: Number(setup.cancellationPolicy?.beforeHours) || 0,
     cancellationNoticeMinutes: Number(setup.cancellationPolicy?.beforeMinutes) || 0,
     cancellationPolicyInstruction: setup.cancellationPolicy?.instruction?.trim() || "",
+    rescheduleFeePercent: Number(setup.reschedulePolicy?.feePercentage) || 0,
+    rescheduleNoticeHours: Number(setup.appointmentBefore?.hours) || 0,
+    rescheduleNoticeMinutes: Number(setup.appointmentBefore?.minutes) || 0,
     kilometerAllowanceLabel:
       setup.kilometerAllowance != null ? `${setup.kilometerAllowance} EUR / km` : "",
     kilometerAllowanceInstructions: setup.kilometerAllowanceInstruction?.trim() || "",

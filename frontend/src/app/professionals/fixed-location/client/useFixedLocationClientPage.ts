@@ -26,8 +26,10 @@ import {
 } from "../../../../store/services/businessApi";
 import {
   DEFAULT_CLIENT_LIST_SORT,
+  isMollureClient,
   matchesClientFilters,
   matchesClientSearch,
+  parseClientSearchQuery,
   type ClientListFilterKey,
 } from "./data/clientListFilters";
 import { mapApiProfessionalClientToRecord } from "./mapApiProfessionalClient";
@@ -73,7 +75,7 @@ export function useFixedLocationClientPage() {
     () => (clientsResponse?.data ?? []).map(mapApiProfessionalClientToRecord),
     [clientsResponse],
   );
-  const [query, setQuery] = React.useState("");
+  const [query, setQuery] = React.useState(() => parseClientSearchQuery(searchParams));
   const [sortBy, setSortBy] = React.useState(DEFAULT_CLIENT_LIST_SORT);
   const [activeFilters, setActiveFilters] = React.useState<Set<ClientListFilterKey>>(() => new Set());
   const [filterDrawerOpen, setFilterDrawerOpen] = React.useState(false);
@@ -106,6 +108,7 @@ export function useFixedLocationClientPage() {
   const [indCountryCode, setIndCountryCode] = React.useState(DEFAULT_DIAL_CODE);
   const [indPhone, setIndPhone] = React.useState("");
   const [indEmail, setIndEmail] = React.useState("");
+  const [indResidentialArea, setIndResidentialArea] = React.useState("");
   const [indErrors, setIndErrors] = React.useState<Partial<Record<string, string>>>({});
   const [nonMollureTypeError, setNonMollureTypeError] = React.useState("");
 
@@ -239,7 +242,9 @@ export function useFixedLocationClientPage() {
 
   const filtered = React.useMemo(() => {
     const base = clients.filter(
-      (c) => matchesClientSearch(c, query) && matchesClientFilters(c, activeFilters),
+      (c) =>
+        matchesClientSearch(c, query) &&
+        matchesClientFilters(c, activeFilters),
     );
 
     const byNameAsc = [...base].sort((a, b) => a.name.localeCompare(b.name));
@@ -285,14 +290,6 @@ export function useFixedLocationClientPage() {
 
   const openClientDetailsEdit = React.useCallback(() => {
     if (!viewClient) return;
-    if (viewClient.tags.includes("Mollure")) {
-      setSnackbar({
-        open: true,
-        severity: "info",
-        message: "Mollure clients manage their own profile. Client details cannot be edited here.",
-      });
-      return;
-    }
     if (viewClient.kind === "company") {
       const c = viewClient;
       const parts = (c.contactPersonName ?? "").trim().split(/\s+/);
@@ -327,6 +324,7 @@ export function useFixedLocationClientPage() {
         phone,
         email: c.email,
         residentialAddress: c.residentialAddress ?? "",
+        residentialArea: c.residentialArea ?? "",
         technicalNote: c.technicalNote ?? "",
       });
     }
@@ -345,6 +343,7 @@ export function useFixedLocationClientPage() {
     setIndCountryCode(DEFAULT_DIAL_CODE);
     setIndPhone("");
     setIndEmail("");
+    setIndResidentialArea("");
     setIndErrors({});
     setNonMollureTypeError("");
     setCoLegalName("");
@@ -422,6 +421,7 @@ export function useFixedLocationClientPage() {
           phone: indPhone.trim(),
           gender: indGender || undefined,
           date_of_birth: parseDobForApi(indDob),
+          residential_area: indResidentialArea.trim() || undefined,
           technical_note: noteParsed.value || undefined,
         }).unwrap();
 
@@ -497,6 +497,7 @@ export function useFixedLocationClientPage() {
     indGender,
     indLastName,
     indPhone,
+    indResidentialArea,
     nonMollureClientType,
     nonMollureTechnicalNote,
     resetNonMollureAddForm,
@@ -520,9 +521,16 @@ export function useFixedLocationClientPage() {
   );
 
   React.useEffect(() => {
+    const clientId = searchParams.get("clientId")?.trim() || "";
     const email = searchParams.get("clientEmail")?.trim().toLowerCase() || "";
     const name = searchParams.get("clientName")?.trim().toLowerCase() || "";
-    if (!email && !name || !clients.length) return;
+    if (!clients.length) return;
+    if (clientId) {
+      const byId = clients.find((client) => client.id === clientId);
+      if (byId) openClientDetailsView(byId.id);
+      return;
+    }
+    if (!email && !name) return;
     const match = clients.find((client) =>
       (email && client.email?.trim().toLowerCase() === email) ||
       (!email && name && client.name.trim().toLowerCase() === name),
@@ -599,13 +607,38 @@ export function useFixedLocationClientPage() {
   const saveClientEdits = React.useCallback(async () => {
     if (!viewClientId || !viewClient) return false;
 
-    if (viewClient.tags.includes("Mollure")) {
-      setSnackbar({
-        open: true,
-        severity: "info",
-        message: "Mollure clients manage their own profile. Client details cannot be edited here.",
+    // Mollure: only technical note is writable (disabled fields stay out of the payload).
+    if (isMollureClient(viewClient)) {
+      const note =
+        viewClient.kind === "company"
+          ? editCompanyForm.technicalNote
+          : editIndividualForm.technicalNote;
+      const parsed = parseText(note.trim(), {
+        required: false,
+        label: "Technical note",
+        min: INPUT_LIMITS.notesMin,
+        max: null,
       });
-      return false;
+      if (!parsed.ok) {
+        setSnackbar({ open: true, message: parsed.error, severity: "error" });
+        return false;
+      }
+      try {
+        await updateProfessionalClientTechnicalNote({
+          id: viewClientId,
+          technical_note: parsed.value,
+        }).unwrap();
+        setClientDetailsMode("view");
+        setSnackbar({ open: true, message: "Technical note saved", severity: "success" });
+        return true;
+      } catch (error) {
+        setSnackbar({
+          open: true,
+          message: getApiErrorMessage(error, "Unable to save technical note."),
+          severity: "error",
+        });
+        return false;
+      }
     }
 
     const phoneErrors =
@@ -670,6 +703,11 @@ export function useFixedLocationClientPage() {
               label: "Address",
               max: INPUT_LIMITS.textMedium,
             }),
+            residentialArea: parseText(editIndividualForm.residentialArea, {
+              required: false,
+              label: "Residential area",
+              max: INPUT_LIMITS.textShort,
+            }),
             technicalNote: parseText(editIndividualForm.technicalNote, {
               required: false,
               label: "Technical note",
@@ -729,6 +767,7 @@ export function useFixedLocationClientPage() {
           phone: editIndividualForm.phone.trim(),
           email: email || undefined,
           residential_address: editIndividualForm.residentialAddress.trim() || undefined,
+          residential_area: editIndividualForm.residentialArea.trim() || undefined,
           technical_note: editIndividualForm.technicalNote.trim() || undefined,
         }).unwrap();
       }
@@ -744,7 +783,14 @@ export function useFixedLocationClientPage() {
       });
       return false;
     }
-  }, [editCompanyForm, editIndividualForm, updateProfessionalClient, viewClient, viewClientId]);
+  }, [
+    editCompanyForm,
+    editIndividualForm,
+    updateProfessionalClient,
+    updateProfessionalClientTechnicalNote,
+    viewClient,
+    viewClientId,
+  ]);
 
   const saveClientTechnicalNote = React.useCallback(
     async (note: string) => {
@@ -836,6 +882,8 @@ export function useFixedLocationClientPage() {
     setIndPhone,
     indEmail,
     setIndEmail,
+    indResidentialArea,
+    setIndResidentialArea,
     indErrors,
     setIndErrors,
     nonMollureTypeError,

@@ -147,14 +147,17 @@ export function filterVisiblePaymentSummarySections<
     isOfflinePay: boolean;
     isCompleted: boolean;
     isPaymentDue: boolean;
+    /** Cancelled: keep Prepayment + Fee Summary as payment history. */
+    isCancelled?: boolean;
   },
 ): T[] {
   if (!paymentSummarySections.length) return [];
-  if (
-    (flags.isPrepaymentPaid || flags.isOfflinePay) &&
-    !flags.isCompleted &&
-    !flags.isPaymentDue
-  ) {
+  const keepPaymentHistoryOnly =
+    flags.isCancelled ||
+    ((flags.isPrepaymentPaid || flags.isOfflinePay) &&
+      !flags.isCompleted &&
+      !flags.isPaymentDue);
+  if (keepPaymentHistoryOnly) {
     // Keep Prepayment + paid Fee Summary; hide after-treatment until due/completed.
     return paymentSummarySections.filter(
       (section) =>

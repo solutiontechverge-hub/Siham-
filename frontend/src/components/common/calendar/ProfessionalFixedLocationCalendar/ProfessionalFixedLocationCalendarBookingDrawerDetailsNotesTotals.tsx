@@ -1,5 +1,7 @@
 "use client";
 
+import * as React from "react";
+
 import {
   mollureLabelSx,
 } from "../../../../theme/mollureHierarchy";
@@ -8,6 +10,7 @@ import StickyNote2OutlinedIcon from "@mui/icons-material/StickyNote2Outlined";
 
 import {
   Box,
+  Chip,
   Stack,
 } from "@mui/material";
 
@@ -36,6 +39,10 @@ import BookingRequestAcceptedPanel from "../BookingRequestAcceptedPanel";
 import BookingDrawerTotalPriceCard from "../BookingDrawerTotalPriceCard";
 
 import { isOfflinePaymentMethod } from "../../client-booking/checkoutPaymentOptions";
+
+import { useBookingFinance } from "../../booking-finance/useBookingFinance";
+import { bookingFinanceBadgeLabel } from "../../booking-finance/mapBookingFinance";
+import { extractBookingId } from "../calendar.utils";
 
 import { useProfessionalFixedLocationCalendar } from "./useProfessionalFixedLocationCalendar";
 
@@ -126,6 +133,18 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsNot
     viewingBookingEvent,
   } = bag;
 
+  const viewingFinanceBookingId = React.useMemo(() => {
+    if (!isViewingBooking || !viewingBookingEvent) return "";
+    return (
+      viewingBookingEvent.bookingCode ||
+      extractBookingId(viewingBookingEvent.id) ||
+      ""
+    );
+  }, [isViewingBooking, viewingBookingEvent]);
+  const { finance: liveFinance } = useBookingFinance(viewingFinanceBookingId, {
+    skip: !viewingFinanceBookingId,
+  });
+
   const effectivePrepayPercent =
     Number(prepaymentPercent) ||
     Number(viewingBookingEvent?.details?.prepaymentPercent) ||
@@ -146,6 +165,14 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsNot
               100,
           ) / 100
         : 0;
+  // Client cancel settles LCF via prepaid/Stripe — do not re-add it into Total Price.
+  const isCancelledBooking = viewingBookingEvent?.status === "Cancelled";
+  const rawCancellationFee =
+    liveFinance?.cancellationFee ||
+    bookingPrice.lateCancellationFeeAmount ||
+    0;
+  const displayCancellationFee = isCancelledBooking ? 0 : rawCancellationFee;
+
   // Prefer feeState remaining when it already applied prepay rules (incl. offline = full total).
   const offlinePrepay = isOfflinePaymentMethod(
     viewingBookingEvent?.details?.paymentMethod,
@@ -284,60 +311,192 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsNot
                 }
               />
             ) : (
-              <BookingDrawerTotalPriceCard
-                payableTotal={
-                  showPrepayBreakdown
-                    ? bookingTotalForSave
-                    : drawerPriceDisplay.displayTotal
-                }
-                actualAmount={
-                  drawerPriceDisplay.originalPrice ??
-                  bookingTotalForSave
-                }
-                lineDiscountAmount={lineDiscountAmount}
-                bookingDiscountAmount={bookingDiscountAmount}
-                bookingTotalDiscount={bookingTotalDiscount}
-                lateCancellationFeeAmount={
-                  bookingPrice.lateCancellationFeeAmount
-                }
-                lateRescheduleFeeAmount={
-                  bookingPrice.lateRescheduleFeeAmount
-                }
-                noShowFeeAmount={bookingPrice.noShowFeeAmount}
-                prepaidApplied={
-                  isDrawerPrepaymentPaid ? displayPrepaidAmount : 0
-                }
-                showPrepayment={showPrepayBreakdown}
-                prepaymentPaid={isDrawerPrepaymentPaid}
-                prepaymentPercent={effectivePrepayPercent}
-                prepaymentAmount={displayPrepaidAmount}
-                remainingAmount={displayRemaining}
-                prepaidAction={
-                  // Professionals never pay here — only clients see "Pay Now".
-                  isDrawerPrepaymentPaid ? (
-                    <BodyText
-                      sx={{
-                        fontWeight: 800,
-                        fontSize: 12,
-                        color: m.teal,
-                      }}
-                    >
-                      Paid
-                    </BodyText>
-                  ) : undefined
-                }
-                extraRows={
-                  kilometerAllowanceAmount > 0
-                    ? [
-                        {
-                          id: "kilometer-allowance",
-                          label: "Kilometer Allowance",
-                          amount: kilometerAllowanceAmount,
-                        },
-                      ]
-                    : []
-                }
-              />
+              <Stack spacing={1}>
+                {liveFinance ? (
+                  <Chip
+                    size="small"
+                    label={bookingFinanceBadgeLabel(liveFinance.badge)}
+                    sx={{
+                      alignSelf: "flex-start",
+                      fontWeight: 800,
+                      ...(liveFinance.badge === "PAID" ||
+                      liveFinance.badge === "PREPAID"
+                        ? {
+                            bgcolor: m.statusGreenBg,
+                            color: m.statusGreenFg,
+                          }
+                        : liveFinance.badge === "UNPAID"
+                          ? {
+                              bgcolor: m.statusRedBg,
+                              color: m.statusRedFg,
+                            }
+                          : liveFinance.badge === "PARTIALLY_PAID" ||
+                              liveFinance.badge === "PENDING_FEE"
+                            ? {
+                                bgcolor: m.statusOrangeBg,
+                                color: m.statusOrangeFg,
+                              }
+                            : {
+                                bgcolor: alpha(m.navy, 0.08),
+                                color: alpha(m.navy, 0.78),
+                              }),
+                    }}
+                  />
+                ) : null}
+                <BookingDrawerTotalPriceCard
+                  payableTotal={
+                    // Client pay total = services + LRF (LCF excluded after cancel).
+                    Math.max(
+                      0,
+                      (liveFinance
+                        ? Math.max(
+                            liveFinance.netTotal,
+                            bookingTotalForSave,
+                            drawerPriceDisplay.displayTotal,
+                          )
+                        : showPrepayBreakdown
+                          ? bookingTotalForSave
+                          : drawerPriceDisplay.displayTotal) -
+                        (isCancelledBooking ? rawCancellationFee : 0),
+                    )
+                  }
+                  actualAmount={
+                    liveFinance?.basePrice ||
+                    drawerPriceDisplay.originalPrice ||
+                    Math.max(
+                      0,
+                      bookingTotalForSave -
+                        (bookingPrice.lateRescheduleFeeAmount || 0) -
+                        rawCancellationFee -
+                        (bookingPrice.noShowFeeAmount || 0),
+                    )
+                  }
+                  lineDiscountAmount={lineDiscountAmount}
+                  bookingDiscountAmount={bookingDiscountAmount}
+                  bookingTotalDiscount={bookingTotalDiscount}
+                  lateCancellationFeeAmount={displayCancellationFee}
+                  lateRescheduleFeeAmount={
+                    bookingPrice.lateRescheduleFeeAmount
+                  }
+                  noShowFeeAmount={bookingPrice.noShowFeeAmount}
+                  prepaidApplied={
+                    liveFinance
+                      ? liveFinance.prepaymentTotal
+                      : isDrawerPrepaymentPaid
+                        ? displayPrepaidAmount
+                        : 0
+                  }
+                  showPrepayment={
+                    liveFinance
+                      ? liveFinance.prepaymentTotal > 0
+                      : showPrepayBreakdown
+                  }
+                  prepaymentPaid={
+                    liveFinance
+                      ? liveFinance.prepaymentTotal > 0
+                      : isDrawerPrepaymentPaid
+                  }
+                  prepaymentPercent={effectivePrepayPercent}
+                  prepaymentAmount={
+                    liveFinance
+                      ? liveFinance.prepaymentTotal
+                      : displayPrepaidAmount
+                  }
+                  // Ledger balance is always an extra "Amount Due" row (not Remaining %).
+                  remainingAmount={
+                    liveFinance ? undefined : displayRemaining
+                  }
+                  prepaidAction={
+                    // Professionals never pay here — only clients see "Pay Now".
+                    (liveFinance
+                      ? liveFinance.prepaymentTotal > 0
+                      : isDrawerPrepaymentPaid) ? (
+                      <BodyText
+                        sx={{
+                          fontWeight: 800,
+                          fontSize: 12,
+                          color: m.teal,
+                        }}
+                      >
+                        Paid
+                      </BodyText>
+                    ) : undefined
+                  }
+                  extraRows={
+                    liveFinance
+                      ? [
+                          ...liveFinance.addOnLines,
+                          ...(liveFinance.totalPaid > 0
+                            ? [
+                                {
+                                  id: "total-paid",
+                                  label: "Total Paid",
+                                  amount: liveFinance.totalPaid,
+                                  tone: "paid" as const,
+                                },
+                              ]
+                            : []),
+                          ...(liveFinance.totalRefunded > 0
+                            ? [
+                                {
+                                  id: "total-refunded",
+                                  label: "Total Refunded",
+                                  amount: -liveFinance.totalRefunded,
+                                  tone: "refund" as const,
+                                },
+                              ]
+                            : []),
+                          // Always surface balance (Remaining row may hide when no prepay %).
+                          {
+                            id: "amount-due",
+                            label: "Amount Due",
+                            amount: Math.max(
+                              0,
+                              Math.max(
+                                liveFinance.netTotal,
+                                bookingTotalForSave,
+                                drawerPriceDisplay.displayTotal,
+                              ) -
+                                (isCancelledBooking ? rawCancellationFee : 0) -
+                                liveFinance.totalPaid,
+                            ),
+                            tone:
+                              Math.max(
+                                liveFinance.netTotal,
+                                bookingTotalForSave,
+                                drawerPriceDisplay.displayTotal,
+                              ) -
+                                (isCancelledBooking ? rawCancellationFee : 0) -
+                                liveFinance.totalPaid >
+                              0
+                                ? ("due" as const)
+                                : ("paid" as const),
+                          },
+                          ...(kilometerAllowanceAmount > 0 &&
+                          !liveFinance.breakdownRows.some(
+                            (r) => r.id === "kilometer-allowance",
+                          )
+                            ? [
+                                {
+                                  id: "kilometer-allowance",
+                                  label: "Kilometer Allowance",
+                                  amount: kilometerAllowanceAmount,
+                                },
+                              ]
+                            : []),
+                        ]
+                      : kilometerAllowanceAmount > 0
+                        ? [
+                            {
+                              id: "kilometer-allowance",
+                              label: "Kilometer Allowance",
+                              amount: kilometerAllowanceAmount,
+                            },
+                          ]
+                        : []
+                  }
+                />
+              </Stack>
             )}
     </>
   );

@@ -20,6 +20,7 @@ import {
 } from "./persistClientEbrEdits";
 import type { BookingEditSuggestedProduct } from "./bookingEditRequest";
 import type { ClientBookingDraft } from "./types";
+import type { BusinessPublicProfileData } from "../../../data/businessPublicProfile.data";
 import type { UpdateMyBookingRequest } from "../../../store/services/businessApi";
 
 type EditRequestApi = {
@@ -98,6 +99,7 @@ export function useClientBookingEbrSuggestFlow(input: {
   updateMyBooking: (payload: UpdateMyBookingRequest) => {
     unwrap: () => Promise<unknown>;
   };
+  businessProfile?: BusinessPublicProfileData | null;
 }) {
   const {
     bookingRef,
@@ -113,6 +115,7 @@ export function useClientBookingEbrSuggestFlow(input: {
     persistBookingPatch,
     refreshActiveBooking,
     updateMyBooking,
+    businessProfile,
   } = input;
 
   const router = useRouter();
@@ -215,11 +218,17 @@ export function useClientBookingEbrSuggestFlow(input: {
       updateMyBooking,
       refreshActiveBooking,
       showSnackbar,
+      rescheduleFeePercent: businessProfile?.rescheduleFeePercent,
+      rescheduleNoticeHours: businessProfile?.rescheduleNoticeHours,
+      rescheduleNoticeMinutes: businessProfile?.rescheduleNoticeMinutes,
     });
   }, [
     activeBooking,
     apiBookingId,
     bookingRef,
+    businessProfile?.rescheduleFeePercent,
+    businessProfile?.rescheduleNoticeHours,
+    businessProfile?.rescheduleNoticeMinutes,
     editRequest,
     refreshActiveBooking,
     showSnackbar,

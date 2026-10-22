@@ -6,6 +6,8 @@ import { alpha } from "@mui/material/styles";
 
 import { useProfessionalFixedLocationCalendar } from "./useProfessionalFixedLocationCalendar";
 
+import SalesDrawerPayableFooter from "../SalesDrawerPayableFooter";
+
 import ProfessionalFixedLocationCalendarBookingDrawerFooterParticipants from "./ProfessionalFixedLocationCalendarBookingDrawerFooterParticipants";
 
 import ProfessionalFixedLocationCalendarBookingDrawerFooterAddOns from "./ProfessionalFixedLocationCalendarBookingDrawerFooterAddOns";
@@ -124,12 +126,16 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerFooter({
     m,
     selectedSlot,
     slotDrawerTab,
+    viewingBookingEvent,
   } = bag;
 
   // Sales/Activity screens own their checkout/action footer. Rendering the
   // persistent booking Checkout button here creates a second action button
   // over the SalesAddOnCheckout flow.
   if (bookingCheckoutOpen || activityDetailItem || !selectedSlot) return null;
+  if (slotDrawerTab === "sales") {
+    return <SalesDrawerPayableFooter viewingBookingEvent={viewingBookingEvent} />;
+  }
   if (slotDrawerTab !== "booking") return null;
 
   return selectedSlot && slotDrawerTab === "booking" ? (

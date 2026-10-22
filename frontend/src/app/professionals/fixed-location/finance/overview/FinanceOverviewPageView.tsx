@@ -295,7 +295,7 @@ export default function FinanceOverviewPageView() {
         open={refundDrawerOpen}
         onClose={() => setRefundDrawerOpen(false)}
         transactions={selectedRows}
-        onSave={() => confirmRefund()}
+        onSave={(payload) => confirmRefund(payload)}
       />
 
       <ManualEntryDrawer

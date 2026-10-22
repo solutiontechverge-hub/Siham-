@@ -2,6 +2,7 @@
 
 import AppButton from "../AppButton";
 import * as React from "react";
+import Image from "next/image";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import { Box, Divider, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -25,16 +26,21 @@ import {
   financePreviewCardSx,
   formatCurrencyDisplay,
   formatPaymentMethod,
+  resolveIssuedInvoiceSettings,
   type PreviewLineItem,
 } from "./financeDocumentUtils";
 import { FinancePreviewLabelValueRow } from "./FinancePreviewRows";
 import type { FinanceProfessionalBusinessOverride } from "./financeDocumentTypes";
-import type { FinanceInvoiceTemplateType } from "./useFinanceInvoiceSettings";
+import type {
+  FinanceInvoiceSettings,
+  FinanceInvoiceTemplateType,
+} from "./useFinanceInvoiceSettings";
 
 type Props = {
   row: TransactionRow | null;
   lineItems: PreviewLineItem[];
   totalPriceLabel: number | string;
+  settings?: FinanceInvoiceSettings | null;
   invoiceType?: FinanceInvoiceTemplateType;
   profileData?: ProfileResponse | null;
   professionalBusinessOverride?: FinanceProfessionalBusinessOverride | null;
@@ -45,12 +51,16 @@ export default function FinanceReceiptPreview({
   row,
   lineItems,
   totalPriceLabel,
+  settings = null,
   onDownload,
 }: Props) {
   const m = useTheme().palette.mollure;
   const { showSnackbar } = useSnackbar();
   const frozenDocument = hasStoredDocumentSnapshot(row);
   const document = getIssuedDocument(row);
+  const logoDataUrl = settings
+    ? resolveIssuedInvoiceSettings(row, settings).logoDataUrl || null
+    : null;
 
   const isRefund = row?.status === "Refunded";
   const receiptTitle = receiptTitleForStatus(row?.status);
@@ -179,9 +189,35 @@ export default function FinanceReceiptPreview({
 
   return (
     <Box sx={financePreviewCardSx(m.navy, 2.5)}>
-      <SubHeading sx={mollurePageTitleSx(m.navy, { mb: 2 })}>
-        {receiptTitle}
-      </SubHeading>
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="flex-start"
+        spacing={2}
+        sx={{ mb: 2 }}
+      >
+        <SubHeading sx={mollurePageTitleSx(m.navy)}>
+          {receiptTitle}
+        </SubHeading>
+        {logoDataUrl ? (
+          <Box
+            sx={{
+              position: "relative",
+              width: 48,
+              height: 48,
+              flexShrink: 0,
+            }}
+          >
+            <Image
+              src={logoDataUrl}
+              alt="Invoice logo"
+              fill
+              unoptimized
+              style={{ objectFit: "contain", borderRadius: "50%" }}
+            />
+          </Box>
+        ) : null}
+      </Stack>
 
       <Stack spacing={1.15}>
         <FinancePreviewLabelValueRow label="Invoice Number" value={invoiceNumber} />

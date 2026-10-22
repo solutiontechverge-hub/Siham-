@@ -21,7 +21,9 @@ import {
   isSettledFinanceStatus,
   mintReceiptNumber,
   processOverdueInvoiceReissues,
+  ensureRefundSalesCardMetadata,
   ensureSalesCardMetadataForFinanceRow,
+  markBookingRefundedIfSettled,
   restartPrepaymentDueForBooking,
   syncBookingToFinanceTransaction,
 } from "../services/finance-sync.service.js";
@@ -60,7 +62,6 @@ import {
   deactivateSubscription,
   setAutoPay,
 } from "../services/subscription-lifecycle.service.js";
-
 const DEFAULT_TRANSACTION_OPTIONS = {
   onlineImmediate: true,
   onlineInvoiceDueDate: true,
@@ -103,6 +104,23 @@ const normalizeFinanceClientType = (value, document) => {
   return "guest";
 };
 
+const NOTES_META_PREFIX = "---mollure-meta---";
+
+function parseBookingFinancialsFromNotes(notes) {
+  if (!notes || typeof notes !== "string") return null;
+  const idx = notes.indexOf(NOTES_META_PREFIX);
+  if (idx === -1) return null;
+  const raw = notes.slice(idx + NOTES_META_PREFIX.length).trim();
+  if (!raw.startsWith("{")) return null;
+  try {
+    const meta = JSON.parse(raw);
+    const financials = meta?.financials;
+    return financials && typeof financials === "object" ? financials : null;
+  } catch {
+    return null;
+  }
+}
+
 const mapTransactionRow = (row) => ({
   id: row.id,
   entryType: row.entry_type,
@@ -132,6 +150,39 @@ const mapTransactionRow = (row) => ({
   issuedDocument: normalizeMoneyJson(row.issued_document ?? row.document) ?? undefined,
   issuedAt: row.issued_at ? new Date(row.issued_at).toISOString() : undefined,
 });
+
+/** Attach shared ledger snapshot so Finances table matches Sale Drawer. */
+async function attachBookingFinancialsToRows(rows) {
+  const refs = [
+    ...new Set(
+      rows.map((r) => String(r.bookingId || "").trim()).filter(Boolean),
+    ),
+  ];
+  if (!refs.length) return rows;
+  const result = await query(
+    `SELECT id::text AS id, unique_code, status, notes
+       FROM bookings
+      WHERE id::text = ANY($1::text[])
+         OR unique_code = ANY($1::text[])`,
+    [refs],
+  );
+  const byRef = new Map();
+  for (const booking of result.rows) {
+    const financials = parseBookingFinancialsFromNotes(booking.notes);
+    if (!financials) continue;
+    const payload = {
+      bookingFinancials: financials,
+      bookingStatus: booking.status ?? null,
+    };
+    byRef.set(String(booking.id), payload);
+    if (booking.unique_code) byRef.set(String(booking.unique_code), payload);
+  }
+  return rows.map((row) => {
+    if (!row.bookingId) return row;
+    const hit = byRef.get(String(row.bookingId));
+    return hit ? { ...row, ...hit } : row;
+  });
+}
 
 const ensureFinanceSettings = async (professionalProfileId) => {
   const existing = await query(
@@ -202,6 +253,7 @@ const resolveFinanceClientParty = async ({
   let resolvedLegalName = String(clientName ?? "").trim() || "Guest";
   let resolvedAddress = null;
   let isMollure = clientType === "mollure";
+  const explicitNonMollure = clientType === "nonMollure";
 
   // Walk-in / one-time guests: name+email only — product has no guest professional_clients record.
   if (clientType === "guest") {
@@ -251,7 +303,10 @@ const resolveFinanceClientParty = async ({
       if (row.user_type === "company" && clientType === "guest") {
         // booking-linked company payer is business
       }
-      isMollure = isMollure || Boolean(row.customer_id);
+      // Explicit Non-Mollure payload must not be upgraded via booking.customer_id.
+      if (!explicitNonMollure) {
+        isMollure = isMollure || Boolean(row.customer_id);
+      }
     }
   }
 
@@ -270,7 +325,10 @@ const resolveFinanceClientParty = async ({
       const user = userLookup.rows[0];
       if (user) {
         customerId = user.id;
-        isMollure = true;
+        // Email collision with a platform user must not flip Non-Mollure → Mollure.
+        if (!explicitNonMollure) {
+          isMollure = true;
+        }
         if (!resolvedVat) resolvedVat = user.vat_number || null;
         if (!resolvedCoc) resolvedCoc = user.ccc_number || null;
         if (user.user_type === "company" && user.legal_name) {
@@ -291,13 +349,18 @@ const resolveFinanceClientParty = async ({
        WHERE professional_profile_id = $1
          AND (
            ($2::uuid IS NOT NULL AND mollure_user_id = $2)
-           OR ($3::text <> '' AND lower(email) = lower($3))
+           OR (
+             $3::text <> ''
+             AND lower(email) = lower($3)
+             AND (is_mollure = true OR $4::boolean)
+           )
          )
        ORDER BY
          CASE WHEN $2::uuid IS NOT NULL AND mollure_user_id = $2 THEN 0 ELSE 1 END,
+         CASE WHEN is_mollure THEN 0 ELSE 1 END,
          updated_at DESC NULLS LAST
        LIMIT 1`,
-      [professionalProfileId, customerId, email],
+      [professionalProfileId, customerId, email, explicitNonMollure],
     );
     const pc = clientRow.rows[0];
     if (pc) {
@@ -308,7 +371,8 @@ const resolveFinanceClientParty = async ({
         resolvedLegalName = pc.legal_name;
       }
       if (pc.business_address) resolvedAddress = pc.business_address;
-      if (pc.is_mollure) isMollure = true;
+      if (pc.is_mollure === true) isMollure = true;
+      else if (pc.is_mollure === false) isMollure = false;
     }
   }
 
@@ -643,20 +707,92 @@ export const listSalesAddons = async (req, res) => {
   } catch (error) { return sendCaughtError(res, error, { fallbackMessage: "Failed to load sales add-ons." }); }
 };
 
+/** Atomic booking money state from the immutable ledger. */
+export const getBookingFinancials = async (req, res) => {
+  try {
+    const profile = await requireProfessional(req, res);
+    if (!profile) return;
+    const bookingRef = String(req.params.bookingId || "").trim();
+    if (!bookingRef) {
+      return res.status(400).json({ success: false, message: "bookingId required.", data: null });
+    }
+    const owned = await query(
+      `SELECT b.id, b.status
+         FROM bookings b
+         INNER JOIN business_setups bs ON bs.id = b.business_setup_id
+        WHERE bs.professional_profile_id = $1
+          AND (b.id::text = $2 OR b.unique_code = $2)
+        LIMIT 1`,
+      [profile.id, bookingRef],
+    );
+    if (!owned.rows[0]) {
+      return res.status(404).json({ success: false, message: "Booking not found.", data: null });
+    }
+    const { recalculateBookingFinancials } = await import(
+      "../services/bookingTransactionLedger.service.js"
+    );
+    const snap = await recalculateBookingFinancials(owned.rows[0].id);
+    const f = snap.financials || {};
+    // Normalize snake_case so Sale Drawer + Finances share one UI model.
+    const financials = {
+      ...f,
+      basePrice: Number(f.basePrice ?? 0),
+      add_ons: Number(f.add_ons ?? f.addOns ?? 0),
+      cancellation_fee: Number(f.cancellation_fee ?? f.cancellationFee ?? 0),
+      total_paid: Number(f.total_paid ?? f.totalPaid ?? 0),
+      total_refunded: Number(f.total_refunded ?? f.totalRefunded ?? 0),
+      net_total: Number(f.net_total ?? f.netTotal ?? 0),
+      outstanding_balance: Number(f.outstanding_balance ?? f.outstandingBalance ?? 0),
+      prepayment_total: Number(f.prepayment_total ?? 0),
+      payment_total: Number(f.payment_total ?? 0),
+      prepaid_refunded: Number(f.prepaid_refunded ?? f.prepaidRefunded ?? 0),
+      net_prepayment_credit: Number(
+        f.net_prepayment_credit ?? f.netPrepaymentCredit ?? 0,
+      ),
+      payment_status: f.payment_status ?? snap.statuses?.payment_status ?? null,
+      cancellation_payment_status: f.cancellation_payment_status ?? null,
+      updatedAt: f.updatedAt ?? new Date().toISOString(),
+    };
+    return res.status(200).json({
+      success: true,
+      message: "Booking financials loaded.",
+      data: {
+        bookingId: snap.bookingId,
+        uniqueCode: snap.uniqueCode,
+        financials,
+        statuses: {
+          ...(snap.statuses ?? {}),
+          booking_status: owned.rows[0].status ?? null,
+        },
+        ledger: snap.rows.map((row) => ({
+          id: row.id,
+          type: row.type,
+          amount: row.amount,
+          status: row.status,
+          createdAt: row.created_at,
+          metadata: row.metadata,
+        })),
+      },
+    });
+  } catch (error) {
+    return sendCaughtError(res, error, { fallbackMessage: "Failed to load booking financials." });
+  }
+};
+
 const mapSalesAddonRow = (row) => ({
   id: row.id, bookingId: row.booking_id, bookingCode: row.booking_code,
   clientName: row.client_name, clientEmail: row.client_email ?? undefined,
   lines: normalizeMoneyJson(row.lines) ?? [], discount: normalizeMoneyJson(row.discount) ?? null,
-  discountAmount: Number(row.discount_amount ?? 0), totalPrice: Number(row.total_price ?? 0),
+  discountAmount: parseMoney(row.discount_amount), totalPrice: parseMoney(row.total_price),
   paymentMethod: row.payment_method, createdAt: row.created_at?.toISOString?.() ?? row.created_at,
   note: row.note ?? undefined, voided: row.voided, refunded: row.refunded,
 });
 
 export const upsertSalesAddon = async (req, res) => {
   try {
+    const body = req.body ?? {};
     const profile = await requireProfessional(req, res);
     if (!profile) return;
-    const body = req.body ?? {};
     if (!body.id || !body.bookingId || !body.bookingCode || !Array.isArray(body.lines)) {
       return res.status(400).json({ success: false, message: "Invalid sales add-on payload.", data: null });
     }
@@ -665,7 +801,43 @@ export const upsertSalesAddon = async (req, res) => {
       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9,$10,$11,$12::timestamptz,$13,$14,$15)
       ON CONFLICT (professional_profile_id,id) DO UPDATE SET booking_id=EXCLUDED.booking_id, booking_code=EXCLUDED.booking_code, client_name=EXCLUDED.client_name, client_email=EXCLUDED.client_email, lines=EXCLUDED.lines, discount=EXCLUDED.discount, discount_amount=EXCLUDED.discount_amount, total_price=EXCLUDED.total_price, payment_method=EXCLUDED.payment_method, note=EXCLUDED.note, voided=EXCLUDED.voided, refunded=EXCLUDED.refunded, updated_at=NOW()
       RETURNING *`, [String(body.id), profile.id, String(body.bookingId), String(body.bookingCode), body.clientName ?? "", body.clientEmail ?? null, JSON.stringify(normalizeMoneyJson(body.lines) ?? []), JSON.stringify(normalizeMoneyJson(body.discount ?? null)), moneyNumber(body.discountAmount), moneyNumber(body.totalPrice), String(body.paymentMethod ?? ""), body.createdAt ?? new Date().toISOString(), body.note ?? null, Boolean(body.voided), Boolean(body.refunded)]);
-    return res.status(200).json({ success: true, message: "Sales add-on saved.", data: mapSalesAddonRow(result.rows[0]) });
+
+    let bookingFinancials = null;
+    try {
+      const { upsertAddonLedgerAndRecalculate } = await import(
+        "../services/bookingTransactionLedger.service.js"
+      );
+      const method = String(body.paymentMethod ?? "");
+      const paid =
+        !Boolean(body.voided) &&
+        !Boolean(body.refunded) &&
+        method !== "onlineDirect" &&
+        method !== "onlineNonDirect" &&
+        method !== "onlineInvoice";
+      const snap = await upsertAddonLedgerAndRecalculate({
+        bookingId: body.bookingId,
+        bookingRef: body.bookingCode,
+        professionalProfileId: profile.id,
+        addonId: String(body.id),
+        amount: moneyNumber(body.totalPrice),
+        discountAmount: moneyNumber(body.discountAmount),
+        paid,
+        voided: Boolean(body.voided),
+        refunded: Boolean(body.refunded),
+      });
+      bookingFinancials = snap?.financials ?? null;
+    } catch (ledgerErr) {
+      console.error(
+        "[sales-addon] ledger recalculate failed:",
+        ledgerErr?.message || ledgerErr,
+      );
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Sales add-on saved.",
+      data: { ...mapSalesAddonRow(result.rows[0]), bookingFinancials },
+    });
   } catch (error) { return sendCaughtError(res, error, { fallbackMessage: "Failed to save sales add-on." }); }
 };
 
@@ -938,11 +1110,13 @@ export const listFinanceTransactions = async (req, res) => {
     );
     const total = countResult.rows[0]?.total ?? 0;
 
+    const mapped = result.rows.map(mapTransactionRow);
+    const rows = await attachBookingFinancialsToRows(mapped);
     return res.status(200).json({
       success: true,
       message: "Transactions loaded.",
       data: {
-        rows: result.rows.map(mapTransactionRow),
+        rows,
         total,
       },
       pagination: buildPaginationMeta({
@@ -1001,10 +1175,9 @@ export const getFinanceAnalytics = async (req, res) => {
 
 export const createFinanceTransaction = async (req, res) => {
   try {
+    const body = req.body ?? {};
     const profile = await requireProfessional(req, res);
     if (!profile) return;
-
-    const body = req.body ?? {};
     let clientType = normalizeFinanceClientType(body.clientType, null);
     const paymentMethod = String(body.paymentMethod || "offlineDirect");
     const isOnlineDirect = paymentMethod === "onlineDirect";
@@ -1049,16 +1222,20 @@ export const createFinanceTransaction = async (req, res) => {
       return res.status(400).json({ success: false, message: "Each line must include a valid source reference.", data: null });
     }
     const lineItems = submittedLines.length
-      ? submittedLines.map((line) => ({
-          description: line.name,
-          sourceReference: String(line.sourceReference),
-          sourceType: line.sourceType,
-          quantity: String(line.quantity ?? 1),
-          vat: "21%",
-          vatRate: 21,
-          pricePerUnit: moneyNumber(line.unitPrice),
-          totalPrice: moneyNumber((line.quantity ?? 1) * (line.unitPrice ?? 0)),
-        }))
+      ? submittedLines.map((line) => {
+          const quantity = parseMoney(line.quantity ?? 1, 1);
+          const unitPrice = moneyNumber(line.unitPrice);
+          return {
+            description: line.name,
+            sourceReference: String(line.sourceReference),
+            sourceType: line.sourceType,
+            quantity,
+            vat: "21%",
+            vatRate: 21,
+            pricePerUnit: unitPrice,
+            totalPrice: moneyNumber(quantity * unitPrice),
+          };
+        })
       : [];
 
     // Discounts and empty submissions are represented by transaction totals,
@@ -1209,7 +1386,7 @@ export const createFinanceTransaction = async (req, res) => {
         // booking code, so persist the resolved UUID while keeping the code in
         // the document/entry metadata above.
         bookingUuid || null,
-        JSON.stringify(document),
+        JSON.stringify(normalizeMoneyJson(document)),
         moneyNumber(body.discountAmount),
         moneyNumber(body.prepaymentAmount),
         isOnlineDirect || isNonDirect ? 0 : moneyNumber(gross),
@@ -1243,10 +1420,62 @@ export const createFinanceTransaction = async (req, res) => {
       }
     }
 
+    let bookingFinancials = null;
+    if (bookingUuid && createdTx?.id) {
+      try {
+        const {
+          upsertAddonLedgerAndRecalculate,
+          mirrorSettledFinanceToLedger,
+          recalculateBookingFinancials,
+        } = await import("../services/bookingTransactionLedger.service.js");
+        if (isAddon) {
+          const snap = await upsertAddonLedgerAndRecalculate({
+            bookingId: bookingUuid,
+            professionalProfileId: profile.id,
+            financeTransactionId: createdTx.id,
+            addonId: addonId || createdTx.id,
+            amount: gross,
+            discountAmount: moneyNumber(body.discountAmount),
+            paid: status === "Paid",
+            voided: false,
+            refunded: false,
+          });
+          bookingFinancials = snap?.financials ?? null;
+        } else {
+          if (status === "Paid" || status === "Prepaid") {
+            await mirrorSettledFinanceToLedger({
+              bookingId: bookingUuid,
+              professionalProfileId: profile.id,
+              financeTransactionId: createdTx.id,
+              paymentPhase,
+              entryLabel,
+              status,
+              amount: gross,
+              metadata: {
+                payerKey: document.payerKey || null,
+                performed_by_user_id: req.user?.id ?? null,
+                actor: "professional",
+              },
+            });
+          }
+          const snap = await recalculateBookingFinancials(bookingUuid);
+          bookingFinancials = snap?.financials ?? null;
+        }
+      } catch (ledgerErr) {
+        console.error(
+          "[finance-create] ledger recalculate failed:",
+          ledgerErr?.message || ledgerErr,
+        );
+      }
+    }
+
     return res.status(201).json({
       success: true,
       message: isAddon ? "Add-on sale created." : "Transaction created.",
-      data: mapTransactionRow(createdTx),
+      data: {
+        ...mapTransactionRow(createdTx),
+        ...(bookingFinancials ? { bookingFinancials } : {}),
+      },
     });
   } catch (error) {
     console.error("createFinanceTransaction failed:", error);
@@ -1316,11 +1545,11 @@ export const updateFinanceTransaction = async (req, res) => {
         if (minted) {
           const nextDoc = { ...currentDoc, receiptNumber: minted };
           fields.push(`document = $${idx}::jsonb`);
-          values.push(JSON.stringify(nextDoc));
+          values.push(JSON.stringify(normalizeMoneyJson(nextDoc)));
           idx += 1;
           const issued = existing.rows[0].issued_document || currentDoc;
           fields.push(`issued_document = $${idx}::jsonb`);
-          values.push(JSON.stringify({ ...issued, receiptNumber: minted }));
+          values.push(JSON.stringify(normalizeMoneyJson({ ...issued, receiptNumber: minted })));
           idx += 1;
         }
       }
@@ -1377,7 +1606,16 @@ export const bulkFinanceTransactionAction = async (req, res) => {
     const profile = await requireProfessional(req, res);
     if (!profile) return;
 
-    const { ids, action, transactionDate } = req.body ?? {};
+    const {
+      ids,
+      action,
+      transactionDate,
+      refundMethod,
+      reason,
+      bankDetails,
+      refundMode,
+      refundItems,
+    } = req.body ?? {};
     if (!Array.isArray(ids) || !ids.length) {
       return res.status(400).json({ success: false, message: "Transaction ids are required.", data: null });
     }
@@ -1430,17 +1668,91 @@ export const bulkFinanceTransactionAction = async (req, res) => {
         });
       }
 
+      const normalizedBank =
+        bankDetails &&
+        typeof bankDetails === "object" &&
+        String(bankDetails.iban || "").trim()
+          ? {
+              accountHolder: String(bankDetails.accountHolder || "").trim(),
+              iban: String(bankDetails.iban || "")
+                .replace(/\s+/g, "")
+                .toUpperCase(),
+            }
+          : null;
+
+      const mode =
+        refundMode === "item" || refundMode === "amount" ? refundMode : null;
+      const items = Array.isArray(refundItems)
+        ? refundItems
+            .map((item) => ({
+              id: item?.id != null ? String(item.id) : undefined,
+              name: String(
+                item?.name || item?.label || item?.description || "",
+              ).trim(),
+              amount: moneyNumber(item?.amount ?? item?.totalPrice ?? item?.value),
+            }))
+            .filter((item) => item.name)
+        : [];
+
+      const emailOutcomes = [];
+      const bookingRefs = new Set();
+
       for (const row of rows.rows) {
         const doc = row.document ?? {};
         const creditNoteNumber = `CR-${Date.now().toString().slice(-6)}`;
+        let refundAmount = moneyNumber(row.net_amount);
+        // Cap refund to ledger remaining paid (prevents over-refund / stacked cancels).
+        if (row.booking_id) {
+          try {
+            const { listLedgerByBookingId } = await import(
+              "../services/bookingTransactionLedger.service.js"
+            );
+            const { computeBookingFinancials } = await import(
+              "../utils/bookingFinancialLedger.js"
+            );
+            const { clampRefundAmount } = await import(
+              "../utils/bookingFinancialGuards.js"
+            );
+            const bookingUuid = (
+              await query(
+                `SELECT id FROM bookings
+                  WHERE id::text = $1 OR unique_code = $1 LIMIT 1`,
+                [row.booking_id],
+              )
+            ).rows[0]?.id;
+            if (bookingUuid) {
+              const ledgerRows = await listLedgerByBookingId(bookingUuid);
+              if (ledgerRows.length) {
+                const clamped = clampRefundAmount(
+                  refundAmount,
+                  computeBookingFinancials(ledgerRows, {}),
+                );
+                refundAmount = clamped.amount;
+              }
+            }
+          } catch {
+            /* appendLedgerTransaction still guards */
+          }
+        }
+        if (refundAmount <= 0) {
+          continue;
+        }
         const creditDocument = {
           ...doc,
           creditNoteNumber,
           receiptNumber: creditNoteNumber,
-          refundAmount: moneyNumber(row.net_amount),
+          refundAmount,
           refundedAt: new Date().toISOString().slice(0, 10),
+          ...(refundMethod
+            ? { refundMethod: String(refundMethod).trim() }
+            : {}),
+          ...(reason ? { refundReason: String(reason).trim() } : {}),
+          ...(normalizedBank ? { refundBankDetails: normalizedBank } : {}),
+          ...(mode ? { refundMode: mode } : {}),
+          ...(items.length ? { refundItems: items } : {}),
         };
-        await query(
+        // Optimistic concurrency: only one refund wins if multi-clicked.
+        const refunded = await query(
           `UPDATE finance_transactions
            SET status = 'Refunded',
                refund_amount = $4,
@@ -1448,22 +1760,116 @@ export const bulkFinanceTransactionAction = async (req, res) => {
                issued_document = $3::jsonb,
                issued_at = NOW(),
                updated_at = NOW()
-           WHERE id = $1 AND professional_profile_id = $2`,
-          [row.id, profile.id, JSON.stringify(creditDocument), moneyNumber(row.net_amount)],
+           WHERE id = $1 AND professional_profile_id = $2
+             AND status IN ('Paid', 'Prepaid')
+           RETURNING id`,
+          [
+            row.id,
+            profile.id,
+            JSON.stringify(normalizeMoneyJson(creditDocument)),
+            refundAmount,
+          ],
         );
+        if (!refunded.rows[0]) {
+          continue;
+        }
+
+        try {
+          const { mirrorRefundToLedger, recalculateBookingFinancials } = await import(
+            "../services/bookingTransactionLedger.service.js"
+          );
+          // Keep original PREPAYMENT/PAYMENT rows; append explicit REFUND only.
+          await mirrorRefundToLedger({
+            bookingRef: row.booking_id,
+            professionalProfileId: profile.id,
+            financeTransactionId: row.id,
+            refundAmount,
+            performedByUserId: req.user?.id ?? null,
+            actor: "professional",
+            metadata: {
+              refundMode: mode,
+              entryLabel: row.entry_label ?? null,
+            },
+          });
+          if (row.booking_id) {
+            await recalculateBookingFinancials(row.booking_id);
+          }
+        } catch (ledgerErr) {
+          console.error(
+            `[finance-refund] ledger mirror failed for ${row.id}:`,
+            ledgerErr?.message || ledgerErr,
+          );
+        }
 
         if (row.booking_id) {
+          bookingRefs.add(String(row.booking_id));
           void logRefundCompletedActivity({
             bookingCode: row.booking_id,
             actorLabel: "Professional",
+            userId: req.user?.id ?? null,
           });
+          try {
+            await ensureRefundSalesCardMetadata({
+              professionalProfileId: profile.id,
+              bookingId: String(row.booking_id),
+              financeTransactionId: row.id,
+              refundMode: mode,
+              refundMethod,
+              refundReason: reason,
+              refundItems: items.length
+                ? items
+                : [{ name: row.entry_label || "Refund", amount: refundAmount }],
+              refundAmount,
+              clientName: row.client_name,
+              clientEmail: row.client_email,
+            });
+          } catch (metaError) {
+            console.error(
+              `[finance-refund] refund sales card meta failed for ${row.id}:`,
+              metaError?.message || metaError,
+            );
+          }
+        }
+
+        // Await so SMTP/Resend errors are logged + returned; never fail the refund.
+        const emailResult = await sendFinanceClientEmail(
+          row.id,
+          FINANCE_EMAIL_TYPES.REFUND_COMPLETED,
+        );
+        if (!emailResult?.sent) {
+          console.warn(
+            `[finance-refund] client email not sent for ${row.id}: ${emailResult?.reason || "unknown"}${
+              emailResult?.error ? ` (${emailResult.error})` : ""
+            }`,
+          );
+        }
+        emailOutcomes.push({ transactionId: row.id, ...emailResult });
+      }
+
+      for (const bookingRef of bookingRefs) {
+        try {
+          await markBookingRefundedIfSettled({
+            professionalProfileId: profile.id,
+            bookingRef,
+          });
+        } catch (statusError) {
+          console.error(
+            `[finance-refund] booking refunded status failed for ${bookingRef}:`,
+            statusError?.message || statusError,
+          );
         }
       }
 
+      const emailsSent = emailOutcomes.filter((row) => row.sent).length;
       return res.status(200).json({
         success: true,
         message: `Refunded ${rows.rows.length} transaction(s) with credit note.`,
-        data: { affected: rows.rows.length, status: "Refunded" },
+        data: {
+          affected: rows.rows.length,
+          status: "Refunded",
+          emailsSent,
+          emails: emailOutcomes,
+        },
       });
     }
 
@@ -1629,9 +2035,41 @@ export const bulkFinanceTransactionAction = async (req, res) => {
            OR LOWER(COALESCE(method_title, '')) LIKE 'offline%'
            OR status = 'Pending'
          )
-       RETURNING id`,
+         AND status IS DISTINCT FROM $3
+       RETURNING id, booking_id, status, net_amount, document, entry_label`,
       [profile.id, parsedIds, nextStatus, paidTransactionDate],
     );
+
+    if (markingPaid && result.rows.length) {
+      try {
+        const { mirrorSettledFinanceToLedger, recalculateBookingFinancials } =
+          await import("../services/bookingTransactionLedger.service.js");
+        for (const row of result.rows) {
+          await mirrorSettledFinanceToLedger({
+            bookingRef: row.booking_id,
+            professionalProfileId: profile.id,
+            financeTransactionId: row.id,
+            paymentPhase: row.document?.paymentPhase ?? null,
+            entryLabel: row.entry_label ?? null,
+            status: "Paid",
+            amount: moneyNumber(row.net_amount),
+            metadata: {
+              performed_by_user_id: req.user?.id ?? null,
+              actor: "professional",
+              source: "bulk_mark_paid",
+            },
+          });
+          if (row.booking_id) {
+            await recalculateBookingFinancials(row.booking_id);
+          }
+        }
+      } catch (ledgerErr) {
+        console.error(
+          "[finance-markPaid] ledger mirror failed:",
+          ledgerErr?.message || ledgerErr,
+        );
+      }
+    }
 
     return res.status(200).json({
       success: true,
@@ -1820,16 +2258,20 @@ export const replaceFinanceTransaction = async (req, res) => {
         data: null,
       });
     }
-    const lineItems = submittedLines.map((line) => ({
-      description: line.name,
-      sourceReference: String(line.sourceReference ?? line.id ?? ""),
-      sourceType: line.sourceType ?? "uniqueItemCode",
-      quantity: String(line.quantity ?? 1),
-      vat: "21%",
-      vatRate: 21,
-      pricePerUnit: moneyNumber(line.unitPrice),
-      totalPrice: moneyNumber((line.quantity ?? 1) * (line.unitPrice ?? 0)),
-    }));
+    const lineItems = submittedLines.map((line) => {
+      const quantity = parseMoney(line.quantity ?? 1, 1);
+      const unitPrice = moneyNumber(line.unitPrice);
+      return {
+        description: line.name,
+        sourceReference: String(line.sourceReference ?? line.id ?? ""),
+        sourceType: line.sourceType ?? "uniqueItemCode",
+        quantity,
+        vat: "21%",
+        vatRate: 21,
+        pricePerUnit: unitPrice,
+        totalPrice: moneyNumber(quantity * unitPrice),
+      };
+    });
 
     const result = await query(
       `INSERT INTO finance_transactions (
@@ -1857,7 +2299,7 @@ export const replaceFinanceTransaction = async (req, res) => {
         isOnline ? "Online – direct" : "Offline – direct",
         "",
         isOnline ? "Pending" : "Paid",
-        JSON.stringify({
+        JSON.stringify(normalizeMoneyJson({
           documentNumber: `INV-RPL-${entryNum}`,
           receiptNumber: mintReceiptNumber(isOnline ? "Pending" : "Paid", `G${entryNum}`),
           serviceDate: today,
@@ -1873,7 +2315,7 @@ export const replaceFinanceTransaction = async (req, res) => {
             invoiceSettings: issuedInvoiceSettings,
             professionalBusiness: issuedProfessionalBusiness,
           },
-        }),
+        })),
       ],
     );
 
@@ -2074,7 +2516,7 @@ export const reissueFinanceInvoiceForBooking = async (req, res) => {
       [
         txId,
         `Reissue of ${prevNumber}`,
-        JSON.stringify(nextDoc),
+        JSON.stringify(normalizeMoneyJson(nextDoc)),
         nextAmount,
         clientEmail,
         clientName,

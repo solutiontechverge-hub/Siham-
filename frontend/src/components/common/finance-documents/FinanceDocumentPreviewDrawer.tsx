@@ -102,6 +102,7 @@ export default function FinanceDocumentPreviewDrawer({
             row={renderRow}
             lineItems={lineItems}
             totalPriceLabel={totalPriceLabel}
+            settings={settings}
             invoiceType={resolvedInvoiceType}
             profileData={frozenDocument ? null : profileData}
             professionalBusinessOverride={frozenDocument ? issuedBusinessOverride : professionalBusinessOverride}

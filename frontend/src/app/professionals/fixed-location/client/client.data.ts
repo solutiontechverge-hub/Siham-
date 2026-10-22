@@ -32,6 +32,14 @@ export const CLIENT_TABLE_HEADERS = [
   "",
 ] as const;
 
+/** Deep-link into the professional Client list detail drawer (`?clientId=`). */
+export function getProfessionalClientHref(clientId?: string | null): string {
+  const id = String(clientId ?? "").trim();
+  return id
+    ? `/professionals/client?clientId=${encodeURIComponent(id)}`
+    : "/professionals/client";
+}
+
 export const CLIENT_PHONE_DIAL_CODES = [
   "+971",
   "+92",

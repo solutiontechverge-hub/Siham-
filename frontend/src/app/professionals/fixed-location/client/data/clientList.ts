@@ -8,6 +8,9 @@ export type ClientKind = "individual" | "company";
 export type ClientRecord = {
   id: string;
   name: string;
+  /** From API when present; search falls back to splitting `name` / contact. */
+  firstName?: string;
+  lastName?: string;
   email: string;
   phone: string;
   totalSales: string;
@@ -25,6 +28,7 @@ export type ClientRecord = {
   businessAddress?: string;
   dateOfBirth?: string;
   residentialAddress?: string;
+  residentialArea?: string;
   bookingsCompleted: number;
   averageBookingValue: string;
   recentServices: { name: string; price: number }[];

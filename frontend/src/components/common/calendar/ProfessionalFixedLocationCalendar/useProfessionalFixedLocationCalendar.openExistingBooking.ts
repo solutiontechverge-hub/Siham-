@@ -169,7 +169,10 @@ export function useProfessionalFixedLocationCalendarOpenExistingBooking({
         freeStart: resolved.start,
         freeEnd: resolved.end,
       });
-      a.setSlotDrawerTab("booking");
+      // Live calendar refresh re-calls openExistingBooking; keep Sales/Activity tab.
+      if (a.editingEventIdRef.current !== resolved.id) {
+        a.setSlotDrawerTab("booking");
+      }
       a.setSlotBookingScreen("new-booking");
       a.setSlotLocation(ev.location);
       a.setSlotBookingType(ev.bookingType ?? "Online");

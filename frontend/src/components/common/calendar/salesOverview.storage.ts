@@ -68,6 +68,16 @@ export function listSalesCardMetaForBooking(bookingId: string): SalesCardMetaRec
   return cardMetadata.filter((row) => row.bookingId === bookingId);
 }
 
+/** Refund Summary cards created by backend bulk refund. */
+export function listRefundSalesCardMetaForBookings(
+  bookingIds: readonly string[],
+): SalesCardMetaRecord[] {
+  const idSet = new Set(bookingIds.map(String));
+  return cardMetadata.filter(
+    (row) => row.cardKind === "refund" && idSet.has(String(row.bookingId)),
+  );
+}
+
 export function upsertSalesCardMeta(record: SalesCardMetaRecord) {
   const all = cardMetadata;
   const existing = all.find((row) => row.cardId === record.cardId);

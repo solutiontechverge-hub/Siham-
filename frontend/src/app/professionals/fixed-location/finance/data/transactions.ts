@@ -362,6 +362,20 @@ export type TransactionRow = {
   /** Booking ID for navigation to calendar */
   bookingId?: string;
   createdAt?: string;
+  /** Shared ledger snapshot (same source as Sale Drawer / useBookingFinance). */
+  bookingFinancials?: {
+    net_total?: number;
+    outstanding_balance?: number;
+    total_paid?: number;
+    total_refunded?: number;
+    prepayment_total?: number;
+    payment_status?: string;
+    cancellation_payment_status?: string;
+    basePrice?: number;
+    add_ons?: number;
+    cancellation_fee?: number;
+  } | null;
+  bookingStatus?: string | null;
 };
 
 

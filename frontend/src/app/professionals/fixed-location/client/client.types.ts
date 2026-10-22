@@ -31,6 +31,7 @@ export type EditIndividualFormState = {
   phone: string;
   email: string;
   residentialAddress: string;
+  residentialArea: string;
   technicalNote: string;
 };
 
@@ -98,6 +99,7 @@ export const emptyEditIndividualForm = (): EditIndividualFormState => ({
   phone: "",
   email: "",
   residentialAddress: "",
+  residentialArea: "",
   technicalNote: "",
 });
 

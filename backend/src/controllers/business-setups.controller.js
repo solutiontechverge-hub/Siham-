@@ -57,6 +57,7 @@ export const getSetupAvailabilityForDate = async (req, res) => {
     const setupId = req.params.setupId;
     const date = String(req.query.date ?? "").trim();
     const location = String(req.query.location ?? "FL").trim().toUpperCase() === "DL" ? "DL" : "FL";
+    const excludeBookingId = String(req.query.excludeBookingId ?? "").trim() || null;
 
     if (!setupId) {
       return res.status(400).json({
@@ -112,8 +113,9 @@ export const getSetupAvailabilityForDate = async (req, res) => {
            WHERE business_setup_id = $1
              AND substring(COALESCE(booking_date::text, start_time::text) from 1 for 10)::date = $2::date
              AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'invalid')
-             AND team_member_id IS NOT NULL`,
-          [setupId, date],
+             AND team_member_id IS NOT NULL
+             AND ($3::uuid IS NULL OR id <> $3::uuid)`,
+          [setupId, date, excludeBookingId],
         ),
         query(
           `SELECT team_member_id, start_time, end_time, blocked_time_start, blocked_time_end, status, start_date, end_date

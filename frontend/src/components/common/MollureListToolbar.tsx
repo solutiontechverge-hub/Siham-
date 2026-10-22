@@ -10,7 +10,6 @@ import { alpha, useTheme } from "@mui/material/styles";
 import AppSearchField from "./AppSearchField";
 
 type MollureListToolbarProps = {
-  searchPlaceholder: string;
   searchValue: string;
   onSearchChange: (next: string) => void;
   onSortClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
@@ -20,7 +19,6 @@ type MollureListToolbarProps = {
 };
 
 export default function MollureListToolbar({
-  searchPlaceholder,
   searchValue,
   onSearchChange,
   onSortClick,
@@ -38,11 +36,11 @@ export default function MollureListToolbar({
         spacing={1.5}
         alignItems={{ md: "center" }}
       >
-        <Box sx={{ flex: 1, maxWidth: { md: 420 } }}>
+        <Box sx={{ flex: 1, maxWidth: { md: 320 } }}>
           <AppSearchField
             fullWidth
             size="small"
-            placeholder={searchPlaceholder}
+            placeholder="Search by name or email"
             value={searchValue}
             onChange={(e) => onSearchChange(e.target.value)}
             onClear={() => onSearchChange("")}

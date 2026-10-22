@@ -1,10 +1,10 @@
 "use client";
 
-import { mollureSectionTitleSx, mollureLabelSx, mollureBodyMutedSx } from "../../../theme/mollureHierarchy";
-
-import AppButton from "../AppButton";
+import * as React from "react";
 import { Box, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import { mollureSectionTitleSx, mollureLabelSx, mollureBodyMutedSx } from "../../../theme/mollureHierarchy";
+import AppButton from "../AppButton";
 import { FinanceDocumentPreviewDrawer } from "../finance-documents";
 import PaymentDueIcon from "../client-booking/PaymentDueIcon";
 import TransactionDateModal from "../../sections/finance/TransactionDateModal";
@@ -73,7 +73,9 @@ export default function SalesOverview({
     setOverdueCard,
     refundCard,
     refundTransactions,
+    refundTransactionsLoading,
     setRefundCard,
+    setRefundTransactionsLoading,
     subToCard,
     transactionDateModal,
     setTransactionDateModal,
@@ -90,9 +92,10 @@ export default function SalesOverview({
     onBookingCompleted,
   });
 
-  if (refundCard) {
-    // Booking-wide sale lines (prepay services + after-treatment + add-ons + fees),
-    // not only the active card — Fee Summary alone used to list LCF only.
+  // Booking-wide sale lines for Refund-by-Item (not only the active card).
+  // Memoized so RefundSalesDrawer does not see a new fallbackItems array every render.
+  const refundFallbackItems = React.useMemo(() => {
+    if (!refundCard) return [];
     const bookingSaleLines = cards
       .filter(
         (card) =>
@@ -100,20 +103,10 @@ export default function SalesOverview({
           String(card.bookingCode) === String(refundCard.bookingCode),
       )
       .flatMap((card) => card.lines);
-    return (
-      <RefundSalesDrawer
-        open
-        transactions={refundTransactions}
-        fallbackItems={refundItemsFromSaleLines(
-          bookingSaleLines.length ? bookingSaleLines : refundCard.lines,
-        )}
-        onClose={() => setRefundCard(null)}
-        onSave={async () => {
-          await handleRefundSales(refundCard);
-        }}
-      />
+    return refundItemsFromSaleLines(
+      bookingSaleLines.length ? bookingSaleLines : refundCard.lines,
     );
-  }
+  }, [cards, refundCard]);
 
   if (editingCard) {
     return (
@@ -272,6 +265,29 @@ export default function SalesOverview({
         settings={financeSettings}
         row={docRow}
         professionalBusinessOverride={professionalBusinessOverride}
+      />
+
+      <RefundSalesDrawer
+        open={Boolean(refundCard)}
+        transactions={refundTransactions}
+        transactionsLoading={refundTransactionsLoading}
+        fallbackItems={refundFallbackItems}
+        originalPaymentMethod={refundCard?.paymentMethod}
+        onClose={() => {
+          setRefundCard(null);
+          // Avoid sticky "Loading…" if a late fetch races after close.
+          setRefundTransactionsLoading(false);
+        }}
+        onSave={
+          refundCard
+            ? async (payload) => {
+                const ok = await handleRefundSales(refundCard, payload);
+                // Snackbar already shown with the real reason; throw to keep drawer open.
+                if (!ok) throw new Error("refund-rejected");
+                setRefundCard(null);
+              }
+            : undefined
+        }
       />
 
       <TransactionNoteModal

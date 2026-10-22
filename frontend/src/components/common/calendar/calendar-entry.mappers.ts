@@ -23,6 +23,8 @@ const statusToApi: Record<CalendarBookingStatus, CreateCalendarEntryRequest["sta
   "No Show": "no_show",
   Completed: "completed",
   Cancelled: "cancelled",
+  // Display-only (notes.refunded) — persist as cancelled for API.
+  Refunded: "cancelled",
 };
 
 const statusFromApi: Record<string, CalendarBookingStatus> = {

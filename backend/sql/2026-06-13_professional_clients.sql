@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS professional_clients (
   gender TEXT,
   date_of_birth DATE,
   residential_address TEXT,
+  residential_area TEXT,
   legal_name TEXT,
   coc TEXT,
   vat TEXT,

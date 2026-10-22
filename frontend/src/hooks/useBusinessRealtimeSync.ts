@@ -38,7 +38,13 @@ export function useBusinessRealtimeSync() {
         dispatch(businessApi.util.invalidateTags(tags));
       }
       if (scopes.has("finance") || scopes.size === 0) {
-        dispatch(financeApi.util.invalidateTags(["FinanceSettings"]));
+        dispatch(
+          financeApi.util.invalidateTags([
+            "FinanceSettings",
+            "FinanceTransactions",
+            "Bookings",
+          ]),
+        );
       }
     };
 

@@ -26,6 +26,9 @@ import AppButton from "../../../components/common/AppButton";
 import { AppDropdown } from "../../../components/common";
 import type { Service, TeamMemberSlotOption } from "./booking.page.types";
 
+/** MUI Select treats "" poorly as a MenuItem value — map Any ↔ null via this id. */
+const ANY_TEAM_MEMBER_VALUE = "__any_team_member__";
+
 export type ClientBookingServicesDetailsPanelProps = {
   serviceTab: "assigned" | "unassigned";
   setServiceTab: (tab: "assigned" | "unassigned") => void;
@@ -44,7 +47,11 @@ export type ClientBookingServicesDetailsPanelProps = {
   allVisibleSelected: boolean;
   someVisibleSelected: boolean;
   unassignService: (id: string) => void;
-  updateServiceTeamMember: (serviceId: string, teamMemberId: string) => void;
+  updateServiceTeamMember: (
+    serviceId: string,
+    teamMemberId: string,
+    guestId?: string | null,
+  ) => void;
   getServiceTeamMemberOptions: (service: Service) => TeamMemberSlotOption[];
   selectedServiceIds: Record<string, boolean>;
   toggleServiceSelection: (id: string, checked: boolean) => void;
@@ -173,11 +180,20 @@ export default function ClientBookingServicesDetailsPanel({
       (isDesiredLocation || serviceTab === "unassigned") ? (
         <Box sx={{ mb: 1.25, maxWidth: 240 }} onClick={(e) => e.stopPropagation()}>
           <AppDropdown
-            value={selectedTeamMemberId}
-            onChange={(val) => applySharedTeamMember(String(val ?? ""))}
+            value={selectedTeamMemberId || ANY_TEAM_MEMBER_VALUE}
+            onChange={(val) => {
+              const raw = String(val ?? "");
+              applySharedTeamMember(
+                raw === ANY_TEAM_MEMBER_VALUE || raw.startsWith("__") ? "" : raw,
+              );
+            }}
             options={[
-              { value: "", label: "Any team member" },
-              ...sharedTeamMemberOptions,
+              { value: ANY_TEAM_MEMBER_VALUE, label: "Any team member" },
+              ...sharedTeamMemberOptions.filter(
+                (option) =>
+                  option.value !== "" &&
+                  option.value !== ANY_TEAM_MEMBER_VALUE,
+              ),
             ]}
             placeholder="Any team member"
             size="small"
@@ -361,12 +377,28 @@ export default function ClientBookingServicesDetailsPanel({
                         onClick={(e) => e.stopPropagation()}
                       >
                         <AppDropdown
-                          value={s.teamMemberId ?? ""}
-                          onChange={(val) =>
-                            updateServiceTeamMember(s.id, String(val ?? ""))
-                          }
-                          options={getServiceTeamMemberOptions(s)}
-                          placeholder="Team member"
+                          value={s.teamMemberId || ANY_TEAM_MEMBER_VALUE}
+                          onChange={(val) => {
+                            const raw = String(val ?? "");
+                            updateServiceTeamMember(
+                              s.id,
+                              raw === ANY_TEAM_MEMBER_VALUE ||
+                                raw.startsWith("__")
+                                ? ""
+                                : raw,
+                              s.guestId,
+                            );
+                          }}
+                          options={getServiceTeamMemberOptions(s).map(
+                            (option) =>
+                              option.value === ""
+                                ? {
+                                    ...option,
+                                    value: ANY_TEAM_MEMBER_VALUE,
+                                  }
+                                : option,
+                          )}
+                          placeholder="Any team member"
                           size="small"
                           fullWidth
                           InputProps={{

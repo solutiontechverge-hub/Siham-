@@ -9,6 +9,8 @@ export function mapApiProfessionalClientToRecord(row: ApiProfessionalClient): Cl
   return {
     id: row.id,
     name: row.display_name,
+    firstName: row.first_name ?? undefined,
+    lastName: row.last_name ?? undefined,
     email: row.email,
     phone: row.phone ?? "—",
     totalSales: row.total_sales_label ?? `€${row.total_sales}`,
@@ -25,6 +27,7 @@ export function mapApiProfessionalClientToRecord(row: ApiProfessionalClient): Cl
     businessAddress: row.business_address ?? undefined,
     dateOfBirth: row.date_of_birth ?? undefined,
     residentialAddress: row.residential_address ?? undefined,
+    residentialArea: row.residential_area ?? undefined,
     bookingsCompleted: row.bookings_completed,
     averageBookingValue: row.average_booking_value_label ?? `€${row.average_booking_value}`,
     statsLastBooking: row.stats_last_booking,

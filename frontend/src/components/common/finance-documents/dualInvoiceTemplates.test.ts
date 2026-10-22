@@ -136,7 +136,7 @@ const businessHeader = professionalBusinessInfoLines(
   }),
   "company",
 );
-assert.ok(businessHeader.some((line) => line.includes("Salon Mollure")));
+assert.ok(!businessHeader.some((line) => line.startsWith("Professional Name:")));
 assert.ok(businessHeader.some((line) => line.includes("Pro Legal BV")));
 assert.ok(businessHeader.some((line) => line.includes("NL999")));
 assert.ok(businessHeader.some((line) => line.includes("87654321")));

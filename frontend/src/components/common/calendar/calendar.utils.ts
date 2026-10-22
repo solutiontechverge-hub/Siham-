@@ -54,6 +54,7 @@ export const EMPTY_CALENDAR_STATUSES: Record<CalendarBookingStatus, boolean> = {
   Confirmed: false,
   Completed: false,
   Cancelled: false,
+  Refunded: false,
   Invalid: false,
   "No Show": false,
   Requested: false,

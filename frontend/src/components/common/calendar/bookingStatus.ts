@@ -96,6 +96,8 @@ export function professionalCalendarDisplayStatus(
     "status" | "details" | "bookingType" | "bookingScenario"
   >,
 ): CalendarBookingStatus {
+  // Finance refund stamps notes.refunded — Status chip must follow, not stay Confirmed.
+  if (event.details?.refunded) return "Refunded";
   if (professionalWaitingForClientPrepay(event)) return "Requested";
   if (event.status === "BR Accepted") return "Confirmed";
   return event.status;
@@ -105,6 +107,7 @@ export function professionalCalendarDisplayStatus(
 export function professionalCalendarStatusLabel(
   event: Pick<CalendarEvent, "status" | "details" | "bookingType" | "bookingScenario">,
 ): string {
+  if (event.details?.refunded) return "Refunded";
   if (professionalWaitingForClientPrepay(event)) return "Requested";
   return calendarBookingStatusLabel(event);
 }
@@ -158,6 +161,14 @@ export const BOOKING_STATUS_THEME: Record<CalendarBookingStatus, StatusTheme> = 
     chipBg: "#F3F4F6",
     chipColor: "#4B5563",
     chipBorder: "#F3F4F6",
+  },
+  Refunded: {
+    accent: "#4B5563",
+    cardBg: "#F3F4F6",
+    cardBorder: "#D0D5DD",
+    chipBg: "#F2F4F7",
+    chipColor: "#4B5563",
+    chipBorder: "#F2F4F7",
   },
   Cancelled: {
     accent: "#DC2626",

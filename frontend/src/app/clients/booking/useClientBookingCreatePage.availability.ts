@@ -3,6 +3,7 @@
 import * as React from "react";
 import { parseTimeLabelToMinutes } from "./booking-time";
 import { extractUuidFromSyntheticId } from "./clientBookingApi.mapper";
+import { getActiveBookingSession } from "./clientBookingSession";
 import { toISO } from "./useClientBookingCreatePage.calendarTime";
 import { useGetSetupAvailabilityQuery } from "../../../store/services/businessApi";
 import type {
@@ -44,6 +45,8 @@ export type UseClientBookingCreateAvailabilityArgs = {
   setSelectedTeamMemberId: React.Dispatch<React.SetStateAction<string>>;
   selectedPersonId: string;
   bookServicesAtSameTime: boolean;
+  /** When true, omit the active booking from busy (reschedule own slot). */
+  excludeActiveBookingBusy?: boolean;
 };
 
 export function useClientBookingCreateAvailability(
@@ -69,13 +72,21 @@ export function useClientBookingCreateAvailability(
     setSelectedTeamMemberId,
     selectedPersonId,
     bookServicesAtSameTime,
+    excludeActiveBookingBusy = false,
   } = args;
+
+  const excludeBookingId = React.useMemo(() => {
+    if (!excludeActiveBookingBusy) return null;
+    const id = String(getActiveBookingSession()?.apiBookingId ?? "").trim();
+    return id || null;
+  }, [excludeActiveBookingBusy]);
 
   const { data: setupAvailabilityResponse } = useGetSetupAvailabilityQuery(
     {
       setupId: setupIdForHours,
       date: toISO(selectedDate),
       location: bookingLocationCode as "FL" | "DL",
+      excludeBookingId,
     },
     {
       skip: !setupIdForHours || !hasAssignableTeamMembers || !profileHydrated,
@@ -141,9 +152,29 @@ export function useClientBookingCreateAvailability(
       servicesDurationMins ||
       availabilitySnapshot.slotStepMinutes;
     const minStart = isSelectedToday ? minBookableMinutes : undefined;
+    // FL per-service dropdown stamps services[].teamMemberId only — not selectedTeamMemberId.
+    const assignedFromServices = [
+      ...new Set(
+        services
+          .map((s) => s.teamMemberId)
+          .filter(
+            (id): id is string =>
+              typeof id === "string" &&
+              id.length > 0 &&
+              candidateMemberIds.includes(id),
+          ),
+      ),
+    ];
+    const memberIdsForSlots =
+      assignedFromServices.length > 0
+        ? assignedFromServices
+        : selectedTeamMemberId &&
+            candidateMemberIds.includes(selectedTeamMemberId)
+          ? [selectedTeamMemberId]
+          : candidateMemberIds;
     return computeUnionBookableSlots(
       availabilitySnapshot,
-      candidateMemberIds,
+      memberIdsForSlots,
       duration,
       minStart,
     );
@@ -153,16 +184,14 @@ export function useClientBookingCreateAvailability(
     hasAssignableTeamMembers,
     isSelectedToday,
     minBookableMinutes,
+    selectedTeamMemberId,
+    services,
     servicesDurationMins,
   ]);
 
   const availableTimes = React.useMemo(() => {
-    // When live TM availability is loaded, never fall back to hours that ignore blocks/busy.
-    if (availabilityBookableTimes) {
-      if (!availabilityBookableTimes.length) return [];
-      const allowed = new Set(availabilityBookableTimes);
-      return baseAvailableTimes.filter((time) => allowed.has(time));
-    }
+    // Live Schedule slots are authoritative — do not clip to a fixed day window.
+    if (availabilityBookableTimes) return availabilityBookableTimes;
     return baseAvailableTimes;
   }, [availabilityBookableTimes, baseAvailableTimes]);
 
@@ -184,32 +213,37 @@ export function useClientBookingCreateAvailability(
     if (!startMin) return;
 
     const catalogList = locationServiceCatalogRef.current;
-    // FL + Combine Services: one free member for the shared window.
-    // Always recalculate from live availability — never pin a hydration/default TM.
-    const assignments = autoAssignServicesByAvailability({
-      snapshot: availabilitySnapshot,
-      services: services.map((service) => ({
+    const fallbackCatalogIds = catalogList.map((service) => service.id);
+    const assignOneMemberForAll = isDesiredLocation || bookServicesAtSameTime;
+    const sharedWindowMins = bookServicesAtSameTime
+      ? servicesDurationMins || undefined
+      : undefined;
+
+    const toAssignInput = (rows: typeof services) =>
+      rows.map((service) => ({
         id: service.id,
         catalogServiceId:
           service.catalogServiceId ?? extractUuidFromSyntheticId(service.id),
         durationMins: service.durationMins,
-        teamMemberId: undefined,
-      })),
-      candidateMemberIds,
-      fallbackCatalogIds: catalogList.map((service) => service.id),
-      startMin,
-      assignOneMemberForAll: isDesiredLocation || bookServicesAtSameTime,
-      sharedWindowMins: bookServicesAtSameTime
-        ? servicesDurationMins || undefined
-        : undefined,
-    });
+        teamMemberId: service.teamMemberId ?? null,
+      }));
 
-    // ponytail: no lastAutoAssignRef — that key ignored current teamMemberIds, so
-    // guest-assign re-stamping the default first TM after a clear never got undone.
+    // From `prev` + index apply: find(id) wiped Guest when CLIENT shared a
+    // catalog line id; closure `services` could also lag the Guest pick.
     setServices((prev) => {
+      if (prev.length === 0) return prev;
+      const assignments = autoAssignServicesByAvailability({
+        snapshot: availabilitySnapshot,
+        services: toAssignInput(prev),
+        candidateMemberIds,
+        fallbackCatalogIds,
+        startMin,
+        assignOneMemberForAll,
+        sharedWindowMins,
+      });
       let changed = false;
-      const next = prev.map((service) => {
-        const assignment = assignments.find((row) => row.id === service.id);
+      const next = prev.map((service, index) => {
+        const assignment = assignments[index];
         if (
           !assignment ||
           (assignment.teamMemberId ?? null) === (service.teamMemberId ?? null)
@@ -222,7 +256,16 @@ export function useClientBookingCreateAvailability(
       return changed ? next : prev;
     });
 
-    if (isDesiredLocation || bookServicesAtSameTime) {
+    if (assignOneMemberForAll) {
+      const mirror = autoAssignServicesByAvailability({
+        snapshot: availabilitySnapshot,
+        services: toAssignInput(services),
+        candidateMemberIds,
+        fallbackCatalogIds,
+        startMin,
+        assignOneMemberForAll,
+        sharedWindowMins,
+      });
       const sharedMember =
         assignments.find((row) => row.teamMemberId)?.teamMemberId ?? "";
       // Sync picker when assign finds someone. Do NOT clear to "" while the
@@ -338,14 +381,16 @@ export function useClientBookingCreateAvailability(
   );
 
   const getServiceTeamMemberOptions = React.useCallback(
-    (service: Service): TeamMemberSlotOption[] =>
-      buildSlotTeamMemberOptions(
+    (service: Service): TeamMemberSlotOption[] => [
+      { value: "", label: "Any team member" },
+      ...buildSlotTeamMemberOptions(
         service.teamMemberId ?? "",
         getServiceStartMin(service.id),
         bookServicesAtSameTime
           ? servicesDurationMins || service.durationMins || 30
           : service.durationMins || 30,
       ),
+    ],
     [
       bookServicesAtSameTime,
       buildSlotTeamMemberOptions,

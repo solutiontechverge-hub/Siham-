@@ -695,6 +695,7 @@ export type ApiProfessionalClient = {
   gender: string | null;
   date_of_birth: string | null;
   residential_address: string | null;
+  residential_area: string | null;
   legal_name: string | null;
   coc: string | null;
   vat: string | null;
@@ -734,6 +735,7 @@ export type CreateProfessionalClientRequest =
       gender?: string;
       date_of_birth?: string;
       residential_address?: string;
+      residential_area?: string;
       coc?: string;
       vat?: string;
       contact_person_name?: string;
@@ -753,6 +755,7 @@ export type UpdateProfessionalClientRequest = {
   gender?: string;
   date_of_birth?: string;
   residential_address?: string;
+  residential_area?: string;
   coc?: string;
   vat?: string;
   contact_person_name?: string;
@@ -938,13 +941,22 @@ export const businessApi = baseApi.injectEndpoints({
           Array<{ startMin: number; endMin: number }>
         >;
       }>,
-      { setupId: string; date: string; location: "FL" | "DL" }
+      {
+        setupId: string;
+        date: string;
+        location: "FL" | "DL";
+        /** Reschedule: omit this booking from busy so its own slot stays selectable. */
+        excludeBookingId?: string | null;
+      }
     >({
       async queryFn(arg, _api, _extraOptions, fetchWithBQ) {
         const params = new URLSearchParams({
           date: arg.date,
           location: arg.location,
         });
+        if (arg.excludeBookingId) {
+          params.set("excludeBookingId", arg.excludeBookingId);
+        }
         const response = await fetchWithBQ({
           url: `/api/business-setups/${encodeURIComponent(arg.setupId)}/availability?${params.toString()}`,
           method: "GET",

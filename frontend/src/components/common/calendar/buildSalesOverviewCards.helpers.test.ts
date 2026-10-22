@@ -6,6 +6,7 @@ import type { CalendarEvent } from "../../../app/professionals/fixed-location/ca
 import {
   buildCancellationFeeInvoiceMetaLines,
   buildCardsForEvent,
+  collapseBurstDuplicateAddons,
   mergeAddonRecordsIntoCards,
   resolveProtectiveFeeSalesCardSpec,
   shouldShowAfterTreatmentCard,
@@ -613,10 +614,14 @@ const addon: SalesAddonRecord = {
 const merged = mergeAddonRecordsIntoCards([baseCard], [addon], {
   financeHints: [],
 });
-// Current helper appends one Add-ons Summary card per booking (does not fold lines).
+// Fold addon lines/total into after-treatment; keep Add-ons Summary for pay/cancel.
 assert.equal(merged.length, 2, "addon becomes its own summary card");
 assert.equal(merged[0].kind, "after_treatment");
 assert.equal(merged[1].kind, "addon");
+assert.ok(
+  merged[0].lines.some((line) => line.label === "Eye Lashes"),
+  "addon lines fold into after-treatment summary",
+);
 assert.ok(
   merged[1].lines.some((line) => line.label === "Eye Lashes"),
   "addon lines live on the add-on card",
@@ -625,10 +630,26 @@ assert.ok(
   merged[0].lines.some((line) => line.id === "kilometer-allowance"),
   "km line preserved on after-treatment card",
 );
-assert.equal(merged[0].total, 64);
+assert.equal(merged[0].total, 114);
 assert.equal(merged[1].total, 50);
 
-// Split bill → separate After Treatment cards (main + guest), Add-Ons on after only.
+// Accidental multi-save: identical eyelash rows within 60s → one line, not ten.
+const burstDupes: SalesAddonRecord[] = Array.from({ length: 10 }, (_, i) => ({
+  ...addon,
+  id: `addon-burst-${i}`,
+  createdAt: new Date(Date.parse("2026-09-28T01:00:00.000Z") + i * 200).toISOString(),
+  lines: [{ id: `l-burst-${i}`, kind: "item" as const, name: "eyelash", quantity: 1, unitPrice: 111 }],
+  totalPrice: 111,
+}));
+assert.equal(collapseBurstDuplicateAddons(burstDupes).length, 1, "burst dupes collapse");
+const burstMerged = mergeAddonRecordsIntoCards([baseCard], burstDupes, {
+  financeHints: [],
+});
+const burstAddonCard = burstMerged.find((card) => card.kind === "addon");
+assert.equal(burstAddonCard?.lines.length, 1, "Add-ons Summary shows one eyelash");
+assert.equal(burstAddonCard?.total, 111, "burst total is one charge");
+
+// Split bill → one After Treatment shell; main + guest as subCards; Add-Ons on subCards only.
 const splitEvent = {
   id: "split-booking-1",
   title: "Cut",
@@ -694,15 +715,29 @@ const prepay = splitCards.filter((c) => c.kind === "prepayment");
 const after = splitCards.filter((c) => c.kind === "after_treatment");
 assert.equal(prepay.length, 1, "prepayment summary stays one card");
 assert.equal(prepay[0]?.showAddOns, false, "no Add-Ons on prepayment");
-assert.equal(after.length, 2, "main + guest each get After Treatment card");
-assert.ok(after.every((c) => c.showAddOns), "Add-Ons on every after-treatment card");
-assert.ok(after.every((c) => !c.subCards?.length), "guests are top-level, not nested subCards");
+assert.equal(after.length, 1, "split bill → one After Treatment parent card");
+assert.equal(after[0]?.showAddOns, false, "no Add-Ons on after-treatment parent shell");
 assert.equal(after[0]?.payerRole, "main_client");
-assert.equal(after[1]?.payerRole, "guest");
-assert.equal(after[1]?.payerLabel, "Guest");
+assert.equal(after[0]?.lines.length, 0, "parent is shell (no main lines)");
+assert.equal(after[0]?.subCards?.length, 2, "main + guest as subCards");
+assert.equal(after[0]?.subCards?.[0]?.payerRole, "main_client");
+assert.equal(after[0]?.subCards?.[0]?.payerKey, "main");
+assert.equal(after[0]?.subCards?.[0]?.clientEmail, "sara@example.com");
+assert.equal(after[0]?.subCards?.[0]?.showAddOns, true, "Add-Ons on main subCard");
 assert.ok(
-  after.every((c) => (c.highlightedLineIds?.length ?? 0) > 0),
-  "dashed payer grouping via highlightedLineIds",
+  (after[0]?.subCards?.[0]?.lines.length ?? 0) > 0,
+  "main lines live on main subCard",
+);
+assert.equal(after[0]?.subCards?.[1]?.payerRole, "guest");
+assert.equal(after[0]?.subCards?.[1]?.payerLabel, "Guest");
+assert.equal(after[0]?.subCards?.[1]?.payerKey, "g1");
+assert.equal(after[0]?.subCards?.[1]?.showAddOns, true, "Add-Ons on guest subCard");
+assert.equal(after[0]?.statusBadge, "Paid", "parent Paid from main sub badge");
+assert.equal(after[0]?.subCards?.[0]?.paymentState, "paid", "main sub Paid");
+assert.notEqual(
+  after[0]?.subCards?.[1]?.paymentState,
+  "paid",
+  "unpaid guest sub is not Paid",
 );
 
 // Finance document.lineItems override calendar-derived lines (count sync).

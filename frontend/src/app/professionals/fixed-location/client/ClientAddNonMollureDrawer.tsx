@@ -45,6 +45,8 @@ type Props = {
   setIndPhone: StrSet;
   indEmail: string;
   setIndEmail: StrSet;
+  indResidentialArea: string;
+  setIndResidentialArea: StrSet;
   indErrors: FieldErrors;
   setIndErrors: React.Dispatch<React.SetStateAction<FieldErrors>>;
   coLegalName: string;
@@ -103,6 +105,8 @@ export default function ClientAddNonMollureDrawer({
   setIndPhone,
   indEmail,
   setIndEmail,
+  indResidentialArea,
+  setIndResidentialArea,
   indErrors,
   setIndErrors,
   coLegalName,
@@ -304,6 +308,28 @@ export default function ClientAddNonMollureDrawer({
             }}
             error={Boolean(indErrors.email)}
             helperText={indErrors.email}
+            sx={mollureWhiteFieldInputSx}
+          />
+
+          <Typography
+            sx={{
+              fontSize: 11.5,
+              fontWeight: 700,
+              color: alpha(m.navy, 0.62),
+              pt: 0.5,
+            }}
+          >
+            Address
+          </Typography>
+          <MollureFormField
+            placeholder="Residential Area"
+            value={indResidentialArea}
+            onChange={(e) => {
+              setIndResidentialArea(e.target.value);
+              setIndErrors((p) => ({ ...p, residentialArea: undefined }));
+            }}
+            error={Boolean(indErrors.residentialArea)}
+            helperText={indErrors.residentialArea}
             sx={mollureWhiteFieldInputSx}
           />
         </Stack>

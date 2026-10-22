@@ -3,7 +3,7 @@ import {
   computeFinanceFees,
   feeMajorFromBalanceTransaction,
 } from "../utils/financeFees.js";
-import { roundMoney } from "../utils/money.js";
+import { normalizeMoneyJson, roundMoney } from "../utils/money.js";
 
 const STRIPE_API_VERSION = "2024-11-20.acacia";
 
@@ -121,7 +121,7 @@ export async function applyLiveFeesToBookingFinance({
         fees.stripeFee,
         fees.mollureFee,
         fees.net,
-        JSON.stringify(nextDoc),
+        JSON.stringify(normalizeMoneyJson(nextDoc)),
       ],
     );
     updated.push({

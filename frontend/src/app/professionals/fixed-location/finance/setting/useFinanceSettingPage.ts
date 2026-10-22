@@ -33,6 +33,10 @@ import type {
 import { stripeSettingsOnboardingView } from "./stripeSettingsOnboardingView";
 import { PROFILE_IMAGE_INVALID_MESSAGE } from "../../../../../lib/profileImageUpload";
 import {
+  fileToInvoiceLogoDataUrl,
+  isAllowedInvoiceLogoFile,
+} from "../../../../../lib/invoiceLogoUpload";
+import {
   consumeStripeReturnPath,
   peekStripeReturnPath,
 } from "../stripePayoutGuard";
@@ -479,33 +483,30 @@ export function useInvoiceSettingsSection() {
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
-    const type = String(file.type || "").toLowerCase();
-    const name = String(file.name || "").toLowerCase();
-    if (
-      type === "image/heic" ||
-      type === "image/heif" ||
-      name.endsWith(".heic") ||
-      name.endsWith(".heif")
-    ) {
+    if (!isAllowedInvoiceLogoFile(file)) {
       showSnackbar({
         severity: "error",
         message: PROFILE_IMAGE_INVALID_MESSAGE,
       });
-      e.target.value = "";
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const url = typeof reader.result === "string" ? reader.result : null;
-      setSettings((prev) => ({ ...prev, logoDataUrl: url }));
-      showSnackbar({
-        severity: "success",
-        message: "Logo uploaded successfully.",
-      });
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
+    void (async () => {
+      try {
+        const url = await fileToInvoiceLogoDataUrl(file);
+        await setSettings((prev) => ({ ...prev, logoDataUrl: url }));
+        showSnackbar({
+          severity: "success",
+          message: "Logo uploaded successfully.",
+        });
+      } catch {
+        showSnackbar({
+          severity: "error",
+          message: "Could not save invoice logo. Try a smaller PNG or JPG.",
+        });
+      }
+    })();
   };
 
   const selectIndividualInvoice = () => {

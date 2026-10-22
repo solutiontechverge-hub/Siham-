@@ -1,4 +1,4 @@
-﻿import type {
+import type {
   CalendarBookingDetails,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import {
@@ -89,6 +89,7 @@ type StoredBookingNoteMeta = Partial<
     | "showLateRescheduling"
     | "lateRescheduleFeePercent"
     | "lateRescheduleFeePercentCeiling"
+    | "outstandingRescheduleFee"
     | "showLateCancellation"
     | "lateCancellationFeePercent"
     | "lateCancellationFeePercentCeiling"
@@ -219,6 +220,10 @@ export function serializeCalendarEntryNotes(
     ...(details?.lateRescheduleFeePercentCeiling
       ? { lateRescheduleFeePercentCeiling: details.lateRescheduleFeePercentCeiling }
       : {}),
+    ...(typeof details?.outstandingRescheduleFee === "number" &&
+    details.outstandingRescheduleFee > 0
+      ? { outstandingRescheduleFee: details.outstandingRescheduleFee }
+      : {}),
     showLateCancellation: details?.showLateCancellation,
     lateCancellationFeePercent: details?.lateCancellationFeePercent,
     ...(details?.lateCancellationFeePercentCeiling
@@ -298,6 +303,44 @@ export function serializeCalendarEntryNotes(
   if (!trimmed && !hasMeta) return null;
   if (!hasMeta) return trimmed;
   return `${trimmed}${trimmed ? "\n" : ""}${NOTES_META_PREFIX}\n${JSON.stringify(meta)}`;
+}
+
+export type BookingFinancialsSnapshot = {
+  subtotal?: number;
+  total_tax?: number;
+  cancellation_fee?: number;
+  total_paid?: number;
+  total_refunded?: number;
+  net_total?: number;
+  outstanding_balance?: number;
+  net_revenue?: number;
+  prepayment_total?: number;
+  payment_total?: number;
+  prepaid_refunded?: number;
+  net_prepayment_credit?: number;
+  add_ons?: number;
+  basePrice?: number;
+  payment_status?: string;
+  cancellation_payment_status?: string;
+  updatedAt?: string;
+};
+
+/** Server ledger aggregates stamped by recalculateBookingFinancials. */
+export function parseBookingFinancialsFromNotes(
+  notes?: string | null,
+): BookingFinancialsSnapshot | null {
+  if (!notes?.trim()) return null;
+  const markerIndex = notes.indexOf(NOTES_META_PREFIX);
+  if (markerIndex === -1) return null;
+  const metaRaw = notes.slice(markerIndex + NOTES_META_PREFIX.length).trim();
+  try {
+    const meta = JSON.parse(metaRaw) as { financials?: BookingFinancialsSnapshot };
+    const financials = meta.financials;
+    if (!financials || typeof financials !== "object") return null;
+    return financials;
+  } catch {
+    return null;
+  }
 }
 
 export function parseStoredEbrFromNotes(notes?: string | null): StoredEbrNotePayload | null {
@@ -619,6 +662,10 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
         ? {
             lateRescheduleFeePercentCeiling: meta.lateRescheduleFeePercentCeiling,
           }
+        : {}),
+      ...(typeof meta.outstandingRescheduleFee === "number" &&
+      meta.outstandingRescheduleFee > 0
+        ? { outstandingRescheduleFee: meta.outstandingRescheduleFee }
         : {}),
       showLateCancellation: Boolean(meta.showLateCancellation),
       lateCancellationFeePercent: meta.lateCancellationFeePercent ?? "",

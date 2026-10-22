@@ -55,6 +55,7 @@ const fourServices = [
 ];
 
 {
+  // Blanks stay null — backend createBooking owns free-TM fill.
   const assigned = autoAssignServicesByAvailability({
     snapshot: makeSnapshot(members, {}),
     services: fourServices,
@@ -62,18 +63,14 @@ const fourServices = [
     fallbackCatalogIds: ["s1", "s2", "s3", "s4"],
     startMin: 10 * 60,
   });
-  const distinct = new Set(
-    assigned.map((row) => row.teamMemberId).filter(Boolean),
-  );
   assert.equal(
-    distinct.size <= FIXED_LOCATION_MAX_DISTINCT_TEAM_MEMBERS,
+    assigned.every((row) => (row.teamMemberId ?? null) === null),
     true,
-    "FL multi must cap distinct members at 3",
+    "FL multi leaves blanks null for backend",
   );
-  assert.equal(
-    assigned.every((row) => row.teamMemberId),
-    true,
-    "FL multi must assign every service when candidates exist",
+  assert.ok(
+    FIXED_LOCATION_MAX_DISTINCT_TEAM_MEMBERS >= 1,
+    "cap constant still exported",
   );
 }
 
@@ -101,7 +98,7 @@ const fourServices = [
 }
 
 {
-  // Blocked member excluded; free peer is chosen.
+  // Blank row: frontend does not invent a free peer (backend does).
   const assigned = autoAssignServicesByAvailability({
     snapshot: makeSnapshot(members.slice(0, 2), {
       a: [{ startMin: 10 * 60, endMin: 11 * 60 }],
@@ -111,11 +108,15 @@ const fourServices = [
     fallbackCatalogIds: ["s1"],
     startMin: 10 * 60,
   });
-  assert.equal(assigned[0]?.teamMemberId, "b", "assign free TM when peer is blocked");
+  assert.equal(
+    assigned[0]?.teamMemberId ?? null,
+    null,
+    "blank stays null even when a free peer exists",
+  );
 }
 
 {
-  // Pre-stamped busy TM must not stick when Combine Services shares one window.
+  // Pre-stamped busy TM must clear; frontend does not swap in another TM.
   const assigned = autoAssignServicesByAvailability({
     snapshot: makeSnapshot(members.slice(0, 2), {
       a: [{ startMin: 9 * 60, endMin: 12 * 60 }],
@@ -141,11 +142,15 @@ const fourServices = [
     sharedWindowMins: 15,
   });
   assert.equal(
-    assigned[0]?.teamMemberId,
-    "b",
-    "combine: busy pre-assign cleared, free peer used",
+    assigned[0]?.teamMemberId ?? null,
+    null,
+    "combine: busy pre-assign cleared to null",
   );
-  assert.equal(assigned[1]?.teamMemberId, "b", "combine: both services share free TM");
+  assert.equal(
+    assigned[1]?.teamMemberId ?? null,
+    null,
+    "combine: both cleared when shared pick is busy",
+  );
 }
 
 {
@@ -180,13 +185,15 @@ const fourServices = [
     startMin: 10 * 60,
     assignOneMemberForAll: true,
   });
-  const ids = assigned.map((row) => row.teamMemberId);
-  assert.equal(new Set(ids).size, 1, "DL stays single shared member");
-  assert.ok(ids[0], "DL assigns a member when free");
+  assert.equal(
+    assigned.every((row) => (row.teamMemberId ?? null) === null),
+    true,
+    "DL shared mode leaves blanks null for backend",
+  );
 }
 
 {
-  // Cap reuse: with 3 already used and a 4th service, stay within those 3.
+  // Keep free picks; blank 4th stays null (no frontend cap-fill).
   const assigned = autoAssignServicesByAvailability({
     snapshot: makeSnapshot(members, {}),
     services: [
@@ -199,15 +206,149 @@ const fourServices = [
     fallbackCatalogIds: ["s1", "s2", "s3", "s4"],
     startMin: 10 * 60,
   });
-  assert.ok(
-    assigned[3]?.teamMemberId &&
-      ["a", "b", "c"].includes(assigned[3].teamMemberId),
-    "4th service must stay within existing 3",
+  assert.equal(assigned[0]?.teamMemberId, "a");
+  assert.equal(assigned[1]?.teamMemberId, "b");
+  assert.equal(assigned[2]?.teamMemberId, "c");
+  assert.equal(
+    assigned[3]?.teamMemberId ?? null,
+    null,
+    "blank 4th stays null for backend",
+  );
+}
+
+{
+  // Optional per-service pick: keep free client choice; leave blanks for backend.
+  const assigned = autoAssignServicesByAvailability({
+    snapshot: makeSnapshot(members.slice(0, 3), {
+      a: [{ startMin: 10 * 60, endMin: 11 * 60 }],
+    }),
+    services: [
+      {
+        id: "1",
+        catalogServiceId: "s1",
+        durationMins: 30,
+        teamMemberId: "b",
+      },
+      { id: "2", catalogServiceId: "s2", durationMins: 30 },
+    ],
+    candidateMemberIds: ["a", "b", "c"],
+    fallbackCatalogIds: ["s1", "s2"],
+    startMin: 10 * 60,
+  });
+  assert.equal(assigned[0]?.teamMemberId, "b", "keep free client pick");
+  assert.equal(
+    assigned[1]?.teamMemberId ?? null,
+    null,
+    "blank service stays null for backend assign",
+  );
+}
+
+{
+  // Combine + multi-person: keep a TM who only performs that row's service.
+  // (canPerformAll used to wipe Guest eyelash when CLIENT also has other services.)
+  const specialist = [
+    { id: "aliza", name: "aliza", assignedServiceIds: ["eyelash"] },
+    { id: "saad", name: "saad", assignedServiceIds: ["s1", "eyelash"] },
+  ];
+  const assigned = autoAssignServicesByAvailability({
+    snapshot: makeSnapshot(specialist, {}),
+    services: [
+      {
+        id: "client-s1",
+        catalogServiceId: "s1",
+        durationMins: 1,
+        teamMemberId: null,
+      },
+      {
+        id: "guest-lash",
+        catalogServiceId: "eyelash",
+        durationMins: 11,
+        teamMemberId: "aliza",
+      },
+    ],
+    candidateMemberIds: ["aliza", "saad"],
+    fallbackCatalogIds: ["s1", "eyelash"],
+    startMin: 9 * 60,
+    assignOneMemberForAll: true,
+    sharedWindowMins: 11,
+  });
+  assert.equal(
+    assigned[1]?.teamMemberId,
+    "aliza",
+    "combine: keep specialist pick for that service",
   );
   assert.equal(
-    new Set(assigned.map((r) => r.teamMemberId)).has("d"),
-    false,
-    "must not introduce a 4th distinct member",
+    assigned[0]?.teamMemberId ?? null,
+    null,
+    "combine: blank sibling stays null",
+  );
+}
+
+{
+  // Guest path: skill id-space mismatch must not wipe a free explicit pick.
+  // (assignedServiceIds often use a different UUID than row.catalogServiceId.)
+  const specialist = [
+    {
+      id: "aliza",
+      name: "aliza",
+      assignedServiceIds: ["other-skill-uuid"],
+    },
+  ];
+  const assigned = autoAssignServicesByAvailability({
+    snapshot: makeSnapshot(specialist, {}),
+    services: [
+      {
+        id: "guest-lash",
+        catalogServiceId: "eyelash-catalog-uuid",
+        durationMins: 11,
+        teamMemberId: "aliza",
+      },
+    ],
+    candidateMemberIds: ["aliza"],
+    fallbackCatalogIds: ["eyelash-catalog-uuid"],
+    startMin: 9 * 60,
+    assignOneMemberForAll: true,
+    sharedWindowMins: 11,
+  });
+  assert.equal(
+    assigned[0]?.teamMemberId,
+    "aliza",
+    "combine: keep free Guest pick even when skill ids do not match",
+  );
+}
+
+{
+  // Duplicate catalog line ids (CLIENT + Guest): keep each pick by index.
+  const roster = [
+    { id: "aliza", name: "aliza", assignedServiceIds: ["eyelash"] },
+  ];
+  const assigned = autoAssignServicesByAvailability({
+    snapshot: makeSnapshot(roster, {}),
+    services: [
+      {
+        id: "lash",
+        catalogServiceId: "eyelash",
+        durationMins: 11,
+        teamMemberId: null,
+      },
+      {
+        id: "lash",
+        catalogServiceId: "eyelash",
+        durationMins: 11,
+        teamMemberId: "aliza",
+      },
+    ],
+    candidateMemberIds: ["aliza"],
+    fallbackCatalogIds: ["eyelash"],
+    startMin: 9 * 60,
+    assignOneMemberForAll: true,
+    sharedWindowMins: 11,
+  });
+  assert.equal(assigned[0]?.teamMemberId ?? null, null);
+  assert.equal(
+    assigned[1]?.teamMemberId,
+    "aliza",
+    "combine: duplicate ids keep Guest pick at its index",
   );
 }
 
