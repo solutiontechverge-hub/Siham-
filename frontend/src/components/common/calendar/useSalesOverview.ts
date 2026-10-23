@@ -345,6 +345,8 @@ export function useSalesOverview({
       payerRole: sub.payerRole,
       payerKey: sub.payerKey,
       clientEmail: sub.clientEmail || parent.clientEmail,
+      clientPhone: parent.clientPhone,
+      clientKind: parent.clientKind,
       lines: sub.lines,
       highlightedLineIds: sub.lines.map((line) => line.id),
       total: sub.total,
@@ -369,6 +371,7 @@ export function useSalesOverview({
       occurredAt: parent.occurredAt,
       paymentMethodLabel: parent.paymentMethodLabel,
       paymentMethod: parent.paymentMethod,
+      limitedMenu: parent.limitedMenu,
     }),
     [],
   );

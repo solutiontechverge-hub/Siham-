@@ -30,6 +30,7 @@ import {
 import { useUploadBookingAttachmentsMutation, useManageBookingEditRequestMutation } from "../../../../store/services/businessApi";
 import {
   useCreateFinanceTransactionMutation,
+  useProcessFinanceInvoiceReissuesMutation,
   useRestartPrepaymentDueMutation,
 } from "../../../../store/services/financeApi";
 import type { ProfessionalFixedLocationCalendarProps } from "./useProfessionalFixedLocationCalendar.types";
@@ -607,6 +608,19 @@ export function useProfessionalFixedLocationCalendar({
     openActivityComparison,
     drawerLineTagComparisonMode,
   } = viewingBookingBag;
+  const [processFinanceInvoiceReissues] =
+    useProcessFinanceInvoiceReissuesMutation();
+  const drawerReissueRunRef = React.useRef("");
+
+  React.useEffect(() => {
+    if (!slotDrawerOpen || !viewingBookingEvent) {
+      drawerReissueRunRef.current = "";
+      return;
+    }
+    if (drawerReissueRunRef.current === viewingBookingEvent.id) return;
+    drawerReissueRunRef.current = viewingBookingEvent.id;
+    void processFinanceInvoiceReissues();
+  }, [processFinanceInvoiceReissues, slotDrawerOpen, viewingBookingEvent]);
 
   const {
     postBookingPendingPayment,

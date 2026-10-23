@@ -307,6 +307,7 @@ export type TransactionDocument = {
   dueDate: string;
   lateFeeNotice?: string;
   reissuedFrom?: string;
+  reissuedAt?: string;
   reissueLevel?: number;
   client?: TransactionDocumentParty;
   bookingItems?: TransactionDocumentBookingItem[];

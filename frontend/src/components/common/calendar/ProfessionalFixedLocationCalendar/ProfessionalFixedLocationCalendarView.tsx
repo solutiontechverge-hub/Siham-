@@ -3,6 +3,8 @@
 import { Box, Paper, Stack } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import AppPillTabs from "../../AppPillTabs";
+import { useGetFinanceTransactionsQuery } from "../../../../store/services/financeApi";
+import { FinancePaymentDueRowsProvider } from "../resolveBookingPaymentDueMeta";
 import type { CalendarSubTab } from "../../../../app/professionals/fixed-location/calendar/calendar.data";
 import {
   useProfessionalFixedLocationCalendar,
@@ -22,6 +24,10 @@ export default function ProfessionalFixedLocationCalendar(
   props: ProfessionalFixedLocationCalendarProps,
 ) {
   const vm = useProfessionalFixedLocationCalendar(props);
+  const { data: financeResponse } = useGetFinanceTransactionsQuery(
+    { limit: 500 },
+    { refetchOnMountOrArgChange: true, pollingInterval: 12_000 },
+  );
   const {
     activeDateIso,
     activeMonthIso,
@@ -89,7 +95,8 @@ export default function ProfessionalFixedLocationCalendar(
   } = vm;
 
   return (
-    <Stack
+    <FinancePaymentDueRowsProvider rows={financeResponse?.data?.rows ?? []}>
+      <Stack
       spacing={1.5}
       sx={{
         bgcolor: alpha(m.teal, 0.12),
@@ -221,6 +228,7 @@ export default function ProfessionalFixedLocationCalendar(
 
       <ProfessionalFixedLocationCalendarBookingDrawer bag={vm} />
       <ProfessionalFixedLocationCalendarOverlays bag={vm} />
-    </Stack>
+      </Stack>
+    </FinancePaymentDueRowsProvider>
   );
 }

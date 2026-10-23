@@ -4,6 +4,8 @@ import type { SalesCardMetaRecord } from "./salesOverview.types";
 import { parseApiCalendarEventId } from "./bookingEventDetails";
 import { extractBookingId } from "./calendar.utils";
 import { formatFinanceDueDate } from "../booking-finance/formatBookingFinance";
+import type { TransactionRow } from "../../../app/professionals/fixed-location/finance/data/transactions";
+import { useGetFinanceTransactionsQuery } from "../../../store/services/financeApi";
 
 export type BookingPaymentDueMeta = {
   dueDateIso: string;
@@ -11,6 +13,18 @@ export type BookingPaymentDueMeta = {
   reissued: boolean;
   paymentDue: boolean;
 };
+
+const FinancePaymentDueRowsContext = React.createContext<TransactionRow[] | null>(null);
+
+export function FinancePaymentDueRowsProvider({
+  children,
+  rows,
+}: {
+  children: React.ReactNode;
+  rows: TransactionRow[];
+}) {
+  return React.createElement(FinancePaymentDueRowsContext.Provider, { value: rows }, children);
+}
 
 function isPaymentDueFromMeta(meta: SalesCardMetaRecord): boolean {
   if (meta.canceled || meta.voided || meta.refunded) return false;
@@ -84,11 +98,68 @@ export function resolveBookingPaymentDueMeta(input: {
 }
 
 /** Live meta for a calendar booking — refreshes when sales reissue meta changes. */
+function resolveFinancePaymentDueMeta(
+  rows: TransactionRow[],
+): BookingPaymentDueMeta | null {
+  const candidates = rows.filter((row) => {
+    const status = String(row.status).trim().toLowerCase();
+    const document = row.issuedDocument ?? row.document;
+    const reissued =
+      Boolean(document?.reissuedAt || document?.reissuedFrom) ||
+      Number(document?.reissueLevel ?? 0) > 0;
+    const closed = ["paid", "prepaid", "refunded", "voided"].includes(status);
+    return (
+      Boolean(
+        row.paymentDeadline ||
+          row.issuedDocument?.dueDate ||
+          row.document?.dueDate,
+      ) &&
+      !closed &&
+      (reissued ||
+        status === "payment due" ||
+        status === "overdue" ||
+        status === "unpaid")
+    );
+  });
+  const row =
+    candidates.find((candidate) => {
+      const document = candidate.issuedDocument ?? candidate.document;
+      return (
+        Boolean(document?.reissuedAt || document?.reissuedFrom) ||
+        Number(document?.reissueLevel ?? 0) > 0
+      );
+    }) ?? candidates[0];
+  if (!row) return null;
+
+  const document = row.issuedDocument ?? row.document;
+  const dueDate = row.paymentDeadline || document?.dueDate;
+  if (!dueDate) return null;
+
+  return {
+    dueDateIso: dueDate,
+    dateLabel: formatFinanceDueDate(dueDate),
+    reissued:
+      Boolean(document?.reissuedAt || document?.reissuedFrom) ||
+      Number(document?.reissueLevel ?? 0) > 0,
+    paymentDue: true,
+  };
+}
+
 export function useBookingPaymentDueMeta(event: {
   id: string;
   bookingCode?: string;
 } | null): BookingPaymentDueMeta | null {
   const [revision, setRevision] = React.useState(0);
+  const preloadedRows = React.useContext(FinancePaymentDueRowsContext);
+  const bookingKey = event
+    ? event.bookingCode ||
+      parseApiCalendarEventId(event.id)?.id ||
+      extractBookingId(event.id)
+    : "";
+  const { data: financeResponse } = useGetFinanceTransactionsQuery(
+    { bookingId: bookingKey, limit: 50 },
+    { skip: preloadedRows !== null || !bookingKey, refetchOnMountOrArgChange: true },
+  );
 
   React.useEffect(() => {
     if (typeof window === "undefined") return;
@@ -103,6 +174,19 @@ export function useBookingPaymentDueMeta(event: {
 
   return React.useMemo(() => {
     if (!event) return null;
+    if (preloadedRows !== null) {
+      const bookingIds = new Set(resolveBookingIds(event));
+      return resolveFinancePaymentDueMeta(
+        preloadedRows.filter(
+          (row) =>
+            bookingIds.has(String(row.bookingId ?? "")) ||
+            bookingIds.has(String(row.entryId ?? "")),
+        ),
+      );
+    }
+    if (financeResponse) {
+      return resolveFinancePaymentDueMeta(financeResponse.data?.rows ?? []);
+    }
     return resolveBookingPaymentDueMeta({
       bookingId: parseApiCalendarEventId(event.id)?.id ?? event.id,
       bookingCode: event.bookingCode,
@@ -110,5 +194,5 @@ export function useBookingPaymentDueMeta(event: {
     });
     // revision intentionally included so in-memory sales meta updates re-resolve
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [event?.id, event?.bookingCode, revision]);
+  }, [event?.id, event?.bookingCode, financeResponse, preloadedRows, revision]);
 }

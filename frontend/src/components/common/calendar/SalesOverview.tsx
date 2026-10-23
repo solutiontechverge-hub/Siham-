@@ -108,6 +108,18 @@ export default function SalesOverview({
     );
   }, [cards, refundCard]);
 
+  // Split-bill payer entries use the same card component as every other sale.
+  // The parent is only a grouping shell, so it is not rendered as a second layout.
+  const displayCards = React.useMemo(
+    () =>
+      cards.flatMap((card) =>
+        card.subCards?.length
+          ? card.subCards.map((sub) => subToCard(sub, card))
+          : [card],
+      ),
+    [cards, subToCard],
+  );
+
   if (editingCard) {
     return (
       <SalesEditCheckout
@@ -220,14 +232,13 @@ export default function SalesOverview({
         </Typography>
       ) : (
         <Stack spacing={1.5}>
-          {cards.map((card) => (
+          {displayCards.map((card) => (
             <SalesOverviewCard
               key={card.id}
               card={card}
               highlighted={
                 Boolean(focusCardId) &&
-                (card.id === focusCardId ||
-                  Boolean(card.subCards?.some((sub) => sub.id === focusCardId)))
+                card.id === focusCardId
               }
               highlightId={focusCardId}
               onViewInvoice={() => openDocument(card, "invoice")}
@@ -236,22 +247,6 @@ export default function SalesOverview({
                 openAddOns(card.bookingId, card.bookingCode, card.id)
               }
               onMenuAction={(action) => void handleMenuAction(card, action)}
-              onSubViewInvoice={(sub) =>
-                openDocument(subToCard(sub, card), "invoice")
-              }
-              onSubViewReceipt={(sub) =>
-                openDocument(subToCard(sub, card), "receipt")
-              }
-              onSubAddOns={(sub) => {
-                openAddOns(
-                  sub.bookingId || card.bookingId,
-                  sub.bookingCode || card.bookingCode,
-                  sub.id,
-                );
-              }}
-              onSubMenuAction={(sub, action) =>
-                void handleMenuAction(subToCard(sub, card), action)
-              }
             />
           ))}
         </Stack>
