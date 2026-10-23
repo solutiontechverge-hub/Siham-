@@ -12,6 +12,7 @@ import { parseUuid } from "../utils/uuid.js";
 import {
   buildPaginationMeta,
   parseListPagination,
+  sqlLimitOffset,
   withPaginationParams,
 } from "../utils/pagination.js";
 import {
@@ -150,24 +151,6 @@ const mapTransactionRow = (row) => ({
   issuedAt: row.issued_at ? new Date(row.issued_at).toISOString() : undefined,
 });
 
-/**
- * List/analytics payloads must not SELECT * — document / issued_document /
- * checkout_snapshot each embed ~110KB (invoice logos in issuedSnapshot).
- * SELECT * over the Supabase pooler hangs the request for minutes.
- */
-const FINANCE_TX_LIST_COLUMNS = `
-  id, entry_type, entry_id, transaction_date, created_at, payment_deadline,
-  entry_label, client_name, client_email, client_type,
-  gross_amount, stripe_fee, mollure_fee, net_amount,
-  method_title, method_detail, status, status_changed_at, status_detail,
-  note, booking_id, issued_at,
-  CASE WHEN document IS NULL THEN NULL ELSE (document - 'issuedSnapshot') END AS document,
-  CASE WHEN issued_document IS NULL THEN NULL ELSE (issued_document - 'issuedSnapshot') END AS issued_document
-`;
-
-/** Stable booking key for overview pagination (one page = N bookings). */
-const FINANCE_TX_BOOKING_KEY = `COALESCE(NULLIF(TRIM(entry_id), ''), NULLIF(TRIM(booking_id), ''), id::text)`;
-
 /** Attach shared ledger snapshot so Finances table matches Sale Drawer. */
 async function attachBookingFinancialsToRows(rows) {
   const refs = [
@@ -177,30 +160,19 @@ async function attachBookingFinancialsToRows(rows) {
   ];
   if (!refs.length) return rows;
   const result = await query(
-    `SELECT b.id::text AS id, b.unique_code, b.status, b.notes,
-            u.email AS customer_email,
-            COALESCE(
-              NULLIF(TRIM(cp.legal_name), ''),
-              NULLIF(TRIM(ip.display_name), ''),
-              NULLIF(TRIM(CONCAT(ip.first_name, ' ', ip.last_name)), ''),
-              u.email
-            ) AS customer_name
-       FROM bookings b
-       LEFT JOIN users u ON u.id = b.customer_id
-       LEFT JOIN individual_profiles ip ON ip.user_id = u.id
-       LEFT JOIN company_profiles cp ON cp.user_id = u.id
-      WHERE b.id::text = ANY($1::text[])
-         OR b.unique_code = ANY($1::text[])`,
+    `SELECT id::text AS id, unique_code, status, notes
+       FROM bookings
+      WHERE id::text = ANY($1::text[])
+         OR unique_code = ANY($1::text[])`,
     [refs],
   );
   const byRef = new Map();
   for (const booking of result.rows) {
     const financials = parseBookingFinancialsFromNotes(booking.notes);
+    if (!financials) continue;
     const payload = {
-      ...(financials ? { bookingFinancials: financials } : {}),
+      bookingFinancials: financials,
       bookingStatus: booking.status ?? null,
-      bookerName: booking.customer_name ?? null,
-      bookerEmail: booking.customer_email ?? null,
     };
     byRef.set(String(booking.id), payload);
     if (booking.unique_code) byRef.set(String(booking.unique_code), payload);
@@ -1120,43 +1092,23 @@ export const listFinanceTransactions = async (req, res) => {
           )
         )`;
     const scopeValue = scopeProfileId ?? bookingIdParam;
-    const filterParams = [scopeValue, ...values];
-    const limitIdx = filterParams.length + 1;
-    const offsetIdx = filterParams.length + 2;
-
-    // Page by distinct booking (entry_id), then return ALL phase/guest rows for those bookings.
-    // Raw LIMIT on transactions was cutting main-client rows off when guests sorted first.
-    const countResult = await query(
-      `SELECT COUNT(*)::int AS total FROM (
-         SELECT 1
-         FROM finance_transactions
-         WHERE ${scopeClause} ${where} ${completeRowGuard}
-         GROUP BY ${FINANCE_TX_BOOKING_KEY}
-       ) booking_pages`,
-      filterParams,
-    );
-    const total = countResult.rows[0]?.total ?? 0;
+    const { clause: limitClause } = sqlLimitOffset(2 + values.length);
 
     const result = await query(
-      `WITH page_bookings AS (
-         SELECT ${FINANCE_TX_BOOKING_KEY} AS booking_key,
-                MAX(COALESCE(transaction_date, created_at::date)) AS sort_date,
-                MAX(created_at) AS sort_created
-         FROM finance_transactions
-         WHERE ${scopeClause} ${where} ${completeRowGuard}
-         GROUP BY 1
-         ORDER BY sort_date DESC, sort_created DESC
-         LIMIT $${limitIdx} OFFSET $${offsetIdx}
-       )
-       SELECT ${FINANCE_TX_LIST_COLUMNS}
-       FROM finance_transactions
-       INNER JOIN page_bookings pb
-         ON ${FINANCE_TX_BOOKING_KEY} = pb.booking_key
-       WHERE ${scopeClause} ${where} ${completeRowGuard}
-       ORDER BY pb.sort_date DESC, pb.sort_created DESC,
-                COALESCE(transaction_date, created_at::date) DESC, created_at DESC`,
-      withPaginationParams(filterParams, pagination),
+      `SELECT * FROM finance_transactions
+       WHERE ${scopeClause}
+       ${where} ${completeRowGuard}
+       ORDER BY COALESCE(transaction_date, created_at::date) DESC, created_at DESC
+       ${limitClause}`,
+      withPaginationParams([scopeValue, ...values], pagination),
     );
+
+    const countResult = await query(
+      `SELECT COUNT(*)::int AS total FROM finance_transactions
+       WHERE ${scopeClause} ${where} ${completeRowGuard}`,
+      [scopeValue, ...values],
+    );
+    const total = countResult.rows[0]?.total ?? 0;
 
     const mapped = result.rows.map(mapTransactionRow);
     const rows = await attachBookingFinancialsToRows(mapped);
@@ -1191,8 +1143,7 @@ export const getFinanceAnalytics = async (req, res) => {
       AND NULLIF(TRIM(COALESCE(client_name, '')), '') IS NOT NULL`;
 
     const result = await query(
-      `SELECT ${FINANCE_TX_LIST_COLUMNS}
-       FROM finance_transactions
+      `SELECT * FROM finance_transactions
        WHERE professional_profile_id = $1
        ${where} ${completeRowGuard}
        ORDER BY COALESCE(transaction_date, created_at::date) DESC, created_at DESC
@@ -2460,71 +2411,46 @@ export const reissueFinanceInvoiceForBooking = async (req, res) => {
         ? moneyNumber(body.totalPrice)
         : null;
 
-    const openTx = await query(
-      `SELECT *
+    let txId = null;
+    const existingTx = await query(
+      `SELECT id, document, net_amount, gross_amount, status, client_email, client_name
        FROM finance_transactions
        WHERE professional_profile_id = $1
          AND booking_id = $2
-         AND status IN ('Payment due', 'Overdue', 'Pending')
+         AND status NOT IN ('Paid', 'Refunded', 'Voided', 'Prepaid')
        ORDER BY
-         CASE
-           WHEN COALESCE(document->>'paymentPhase', '') = 'full' THEN 0
-           WHEN COALESCE(document->>'paymentPhase', '') = 'addon' THEN 1
-           ELSE 2
-         END,
+         CASE WHEN status IN ('Payment due', 'Overdue', 'Pending') THEN 0 ELSE 1 END,
          updated_at DESC NULLS LAST,
-         created_at DESC NULLS LAST`,
+         created_at DESC NULLS LAST
+       LIMIT 1`,
       [profile.id, bookingRef],
     );
 
-    // Reissue only after-treatment (full) invoices — never prepay/addon rows.
-    // Optional payerKey / financeTransactionId = one payer (main / guest / model).
-    const isFullPhase = (row) => {
-      const phase = String(row?.document?.paymentPhase ?? "").toLowerCase();
-      return phase === "full" || !phase;
-    };
-    const isMainPayerKey = (pk) => {
-      const key = String(pk ?? "").trim().toLowerCase();
-      return !key || key === "main-client" || key === "main" || key === "main_client";
-    };
-    const targetTxId = String(
-      body.financeTransactionId ?? body.transactionId ?? "",
-    ).trim();
-    const targetPayerKey = String(body.payerKey ?? "").trim();
-    const matchesPayer = (row) => {
-      if (targetTxId) return String(row.id) === targetTxId;
-      if (!targetPayerKey) return true;
-      const rowKey = String(row?.document?.payerKey ?? "").trim();
-      if (isMainPayerKey(targetPayerKey)) return isMainPayerKey(rowKey);
-      return rowKey === targetPayerKey;
-    };
-    let rows = openTx.rows.filter((row) => isFullPhase(row) && matchesPayer(row));
-    if (!rows.length && !targetTxId) {
-      const createdId = await syncBookingToFinanceTransaction(bookingId, {
+    if (existingTx.rows[0]) {
+      txId = existingTx.rows[0].id;
+    } else {
+      txId = await syncBookingToFinanceTransaction(bookingId, {
         paymentPhase: "full",
         paymentMethod: body.paymentMethod || "onlineNonDirect",
-        payerKey: targetPayerKey || "main-client",
         amountOverride:
           totalOverride != null && Number.isFinite(totalOverride)
             ? totalOverride
             : null,
         statusOverride: "Payment due",
       });
-      if (!createdId) {
-        return res.status(404).json({
-          success: false,
-          message: "Unable to find or create a finance transaction for this booking.",
-          data: null,
-        });
-      }
-      const created = await query(
-        `SELECT * FROM finance_transactions WHERE id = $1`,
-        [createdId],
-      );
-      rows = created.rows.filter((row) => isFullPhase(row) && matchesPayer(row));
     }
 
-    if (!rows.length) {
+    if (!txId) {
+      return res.status(404).json({
+        success: false,
+        message: "Unable to find or create a finance transaction for this booking.",
+        data: null,
+      });
+    }
+
+    const current = await query(`SELECT * FROM finance_transactions WHERE id = $1`, [txId]);
+    const row = current.rows[0];
+    if (!row) {
       return res.status(404).json({
         success: false,
         message: "Finance transaction not found.",
@@ -2532,87 +2458,72 @@ export const reissueFinanceInvoiceForBooking = async (req, res) => {
       });
     }
 
+    const doc = row.document && typeof row.document === "object" ? { ...row.document } : {};
+    const prevNumber = doc.documentNumber || `INV-${bookingRef}`;
+    const reissueNumber = String(prevNumber).includes("-R")
+      ? prevNumber
+      : `${prevNumber}-R${Date.now().toString().slice(-4)}`;
+
     const penalty = Number.isFinite(penaltyAmount) ? penaltyAmount : 0;
-    const reissuedAt = new Date().toISOString();
-    const clientEmailFallback =
+    // totalPrice from client is the final amount (already includes penalty when sent).
+    const nextAmount =
+      totalOverride != null && Number.isFinite(totalOverride)
+        ? Math.round(totalOverride * 100) / 100
+        : Math.round(
+            ((Number(row.net_amount ?? row.gross_amount ?? booking.total_price ?? 0) || 0) +
+              penalty) *
+              100,
+          ) / 100;
+    const nextLevel = (Number(doc.reissueLevel) || 0) + 1;
+
+    const nextDoc = {
+      ...doc,
+      documentNumber: reissueNumber,
+      invoiceDate: toIsoDate(new Date()),
+      dueDate,
+      totalPrice: moneyNumber(nextAmount),
+      reissuedAt: new Date().toISOString(),
+      reissueLevel: nextLevel,
+      ...(penalty > 0 ? { penaltyAmount: penalty } : {}),
+    };
+
+    const clientEmail =
       String(body.clientEmail ?? "").trim() ||
+      String(row.client_email ?? "").trim() ||
       String(booking.customer_email ?? "").trim() ||
       "";
-    const clientNameFallback =
+    const clientName =
       String(body.clientName ?? "").trim() ||
+      String(row.client_name ?? "").trim() ||
       String(booking.customer_name ?? "").trim() ||
       "Client";
 
-    const updatedRows = [];
-    for (const row of rows) {
-      const doc =
-        row.document && typeof row.document === "object" ? { ...row.document } : {};
-      const prevNumber = doc.documentNumber || `INV-${bookingRef}`;
-      const reissueNumber = String(prevNumber).includes("-R")
-        ? prevNumber
-        : `${prevNumber}-R${Date.now().toString().slice(-4)}`;
-      const phase = String(doc.paymentPhase ?? "").toLowerCase();
-      // Apply amount/penalty only to the primary full-phase row; others keep amount, share due date.
-      const applyAmount =
-        phase === "full" || (!phase && updatedRows.length === 0);
-      const nextAmount = applyAmount
-        ? totalOverride != null && Number.isFinite(totalOverride)
-          ? Math.round(totalOverride * 100) / 100
-          : Math.round(
-              ((Number(row.net_amount ?? row.gross_amount ?? booking.total_price ?? 0) ||
-                0) +
-                penalty) *
-                100,
-            ) / 100
-        : Math.round(
-            (Number(row.net_amount ?? row.gross_amount ?? 0) || 0) * 100,
-          ) / 100;
-      const nextLevel = (Number(doc.reissueLevel) || 0) + 1;
-      const nextDoc = {
-        ...doc,
-        documentNumber: reissueNumber,
-        invoiceDate: toIsoDate(new Date()),
+    const updated = await query(
+      `UPDATE finance_transactions
+       SET status = 'Payment due',
+           status_detail = $2,
+           document = $3::jsonb,
+           issued_document = $3::jsonb,
+           issued_at = NOW(),
+           gross_amount = $4,
+           net_amount = $4,
+           payment_deadline = $7::date,
+           client_email = CASE WHEN $5 = '' THEN client_email ELSE $5 END,
+           client_name = CASE WHEN $6 = '' THEN client_name ELSE $6 END,
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [
+        txId,
+        `Reissue of ${prevNumber}`,
+        JSON.stringify(normalizeMoneyJson(nextDoc)),
+        nextAmount,
+        clientEmail,
+        clientName,
         dueDate,
-        totalPrice: moneyNumber(nextAmount),
-        reissuedAt,
-        reissueLevel: nextLevel,
-        ...(applyAmount && penalty > 0 ? { penaltyAmount: penalty } : {}),
-      };
-      const clientEmail =
-        clientEmailFallback || String(row.client_email ?? "").trim() || "";
-      const clientName =
-        clientNameFallback || String(row.client_name ?? "").trim() || "Client";
+      ],
+    );
 
-      const updated = await query(
-        `UPDATE finance_transactions
-         SET status = 'Payment due',
-             status_detail = $2,
-             document = $3::jsonb,
-             issued_document = $3::jsonb,
-             issued_at = NOW(),
-             gross_amount = $4,
-             net_amount = $4,
-             payment_deadline = $7::date,
-             client_email = CASE WHEN $5 = '' THEN client_email ELSE $5 END,
-             client_name = CASE WHEN $6 = '' THEN client_name ELSE $6 END,
-             updated_at = NOW()
-         WHERE id = $1
-         RETURNING *`,
-        [
-          row.id,
-          `Reissue of ${prevNumber}`,
-          JSON.stringify(normalizeMoneyJson(nextDoc)),
-          nextAmount,
-          clientEmail,
-          clientName,
-          dueDate,
-        ],
-      );
-      if (updated.rows[0]) updatedRows.push(updated.rows[0]);
-    }
-
-    const primary = updatedRows[0];
-    const txId = primary.id;
     const dueDateLabel = dueDate.split("-").reverse().join("/");
     const notification = await dispatchInvoiceReissuedNotification(txId, dueDateLabel);
     const email = await sendFinanceClientEmail(txId, FINANCE_EMAIL_TYPES.INVOICE_REISSUED, {
@@ -2623,8 +2534,7 @@ export const reissueFinanceInvoiceForBooking = async (req, res) => {
       success: true,
       message: "Invoice reissued. Client notified.",
       data: {
-        transaction: mapTransactionRow(primary),
-        updatedCount: updatedRows.length,
+        transaction: mapTransactionRow(updated.rows[0]),
         notificationSent: Boolean(notification),
         emailSent: Boolean(email?.sent),
         emailTo: email?.to ?? null,

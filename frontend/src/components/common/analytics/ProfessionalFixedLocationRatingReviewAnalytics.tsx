@@ -26,10 +26,12 @@ import { useRouter } from "next/navigation";
 import type { ProfessionalFixedLocationRatingReviewAnalyticsData } from "../../../app/professionals/fixed-location/analytics/ratingReviewAnalytics.data";
 import { ratingReviewAnalyticsHref } from "../../../app/professionals/fixed-location/analytics/ratingReviewRoutes";
 import {
+  REVIEWS_CHANGED_EVENT,
   clientReviewsHref,
+  computeReviewStats,
+  loadReviewsForShop,
 } from "../../../data/clientProfessionalReviews";
 import { useGetBusinessSetupQuery } from "../../../store/services/businessApi";
-import { useGetReviewsQuery } from "../../../store/services/reviewsApi";
 import AnalyticsSectionExplanation from "./AnalyticsSectionExplanation";
 import ReviewSummaryByCategoryChart from "./ReviewSummaryByCategoryChart";
 import { BodyText } from "../../ui/typography";
@@ -56,15 +58,23 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({
   const analytics43 = data.ratingDistributionByCategory;
   const analytics44 = data.reviewSummaryByCategory;
 
-  const { data: reviewsResponse } = useGetReviewsQuery(
-    { businessSetupId: shopId },
-    { skip: !shopId },
+  const [reviewStats, setReviewStats] = React.useState(() =>
+    computeReviewStats([]),
   );
-  const reviewStats = reviewsResponse?.data?.stats ?? {
-    average: 0,
-    total: 0,
-    distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
-  };
+
+  const refreshReviewStats = React.useCallback(() => {
+    setReviewStats(computeReviewStats(loadReviewsForShop(shopId)));
+  }, [shopId]);
+
+  React.useEffect(() => {
+    refreshReviewStats();
+    window.addEventListener(REVIEWS_CHANGED_EVENT, refreshReviewStats);
+    window.addEventListener("storage", refreshReviewStats);
+    return () => {
+      window.removeEventListener(REVIEWS_CHANGED_EVENT, refreshReviewStats);
+      window.removeEventListener("storage", refreshReviewStats);
+    };
+  }, [refreshReviewStats]);
 
   const overallRating = reviewStats.total > 0 ? reviewStats.average : 0;
   const totalReviews = reviewStats.total;

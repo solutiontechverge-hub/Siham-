@@ -6,13 +6,10 @@
  */
 
 import * as React from "react";
-import {
-  getUiPrefsSnapshot,
-  patchUiPrefs,
-  subscribeUiPrefs,
-} from "../../../lib/uiPrefsStore";
 
 export type BookingUpdateViewer = "professional" | "client";
+
+const STORAGE_KEY = "mollure:booking_update_seen_v1";
 
 type SeenMap = Record<string, string>;
 
@@ -23,8 +20,6 @@ function bumpSeenVersion() {
   seenVersion += 1;
   seenListeners.forEach((listener) => listener());
 }
-
-subscribeUiPrefs(() => bumpSeenVersion());
 
 export function subscribeBookingUpdateSeen(listener: () => void) {
   seenListeners.add(listener);
@@ -52,11 +47,19 @@ function storageKey(viewer: BookingUpdateViewer, bookingRef: string) {
 }
 
 function loadSeen(): SeenMap {
-  return { ...(getUiPrefsSnapshot().bookingUpdateSeen ?? {}) };
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) as SeenMap;
+  } catch {
+    return {};
+  }
 }
 
 function saveSeen(map: SeenMap) {
-  patchUiPrefs({ bookingUpdateSeen: map });
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
 }
 
 function toMs(value?: string | null): number {
@@ -140,7 +143,7 @@ function visitSessionKey(viewer: BookingUpdateViewer, bookingRef: string) {
 
 /**
  * Keep Updated chips for this browser tab visit even if React Strict Mode
- * remounts the page (which would otherwise clear seen state mid-visit).
+ * remounts the page (which would otherwise clear localStorage-seen mid-visit).
  */
 export function rememberSilentUpdateVisit(
   viewer: BookingUpdateViewer,

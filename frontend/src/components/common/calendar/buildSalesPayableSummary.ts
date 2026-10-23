@@ -47,11 +47,9 @@ function feeLabelFromLedger(row: {
  * Charges = services + add-ons + protective fees only (the real total).
  * Prepayment is a formality credit against that total — refunds reduce the
  * credit, they must NOT be added again on top of services (that inflates due).
- * Cancelled: services dropped (never availed); payable = unpaid fees only.
  */
 export function buildSalesPayableSummary(
   finance: BookingFinanceViewModel | null | undefined,
-  opts?: { bookingStatus?: string | null },
 ): SalesPayableSummary | null {
   if (!finance) return null;
 
@@ -64,32 +62,13 @@ export function buildSalesPayableSummary(
   // Backend owns prepaid − refund math; UI only displays.
   const prepaidRefunded = money(finance.prepaidRefunded);
   const netPrepayCredit = money(finance.netPrepaymentCredit);
-  const payableRaw = money(finance.amountDue);
-  const bookingStatus = String(
-    opts?.bookingStatus ?? finance.bookingStatus ?? "",
-  ).toLowerCase();
-  const isCancelledBooking =
-    bookingStatus === "cancelled" || bookingStatus === "canceled";
+  const payable = money(finance.amountDue);
 
-  // Cancelled: drop service/add-on charges — client did not take them.
-  const chargeBase = isCancelledBooking ? 0 : base;
-  const chargeAddOns = isCancelledBooking ? 0 : addOns;
-
-  if (chargeBase > 0) {
-    lines.push({
-      id: "services",
-      label: "Services",
-      amount: chargeBase,
-      tone: "charge",
-    });
+  if (base > 0) {
+    lines.push({ id: "services", label: "Services", amount: base, tone: "charge" });
   }
-  if (chargeAddOns > 0) {
-    lines.push({
-      id: "addons",
-      label: "Add-ons",
-      amount: chargeAddOns,
-      tone: "charge",
-    });
+  if (addOns > 0) {
+    lines.push({ id: "addons", label: "Add-ons", amount: addOns, tone: "charge" });
   }
 
   // Split protective fees from ledger (cancel / reschedule / no-show).
@@ -122,9 +101,7 @@ export function buildSalesPayableSummary(
   if (chargesTotal > 0 && lines.length > 1) {
     lines.push({
       id: "charges-total",
-      label: isCancelledBooking
-        ? "Total (fees)"
-        : "Total (services & products)",
+      label: "Total (services & products)",
       amount: chargesTotal,
       tone: "charge",
     });
@@ -149,21 +126,19 @@ export function buildSalesPayableSummary(
       String(row.type).toUpperCase() === "PAYMENT",
   );
 
-  let paymentCredit = 0;
   if (paymentRows.length > 0) {
-    paymentCredit = roundMoney(
+    const paymentSum = roundMoney(
       paymentRows.reduce((sum, row) => sum + money(row.amount), 0),
     );
-    if (paymentCredit > 0) {
+    if (paymentSum > 0) {
       lines.push({
         id: "payments",
         label: "Payments received",
-        amount: -paymentCredit,
+        amount: -paymentSum,
         tone: "credit",
       });
     }
   } else if (paidOther > 0) {
-    paymentCredit = paidOther;
     lines.push({
       id: "payments",
       label: "Payments received",
@@ -171,13 +146,6 @@ export function buildSalesPayableSummary(
       tone: "credit",
     });
   }
-
-  // Cancelled: amountDue may still include stale service balance — recompute from fees only.
-  const payable = isCancelledBooking
-    ? roundMoney(
-        Math.max(0, chargesTotal - netPrepayCredit - paymentCredit),
-      )
-    : payableRaw;
 
   if (lines.length === 0 && payable <= 0) return null;
 

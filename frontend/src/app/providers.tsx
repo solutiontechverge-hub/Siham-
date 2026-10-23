@@ -9,7 +9,6 @@ import StoreProvider from "../store/provider";
 import MessagingRealtimeBridge from "../components/common/messaging/MessagingRealtimeBridge";
 import NotificationsRealtimeBridge from "../components/common/NotificationsRealtimeBridge";
 import BusinessRealtimeBridge from "../components/common/BusinessRealtimeBridge";
-import UiPrefsSync from "../components/common/UiPrefsSync";
 import { MessagingWidgetProvider } from "../components/common/messaging/MessagingWidgetContext";
 
 const MessagingWidgetHost = dynamic(
@@ -23,7 +22,6 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       <ThemeRegistry>
         <MessagingWidgetProvider>
           {children}
-          <UiPrefsSync />
           <MessagingRealtimeBridge />
           <NotificationsRealtimeBridge />
           <BusinessRealtimeBridge />

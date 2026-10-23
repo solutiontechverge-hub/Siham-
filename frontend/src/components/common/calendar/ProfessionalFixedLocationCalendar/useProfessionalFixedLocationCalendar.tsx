@@ -84,7 +84,6 @@ import { useProfessionalFixedLocationCalendarDrawerShellState } from "./useProfe
 import { useProfessionalFixedLocationCalendarViewRange } from "./useProfessionalFixedLocationCalendar.viewRange";
 import { useProfessionalFixedLocationCalendarViewingBooking } from "./useProfessionalFixedLocationCalendar.viewingBooking";
 import { useProfessionalFixedLocationCalendarMessaging } from "./useProfessionalFixedLocationCalendar.messaging";
-import { useHydrateSalesCardMetadata } from "../useHydrateSalesCardMetadata";
 
 export type {
   InlineGuestDraftState,
@@ -135,8 +134,6 @@ export function useProfessionalFixedLocationCalendar({
   onUpdateCalendarEntryStatus,
   onDateRangeChange,
 }: ProfessionalFixedLocationCalendarProps) {
-  // One-shot sales meta for Booking banner + Sales cards (RTK cache shared).
-  useHydrateSalesCardMetadata();
   const theme = useTheme();
   const m = theme.palette.mollure;
   const timelineGridSlotColors = React.useMemo<TimelineGridSlotColors>(

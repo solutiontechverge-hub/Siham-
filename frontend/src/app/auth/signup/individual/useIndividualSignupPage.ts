@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTheme } from "@mui/material/styles";
 import { getApiErrorMessage } from "../../../../lib/api-error";
 import {
+  CLIENT_PROFILE_KEY,
   SIGNUP_EMAIL_KEY,
   SIGNUP_USER_TYPE_KEY,
 } from "../../../../lib/auth-storage";
@@ -195,6 +196,34 @@ export function useIndividualSignupPage() {
           undefined,
         phone: form.phone.trim() || undefined,
       }).unwrap();
+
+      // Persist client details for pre-filling the client profile page.
+      try {
+        window.localStorage.setItem(
+          CLIENT_PROFILE_KEY,
+          JSON.stringify({
+            first_name: form.firstName.trim(),
+            last_name: form.lastName.trim(),
+            display_name:
+              resolveDisplayNameFromMode(
+                form.reviewNameMode,
+                form.firstName,
+                form.lastName,
+              ) || undefined,
+            date_of_birth: form.birthDate || undefined,
+            gender: form.gender || undefined,
+            country_code:
+              (findCountryDialCode(form.countryCode)?.dialCode ??
+                form.countryCode.trim()) ||
+              undefined,
+            phone: form.phone.trim() || undefined,
+            email: form.email.trim().toLowerCase(),
+            avatar_url: null,
+          }),
+        );
+      } catch {
+        // ignore storage failures
+      }
 
       showSnackbar({
         severity: "success",

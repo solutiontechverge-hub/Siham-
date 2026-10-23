@@ -31,11 +31,7 @@ import {
 } from "../../../../../store/services/financeApi";
 import { getApiErrorMessage } from "../../../../../lib/api-error";
 import type { RefundSalesSavePayload } from "../../../../../components/sections/finance/refundSales.data";
-import {
-  INITIAL_VISIBLE,
-  buildActionMenuItems,
-  groupFinanceOverviewRows,
-} from "./overview.data";
+import { INITIAL_VISIBLE, buildActionMenuItems } from "./overview.data";
 import { useStripePayoutGuard } from "../useStripePayoutGuard";
 
 export function useFinanceOverviewPage() {
@@ -128,11 +124,7 @@ export function useFinanceOverviewPage() {
   }, [fromDate, toDate]);
 
   const filtered = transactions;
-  // API total = distinct bookings; limit/offset page by booking.
-  const visibleRows = React.useMemo(
-    () => groupFinanceOverviewRows(filtered),
-    [filtered],
-  );
+  const visibleRows = filtered;
   const pageCount = Math.max(1, Math.ceil(totalTransactions / INITIAL_VISIBLE));
 
   const toggleOne = (id: string) => {
@@ -146,22 +138,16 @@ export function useFinanceOverviewPage() {
     }
     const next: Record<string, boolean> = {};
     visibleRows.forEach((r) => {
-      if (r.entryId == null) return; // continuation rows (image 2)
       next[r.id] = true;
     });
     setSelected(next);
   };
 
-  const selectableVisible = React.useMemo(
-    () => visibleRows.filter((r) => r.entryId != null),
-    [visibleRows],
-  );
   const allVisibleSelected =
-    selectableVisible.length > 0 &&
-    selectableVisible.every((r) => selected[r.id]);
+    visibleRows.length > 0 && visibleRows.every((r) => selected[r.id]);
   const selectedCount = React.useMemo(
-    () => selectableVisible.filter((r) => selected[r.id]).length,
-    [selectableVisible, selected],
+    () => visibleRows.filter((r) => selected[r.id]).length,
+    [visibleRows, selected],
   );
   const multipleSelected = selectedCount >= 2;
 

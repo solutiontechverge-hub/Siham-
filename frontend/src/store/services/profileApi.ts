@@ -210,21 +210,6 @@ export const profileApi = baseApi.injectEndpoints({
         return { data };
       },
     }),
-    getUiPrefs: builder.query<ApiEnvelope<Record<string, unknown>>, void>({
-      query: () => "/api/user/ui-prefs",
-      providesTags: ["UiPrefs"],
-    }),
-    putUiPrefs: builder.mutation<
-      ApiEnvelope<Record<string, unknown>>,
-      Record<string, unknown>
-    >({
-      query: (body) => ({
-        url: "/api/user/ui-prefs",
-        method: "PUT",
-        body,
-      }),
-      invalidatesTags: ["UiPrefs"],
-    }),
   }),
   overrideExisting: false,
 });
@@ -233,6 +218,4 @@ export const {
   useGetProfileQuery,
   useUpdateProfileMutation,
   useChangeEmailMutation,
-  useGetUiPrefsQuery,
-  usePutUiPrefsMutation,
 } = profileApi;

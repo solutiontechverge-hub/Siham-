@@ -21,6 +21,7 @@ import {
   resolveDisplayNameFromMode,
   type ReviewNameMode,
 } from "../../../lib/reviewNameDisplay";
+import { CLIENT_PROFILE_KEY } from "../../../lib/auth-storage";
 import {
   type CompanyProfile,
   type IndividualProfile,
@@ -76,6 +77,37 @@ const initialForm: ProfileFormState = {
   contactLastName: "",
   logoOrProfilePicture: null,
 };
+
+type PersistedClientProfile = {
+  first_name?: string;
+  last_name?: string;
+  display_name?: string;
+  date_of_birth?: string;
+  gender?: string;
+  country_code?: string;
+  phone?: string;
+  email?: string;
+  avatar_url?: string | null;
+  legal_name?: string;
+  ccc_number?: string;
+  vat_number?: string;
+  street?: string;
+  street_number?: string;
+  postal_code?: string;
+  province?: string;
+  municipality?: string;
+  contact_first_name?: string;
+  contact_last_name?: string;
+  logo?: string | null;
+};
+
+function writePersistedClientProfile(next: PersistedClientProfile) {
+  try {
+    window.localStorage.setItem(CLIENT_PROFILE_KEY, JSON.stringify(next));
+  } catch {
+    // ignore storage failures
+  }
+}
 
 function computedDisplayName(form: ProfileFormState): string {
   return resolveDisplayNameFromMode(
@@ -234,6 +266,31 @@ export function useClientProfilePage() {
     }
 
     setForm(mapProfileToForm(profile));
+
+    // Keep messaging / header avatar in sync even before the user hits Save.
+    if (profile.user_type === "company") {
+      const companyProfile = profile.profile as CompanyProfile | null;
+      writePersistedClientProfile({
+        email: profile.email,
+        display_name: companyProfile?.legal_name ?? "",
+        first_name: companyProfile?.contact_first_name ?? "",
+        last_name: companyProfile?.contact_last_name ?? "",
+        avatar_url: companyProfile?.logo ?? null,
+      });
+    } else if (profile.user_type === "individual") {
+      const individualProfile = profile.profile as IndividualProfile | null;
+      writePersistedClientProfile({
+        first_name: individualProfile?.first_name ?? "",
+        last_name: individualProfile?.last_name ?? "",
+        display_name: individualProfile?.display_name ?? "",
+        date_of_birth: individualProfile?.date_of_birth ?? "",
+        gender: individualProfile?.gender ?? "",
+        country_code: individualProfile?.country_code ?? "",
+        phone: individualProfile?.phone ?? "",
+        email: profile.email,
+        avatar_url: individualProfile?.profile_picture ?? null,
+      });
+    }
   }, [profile]);
 
   const clearMessages = React.useCallback(() => {
@@ -441,6 +498,40 @@ export function useClientProfilePage() {
       }
 
       setPendingAvatarFile(null);
+
+      if (result.data.user_type === "company") {
+        const companyProfile = result.data.profile as CompanyProfile | null;
+        writePersistedClientProfile({
+          email: result.data.email,
+          legal_name: companyProfile?.legal_name ?? "",
+          ccc_number: companyProfile?.ccc_number ?? "",
+          vat_number: companyProfile?.vat_number ?? "",
+          street: companyProfile?.street ?? "",
+          street_number: companyProfile?.street_number ?? "",
+          postal_code: companyProfile?.postal_code ?? "",
+          province: companyProfile?.province ?? "",
+          municipality: companyProfile?.municipality ?? "",
+          contact_first_name: companyProfile?.contact_first_name ?? "",
+          contact_last_name: companyProfile?.contact_last_name ?? "",
+          phone: companyProfile?.phone ?? "",
+          logo: companyProfile?.logo ?? null,
+        });
+      } else {
+        const individualProfile = result.data
+          .profile as IndividualProfile | null;
+        writePersistedClientProfile({
+          first_name: individualProfile?.first_name ?? "",
+          last_name: individualProfile?.last_name ?? "",
+          display_name: individualProfile?.display_name ?? "",
+          date_of_birth: individualProfile?.date_of_birth ?? "",
+          gender: individualProfile?.gender ?? "",
+          country_code: individualProfile?.country_code ?? "",
+          phone: individualProfile?.phone ?? "",
+          email: result.data.email,
+          avatar_url: individualProfile?.profile_picture ?? null,
+        });
+      }
+
       setSuccessMessage("Profile updated.");
       setIsEditing(false);
     } catch {

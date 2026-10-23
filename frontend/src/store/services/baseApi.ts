@@ -191,8 +191,6 @@ export const baseApi = createApi({
     "ProfessionalClients",
     "FinanceSettings",
     "FinanceTransactions",
-    "SalesCardMetadata",
-    "SalesAddons",
     "Messaging",
     "Notifications",
     "AdminDashboard",
@@ -206,7 +204,6 @@ export const baseApi = createApi({
     "AdminListingRanking",
     "Favorites",
     "Reviews",
-    "UiPrefs",
   ],
   baseQuery: baseQueryWithAuthHandling,
   /** Keep cached query data longer after the last subscriber unmounts (seconds). */

@@ -118,11 +118,9 @@ export default function TransactionsTable({
   theme,
   m,
 }: TransactionsTableProps) {
-  const selectableRows = rows.filter((r) => r.entryId != null);
   const allVisibleSelected =
-    selectableRows.length > 0 &&
-    selectableRows.every((r) => selected[r.id]);
-  const someVisibleSelected = selectableRows.some((r) => selected[r.id]);
+    rows.length > 0 && rows.every((r) => selected[r.id]);
+  const someVisibleSelected = rows.some((r) => selected[r.id]);
 
   return (
     <Box sx={{ px: 2.25, pb: 2.25 }}>
@@ -182,7 +180,6 @@ export default function TransactionsTable({
           </TableHead>
           <TableBody>
             {rows.map((row) => {
-              const isContinuation = row.entryId == null;
               const showClientEmail = shouldShowTransactionClientEmail(row);
               const entryDisplay = formatEntryIdDisplay(
                 row.entryType,
@@ -209,58 +206,48 @@ export default function TransactionsTable({
                       borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
                       verticalAlign: "middle",
                     },
-                    // Image 2: continuation sits under parent without a hard checkbox break.
-                    ...(isContinuation
-                      ? {
-                          "& td:first-of-type": {
-                            borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
-                          },
-                        }
-                      : null),
                   }}
                 >
                   <TableCell padding="checkbox">
-                    {isContinuation ? null : (
-                      <Checkbox
-                        size="small"
-                        checked={Boolean(selected[row.id])}
-                        onChange={() => onToggleOne(row.id)}
-                        sx={{ p: 0.5 }}
-                      />
-                    )}
+                    <Checkbox
+                      size="small"
+                      checked={Boolean(selected[row.id])}
+                      onChange={() => onToggleOne(row.id)}
+                      sx={{ p: 0.5 }}
+                    />
                   </TableCell>
                   <TableCell>
                     <Stack spacing={0.25}>
-                      {!isContinuation && entryDisplay ? (
-                        row.bookingId && onEntryClick ? (
-                          <MuiLink
-                            component="button"
-                            type="button"
-                            underline="hover"
-                            onClick={() => onEntryClick(row)}
-                            sx={mollureLabelSx(theme.palette.mollure.navy, {
-                              color: theme.palette.primary.main,
-                              border: 0,
-                              bgcolor: "transparent",
-                              p: 0,
-                              cursor: "pointer",
-                              fontFamily: "inherit",
-                              textAlign: "left",
-                            })}
-                          >
-                            {entryDisplay}
-                          </MuiLink>
-                        ) : (
-                          <BodyText
-                            component="span"
-                            sx={mollureLabelSx(m.navy)}
-                          >
-                            {entryDisplay}
-                          </BodyText>
-                        )
-                      ) : null}
+                      {row.bookingId && onEntryClick ? (
+                        <MuiLink
+                          component="button"
+                          type="button"
+                          underline="hover"
+                          onClick={() => onEntryClick(row)}
+                          sx={mollureLabelSx(theme.palette.mollure.navy, {
+                            color: theme.palette.primary.main,
+                            border: 0,
+                            bgcolor: "transparent",
+                            p: 0,
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                            textAlign: "left",
+                          })}
+                        >
+                          {entryDisplay}
+                        </MuiLink>
+                      ) : (
+                        <BodyText
+                          component="span"
+                          sx={mollureLabelSx(m.navy)}
+                        >
+                          {entryDisplay}
+                        </BodyText>
+                      )}
+                      {/* Same booking Entry ID across PRE/AT/fees — phase label distinguishes rows. */}
                       {row.entryLabel &&
-                      (!entryDisplay || row.entryLabel !== entryDisplay) ? (
+                      entryDisplay &&
+                      row.entryLabel !== entryDisplay ? (
                         <BodyText
                           component="span"
                           sx={{
@@ -371,11 +358,7 @@ export default function TransactionsTable({
                           </BodyText>
                         )}
                         <ClientPlatformTag
-                          isGuest={
-                            row.clientType === "guest" ||
-                            /^guest\b/i.test(row.clientName.trim()) ||
-                            /^model\b/i.test(row.clientName.trim())
-                          }
+                          isGuest={row.clientType === "guest"}
                           isMollure={
                             row.clientType === "mollure" ||
                             Boolean(row.document?.client?.isMollure) ||

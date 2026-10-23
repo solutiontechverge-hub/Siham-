@@ -37,6 +37,7 @@ export type ReviewRatingStats = {
   distribution: Record<1 | 2 | 3 | 4 | 5, number>;
 };
 
+const STORAGE_KEY = "mollure:client_professional_reviews";
 export const REVIEWS_CHANGED_EVENT = "mollure:client_reviews_changed";
 
 function reviewKey(shopId: string, memberId: string) {
@@ -81,13 +82,20 @@ export function buildReviewFilterGroups(
   });
 }
 
-/** Reviews are stored via /api/reviews — local helpers only for filter/stats utils. */
 function loadAll(): ClientProfessionalReview[] {
-  return [];
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+    return Array.isArray(parsed) ? (parsed as ClientProfessionalReview[]) : [];
+  } catch {
+    return [];
+  }
 }
 
-function saveAll(_reviews: ClientProfessionalReview[]) {
+function saveAll(reviews: ClientProfessionalReview[]) {
   if (typeof window === "undefined") return;
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(reviews));
   window.dispatchEvent(new Event(REVIEWS_CHANGED_EVENT));
 }
 

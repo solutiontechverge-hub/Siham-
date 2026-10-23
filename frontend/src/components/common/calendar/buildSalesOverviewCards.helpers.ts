@@ -69,27 +69,6 @@ function isSettledProtectiveFeeStatus(status?: string | null): boolean {
   return s === "paid" || s === "prepaid" || s === "confirmed";
 }
 
-/** Open protective-fee invoice (Payment Due / pending) — still drives Fee Summary UI. */
-function isOpenProtectiveFeeStatus(status?: string | null): boolean {
-  const s = String(status ?? "")
-    .toLowerCase()
-    .replace(/_/g, " ")
-    .trim();
-  return (
-    s === "payment due" ||
-    s === "pending" ||
-    s === "unpaid" ||
-    s === "overdue" ||
-    s === "partially paid"
-  );
-}
-
-function isDisplayableProtectiveFeeStatus(status?: string | null): boolean {
-  return (
-    isSettledProtectiveFeeStatus(status) || isOpenProtectiveFeeStatus(status)
-  );
-}
-
 /** Reconstruct booking services base from Paid fee amount ÷ % (cancel may store fee-only total_price). */
 function recoverBookingBaseFromFeeHints(
   hints: readonly SalesFinanceHint[],
@@ -541,11 +520,7 @@ function applyDueDateMeta<T extends {
     });
   }
 
-  // Reissued Invoice Summary only for after-treatment (never prepay/addon).
-  if (
-    meta.reissuedAt &&
-    (kind === "after_treatment" || kind === "reissued_invoice")
-  ) {
+  if (meta.reissuedAt) {
     if (typeof next.title === "string") next.title = "Reissued Invoice Summary";
     if (next.kind) next.kind = "reissued_invoice";
     next.limitedMenu = true;
@@ -563,16 +538,8 @@ function applyEditedLines<T extends {
   documentAmount?: number;
   secondaryRows?: SalesLineItem[];
   title?: string;
-  kind?: SalesOverviewCardData["kind"];
 }>(next: T, meta: SalesCardMetaRecord): void {
   if (!meta.editedLines?.length) return;
-  // Prepayment service breakdown follows the live booking (same policy as
-  // skipping finance lineItems). Stale editedLines were duplicating services.
-  const isPrepayment =
-    next.title === "Prepayment Summary" || next.kind === "prepayment";
-  if (isPrepayment) {
-    return;
-  }
   next.lines = meta.editedLines.map((line) => ({
     id: line.id,
     label: line.quantity > 1 ? `${line.name} ×${line.quantity}` : line.name,
@@ -748,29 +715,9 @@ function applyFinanceAndMetaState(
     ("paymentMethod" in next ? next.paymentMethod : undefined) ||
     finance?.paymentMethod;
   const paidAt = meta?.paidAt || finance?.paidAt || extras.occurredAt;
-  // Finance payment_deadline is SSOT, but fresher sales-card meta dueDate wins
-  // (reissue stamp OR Edit Sales dueDateSetAt) until finance catches up.
-  const metaDue = meta?.dueDate || null;
-  const financeDue = finance?.dueDate || null;
-  const metaReissueTs = meta?.reissuedAt ? Date.parse(meta.reissuedAt) : NaN;
-  const metaDueSetTs = meta?.dueDateSetAt ? Date.parse(meta.dueDateSetAt) : NaN;
-  const financeReissueTs = finance?.reissuedAt
-    ? Date.parse(String(finance.reissuedAt))
-    : NaN;
-  const metaFreshTs = Math.max(
-    Number.isFinite(metaReissueTs) ? metaReissueTs : 0,
-    Number.isFinite(metaDueSetTs) ? metaDueSetTs : 0,
-  );
-  const preferMetaDue =
-    Boolean(metaDue) &&
-    metaDue !== financeDue &&
-    metaFreshTs > 0 &&
-    (meta?.cardKind === "reissued_invoice" ||
-      !Number.isFinite(financeReissueTs) ||
-      metaFreshTs >= financeReissueTs);
-  const dueDate = preferMetaDue
-    ? metaDue
-    : financeDue || metaDue || next.dueDate;
+  // Linked finance payment_deadline (via hint.dueDate) beats local sales-card meta —
+  // reissue/overdue jobs update the column; stale meta must not win the due line.
+  const dueDate = finance?.dueDate || meta?.dueDate || next.dueDate;
 
   const linkedTxId = finance?.transactionId || meta?.financeTransactionId;
   if (linkedTxId) {
@@ -800,13 +747,9 @@ function applyFinanceAndMetaState(
       financeState === "paid" || financeState === "prepaid"
         ? paidAt ?? null
         : null;
-    // Finance reissueLevel is SSOT when linked — do not promote from meta.reissuedAt
-    // alone (Edit Sales used to set that on first Non-Direct issue).
-    const reissueLevel = Number(finance.reissueLevel) || 0;
-    const canShowReissued =
-      kind === "after_treatment" || kind === "reissued_invoice";
+    const reissueLevel =
+      Number(finance.reissueLevel ?? (meta?.reissuedAt ? 1 : 0)) || 0;
     if (
-      canShowReissued &&
       reissueLevel >= 1 &&
       (financeState === "payment_due" || financeState === "overdue_invoice")
     ) {
@@ -888,7 +831,6 @@ function applyFinanceAndMetaState(
   next.paidAt = open.paidAt ?? null;
   const openReissueLevel = meta?.reissuedAt ? 1 : 0;
   if (
-    (kind === "after_treatment" || kind === "reissued_invoice") &&
     openReissueLevel >= 1 &&
     (open.state === "payment_due" || open.state === "overdue_invoice")
   ) {
@@ -1046,38 +988,12 @@ function applyMeta(
           return !subMeta?.canceled || Boolean(subMeta.voided);
         }),
     };
-    // After-treatment shell: main + guest/model live in subCards — strip parent body.
-    // Title/reissue is per-payer; shell shows Reissued only when any open payer was reissued.
+    // After-treatment shell: main lives in subCards — strip parent body, keep badge from main.
     const subCards = next.subCards ?? [];
     if (subCards.some((sub) => sub.payerRole === "main_client")) {
       const mainSub = subCards.find((sub) => sub.payerRole === "main_client");
-      const anyReissued = subCards.some((sub) => {
-        const subMeta =
-          getSalesCardMeta(sub.id) ||
-          (sub.payerRole === "main_client" ? getSalesCardMeta(next.id) : null);
-        const fin = matchFinanceHint(
-          {
-            id: sub.id,
-            bookingId: next.bookingId,
-            bookingCode: next.bookingCode,
-            kind: "after_treatment",
-            payerKey: sub.payerKey,
-            financeTransactionId:
-              sub.financeTransactionId || subMeta?.financeTransactionId,
-          },
-          ctx.financeHints,
-        );
-        return (
-          (Number(fin?.reissueLevel) || 0) >= 1 ||
-          subMeta?.cardKind === "reissued_invoice"
-        );
-      });
       next = {
         ...next,
-        title: anyReissued
-          ? "Reissued Invoice Summary"
-          : "After treatment Summary",
-        kind: anyReissued ? "reissued_invoice" : "after_treatment",
         lines: [],
         secondaryRows: undefined,
         highlightedLineIds: undefined,
@@ -1089,11 +1005,6 @@ function applyMeta(
         dueDate: null,
         statusBadge: mainSub?.statusBadge,
         paymentState: mainSub?.paymentState,
-        penaltyPrompt: subCards.some((s) => s.penaltyPrompt === "manual")
-          ? "manual"
-          : subCards.some((s) => s.penaltyPrompt === "automatic")
-            ? "automatic"
-            : "none",
       };
     }
   }
@@ -1339,7 +1250,7 @@ function protectiveFeeHintSortKey(entryLabel?: string | null): number {
   return 3;
 }
 
-/** Protective-fee finance rows for Fee Summary (paid + open Payment Due). */
+/** All settled protective-fee finance rows — Fee Summary can stack LRF + LCF. */
 export function findProtectiveFeeFinanceHints(
   hints: readonly SalesFinanceHint[],
   bookingId: string,
@@ -1349,7 +1260,7 @@ export function findProtectiveFeeFinanceHints(
     .filter((hint) => {
       if (!financeHintMatchesBooking(hint, bookingId, bookingCode)) return false;
       if (!isProtectiveFeeEntryLabel(hint.entryLabel)) return false;
-      return isDisplayableProtectiveFeeStatus(hint.status);
+      return isSettledProtectiveFeeStatus(hint.status);
     })
     .sort(
       (a, b) =>
@@ -1358,7 +1269,7 @@ export function findProtectiveFeeFinanceHints(
     );
 }
 
-/** First displayable protective-fee finance row (Paid or Payment Due). */
+/** Paid protective-fee finance row (LCF/LRF/NS) — Fee Summary only when fee is settled. */
 export function findProtectiveFeeFinanceHint(
   hints: readonly SalesFinanceHint[],
   bookingId: string,
@@ -1383,7 +1294,7 @@ export function resolveProtectiveFeeSalesCardSpec(input: {
   discount?: { type: "fixed" | "percentage"; amount: number } | null;
   cancellationFeeAt?: string | null;
   exceededCancellationWindow?: boolean;
-  /** LCF/LRF/NS finance row (Paid or Payment Due) — stamps alone handled by caller fallback. */
+  /** Paid LCF/LRF/NS finance row — Fee Summary requires settled fee (product rule). */
   financeFeeHint?: SalesFinanceHint | null;
 }): ProtectiveFeeSalesCardSpec | null {
   const status = String(input.status ?? "").toLowerCase();
@@ -1399,15 +1310,15 @@ export function resolveProtectiveFeeSalesCardSpec(input: {
 
   const hint = input.financeFeeHint;
   const hintAmount = Number(hint?.amount);
-  const hasFeeHint =
+  const hasPaidFeeHint =
     Boolean(hint) &&
-    isDisplayableProtectiveFeeStatus(hint?.status) &&
+    isSettledProtectiveFeeStatus(hint?.status) &&
     Number.isFinite(hintAmount) &&
     hintAmount > 0 &&
     isProtectiveFeeEntryLabel(hint?.entryLabel);
 
-  // Need a finance fee row (settled or open) — stamp-only invent is caller's job.
-  if (!hasFeeHint) return null;
+  // Product: Fee Summary only when protective fee is Paid (not unpaid due / policy invent).
+  if (!hasPaidFeeHint) return null;
 
   const label = String(hint!.entryLabel ?? "");
   const isLateCancelLabel = label.startsWith(LATE_CANCELLATION_BOOKING_FEE);
@@ -1673,8 +1584,8 @@ export function buildCardsForEvent(input: {
   };
 
   const buildProtectiveFeeSummaryCard = (): SalesOverviewCardData | null => {
-    // Stack protective fees on one Fee Summary (finance Paid/Due, else stamp calc).
-    let feeLines = financeFeeHints
+    // Stack all settled protective fees on one Fee Summary (LRF + LCF mocks).
+    const feeLines = financeFeeHints
       .map((hint, index) => {
         const spec = resolveProtectiveFeeSalesCardSpec({
           ...feeSpecInput,
@@ -1694,70 +1605,9 @@ export function buildCardsForEvent(input: {
           entryLabel: spec.entryLabel,
           metaLines: spec.metaLines,
           title: spec.title,
-          settled: isSettledProtectiveFeeStatus(hint.status),
         };
       })
       .filter((line): line is NonNullable<typeof line> => line != null);
-
-    // No finance fee row yet: use cancel/no-show stamps + existing price logic (not policy alone).
-    if (!feeLines.length) {
-      const price = computeBookingPrice({
-        lineSubtotal: feeSpecInput.lineSubtotal,
-        extrasAmount: feeSpecInput.extrasAmount ?? 0,
-        discount: feeSpecInput.discount ?? null,
-        showLateCancellation: Boolean(showLateCancellation),
-        lateCancellationFeePercent: lateCancellationFeePercent ?? undefined,
-        showNoShowFee: Boolean(showNoShowFee) || isNoShowStatus,
-        noShowFeePercent: noShowFeePercent ?? undefined,
-      });
-      if (
-        (isCancelled || showLateCancellation) &&
-        showLateCancellation &&
-        price.lateCancellationFeeAmount > 0
-      ) {
-        const percent = Number(lateCancellationFeePercent) || 0;
-        feeLines = [
-          {
-            id: `late-cancellation-${bookingId}-stamp`,
-            label:
-              percent > 0
-                ? formatProtectiveFeeLineDescription(
-                    "lateCancellation",
-                    percent,
-                    price.afterDiscount,
-                  )
-                : LATE_CANCELLATION_BOOKING_FEE,
-            amount: price.lateCancellationFeeAmount,
-            entryLabel: LATE_CANCELLATION_BOOKING_FEE,
-            metaLines: buildCancellationFeeInvoiceMetaLines({
-              cancellationFeeAt,
-              exceededCancellationWindow,
-            }),
-            title: "Fee Summary",
-            settled: false,
-          },
-        ];
-      } else if (
-        (isNoShowStatus || showNoShowFee) &&
-        price.noShowFeeAmount > 0
-      ) {
-        feeLines = [
-          {
-            id: `no-show-${bookingId}-stamp`,
-            label: "No-show fee",
-            amount: price.noShowFeeAmount,
-            entryLabel: "No-show fee",
-            metaLines: buildCancellationFeeInvoiceMetaLines({
-              cancellationFeeAt,
-              exceededCancellationWindow,
-            }),
-            title: "No-Show Fee Invoice",
-            settled: false,
-          },
-        ];
-      }
-    }
-
     if (!feeLines.length) return null;
 
     const feeId = resolveLiveCardId(bookingId, `${bookingId}-protective-fee`);
@@ -1775,8 +1625,6 @@ export function buildCardsForEvent(input: {
       ? "No-Show Fee Invoice"
       : "Fee Summary";
     const metaLines = feeLines.flatMap((l) => l.metaLines);
-    const feeSettled =
-      paymentAmount <= 0 || feeLines.every((line) => line.settled);
     return applyMeta(
       {
         id: feeId,
@@ -1824,12 +1672,12 @@ export function buildCardsForEvent(input: {
         isAfterTreatment: true,
         isPrepayPaid: false,
         isFailed: false,
-        paidHint: feeSettled,
+        paidHint: true,
       },
     );
   };
 
-  // Cancelled / no-show: Prepayment + Fee Summary only (never After treatment).
+  // Cancelled / no-show: prepaid receipt + Fee Summary when paid protective fee exists.
   if (isCancelled || isNoShowStatus) {
     const cancelledCards: SalesOverviewCardData[] = [];
     if (isPrepayPaid && prepaidAmount > 0) {
@@ -1842,18 +1690,13 @@ export function buildCardsForEvent(input: {
           feeRecoveredBase > sum &&
           positive.length === 1 &&
           financeFeeHints.some(
-            (h) =>
-              roundMoney(Number(h.amount) || 0) ===
-              roundMoney(positive[0].amount),
+            (h) => roundMoney(Number(h.amount) || 0) === roundMoney(positive[0].amount),
           )
         ) {
           return [{ ...positive[0], amount: baseTotal }];
         }
         return positive;
       })();
-      const listedTotal = roundMoney(
-        prepayLines.reduce((sum, line) => sum + line.amount, 0) || baseTotal,
-      );
       cancelledCards.push(
         applyMeta(
           {
@@ -1869,7 +1712,7 @@ export function buildCardsForEvent(input: {
             clientPhone: phone,
             clientKind,
             lines: prepayLines,
-            total: listedTotal,
+            total: baseTotal,
             totalLabel: "Total",
             highlightLabel: prepaidBreakdownLabel(prepaymentPercent, true),
             highlightAmount: prepaidAmount,
@@ -1895,7 +1738,6 @@ export function buildCardsForEvent(input: {
     }
     const feeCard = buildProtectiveFeeSummaryCard();
     if (feeCard) cancelledCards.push(feeCard);
-    // Early return: no After treatment / remaining-payment scenarios.
     return cancelledCards;
   }
 

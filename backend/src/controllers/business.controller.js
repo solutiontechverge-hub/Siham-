@@ -3747,7 +3747,7 @@ export const updateBookingStatus = async (req, res) => {
              WHEN $1 = 'no_show' THEN GREATEST(0, ROUND((
                ($3 * COALESCE((SELECT no_show_fee_percentage FROM business_setups WHERE id = $9), 0) / 100)
                - CASE WHEN LOWER(COALESCE(prepayment_status, '')) = 'paid'
-                      THEN ($3 * COALESCE((SELECT prepayment_percentage FROM business_setups WHERE id = $9), 0) / 100)
+                      THEN ($3 * COALESCE(prepayment_percentage, 0) / 100)
                       ELSE 0 END
              )::numeric, 2))
              ELSE no_show_fee_due

@@ -82,10 +82,8 @@ export type BookingEditRequestRecord = {
   originalTime?: string;
 };
 
+const STORAGE_KEY = "mollure:booking_edit_requests";
 export const BOOKING_EDIT_REQUEST_UPDATED_EVENT = "mollure:booking-edit-request-updated";
-
-/** In-memory cache — durable ER lives on bookings.edit_request (+ notes). */
-let memoryStore: Record<string, BookingEditRequestRecord> = {};
 
 export function notifyBookingEditRequestUpdated() {
   if (typeof window === "undefined") return;
@@ -96,11 +94,22 @@ export function notifyBookingEditRequestUpdated() {
 }
 
 function loadAll(): Record<string, BookingEditRequestRecord> {
-  return memoryStore;
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY) ?? window.sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) as Record<string, BookingEditRequestRecord>;
+  } catch {
+    return {};
+  }
 }
 
 function saveAll(data: Record<string, BookingEditRequestRecord>) {
-  memoryStore = data;
+  if (typeof window === "undefined") return;
+  const raw = JSON.stringify(data);
+  window.localStorage.setItem(STORAGE_KEY, raw);
+  // Keep legacy session copy in sync for same-tab readers.
+  window.sessionStorage.setItem(STORAGE_KEY, raw);
   notifyBookingEditRequestUpdated();
 }
 

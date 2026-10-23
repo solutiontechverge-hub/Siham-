@@ -6,11 +6,7 @@ import { favouritesPageData } from "./favourites.data";
 import { useListingCards } from "../listing/use-listing-cards";
 import { useClientFavorites } from "../../../hooks/useClientFavorites";
 import { useAppSelector } from "../../../store/hooks";
-import {
-  useGetProfileQuery,
-  type CompanyProfile,
-  type IndividualProfile,
-} from "../../../store/services/profileApi";
+import { CLIENT_PROFILE_KEY } from "../../../lib/auth-storage";
 
 export function useFavouritesTokens() {
   return useTheme().palette.mollure;
@@ -22,9 +18,6 @@ export function useClientFavouritesPage() {
     useClientFavorites();
   const [page, setPage] = React.useState(1);
   const user = useAppSelector((s) => s.auth.user);
-  const { data: profileEnvelope } = useGetProfileQuery(undefined, {
-    skip: !user,
-  });
   const fallbackDisplayName =
     ((user as { display_name?: string })?.display_name as string | undefined) ||
     `${(user as { first_name?: string })?.first_name ?? ""} ${(user as { last_name?: string })?.last_name ?? ""}`.trim();
@@ -45,30 +38,36 @@ export function useClientFavouritesPage() {
   }, [page, totalPages]);
 
   React.useEffect(() => {
-    const profile = profileEnvelope?.data;
-    if (!profile) {
-      const next = fallbackDisplayName.trim();
-      if (next) setUserName(next);
-      return;
+    try {
+      const raw = window.localStorage.getItem(CLIENT_PROFILE_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw) as {
+        avatar_url?: string | null;
+        email?: string;
+        first_name?: string;
+        last_name?: string;
+        display_name?: string;
+      };
+      const authedEmail = user?.email?.trim().toLowerCase();
+      const persistedEmail = data?.email?.trim().toLowerCase();
+      if (authedEmail && persistedEmail && authedEmail === persistedEmail) {
+        if (typeof data.avatar_url === "string" && data.avatar_url)
+          setAvatarUrl(data.avatar_url);
+        const persistedName = (data.display_name ?? "").trim();
+        const fullName =
+          `${data.first_name ?? ""} ${data.last_name ?? ""}`.trim();
+        const resolved = persistedName || fullName;
+        if (resolved) setUserName(resolved);
+      }
+    } catch {
+      // ignore
     }
-    if (profile.user_type === "company") {
-      const company = profile.profile as CompanyProfile | null;
-      const name =
-        (company?.legal_name ?? "").trim() ||
-        `${company?.contact_first_name ?? ""} ${company?.contact_last_name ?? ""}`.trim();
-      if (name) setUserName(name);
-      if (company?.logo) setAvatarUrl(company.logo);
-      return;
-    }
-    if (profile.user_type === "individual") {
-      const individual = profile.profile as IndividualProfile | null;
-      const name =
-        (individual?.display_name ?? "").trim() ||
-        `${individual?.first_name ?? ""} ${individual?.last_name ?? ""}`.trim();
-      if (name) setUserName(name);
-      if (individual?.profile_picture) setAvatarUrl(individual.profile_picture);
-    }
-  }, [fallbackDisplayName, profileEnvelope?.data]);
+  }, [user?.email]);
+
+  React.useEffect(() => {
+    const next = fallbackDisplayName.trim();
+    if (next) setUserName(next);
+  }, [fallbackDisplayName]);
 
   const items = React.useMemo(() => {
     const start = (page - 1) * pageSize;
