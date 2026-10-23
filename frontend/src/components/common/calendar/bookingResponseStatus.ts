@@ -4,7 +4,6 @@ import { prepayBlocksConfirmation } from "./bookingAcknowledgment";
 import { resolvePostBookingPendingPayment } from "./bookingCheckout";
 import {
   hasStoredResponseDeadline,
-  isBookingStartPast,
   isResponseWindowOverdue,
   type ResponseWindowInput,
 } from "./bookingResponseDeadline";
@@ -79,9 +78,10 @@ export function resolveBookingResponseIndicators(
       respondBy: details?.respondBy,
       responseWindowMinutes: details?.responseWindowMinutes,
     };
-    const overdue = hasStoredResponseDeadline(deadlineFields)
-      ? isResponseWindowOverdue(deadlineFields, new Date(), opts?.responseTime)
-      : isBookingStartPast(event);
+    // ⚠️ only when stamped respondBy has elapsed — not appointment start.
+    const overdue =
+      hasStoredResponseDeadline(deadlineFields) &&
+      isResponseWindowOverdue(deadlineFields, new Date(), opts?.responseTime);
     indicators.push(overdue ? "overdue_response" : "response_time_active");
   }
 

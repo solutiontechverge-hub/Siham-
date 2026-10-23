@@ -6,7 +6,6 @@ import type { BookingPaymentSummarySection } from "../booking-finance/bookingFin
 
 type Props = {
   sections: BookingPaymentSummarySection[];
-  headerTotal: number;
   onViewInvoice?: (lineId?: string) => void;
   onViewReceipt?: (lineId?: string) => void;
   onPayNow?: (lineId?: string) => void;
@@ -14,7 +13,6 @@ type Props = {
 
 export default function ClientBookingPaymentSummary({
   sections,
-  headerTotal,
   onViewInvoice,
   onViewReceipt,
   onPayNow,
@@ -24,7 +22,6 @@ export default function ClientBookingPaymentSummary({
   return (
     <Box sx={{ mt: 0 }}>
       <BookingPaymentSummaryCard
-        headerTotal={headerTotal}
         sections={sections}
         onViewInvoice={onViewInvoice}
         onViewReceipt={onViewReceipt}

@@ -6,6 +6,7 @@ import type { CalendarEvent } from "../../../../app/professionals/fixed-location
 import { calendarEventIsGuest } from "../../../../app/professionals/fixed-location/calendar/calendar.data";
 import { useGetFinanceTransactionsQuery } from "../../../../store/services/financeApi";
 import {
+  ensureKilometerAllowanceOnTransactionRow,
   findIssuedFinanceTransaction,
   hasStoredDocumentSnapshot,
 } from "../../finance-documents";
@@ -31,6 +32,7 @@ export type UseProfessionalFixedLocationCalendarDrawerPaymentDocsArgs = {
   prepaymentAmount: number;
   remainingAfterPrepayment: number;
   bookingTotalForSave: number;
+  kilometerAllowanceAmount?: number;
   showPrepayment: boolean;
   prepaymentPercent: string;
   paymentMethod: "online" | "offline";
@@ -60,6 +62,7 @@ export function useProfessionalFixedLocationCalendarDrawerPaymentDocs({
   prepaymentAmount,
   remainingAfterPrepayment,
   bookingTotalForSave,
+  kilometerAllowanceAmount = 0,
   showPrepayment,
   prepaymentPercent,
   paymentMethod,
@@ -211,24 +214,37 @@ export function useProfessionalFixedLocationCalendarDrawerPaymentDocs({
     ],
   );
 
+  const kmOpts = React.useMemo(
+    () => ({
+      kilometerAllowanceAmount,
+      bookingTotal: bookingTotalForSave > 0 ? bookingTotalForSave : undefined,
+      prepaidAmount: prepaymentAmount > 0 ? prepaymentAmount : undefined,
+    }),
+    [bookingTotalForSave, kilometerAllowanceAmount, prepaymentAmount],
+  );
+
   const drawerInvoiceRow = React.useMemo(() => {
     const issued = findIssuedFinanceTransaction(drawerFinanceRows, {
       bookingId: drawerBookingKey,
       bookingCode: viewingBookingEvent?.bookingCode,
       phase: "full",
     });
-    if (issued && hasStoredDocumentSnapshot(issued)) return issued;
-    return buildDrawerInvoiceRow({
-      drawerDocumentDraft,
-      viewingBookingEvent,
-      editingEventId,
-      selectedClient,
-      financeSettings,
-      showPrepayment,
-      prepaymentAmount,
-      isDrawerPrepaymentPaid,
-      drawerPaymentMethod,
-    });
+    const row =
+      issued && hasStoredDocumentSnapshot(issued)
+        ? issued
+        : buildDrawerInvoiceRow({
+            drawerDocumentDraft,
+            viewingBookingEvent,
+            editingEventId,
+            selectedClient,
+            financeSettings,
+            showPrepayment,
+            prepaymentAmount,
+            isDrawerPrepaymentPaid,
+            drawerPaymentMethod,
+            kilometerAllowanceAmount,
+          });
+    return ensureKilometerAllowanceOnTransactionRow(row, kmOpts);
   }, [
     drawerBookingKey,
     drawerDocumentDraft,
@@ -237,6 +253,8 @@ export function useProfessionalFixedLocationCalendarDrawerPaymentDocs({
     editingEventId,
     financeSettings,
     isDrawerPrepaymentPaid,
+    kilometerAllowanceAmount,
+    kmOpts,
     prepaymentAmount,
     selectedClient?.email,
     selectedClient?.name,
@@ -250,18 +268,22 @@ export function useProfessionalFixedLocationCalendarDrawerPaymentDocs({
       bookingCode: viewingBookingEvent?.bookingCode,
       phase: "prepay",
     });
-    if (issued && hasStoredDocumentSnapshot(issued)) return issued;
-    return buildDrawerReceiptRow({
-      drawerDocumentDraft,
-      prepaymentAmount,
-      isDrawerPrepaymentPaid,
-      drawerPaymentIsOffline,
-      viewingBookingEvent,
-      editingEventId,
-      selectedClient,
-      financeSettings,
-      drawerPaymentMethod,
-    });
+    const row =
+      issued && hasStoredDocumentSnapshot(issued)
+        ? issued
+        : buildDrawerReceiptRow({
+            drawerDocumentDraft,
+            prepaymentAmount,
+            isDrawerPrepaymentPaid,
+            drawerPaymentIsOffline,
+            viewingBookingEvent,
+            editingEventId,
+            selectedClient,
+            financeSettings,
+            drawerPaymentMethod,
+            kilometerAllowanceAmount,
+          });
+    return ensureKilometerAllowanceOnTransactionRow(row, kmOpts);
   }, [
     drawerBookingKey,
     drawerDocumentDraft,
@@ -271,6 +293,8 @@ export function useProfessionalFixedLocationCalendarDrawerPaymentDocs({
     editingEventId,
     financeSettings,
     isDrawerPrepaymentPaid,
+    kilometerAllowanceAmount,
+    kmOpts,
     prepaymentAmount,
     selectedClient?.email,
     selectedClient?.name,

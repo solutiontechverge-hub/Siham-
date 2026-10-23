@@ -17,7 +17,10 @@ import { useActiveClientBooking } from "./useActiveClientBooking";
 import { useCheckoutBookingRef } from "./useCheckoutBookingRef";
 import type { ClientEbrActionKind } from "./ClientEbrActionDialog";
 import { useBookingEditRequest } from "./useBookingEditRequest";
-import { parseCalendarEntryNotes } from "../calendar/bookingEventDetails";
+import {
+  parseCalendarEntryNotes,
+  resolveKilometerAllowanceAmount,
+} from "../calendar/bookingEventDetails";
 import { clientShouldAck } from "../calendar/bookingAcknowledgment";
 import { usePublicFinanceSettings } from "../finance-documents/usePublicFinanceSettings";
 import { isProtectiveFeeEntryLabel } from "../finance-documents/protectiveFeeInvoice";
@@ -336,6 +339,14 @@ export function useClientBookingDetails({
     setEbrAction,
   });
 
+  // Invoice docs run before payment-display memos — resolve km here for PRE/full rows.
+  const invoiceKilometerAllowanceAmount = React.useMemo(() => {
+    if (locationMode !== "desired") return 0;
+    return resolveKilometerAllowanceAmount(
+      parseCalendarEntryNotes(activeBooking?.notes)?.kilometerAllowance,
+    );
+  }, [activeBooking?.notes, locationMode]);
+
   const {
     activeDocument,
     setActiveDocument,
@@ -368,6 +379,8 @@ export function useClientBookingDetails({
     isPrepaymentPaid,
     prepaidAmount,
     isOfflinePay,
+    kilometerAllowanceAmount: invoiceKilometerAllowanceAmount,
+    bookingTotal: draft?.total,
   });
 
   const paidProtectiveFees = React.useMemo(

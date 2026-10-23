@@ -97,6 +97,7 @@ export function buildDrawerInvoiceRow(input: {
   prepaymentAmount: number;
   isDrawerPrepaymentPaid: boolean;
   drawerPaymentMethod: string;
+  kilometerAllowanceAmount?: number;
 }) {
   const {
     drawerDocumentDraft,
@@ -108,6 +109,7 @@ export function buildDrawerInvoiceRow(input: {
     prepaymentAmount,
     isDrawerPrepaymentPaid,
     drawerPaymentMethod,
+    kilometerAllowanceAmount,
   } = input;
   if (!drawerDocumentDraft) return null;
   const bookingRef =
@@ -121,6 +123,7 @@ export function buildDrawerInvoiceRow(input: {
     financeSettings,
     prepaymentAmount: showPrepaidRow ? prepaymentAmount : undefined,
     prepaymentPaid: showPrepaidRow ? isDrawerPrepaymentPaid : undefined,
+    kilometerAllowanceAmount,
     methodTitle: checkoutPaymentMethodTitle(drawerPaymentMethod),
     methodDetail: checkoutPaymentMethodDetail(drawerPaymentMethod),
   });
@@ -138,6 +141,7 @@ export function buildDrawerReceiptRow(input: {
     typeof buildClientBookingTransactionRow
   >[0]["financeSettings"];
   drawerPaymentMethod: string;
+  kilometerAllowanceAmount?: number;
 }) {
   const {
     drawerDocumentDraft,
@@ -149,6 +153,7 @@ export function buildDrawerReceiptRow(input: {
     selectedClient,
     financeSettings,
     drawerPaymentMethod,
+    kilometerAllowanceAmount,
   } = input;
   if (!drawerDocumentDraft || !(prepaymentAmount > 0)) return null;
   if (!isDrawerPrepaymentPaid && !drawerPaymentIsOffline) return null;
@@ -163,6 +168,7 @@ export function buildDrawerReceiptRow(input: {
     documentAmount: prepaymentAmount,
     prepaymentAmount,
     asPrepaymentReceipt: true,
+    kilometerAllowanceAmount,
     methodTitle: checkoutPaymentMethodTitle(drawerPaymentMethod),
     methodDetail: checkoutPaymentMethodDetail(drawerPaymentMethod),
   });

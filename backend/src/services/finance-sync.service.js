@@ -354,6 +354,45 @@ function snapshotServiceSubtotal(meta, booking) {
   return roundMoney(Number(booking.total_price ?? 0));
 }
 
+/** Match frontend `resolveKilometerAllowanceAmount` — rate × km from booking notes. */
+export function resolveKilometerAllowanceAmount(meta) {
+  const rate = Number(meta?.kilometerAllowance?.eurPerKm);
+  const km = Number(meta?.kilometerAllowance?.totalKilometer);
+  if (!Number.isFinite(rate) || !Number.isFinite(km) || rate <= 0 || km <= 0) return 0;
+  return roundMoney(rate * km);
+}
+
+function isKilometerAllowanceLine(line) {
+  const ref = String(line?.sourceReference ?? "").trim();
+  if (ref === "kilometer-allowance") return true;
+  return /^kilometer allowance$/i.test(String(line?.description ?? "").trim());
+}
+
+/** Append Kilometer Allowance when amount > 0 and not already present. */
+export function withKilometerAllowanceLine(lines, meta) {
+  const amount = resolveKilometerAllowanceAmount(meta);
+  const list = Array.isArray(lines) ? [...lines] : [];
+  if (!(amount > 0) || list.some(isKilometerAllowanceLine)) return list;
+  list.push({
+    description: "Kilometer Allowance",
+    sourceType: "uniqueItemCode",
+    sourceReference: "kilometer-allowance",
+    quantity: 1,
+    vat: "0%",
+    vatRate: 0,
+    pricePerUnit: amount,
+    totalPrice: amount,
+  });
+  return list;
+}
+
+/** Services/products + km — prepaid % and PRE invoice total base (fee % stays services-only). */
+function snapshotBookingSubtotal(meta, booking) {
+  const services = snapshotServiceSubtotal(meta, booking);
+  const withKm = roundMoney(services + resolveKilometerAllowanceAmount(meta));
+  return roundMoney(Math.max(withKm, Number(booking?.total_price) || 0));
+}
+
 /** Frontend splitBill stores composite line ids (`serviceId::guest::index`). */
 export function catalogRefFromLineId(lineId) {
   const raw = String(lineId ?? "").trim();
@@ -388,20 +427,23 @@ function buildFallbackLineItems(booking, meta, invoiceSettings) {
     ? meta.clientSnapshot.services
     : [];
   if (snapshotServices.length) {
-    return snapshotServices
-      .filter((service) => service?.id || service?.serviceId)
-      .map((service) => {
-        const sourceReference = String(service.id || service.serviceId);
-        return {
-          description: service.name || "Service",
-          sourceReference,
-          sourceType: "serviceId",
-          quantity: 1,
-          ...vatFieldsForService(sourceReference, invoiceSettings),
-          pricePerUnit: roundMoney(service.price),
-          totalPrice: roundMoney(service.price),
-        };
-      });
+    return withKilometerAllowanceLine(
+      snapshotServices
+        .filter((service) => service?.id || service?.serviceId)
+        .map((service) => {
+          const sourceReference = String(service.id || service.serviceId);
+          return {
+            description: service.name || "Service",
+            sourceReference,
+            sourceType: "serviceId",
+            quantity: 1,
+            ...vatFieldsForService(sourceReference, invoiceSettings),
+            pricePerUnit: roundMoney(service.price),
+            totalPrice: roundMoney(service.price),
+          };
+        }),
+      meta,
+    );
   }
 
   const guests = Array.isArray(meta?.guests) ? meta.guests : [];
@@ -434,21 +476,31 @@ function buildFallbackLineItems(booking, meta, invoiceSettings) {
       });
     }
   }
-  if (fromGuests.length) return fromGuests;
+  if (fromGuests.length) return withKilometerAllowanceLine(fromGuests, meta);
 
   if (booking.service_id) {
     const sourceReference = String(booking.service_id);
-    return [{
-      description: booking.service_title || "Professional Service",
-      sourceReference,
-      sourceType: "serviceId",
-      quantity: 1,
-      ...vatFieldsForService(sourceReference, invoiceSettings),
-      pricePerUnit: roundMoney(booking.total_price),
-      totalPrice: roundMoney(booking.total_price),
-    }];
+    // Strip km from the blob total when we also emit a Kilometer Allowance line.
+    const serviceAmount = roundMoney(
+      Math.max(
+        0,
+        roundMoney(booking.total_price) - resolveKilometerAllowanceAmount(meta),
+      ),
+    );
+    return withKilometerAllowanceLine(
+      [{
+        description: booking.service_title || "Professional Service",
+        sourceReference,
+        sourceType: "serviceId",
+        quantity: 1,
+        ...vatFieldsForService(sourceReference, invoiceSettings),
+        pricePerUnit: serviceAmount,
+        totalPrice: serviceAmount,
+      }],
+      meta,
+    );
   }
-  return [];
+  return withKilometerAllowanceLine([], meta);
 }
 
 function formatProtectiveFeeBase(baseAmount) {
@@ -803,10 +855,8 @@ function isPlanningPerson(person) {
  * Prepayment is always charged to the main client against the full booking total %.
  */
 function resolveSplitPayers(booking, meta, invoiceSettings) {
-  // Snapshot services beat total_price (fee checkout may replace total with LCF only).
-  const total = roundMoney(
-    Math.max(snapshotServiceSubtotal(meta, booking), Number(booking.total_price) || 0),
-  );
+  // Services + km (and total_price floor). Fee % bases stay on snapshotServiceSubtotal.
+  const total = snapshotBookingSubtotal(meta, booking);
   const prepaymentPercent = Number(
     meta.prepaymentPercent ??
       meta.prepayment_percentage ??
@@ -923,7 +973,13 @@ function resolveSplitPayers(booking, meta, invoiceSettings) {
         displayName = trimmed && trimmed.toLowerCase() !== "guest" ? trimmed : `Guest ${guestOrdinal}`;
       }
 
-      const subtotal = roundMoney(lines.reduce((sum, line) => sum + line.amount, 0));
+      let docLines = lines.map(({ amount: _a, ...docLine }) => docLine);
+      if (role === "main_client") {
+        docLines = withKilometerAllowanceLine(docLines, meta);
+      }
+      const subtotal = roundMoney(
+        docLines.reduce((sum, line) => sum + (Number(line.totalPrice) || 0), 0),
+      );
       const paymentAmount =
         role === "main_client"
           ? roundMoney(Math.max(0, subtotal - prepaidAmount))
@@ -936,7 +992,7 @@ function resolveSplitPayers(booking, meta, invoiceSettings) {
         displayName,
         subtotal,
         paymentAmount,
-        lineItems: lines.map(({ amount: _a, ...docLine }) => docLine),
+        lineItems: docLines,
       });
     }
 
@@ -1010,6 +1066,8 @@ function resolveSplitPayers(booking, meta, invoiceSettings) {
     }
 
     const mainSubtotal = roundMoney(Math.max(0, total - assigned));
+    const kmAmount = resolveKilometerAllowanceAmount(meta);
+    const mainServiceAmount = roundMoney(Math.max(0, mainSubtotal - kmAmount));
     payers.unshift({
       key: "main-client",
       role: "main_client",
@@ -1018,22 +1076,27 @@ function resolveSplitPayers(booking, meta, invoiceSettings) {
       subtotal: mainSubtotal,
       paymentAmount: roundMoney(Math.max(0, mainSubtotal - prepaidAmount)),
       // No-ref generic filler is forbidden — only persist catalog-backed lines.
-      lineItems: booking.service_id
-        ? [{
-            description: booking.service_title || "Service",
-            sourceReference: String(booking.service_id),
-            sourceType: "serviceId",
-            quantity: 1,
-            ...vatFieldsForService(booking.service_id, invoiceSettings),
-            pricePerUnit: roundMoney(mainSubtotal),
-            totalPrice: roundMoney(mainSubtotal),
-          }]
-        : [],
+      lineItems: withKilometerAllowanceLine(
+        booking.service_id && mainServiceAmount > 0
+          ? [{
+              description: booking.service_title || "Service",
+              sourceReference: String(booking.service_id),
+              sourceType: "serviceId",
+              quantity: 1,
+              ...vatFieldsForService(booking.service_id, invoiceSettings),
+              pricePerUnit: mainServiceAmount,
+              totalPrice: mainServiceAmount,
+            }]
+          : [],
+        meta,
+      ),
     });
 
     return { prepaidAmount, payers };
   }
 
+  const kmAmount = resolveKilometerAllowanceAmount(meta);
+  const serviceOnlyTotal = roundMoney(Math.max(0, total - kmAmount));
   return {
     prepaidAmount,
     payers: [
@@ -1044,17 +1107,20 @@ function resolveSplitPayers(booking, meta, invoiceSettings) {
         displayName: booking.customer_name || "Client",
         subtotal: total,
         paymentAmount: roundMoney(Math.max(0, total - prepaidAmount)),
-        lineItems: booking.service_id
-          ? [{
-              description: booking.service_title || "Service",
-              sourceReference: String(booking.service_id),
-              sourceType: "serviceId",
-              quantity: 1,
-              ...vatFieldsForService(booking.service_id, invoiceSettings),
-              pricePerUnit: roundMoney(total),
-              totalPrice: roundMoney(total),
-            }]
-          : [],
+        lineItems: withKilometerAllowanceLine(
+          booking.service_id && serviceOnlyTotal > 0
+            ? [{
+                description: booking.service_title || "Service",
+                sourceReference: String(booking.service_id),
+                sourceType: "serviceId",
+                quantity: 1,
+                ...vatFieldsForService(booking.service_id, invoiceSettings),
+                pricePerUnit: serviceOnlyTotal,
+                totalPrice: serviceOnlyTotal,
+              }]
+            : [],
+          meta,
+        ),
       },
     ],
   };
@@ -1084,6 +1150,53 @@ async function healEmptyDocumentLineItems(financeTransactionId, lineItems) {
   );
 }
 
+/**
+ * Append missing Kilometer Allowance to an existing doc and bump totalPrice.
+ * Settled PRE rows reuse exact matches — without this, km stays absent forever.
+ */
+async function healMissingKilometerAllowanceLine(financeTransactionId, lineItems) {
+  const kmLine = (Array.isArray(lineItems) ? lineItems : []).find(isKilometerAllowanceLine);
+  if (!financeTransactionId || !kmLine) return;
+  const existing = await query(
+    `SELECT document, issued_document FROM finance_transactions WHERE id = $1 LIMIT 1`,
+    [financeTransactionId],
+  );
+  const row = existing.rows[0];
+  if (!row) return;
+
+  const patchDoc = (doc) => {
+    if (!doc || typeof doc !== "object") return null;
+    const lines = Array.isArray(doc.lineItems) ? doc.lineItems : [];
+    if (lines.some(isKilometerAllowanceLine)) return null;
+    const nextLines = [...lines, kmLine];
+    const linesTotal = roundMoney(
+      nextLines.reduce((sum, line) => sum + (Number(line?.totalPrice) || 0), 0),
+    );
+    return {
+      ...doc,
+      lineItems: nextLines,
+      totalPrice: roundMoney(Math.max(Number(doc.totalPrice) || 0, linesTotal)),
+    };
+  };
+
+  const nextDocument = patchDoc(row.document);
+  const nextIssued = patchDoc(row.issued_document);
+  if (!nextDocument && !nextIssued) return;
+
+  await query(
+    `UPDATE finance_transactions
+     SET document = COALESCE($2::jsonb, document),
+         issued_document = COALESCE($3::jsonb, issued_document),
+         updated_at = NOW()
+     WHERE id = $1`,
+    [
+      financeTransactionId,
+      nextDocument ? JSON.stringify(normalizeMoneyJson(nextDocument)) : null,
+      nextIssued ? JSON.stringify(normalizeMoneyJson(nextIssued)) : null,
+    ],
+  );
+}
+
 async function linkSalesCardForInsertedTx(
   booking,
   fields,
@@ -1093,6 +1206,7 @@ async function linkSalesCardForInsertedTx(
   if (!financeTransactionId || !booking?.id) return financeTransactionId;
   try {
     await healEmptyDocumentLineItems(financeTransactionId, lineItems);
+    await healMissingKilometerAllowanceLine(financeTransactionId, lineItems);
     await ensureSalesCardMetadataForFinanceRow({
       professionalProfileId: booking.professional_profile_id,
       bookingId: booking.id,
@@ -1285,7 +1399,12 @@ async function insertFinanceTransaction({
   const isPrepaymentDocument = paymentPhase === "prepay";
   // PRE: never persist LCF/LRF/NS lines — those belong on the fee invoice only.
   const rawLines = Array.isArray(lineItems) ? lineItems : [];
-  const documentLines = isPrepaymentDocument
+  // Prefer mollure-meta parser — raw JSON.parse misses ---mollure-meta--- notes.
+  const notesMeta =
+    booking.notes && typeof booking.notes === "object"
+      ? booking.notes
+      : parseBookingNotes(booking.notes);
+  const filteredLines = isPrepaymentDocument
     ? rawLines.filter((line) => {
         const desc = String(line?.description ?? "");
         const ref = String(line?.sourceReference ?? "");
@@ -1297,21 +1416,19 @@ async function insertFinanceTransaction({
         return true;
       })
     : rawLines;
-  // PRE total = booking services (snapshot), not fee-replaced total_price.
-  const notesMeta = (() => {
-    try {
-      return typeof booking.notes === "string"
-        ? JSON.parse(booking.notes || "{}")
-        : booking.notes || {};
-    } catch {
-      return {};
-    }
-  })();
+  // Fee invoices stay fee-only; booking/prepay docs include km when present on notes.
+  const documentLines = feeSettlement
+    ? filteredLines
+    : withKilometerAllowanceLine(filteredLines, notesMeta);
+  // PRE total = services + km (not fee-replaced total_price).
+  const linesTotal = roundMoney(
+    documentLines.reduce((sum, line) => sum + (Number(line?.totalPrice) || 0), 0),
+  );
   const prepayBookingTotal = isPrepaymentDocument
     ? roundMoney(
         Math.max(
-          snapshotServiceSubtotal(notesMeta, booking),
-          Number(booking.total_price) || 0,
+          snapshotBookingSubtotal(notesMeta, booking),
+          linesTotal,
           gross,
         ),
       )
@@ -1342,7 +1459,11 @@ async function insertFinanceTransaction({
     // amount is kept separately so invoice remaining balance is not zeroed.
     lineItems: documentLines,
     totalPrice: roundMoney(
-      isPrepaymentDocument ? prepayBookingTotal : feeSettlement ? feeTotal : gross,
+      feeSettlement
+        ? feeTotal
+        : isPrepaymentDocument
+          ? prepayBookingTotal
+          : Math.max(gross, linesTotal),
     ),
     ...(isPrepaymentDocument ? { prepaymentAmount: roundMoney(gross) } : {}),
     // Fee docs: invoice renders Total (fee) → Prepaid → Remaining from these.

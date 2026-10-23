@@ -379,7 +379,6 @@ export default function ClientBookingDetailsView({
                     showPaymentSummary ? (
                       <ClientBookingPaymentSummary
                         sections={visiblePaymentSummarySections}
-                        headerTotal={displayTotal}
                         onViewInvoice={
                           hasAnyDocument ? openInvoice : undefined
                         }

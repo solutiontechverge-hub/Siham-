@@ -44,4 +44,20 @@ assert.ok(
   "expired window must not use waiting alarm",
 );
 
+// Past appointment start alone must not flip to ⚠️ without stamped respondBy.
+const pastSlotNoDeadline = resolveBookingResponseIndicators({
+  ...base,
+  date: "2020-01-01",
+  start: "10:00",
+  details: {},
+});
+assert.ok(
+  pastSlotNoDeadline.includes("response_time_active"),
+  "no stamped deadline → waiting alarm, not overdue",
+);
+assert.ok(
+  !pastSlotNoDeadline.includes("overdue_response"),
+  "past slot without respondBy must not show overdue triangle",
+);
+
 console.log("bookingResponseStatus.test.ts: ok");

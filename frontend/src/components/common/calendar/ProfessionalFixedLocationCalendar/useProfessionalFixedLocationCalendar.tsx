@@ -634,6 +634,7 @@ export function useProfessionalFixedLocationCalendar({
     prepaymentAmount,
     remainingAfterPrepayment,
     bookingTotalForSave,
+    kilometerAllowanceAmount,
     showPrepayment,
     prepaymentPercent,
     paymentMethod,

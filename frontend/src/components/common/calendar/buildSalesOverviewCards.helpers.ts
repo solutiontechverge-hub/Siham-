@@ -268,11 +268,22 @@ export function applyLedgerFinancialsToCards(
         card.paymentState === "paid" ||
         card.paymentState === "prepaid" ||
         Boolean(card.paidAt);
+      // Total = listed services + allowances (never deposit). Unpaid ledger
+      // prepayment_total=0 used to wipe both Total and Prepayment % to €0.
+      const listedTotal = roundMoney(
+        (card.lines ?? [])
+          .filter((line) => line.amount >= 0)
+          .reduce((sum, line) => sum + line.amount, 0),
+      );
       return {
         ...card,
-        total: roundMoney(prepay),
-        highlightAmount: roundMoney(prepay),
-        documentAmount: roundMoney(prepay),
+        total: listedTotal > 0 ? listedTotal : card.total,
+        ...(prepay > 0
+          ? {
+              highlightAmount: roundMoney(prepay),
+              documentAmount: roundMoney(prepay),
+            }
+          : {}),
         statusBadge: prepayPaid ? "Prepaid" : card.statusBadge || "Prepayment Due",
         paymentState: prepayPaid ? ("prepaid" as const) : card.paymentState,
       };
@@ -1536,7 +1547,7 @@ export function buildCardsForEvent(input: {
   ctx: BuilderCtx;
 }): SalesOverviewCardData[] {
   const { event, booking, clientName, clientEmail, clientPhone, clientKind, ctx } = input;
-  const { lines, subtotal } = buildLinesFromEvent(event);
+  const { lines } = buildLinesFromEvent(event);
   const status = String(booking?.status ?? event.status ?? "").toLowerCase();
   const isCancelled = status === "cancelled" || status === "canceled";
   const isInvalid = status === "invalid" || isBookingRequestRejected(event);
@@ -1568,11 +1579,14 @@ export function buildCardsForEvent(input: {
   const totalFromBooking = Number(booking?.total_price);
   const bookingFinancials =
     ctx.liveFinancials ?? parseBookingFinancialsFromNotes(booking?.notes);
-  const rawBaseTotal = bookingFinancials?.basePrice != null
-    ? roundMoney(bookingFinancials.basePrice)
-    : lines.length
-      ? subtotal
-      : roundMoney(Number.isFinite(totalFromBooking) ? totalFromBooking : 0);
+  // Listed services + allowances win when ledger basePrice omits extras (e.g. km).
+  const rawBaseTotal = roundMoney(
+    Math.max(
+      bookingFinancials?.basePrice != null ? bookingFinancials.basePrice : 0,
+      lines.length ? lineSubtotalBeforeDiscount : 0,
+      !lines.length && Number.isFinite(totalFromBooking) ? totalFromBooking : 0,
+    ),
+  );
 
   // Prefer live event details; fall back to booking.notes when calendar state is stale.
   const notesFee = protectiveFeeFlagsFromBooking(booking);
