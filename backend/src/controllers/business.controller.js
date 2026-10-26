@@ -2480,9 +2480,9 @@ const ensureIncomingCalendarRequestsMirrored = async (customerUserId) => {
 /**
  * Past / Ongoing / Upcoming buckets for client + professional booking lists.
  *
- * Upcoming = not started yet (requested, confirmed, invalid, waiting-for-prepayment).
- * Ongoing  = service currently happening (in_progress only; scoped per client/business).
- * Past     = finished / cancelled / no-show — never requested or confirmed.
+ * Past     = schedule already over (any status), or terminal status.
+ * Ongoing  = in_progress and schedule not over yet.
+ * Upcoming = not started, schedule still ahead.
  *
  * "Waiting for Prepayment" is confirmed/requested with unpaid required prepayment.
  */
@@ -2492,19 +2492,31 @@ const parseBookingsTabFilter = (tab, alias = "b") => {
     LOWER(TRIM(COALESCE(${alias}.prepayment_status, ''))) IN ('pending', 'required')
     AND ${alias}.status IN ('requested', 'br_accepted', 'confirmed')
   )`;
+  // End time passed, or date-only row before today.
+  const schedulePastSql = `(
+    (${alias}.end_time IS NOT NULL AND ${alias}.end_time <= NOW())
+    OR (
+      ${alias}.end_time IS NULL
+      AND COALESCE(${alias}.booking_date, ${alias}.start_time::date) < CURRENT_DATE
+    )
+  )`;
 
   if (normalized === "past") {
-    return `AND ${alias}.status IN ('completed', 'cancelled', 'no_show')
-      AND COALESCE(${alias}.booking_date, ${alias}.start_time::date) >= CURRENT_DATE - INTERVAL '30 days'`;
+    return `AND (
+      ${alias}.status IN ('completed', 'cancelled', 'no_show')
+      OR ${schedulePastSql}
+    )`;
   }
   if (normalized === "ongoing") {
-    return `AND ${alias}.status = 'in_progress'`;
+    return `AND ${alias}.status = 'in_progress' AND NOT ${schedulePastSql}`;
   }
   if (normalized === "upcoming") {
     return `AND (
       ${alias}.status IN ('requested', 'br_accepted', 'confirmed', 'invalid')
       OR ${waitingPrepaymentSql}
-    )`;
+    )
+      AND ${alias}.status NOT IN ('completed', 'cancelled', 'no_show')
+      AND NOT ${schedulePastSql}`;
   }
   return "";
 };

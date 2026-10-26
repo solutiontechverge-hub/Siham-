@@ -69,14 +69,22 @@ export default function ModalActionConfirmDialog({
       onClose={busy ? () => undefined : onClose}
       maxWidth={maxWidth}
       headerTone={headerTone}
+      onFormSubmit={() => {
+        if (busy) return;
+        handlePrimary();
+      }}
       footer={
         <>
-          <MessagingModalCancelButton onClick={onClose} disabled={busy} />
+          <MessagingModalCancelButton
+            onClick={onClose}
+            disabled={busy}
+            type="button"
+          />
           <MessagingModalPrimaryButton
+            type="submit"
             label={confirmLabel}
             tone={primaryTone}
             disabled={busy}
-            onClick={handlePrimary}
           />
         </>
       }

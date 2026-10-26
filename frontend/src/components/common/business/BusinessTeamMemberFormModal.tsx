@@ -165,13 +165,26 @@ export default function BusinessTeamMemberFormModal({
       primaryLabel={submitLabel}
       cancelDisabled={disabled}
       primaryDisabled={disabled || !canSubmit}
+      primaryType="submit"
       cancelSx={{ px: 3 }}
       primarySx={{ px: 4 }}
     />
   );
 
   return (
-    <AppDrawer open={open} onClose={onClose} title={title} footer={footer}>
+    <AppDrawer
+      open={open}
+      onClose={onClose}
+      title={title}
+      onFormSubmit={
+        disabled || !canSubmit
+          ? undefined
+          : () => {
+              onSubmit();
+            }
+      }
+      footer={footer}
+    >
       <Box sx={{ px: 2.5, py: 2, width: "100%", boxSizing: "border-box" }}>
         <Stack spacing={2} sx={{ width: "100%", alignItems: "stretch" }}>
           {isAddMode && reusableMembers.length > 0 && onChooseReusableMember ? (

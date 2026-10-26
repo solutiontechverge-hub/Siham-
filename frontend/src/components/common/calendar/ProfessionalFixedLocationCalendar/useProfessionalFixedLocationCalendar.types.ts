@@ -94,6 +94,7 @@ export type ProfessionalFixedLocationCalendarProps = {
     id: string,
     status:
       | "requested"
+      | "br_accepted"
       | "cancelled"
       | "completed"
       | "confirmed"

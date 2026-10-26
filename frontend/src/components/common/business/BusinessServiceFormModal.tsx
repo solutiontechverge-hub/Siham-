@@ -81,6 +81,7 @@ export default function BusinessServiceFormModal({
       primaryLabel={submitLabel}
       cancelDisabled={disabled}
       primaryDisabled={disabled || !canSubmit}
+      primaryType="submit"
       cancelSx={{ px: 3 }}
       primarySx={{ px: 4 }}
     />
@@ -91,6 +92,13 @@ export default function BusinessServiceFormModal({
       open={open}
       onClose={onClose}
       title={title}
+      onFormSubmit={
+        readOnly || disabled || !canSubmit
+          ? undefined
+          : () => {
+              onSubmit();
+            }
+      }
       footer={readOnly ? undefined : footer}
       headerActions={
         readOnly && onEdit ? (

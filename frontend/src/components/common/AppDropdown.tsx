@@ -10,6 +10,7 @@ import {
   type TextFieldProps,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
+import { useListboxKeyboard } from "../../hooks/useListboxKeyboard";
 import AppTextField from "./AppTextField";
 import AppSearchField from "./AppSearchField";
 
@@ -153,6 +154,45 @@ export default function AppDropdown({
     }
   };
 
+  const selectVisibleAt = React.useCallback(
+    (index: number) => {
+      if (disabled) return;
+      const option = visibleOptions[index];
+      if (!option || option.disabled) return;
+      if (multiple) {
+        const next = selectedValues.includes(option.value)
+          ? selectedValues.filter((id) => id !== option.value)
+          : [...selectedValues, option.value];
+        onChange(next);
+        if (closeOnSelect) setMenuOpen(false);
+        return;
+      }
+      onChange(option.value);
+      setMenuOpen(false);
+      setSearch("");
+    },
+    [
+      closeOnSelect,
+      disabled,
+      multiple,
+      onChange,
+      selectedValues,
+      visibleOptions,
+    ],
+  );
+
+  const {
+    highlightIndex,
+    setHighlightIndex,
+    itemRefs,
+    handleListKeyDown,
+  } = useListboxKeyboard({
+    length: searchable ? visibleOptions.length : 0,
+    open: searchable && menuOpen,
+    resetKey: query,
+    onSelect: selectVisibleAt,
+  });
+
   const { MenuProps: callerMenuProps, ...restCallerSelectProps } =
     callerSelectProps ?? {};
 
@@ -228,6 +268,9 @@ export default function AppDropdown({
         ...restCallerSelectProps,
         MenuProps: {
           disablePortal: false,
+          ...(searchable
+            ? { autoFocus: false, disableAutoFocusItem: true }
+            : {}),
           ...callerMenuProps,
         },
       }}
@@ -245,8 +288,13 @@ export default function AppDropdown({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onClear={() => setSearch("")}
-            onKeyDown={(e) => {
-              if (e.key !== "Escape") e.stopPropagation();
+            onKeyDown={handleListKeyDown}
+            onClick={(e) => e.stopPropagation()}
+            inputProps={{
+              role: "combobox",
+              "aria-expanded": menuOpen,
+              "aria-controls": "app-dropdown-listbox",
+              "aria-autocomplete": "list",
             }}
           />
         </ListSubheader>
@@ -297,6 +345,18 @@ export default function AppDropdown({
             key={option.value}
             value={option.value}
             disabled={option.disabled}
+            selected={searchable ? index === highlightIndex : undefined}
+            ref={
+              searchable
+                ? (el) => {
+                    itemRefs.current[index] = el;
+                  }
+                : undefined
+            }
+            onMouseEnter={
+              searchable ? () => setHighlightIndex(index) : undefined
+            }
+            role="option"
             sx={{
               ...menuItemBaseSx,
               gap: option.icon ? 1.75 : 1,

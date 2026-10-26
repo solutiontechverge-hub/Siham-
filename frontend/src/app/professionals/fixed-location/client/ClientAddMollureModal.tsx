@@ -47,12 +47,17 @@ export default function ClientAddMollureModal({
   maxWidth="sm"
   title="Add Mollure Client"
   contentMinHeight={360}
+  onFormSubmit={() => {
+    if (!selectedId) return;
+    onAdd();
+  }}
   footer={
     <FinanceDrawerActionsFooter
       onCancel={onClose}
       onPrimary={onAdd}
       primaryLabel="Add to Client List"
       primaryDisabled={!selectedId}
+      primaryType="submit"
       spacing={1}
       stackSx={{ py: 2 }}
       primarySx={{
@@ -97,6 +102,9 @@ export default function ClientAddMollureModal({
         value={search}
         onChange={(e) => onSearchChange(e.target.value)}
         onClear={() => onSearchChange("")}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.preventDefault();
+        }}
         sx={mollureWhiteFieldInputSx}
       />
     </Box>

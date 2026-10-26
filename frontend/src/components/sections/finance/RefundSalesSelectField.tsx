@@ -4,6 +4,8 @@ import * as React from "react";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import { Box, Checkbox, Paper, Radio, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import { useListboxKeyboard } from "../../../hooks/useListboxKeyboard";
+import { resolveListboxNavKey } from "../../../lib/keyboard";
 import { BodyText } from "../../ui/typography";
 
 export type RefundSelectOption = {
@@ -43,6 +45,7 @@ export default function RefundSalesSelectField({
   const m = useTheme().palette.mollure;
   const [localOpen, setLocalOpen] = React.useState(false);
   const rootRef = React.useRef<HTMLDivElement | null>(null);
+  const listboxId = React.useId();
 
   const usesGroup = Boolean(selectId && onOpenSelectIdChange);
   const open = usesGroup ? openSelectId === selectId : localOpen;
@@ -60,6 +63,29 @@ export default function RefundSalesSelectField({
 
   const selectedLabel = options.find((opt) => opt.value === value)?.label;
 
+  const selectAt = React.useCallback(
+    (index: number) => {
+      const next = options[index];
+      if (!next) return;
+      onChange(next.value);
+      setOpen(false);
+    },
+    [onChange, options, setOpen],
+  );
+
+  const {
+    highlightIndex,
+    setHighlightIndex,
+    itemRefs,
+    handleListKeyDown,
+  } = useListboxKeyboard({
+    length: options.length,
+    open,
+    resetKey: open ? "open" : "closed",
+    onSelect: selectAt,
+    spaceSelects: true,
+  });
+
   React.useEffect(() => {
     if (!open) return;
     const onDocClick = (event: MouseEvent) => {
@@ -69,13 +95,28 @@ export default function RefundSalesSelectField({
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [open, setOpen]);
 
-  const handleSelect = (next: string) => {
-    onChange(next);
-    setOpen(false);
-  };
-
   const borderColor =
     open || (highlightBorderWhenValue && value) ? m.teal : alpha(m.navy, 0.12);
+
+  const handleTriggerKeyDown = (e: React.KeyboardEvent) => {
+    if (!open) {
+      if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        setOpen(true);
+      }
+      return;
+    }
+
+    const action = resolveListboxNavKey(e.key, highlightIndex, options.length, {
+      spaceSelects: true,
+    });
+    if (action.type === "close") {
+      e.preventDefault();
+      setOpen(false);
+      return;
+    }
+    handleListKeyDown(e);
+  };
 
   return (
     <Box ref={rootRef}>
@@ -90,15 +131,13 @@ export default function RefundSalesSelectField({
         {label}
       </BodyText>
       <Box
-        role="button"
+        role="combobox"
         tabIndex={0}
+        aria-expanded={open}
+        aria-controls={open ? listboxId : undefined}
+        aria-haspopup="listbox"
         onClick={() => setOpen(!open)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            setOpen(!open);
-          }
-        }}
+        onKeyDown={handleTriggerKeyDown}
         sx={{
           display: "flex",
           alignItems: "center",
@@ -132,6 +171,8 @@ export default function RefundSalesSelectField({
 
       {open ? (
         <Paper
+          id={listboxId}
+          role="listbox"
           elevation={0}
           sx={{
             mt: 1,
@@ -143,6 +184,7 @@ export default function RefundSalesSelectField({
         >
           {options.map((opt, index) => {
             const active = value === opt.value;
+            const highlighted = index === highlightIndex;
             const checkboxNode =
               optionStyle === "checkbox" ? (
                 <Checkbox
@@ -164,7 +206,12 @@ export default function RefundSalesSelectField({
                 key={opt.value}
                 role="option"
                 aria-selected={active}
-                onClick={() => handleSelect(opt.value)}
+                tabIndex={-1}
+                ref={(el: HTMLDivElement | null) => {
+                  itemRefs.current[index] = el;
+                }}
+                onMouseEnter={() => setHighlightIndex(index)}
+                onClick={() => selectAt(index)}
                 sx={{
                   display: "flex",
                   alignItems: "center",
@@ -173,7 +220,8 @@ export default function RefundSalesSelectField({
                   px: 1.75,
                   py: 1.15,
                   cursor: "pointer",
-                  bgcolor: active ? alpha(m.teal, 0.08) : "#fff",
+                  bgcolor:
+                    highlighted || active ? alpha(m.teal, 0.08) : "#fff",
                   borderBottom:
                     index < options.length - 1
                       ? `1px solid ${alpha(m.navy, 0.06)}`

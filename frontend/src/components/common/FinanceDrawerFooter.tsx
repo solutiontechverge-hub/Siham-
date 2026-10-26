@@ -17,6 +17,8 @@ type FinanceDrawerActionsFooterProps = {
   fullWidth?: boolean;
   spacing?: number;
   stackSx?: SxProps<Theme>;
+  /** Use `submit` when the footer sits inside an `onFormSubmit` AppDrawer/AppModal. */
+  primaryType?: "button" | "submit";
 };
 
 /** Standard drawer footer: Cancel + primary action aligned right (or full width). */
@@ -32,6 +34,7 @@ export function FinanceDrawerActionsFooter({
   fullWidth = false,
   spacing = 1.25,
   stackSx,
+  primaryType = "button",
 }: FinanceDrawerActionsFooterProps) {
   return (
     <Stack
@@ -41,6 +44,7 @@ export function FinanceDrawerActionsFooter({
       sx={{ px: 2.5, py: 1.75, width: fullWidth ? "100%" : undefined, ...stackSx }}
     >
       <AppButton
+        type="button"
         tone="secondary"
         onClick={onCancel}
         disabled={cancelDisabled}
@@ -50,9 +54,10 @@ export function FinanceDrawerActionsFooter({
         {cancelLabel}
       </AppButton>
       <AppButton
+        type={primaryType}
         tone="primary"
         disabled={primaryDisabled}
-        onClick={onPrimary}
+        onClick={primaryType === "submit" ? undefined : onPrimary}
         fullWidth={fullWidth}
         sx={primarySx}
       >
@@ -75,6 +80,8 @@ type ModalCancelApplyFooterProps = {
   buttonSx?: SxProps<Theme>;
   stackSx?: SxProps<Theme>;
   spacing?: number;
+  /** Use `submit` when the footer sits inside an `onFormSubmit` AppModal. */
+  primaryType?: "button" | "submit";
 };
 
 /** Shared Cancel + Apply/Save footer used by calendar AppModals. */
@@ -90,6 +97,7 @@ export function ModalCancelApplyFooter({
   buttonSx,
   stackSx,
   spacing = 1.25,
+  primaryType = "button",
 }: ModalCancelApplyFooterProps) {
   const resolvedButtonSx = buttonSx ?? { height: 38, minWidth: 110 };
 
@@ -101,6 +109,7 @@ export function ModalCancelApplyFooter({
       sx={{ px: 2.5, py: 2, ...stackSx }}
     >
       <AppButton
+        type="button"
         tone="secondary"
         onClick={onCancel}
         disabled={cancelDisabled}
@@ -109,9 +118,10 @@ export function ModalCancelApplyFooter({
         {cancelLabel}
       </AppButton>
       <AppButton
+        type={primaryType}
         tone={primaryTone}
         disabled={primaryDisabled}
-        onClick={onPrimary}
+        onClick={primaryType === "submit" ? undefined : onPrimary}
         sx={resolvedButtonSx}
       >
         {primaryLabel}

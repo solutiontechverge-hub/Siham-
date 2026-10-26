@@ -70,6 +70,8 @@ type Props = {
   rejectedChangesNote?: OutcomeChangesNote | null;
   /** Offline prepayment is due at the visit — keep the total undeducted. */
   prepaymentOffline?: boolean;
+  /** Notes meta — who was marked no-show (pro modal). */
+  noShowParticipantIds?: readonly string[] | null;
 };
 
 export default function ClientBookingPaymentDetailsCard({
@@ -108,6 +110,7 @@ export default function ClientBookingPaymentDetailsCard({
   acceptedChangesNote = null,
   rejectedChangesNote = null,
   prepaymentOffline = false,
+  noShowParticipantIds,
 }: Props) {
   const m = useTheme().palette.mollure;
   const sections = React.useMemo(
@@ -331,6 +334,7 @@ export default function ClientBookingPaymentDetailsCard({
           scheduleChangeTags={scheduleChangeTags}
           editTagSignpostTitle={editTagSignpostTitle}
           onEditTagSignpostClick={onEditTagSignpostClick}
+          noShowParticipantIds={noShowParticipantIds}
         />
 
         <Box

@@ -1024,5 +1024,8 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
     needsOk: notesDetails?.needsOk,
     ackRecipient: notesDetails?.ackRecipient,
     ackScenario: notesDetails?.ackScenario,
+    ...(notesDetails?.noShowParticipantIds?.length
+      ? { noShowParticipantIds: notesDetails.noShowParticipantIds }
+      : {}),
   };
 }

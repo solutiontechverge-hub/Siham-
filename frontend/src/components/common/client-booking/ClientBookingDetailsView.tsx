@@ -191,6 +191,7 @@ export default function ClientBookingDetailsView({
     lateRescheduleFeePercent: bookingNotesMeta?.lateRescheduleFeePercent,
     showNoShowFee: Boolean(bookingNotesMeta?.showNoShowFee),
     noShowFeePercent: bookingNotesMeta?.noShowFeePercent,
+    noShowParticipantIds: bookingNotesMeta?.noShowParticipantIds,
     editedServiceIds: clientVisibleEditedServiceIds,
     addedServiceIds: clientVisibleAddedServiceIds,
     cancelledServiceIds: clientVisibleCancelledServiceIds,

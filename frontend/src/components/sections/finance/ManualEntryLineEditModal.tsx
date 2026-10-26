@@ -53,11 +53,13 @@ export default function ManualEntryLineEditModal({
       onClose={onClose}
       title={line?.kind === "product" ? "Edit Product" : "Edit Item"}
       maxWidth="xs"
+      onFormSubmit={handleSave}
       footer={
         <ModalCancelApplyFooter
           onCancel={onClose}
           onPrimary={handleSave}
           primaryLabel="Save"
+          primaryType="submit"
           buttonSx={{}}
         />
       }

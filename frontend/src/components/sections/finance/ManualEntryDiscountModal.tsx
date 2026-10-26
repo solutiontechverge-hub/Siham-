@@ -49,11 +49,13 @@ export default function ManualEntryDiscountModal({
       onClose={onClose}
       title="Add Discount"
       maxWidth="xs"
+      onFormSubmit={handleApply}
       footer={
         <ModalCancelApplyFooter
           onCancel={onClose}
           onPrimary={handleApply}
           primaryLabel="Apply"
+          primaryType="submit"
           buttonSx={{}}
         />
       }

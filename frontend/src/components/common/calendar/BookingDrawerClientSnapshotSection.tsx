@@ -17,16 +17,19 @@ import {
   planningScheduleMeta,
 } from "../client-booking/buildBookingSummarySections";
 import { isExtraBookingParticipant } from "../../../data/bookingChronologicalBlocks";
+import BookingNoShowTag, { isParticipantMarkedNoShow } from "./BookingNoShowTag";
 
 type Props = {
   snapshot?: CalendarBookingClientSnapshot | null;
   /** Guest/model blocks already shown in the drawer editor — skip to avoid a duplicate heading. */
   hiddenPersonIds?: readonly string[];
+  noShowParticipantIds?: readonly string[] | null;
 };
 
 export default function BookingDrawerClientSnapshotSection({
   snapshot,
   hiddenPersonIds,
+  noShowParticipantIds,
 }: Props) {
   const m = useTheme().palette.mollure;
   if (!snapshot) return null;
@@ -238,6 +241,9 @@ export default function BookingDrawerClientSnapshotSection({
               >
                 {title}
               </Typography>
+              {isParticipantMarkedNoShow(person.id, noShowParticipantIds) ? (
+                <BookingNoShowTag />
+              ) : null}
             </Stack>
             {hasPlanning ? (
               <Box

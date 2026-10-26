@@ -41,6 +41,11 @@ export default function ModalActionsFormDialog({
 }: ModalActionsFormDialogProps) {
   const m = useTheme().palette.mollure;
 
+  const handleSubmit = () => {
+    if (primaryDisabled) return;
+    onConfirm();
+  };
+
   return (
     <AppModal
       contentSx={{ px: 2.5 }}
@@ -51,13 +56,14 @@ export default function ModalActionsFormDialog({
       maxWidth={maxWidth}
       embedded={embedded}
       headerTone={headerTone}
+      onFormSubmit={handleSubmit}
       footer={
         <>
           <MessagingModalCancelButton onClick={onClose} label={cancelLabel} />
           <MessagingModalPrimaryButton
+            type="submit"
             label={confirmLabel}
             disabled={primaryDisabled}
-            onClick={onConfirm}
           />
         </>
       }

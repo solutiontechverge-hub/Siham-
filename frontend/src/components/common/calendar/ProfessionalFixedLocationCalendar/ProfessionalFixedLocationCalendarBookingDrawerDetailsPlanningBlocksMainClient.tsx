@@ -6,6 +6,7 @@ import { BodyText } from "../../../ui/typography";
 import { mollureLabelSx } from "../../../../theme/mollureHierarchy";
 import { participantRoleHeading } from "../../client-booking/buildBookingSummarySections";
 import BookingDrawerSelectedItemsSection from "../BookingDrawerSelectedItemsSection";
+import BookingNoShowTag, { isParticipantMarkedNoShow } from "../BookingNoShowTag";
 import { ACTIVITY_COMPARISON_SIGNPOST } from "../buildActivityComparison";
 import type { ProfessionalFixedLocationCalendarBookingDrawerDetailsPlanningBlocksBag } from "./ProfessionalFixedLocationCalendarBookingDrawerDetailsPlanningBlocks";
 
@@ -30,6 +31,7 @@ type Props = {
     | "selectedClient"
     | "showLineItemRemoveButton"
     | "theme"
+    | "viewingBookingEvent"
   >;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   block: { services: any[] };
@@ -59,9 +61,14 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsPla
     selectedClient,
     showLineItemRemoveButton,
     theme,
+    viewingBookingEvent,
   } = bag;
 
   if (!block.services.length) return null;
+  const clientMarkedNoShow = isParticipantMarkedNoShow(
+    "client",
+    viewingBookingEvent?.details?.noShowParticipantIds,
+  );
 
   return (
     <Box>
@@ -104,6 +111,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsPla
             >
               {selectedClient?.name ?? "Client"}
             </BodyText>
+            {clientMarkedNoShow ? <BookingNoShowTag /> : null}
           </Stack>
           <BookingDrawerSelectedItemsSection
             nested

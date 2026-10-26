@@ -11,6 +11,9 @@ import {
 } from "../../../app/clients/booking/booking-time";
 import { ServiceSummaryMetaLine } from "../ServiceSummaryMetaLine";
 import BookingEditedTag, { BookingChangeTags } from "../calendar/BookingEditedTag";
+import BookingNoShowTag, {
+  isParticipantMarkedNoShow,
+} from "../calendar/BookingNoShowTag";
 import type { BookingEditTagVariant } from "../calendar/bookingRequestNegotiation";
 import { resolveLineChangeTags } from "../calendar/bookingRequestNegotiation";
 import {
@@ -62,6 +65,8 @@ type Props = {
   scheduleChangeTags: readonly BookingEditTagVariant[];
   editTagSignpostTitle?: string;
   onEditTagSignpostClick?: () => void;
+  /** From notes meta — selected in pro No Show modal. */
+  noShowParticipantIds?: readonly string[] | null;
 };
 
 export default function ClientBookingPaymentChronology({
@@ -84,6 +89,7 @@ export default function ClientBookingPaymentChronology({
   scheduleChangeTags,
   editTagSignpostTitle,
   onEditTagSignpostClick,
+  noShowParticipantIds,
 }: Props) {
   const m = useTheme().palette.mollure;
   const bookingStartMinutes = React.useMemo(
@@ -342,7 +348,10 @@ export default function ClientBookingPaymentChronology({
     </Box>
   );
 
-  const renderPersonHeader = (name: string, showUpdated?: boolean) => (
+  const renderPersonHeader = (
+    name: string,
+    options?: { showUpdated?: boolean; showNoShow?: boolean },
+  ) => (
     <Stack
       direction="row"
       alignItems="center"
@@ -371,7 +380,8 @@ export default function ClientBookingPaymentChronology({
       >
         {name}
       </BodyText>
-      {showUpdated ? <BookingEditedTag variant="updated" /> : null}
+      {options?.showNoShow ? <BookingNoShowTag /> : null}
+      {options?.showUpdated ? <BookingEditedTag variant="updated" /> : null}
     </Stack>
   );
 
@@ -389,6 +399,10 @@ export default function ClientBookingPaymentChronology({
 
   const renderRequesterIdentity = () => {
     if (!requesterName.trim()) return null;
+    const requesterNoShow = isParticipantMarkedNoShow(
+      "client",
+      noShowParticipantIds,
+    );
     return (
       <Stack
         direction="row"
@@ -409,16 +423,19 @@ export default function ClientBookingPaymentChronology({
         >
           {requesterName.charAt(0).toUpperCase()}
         </Avatar>
-        <Stack spacing={0.25}>
-          <BodyText
-            sx={{
-              m: 0,
-              ...mollureLabelSx(m.navy),
-              lineHeight: 1.2,
-            }}
-          >
-            {requesterName}
-          </BodyText>
+        <Stack spacing={0.25} sx={{ minWidth: 0, flex: 1 }}>
+          <Stack direction="row" alignItems="center" spacing={0.75}>
+            <BodyText
+              sx={{
+                m: 0,
+                ...mollureLabelSx(m.navy),
+                lineHeight: 1.2,
+              }}
+            >
+              {requesterName}
+            </BodyText>
+            {requesterNoShow ? <BookingNoShowTag /> : null}
+          </Stack>
           {requesterEmail ? (
             <BodyText
               sx={{
@@ -497,7 +514,13 @@ export default function ClientBookingPaymentChronology({
         <Box sx={useSoftPanel ? nestedCardSx : undefined}>
           {showRequesterIdentity ? renderRequesterIdentity() : null}
           {showInnerName
-            ? renderPersonHeader(personName || roleHeading, showGuestUpdated)
+            ? renderPersonHeader(personName || roleHeading, {
+                showUpdated: showGuestUpdated,
+                showNoShow: isParticipantMarkedNoShow(
+                  participantId,
+                  noShowParticipantIds,
+                ),
+              })
             : null}
           <Stack spacing={1.5}>
             {(() => {

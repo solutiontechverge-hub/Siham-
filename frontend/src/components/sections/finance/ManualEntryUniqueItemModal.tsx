@@ -68,11 +68,13 @@ export default function ManualEntryUniqueItemModal({
       onBack={onClose}
       contentVariant="muted"
       sx={{ zIndex: (theme) => theme.zIndex.drawer + 2 }}
+      onFormSubmit={handleSave}
       footer={
         <FinanceDrawerActionsFooter
           onCancel={onClose}
           onPrimary={handleSave}
           primaryLabel="Save"
+          primaryType="submit"
         />
       }
     >

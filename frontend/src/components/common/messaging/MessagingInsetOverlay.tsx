@@ -11,6 +11,7 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import { isModKey } from "../../../lib/keyboard";
 
 export type MessagingInsetOverlayProps = {
   open: boolean;
@@ -22,6 +23,8 @@ export type MessagingInsetOverlayProps = {
   maxWidth?: number;
   /** Soft teal by default; soft red for destructive confirmations. */
   headerTone?: "default" | "danger";
+  /** When set, body + footer wrap in one `<form>` for Enter / submit. */
+  onFormSubmit?: (event: React.FormEvent<HTMLFormElement>) => void;
 };
 
 export default function MessagingInsetOverlay({
@@ -33,6 +36,7 @@ export default function MessagingInsetOverlay({
   hideDivider,
   maxWidth = 400,
   headerTone = "default",
+  onFormSubmit,
 }: MessagingInsetOverlayProps) {
   const m = useTheme().palette.mollure;
   const headerBg =
@@ -108,35 +112,57 @@ export default function MessagingInsetOverlay({
         </Stack>
 
         <Box
+          component={onFormSubmit ? "form" : "div"}
+          onSubmit={onFormSubmit}
+          onKeyDown={
+            onFormSubmit
+              ? (event: React.KeyboardEvent<HTMLFormElement>) => {
+                  if (event.key !== "Enter" || !isModKey(event)) return;
+                  const tag = (event.target as HTMLElement | null)?.tagName;
+                  if (tag !== "TEXTAREA") return;
+                  event.preventDefault();
+                  event.currentTarget.requestSubmit();
+                }
+              : undefined
+          }
           sx={{
-            px: { xs: 2, sm: 2.5 },
-            pt: { xs: 1.75, sm: 2 },
-            pb: footer ? 1 : { xs: 2, sm: 2.5 },
-            overflowY: "auto",
+            display: "flex",
+            flexDirection: "column",
             flex: 1,
             minHeight: 0,
           }}
         >
-          {children}
-        </Box>
-
-        {footer ? (
-          <DialogActions
+          <Box
             sx={{
               px: { xs: 2, sm: 2.5 },
-              pb: { xs: 2, sm: 2.5 },
-              pt: hideDivider ? 0 : 1,
-              justifyContent: "center",
-              gap: 1.5,
-              flexShrink: 0,
-              borderTop: hideDivider
-                ? "none"
-                : `1px solid ${alpha(m.navy, 0.08)}`,
+              pt: { xs: 1.75, sm: 2 },
+              pb: footer ? 1 : { xs: 2, sm: 2.5 },
+              overflowY: "auto",
+              flex: 1,
+              minHeight: 0,
             }}
           >
-            {footer}
-          </DialogActions>
-        ) : null}
+            {children}
+          </Box>
+
+          {footer ? (
+            <DialogActions
+              sx={{
+                px: { xs: 2, sm: 2.5 },
+                pb: { xs: 2, sm: 2.5 },
+                pt: hideDivider ? 0 : 1,
+                justifyContent: "center",
+                gap: 1.5,
+                flexShrink: 0,
+                borderTop: hideDivider
+                  ? "none"
+                  : `1px solid ${alpha(m.navy, 0.08)}`,
+              }}
+            >
+              {footer}
+            </DialogActions>
+          ) : null}
+        </Box>
       </Paper>
     </Box>
   );

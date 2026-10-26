@@ -30,6 +30,7 @@ import {
 } from "../../../ui/typography";
 
 import BookingEditedTag from "../BookingEditedTag";
+import BookingNoShowTag, { isParticipantMarkedNoShow } from "../BookingNoShowTag";
 
 import {
   participantHeadingOrdinal,
@@ -182,6 +183,9 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsPla
                 viewingBookingEvent?.details?.clientSnapshot ?? null
               }
               hiddenPersonIds={bookingGuests.map((guest) => guest.id)}
+              noShowParticipantIds={
+                viewingBookingEvent?.details?.noShowParticipantIds
+              }
             />
 
             {drawerOrderedBlocks.map((block) => {
@@ -394,6 +398,12 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsPla
                           >
                             {guest.name || sectionLabel}
                           </BodyText>
+                          {isParticipantMarkedNoShow(
+                            guest.id,
+                            viewingBookingEvent?.details?.noShowParticipantIds,
+                          ) ? (
+                            <BookingNoShowTag />
+                          ) : null}
                           {isFirstGuestBlock &&
                           (participantKind === "guest" ||
                             participantKind === "model") &&

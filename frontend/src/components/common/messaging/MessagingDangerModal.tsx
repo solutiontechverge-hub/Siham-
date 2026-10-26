@@ -37,6 +37,11 @@ export default function MessagingDangerModal({
   primaryTone = "primary",
   contentSx = { px: 2.5 },
 }: MessagingDangerModalProps) {
+  const handleSubmit = () => {
+    if (primaryDisabled) return;
+    onPrimary();
+  };
+
   return (
     <AppModal
       contentSx={contentSx}
@@ -47,14 +52,15 @@ export default function MessagingDangerModal({
       onClose={onClose}
       embedded={embedded}
       maxWidth={maxWidth}
+      onFormSubmit={handleSubmit}
       footer={
         <>
           <MessagingModalCancelButton onClick={onClose} label={cancelLabel} />
           <MessagingModalPrimaryButton
+            type="submit"
             label={primaryLabel}
             tone={primaryTone}
             disabled={primaryDisabled}
-            onClick={onPrimary}
           />
         </>
       }

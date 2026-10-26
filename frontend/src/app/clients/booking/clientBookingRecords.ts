@@ -54,6 +54,8 @@ export type ClientBookingRecord = {
   editedProductIds?: string[];
   /** Incoming EBR from professional, parsed from booking notes. */
   incomingEditRequest?: BookingEditRequestRecord | null;
+  /** Participant ids marked no-show in notes meta (pro modal). */
+  noShowParticipantIds?: string[];
   /** Soft-delete from client list without changing status. */
   hiddenForCustomer?: boolean;
   /** Counterparty action awaiting client OK acknowledgement. */
@@ -69,6 +71,15 @@ function bookingDate(record: ClientBookingRecord): Date | null {
   if (!iso) return null;
   const d = new Date(`${iso}T00:00:00`);
   return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** True when booking date is before today (list tab helper; API uses end_time). */
+function isSchedulePast(record: ClientBookingRecord): boolean {
+  const d = bookingDate(record);
+  if (!d) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return d.getTime() < today.getTime();
 }
 
 /** Draft bookings are checkout-only until the client sends a booking request. */
@@ -107,32 +118,28 @@ export function isClientBookingPaymentDue(record: ClientBookingRecord): boolean 
 
 export function listTabForClientBooking(record: ClientBookingRecord): BookingListTab {
   const status = normalizeStatus(record);
-  if (status === "cancelled" || status === "no_show" || status === "completed") return "past";
-  if (status === "in_progress") return "ongoing";
+  const schedulePast = isSchedulePast(record);
+  if (status === "in_progress" && !schedulePast) return "ongoing";
+  if (
+    status === "cancelled" ||
+    status === "no_show" ||
+    status === "completed" ||
+    schedulePast
+  ) {
+    return "past";
+  }
   return "upcoming";
 }
 
 /**
- * Upcoming = not started (requested / confirmed / invalid / waiting for prepayment).
- * Ongoing  = in progress only.
- * Past     = completed / cancelled / no-show — never requested or confirmed.
+ * Past     = schedule over (any status) or terminal status.
+ * Ongoing  = in progress while schedule still active.
+ * Upcoming = not started, schedule still ahead.
  */
 export function filterBookingsByTab(bookings: ClientBookingRecord[], tab: BookingListTab): ClientBookingRecord[] {
   const filtered = bookings.filter((b) => {
     if (b.hiddenForCustomer) return false;
-    const status = normalizeStatus(b);
-    if (status === "cancelled" || status === "no_show" || status === "completed") {
-      return tab === "past";
-    }
-    if (status === "in_progress") return tab === "ongoing";
-    if (
-      status === "requested" ||
-      status === "confirmed" ||
-      status === "invalid"
-    ) {
-      return tab === "upcoming";
-    }
-    return tab === "upcoming";
+    return listTabForClientBooking(b) === tab;
   });
   return filtered.sort((a, b) => {
     const dateA = bookingDate(a)?.getTime() ?? 0;

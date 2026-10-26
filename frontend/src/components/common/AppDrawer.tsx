@@ -14,6 +14,7 @@ import {
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import useOverlayScrollLock from "../../hooks/useOverlayScrollLock";
+import { isModKey } from "../../lib/keyboard";
 import {
   mollurePageSubtitleSx,
   mollurePageTitleSx,
@@ -51,6 +52,10 @@ type AppDrawerProps = Omit<DrawerProps, "children" | "title"> & {
   bodyBgcolor?: string;
   /** Scrollable body — used to restore position after sub-screens. */
   contentRef?: React.Ref<HTMLDivElement>;
+  /**
+   * When set, body + footer wrap in a `<form>`. Use with primary `type="submit"`.
+   */
+  onFormSubmit?: (event: React.FormEvent<HTMLFormElement>) => void;
 };
 
 /** Single shared Mollure panel drawer — soft teal header, scroll body, optional footer. */
@@ -67,6 +72,7 @@ export default function AppDrawer({
   headerTone = "default",
   bodyBgcolor,
   contentRef,
+  onFormSubmit,
   onClose,
   anchor = "right",
   PaperProps,
@@ -230,35 +236,70 @@ export default function AppDrawer({
         </Stack>
 
         <Box
-          ref={contentRef}
-          sx={[
-            // minHeight: 0 lets this flex child shrink so the footer stays pinned
-            // instead of the whole column growing and scrolling with content.
-            { flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", overscrollBehavior: "contain" },
-            ...(Array.isArray(mergedContentSx)
-              ? mergedContentSx
-              : mergedContentSx
-                ? [mergedContentSx]
-                : []),
-          ]}
+          component={onFormSubmit ? "form" : "div"}
+          onSubmit={
+            onFormSubmit
+              ? (event: React.FormEvent<HTMLFormElement>) => {
+                  event.preventDefault();
+                  onFormSubmit(event);
+                }
+              : undefined
+          }
+          onKeyDown={
+            onFormSubmit
+              ? (event: React.KeyboardEvent<HTMLFormElement>) => {
+                  if (event.key !== "Enter" || !isModKey(event)) return;
+                  const tag = (event.target as HTMLElement | null)?.tagName;
+                  if (tag !== "TEXTAREA") return;
+                  event.preventDefault();
+                  event.currentTarget.requestSubmit();
+                }
+              : undefined
+          }
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            flex: 1,
+            minHeight: 0,
+          }}
         >
-          {children}
-        </Box>
-
-        {footer ? (
           <Box
-            sx={{
-              flexShrink: 0,
-              flexGrow: 0,
-              position: "sticky",
-              bottom: 0,
-              zIndex: 3,
-              bgcolor: panelBg,
-            }}
+            ref={contentRef}
+            sx={[
+              // minHeight: 0 lets this flex child shrink so the footer stays pinned
+              // instead of the whole column growing and scrolling with content.
+              {
+                flex: 1,
+                minHeight: 0,
+                overflowY: "auto",
+                overflowX: "hidden",
+                overscrollBehavior: "contain",
+              },
+              ...(Array.isArray(mergedContentSx)
+                ? mergedContentSx
+                : mergedContentSx
+                  ? [mergedContentSx]
+                  : []),
+            ]}
           >
-            {footer}
+            {children}
           </Box>
-        ) : null}
+
+          {footer ? (
+            <Box
+              sx={{
+                flexShrink: 0,
+                flexGrow: 0,
+                position: "sticky",
+                bottom: 0,
+                zIndex: 3,
+                bgcolor: panelBg,
+              }}
+            >
+              {footer}
+            </Box>
+          ) : null}
+        </Box>
       </Box>
     </Drawer>
   );

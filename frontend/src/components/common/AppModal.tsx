@@ -18,6 +18,7 @@ import {
 } from "../../theme/mollureHierarchy";
 import { BodyText, SubHeading } from "../ui/typography";
 import useOverlayScrollLock from "../../hooks/useOverlayScrollLock";
+import { isModKey } from "../../lib/keyboard";
 import AppButton from "./AppButton";
 import MessagingInsetOverlay from "./messaging/MessagingInsetOverlay";
 
@@ -38,6 +39,11 @@ type AppModalProps = Omit<DialogProps, "children" | "title" | "onClose"> & {
   footerVariant?: "plain" | "actions";
   /** Soft teal by default; soft red for cancel/delete/destructive confirmations. */
   headerTone?: "default" | "danger";
+  /**
+   * When set, body + footer wrap in a `<form>`. Use with primary `type="submit"`.
+   * Caller should `preventDefault` (helpers do this before invoking).
+   */
+  onFormSubmit?: (event: React.FormEvent<HTMLFormElement>) => void;
   onClose?: AppModalCloseHandler;
 };
 
@@ -59,6 +65,7 @@ export default function AppModal({
   embedded = false,
   footerVariant = "plain",
   headerTone = "default",
+  onFormSubmit,
   onClose,
   maxWidth = "sm",
   fullWidth = true,
@@ -164,6 +171,42 @@ export default function AppModal({
     </Box>
   ) : null;
 
+  const handleFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    onFormSubmit?.(event);
+  };
+
+  const handleFormKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
+    // Multiline fields: Cmd/Ctrl+Enter submits (Enter alone inserts newline).
+    if (event.key !== "Enter" || !isModKey(event)) return;
+    const tag = (event.target as HTMLElement | null)?.tagName;
+    if (tag !== "TEXTAREA") return;
+    event.preventDefault();
+    event.currentTarget.requestSubmit();
+  };
+
+  const mainContent = onFormSubmit ? (
+    <Box
+      component="form"
+      onSubmit={handleFormSubmit}
+      onKeyDown={handleFormKeyDown}
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        minHeight: 0,
+        flex: 1,
+      }}
+    >
+      {body}
+      {footerBlock}
+    </Box>
+  ) : (
+    <>
+      {body}
+      {footerBlock}
+    </>
+  );
+
   if (embedded) {
     return (
       <MessagingInsetOverlay
@@ -174,6 +217,7 @@ export default function AppModal({
         hideDivider={hideDivider}
         headerTone={headerTone}
         maxWidth={maxWidth === "sm" ? 440 : 400}
+        onFormSubmit={onFormSubmit ? handleFormSubmit : undefined}
       >
         {children}
       </MessagingInsetOverlay>
@@ -212,8 +256,7 @@ export default function AppModal({
     >
       <Stack sx={{ maxHeight: "inherit", minHeight: 0 }}>
         {header}
-        {body}
-        {footerBlock}
+        {mainContent}
       </Stack>
     </Dialog>
   );
@@ -224,16 +267,19 @@ function AppModalActionButton({
   label,
   disabled,
   tone,
+  type = "button",
 }: {
-  onClick: () => void;
+  onClick?: () => void;
   label: string;
   disabled?: boolean;
   tone: "primary" | "secondary" | "danger";
+  type?: "button" | "submit" | "reset";
 }) {
   return (
     <AppButton
       tone={tone}
       presetSize="lg"
+      type={type}
       onClick={onClick}
       disabled={disabled}
       sx={{ minWidth: 100, px: 3 }}
@@ -247,10 +293,12 @@ export function AppModalCancelButton({
   onClick,
   label = "Cancel",
   disabled,
+  type = "button",
 }: {
-  onClick: () => void;
+  onClick?: () => void;
   label?: string;
   disabled?: boolean;
+  type?: "button" | "submit" | "reset";
 }) {
   return (
     <AppModalActionButton
@@ -258,6 +306,7 @@ export function AppModalCancelButton({
       label={label}
       disabled={disabled}
       tone="secondary"
+      type={type}
     />
   );
 }
@@ -267,18 +316,21 @@ export function AppModalPrimaryButton({
   label,
   disabled,
   tone = "primary",
+  type = "button",
 }: {
-  onClick: () => void;
+  onClick?: () => void;
   label: string;
   disabled?: boolean;
   tone?: "primary" | "danger";
+  type?: "button" | "submit" | "reset";
 }) {
   return (
     <AppModalActionButton
-      onClick={onClick}
+      onClick={type === "submit" ? undefined : onClick}
       label={label}
       disabled={disabled}
       tone={tone}
+      type={type}
     />
   );
 }

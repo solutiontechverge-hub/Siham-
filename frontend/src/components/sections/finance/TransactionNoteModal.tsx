@@ -53,6 +53,10 @@ export default function TransactionNoteModal({
       onClose={onClose}
       title="Add Note"
       maxWidth="sm"
+      onFormSubmit={() => {
+        if (!note.trim()) return;
+        handleSave();
+      }}
       footer={
         <Stack
           direction="row"
@@ -62,6 +66,7 @@ export default function TransactionNoteModal({
         >
           {hasExistingNote && onDelete ? (
             <AppButton
+              type="button"
               onClick={() => {
                 onDelete();
                 onClose();
@@ -81,6 +86,7 @@ export default function TransactionNoteModal({
             onPrimary={handleSave}
             primaryLabel="Save"
             primaryDisabled={!note.trim()}
+            primaryType="submit"
             buttonSx={{}}
             stackSx={{ px: 0, py: 0 }}
           />

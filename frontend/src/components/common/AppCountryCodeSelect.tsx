@@ -10,6 +10,7 @@ import {
   Typography,
   type TextFieldProps,
 } from "@mui/material";
+import { useListboxKeyboard } from "../../hooks/useListboxKeyboard";
 import AppSearchField from "./AppSearchField";
 import AppTextField from "./AppTextField";
 import {
@@ -161,24 +162,11 @@ export default function AppCountryCodeSelect({
   const selectValue = resolveCountrySelectValue(value);
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
-  const [highlightIndex, setHighlightIndex] = React.useState(0);
-  const itemRefs = React.useRef<Array<HTMLLIElement | null>>([]);
 
   const query = search.trim();
   const visibleCountries = COUNTRY_DIAL_CODES.filter((entry) =>
     matchesCountrySearch(entry, query),
   );
-
-  React.useEffect(() => {
-    setHighlightIndex(0);
-    itemRefs.current = [];
-  }, [query, menuOpen]);
-
-  React.useEffect(() => {
-    if (!menuOpen || visibleCountries.length === 0) return;
-    const el = itemRefs.current[highlightIndex];
-    el?.scrollIntoView({ block: "nearest" });
-  }, [highlightIndex, menuOpen, visibleCountries.length]);
 
   const selectCountryAt = React.useCallback(
     (index: number) => {
@@ -187,37 +175,21 @@ export default function AppCountryCodeSelect({
       onChange(dialCodeFromSelectValue(countryDialOptionValue(entry)));
       setMenuOpen(false);
       setSearch("");
-      setHighlightIndex(0);
     },
     [onChange, visibleCountries],
   );
 
-  const handleSearchKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") return;
-
-    const navKeys = ["ArrowDown", "ArrowUp", "Enter", "Home", "End"] as const;
-    if ((navKeys as readonly string[]).includes(e.key)) {
-      e.preventDefault();
-      e.stopPropagation();
-      if (visibleCountries.length === 0) return;
-      if (e.key === "ArrowDown") {
-        setHighlightIndex((prev) =>
-          Math.min(prev + 1, visibleCountries.length - 1),
-        );
-      } else if (e.key === "ArrowUp") {
-        setHighlightIndex((prev) => Math.max(prev - 1, 0));
-      } else if (e.key === "Enter") {
-        selectCountryAt(highlightIndex);
-      } else if (e.key === "Home") {
-        setHighlightIndex(0);
-      } else {
-        setHighlightIndex(visibleCountries.length - 1);
-      }
-      return;
-    }
-
-    e.stopPropagation();
-  };
+  const {
+    highlightIndex,
+    setHighlightIndex,
+    itemRefs,
+    handleListKeyDown,
+  } = useListboxKeyboard({
+    length: visibleCountries.length,
+    open: menuOpen,
+    resetKey: query,
+    onSelect: selectCountryAt,
+  });
 
   const menuItemSx = {
     minHeight: 40,
@@ -271,6 +243,7 @@ export default function AppCountryCodeSelect({
           autoFocus: false,
           disableAutoFocusItem: true,
           PaperProps: { sx: { maxHeight: 360 } },
+          MenuListProps: { id: "country-code-listbox", role: "listbox" },
         },
         renderValue: (selected) => {
           if (!selected) {
@@ -292,8 +265,14 @@ export default function AppCountryCodeSelect({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onClear={() => setSearch("")}
-          onKeyDown={handleSearchKeyDown}
+          onKeyDown={handleListKeyDown}
           onClick={(e) => e.stopPropagation()}
+          inputProps={{
+            role: "combobox",
+            "aria-expanded": menuOpen,
+            "aria-controls": "country-code-listbox",
+            "aria-autocomplete": "list",
+          }}
         />
       </ListSubheader>
       <MenuItem value="" sx={menuItemSx}>
@@ -321,6 +300,7 @@ export default function AppCountryCodeSelect({
             key={countryDialOptionValue(entry)}
             value={countryDialOptionValue(entry)}
             selected={index === highlightIndex}
+            role="option"
             ref={(el) => {
               itemRefs.current[index] = el;
             }}

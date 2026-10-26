@@ -47,21 +47,26 @@ export default function TransactionDateModal({
     );
   }, [initialDate, open]);
 
+  const canConfirm = /^\d{4}-\d{2}-\d{2}$/.test(date);
+  const handleConfirm = () => {
+    if (!canConfirm) return;
+    onConfirm(date);
+  };
+
   return (
     <AppModal
       open={open}
       onClose={onClose}
       title={title}
       maxWidth="xs"
+      onFormSubmit={handleConfirm}
       footer={
         <ModalCancelApplyFooter
           onCancel={onClose}
-          onPrimary={() => {
-            if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
-            onConfirm(date);
-          }}
+          onPrimary={handleConfirm}
           primaryLabel={confirmLabel}
-          primaryDisabled={!/^\d{4}-\d{2}-\d{2}$/.test(date)}
+          primaryDisabled={!canConfirm}
+          primaryType="submit"
         />
       }
     >

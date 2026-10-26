@@ -3,6 +3,8 @@ import type { CalendarEvent } from "../../../../app/professionals/fixed-location
 
 export type NoShowParticipantOption = { id: string; name: string };
 
+export { isParticipantMarkedNoShow } from "../BookingNoShowTag";
+
 /** Same list the No Show modal offers (requester + guests/models). */
 export function listNoShowParticipantOptions(
   event: Pick<CalendarEvent, "showClientName" | "details"> | null | undefined,
