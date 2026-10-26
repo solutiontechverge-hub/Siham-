@@ -15,6 +15,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 import {
   fmtMinutesToIsoTime,
   fmtMinutesToTimeLabel,
+  parseTimeLabelToMinutes,
   serviceTimeRangeLabel,
 } from "../../../app/clients/booking/booking-time";
 import {
@@ -315,8 +316,16 @@ export default function ClientBookingCreateSummaryServiceCard({
                       </Box>
                     ) : null}
                     {section.items.map((item, itemIndex) => {
-                      const start = serviceCursor;
-                      serviceCursor += item.durationMins;
+                      const start = item.startTime?.trim()
+                        ? parseTimeLabelToMinutes(item.startTime)
+                        : serviceCursor;
+                      const rawDuration = Number(item.durationMins) || 0;
+                      const endMin = item.endTime?.trim()
+                        ? parseTimeLabelToMinutes(item.endTime)
+                        : start + rawDuration;
+                      const displayDurationMins =
+                        endMin > start ? endMin - start : rawDuration;
+                      serviceCursor = start + displayDurationMins;
                       const tmId = String(item.teamMemberId ?? "").trim();
                       const tmName =
                         resolveTeamMemberFirstName(
@@ -362,8 +371,11 @@ export default function ClientBookingCreateSummaryServiceCard({
                                   color: alpha(m.navy, 0.48),
                                 }}
                               >
-                                {serviceTimeRangeLabel(start, item.durationMins)}{" "}
-                                • {item.durationMins} Mins
+                                {serviceTimeRangeLabel(
+                                  start,
+                                  displayDurationMins,
+                                )}{" "}
+                                • {displayDurationMins} Mins
                               </Typography>
                               {tmName ? (
                                 <Box

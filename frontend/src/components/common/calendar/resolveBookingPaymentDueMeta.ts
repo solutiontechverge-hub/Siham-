@@ -3,6 +3,7 @@ import { listSalesCardMetaForBooking, SALES_META_CHANGED_EVENT } from "./salesOv
 import type { SalesCardMetaRecord } from "./salesOverview.types";
 import { parseApiCalendarEventId } from "./bookingEventDetails";
 import { extractBookingId } from "./calendar.utils";
+import { isCancelledOrNoShowBookingStatus } from "./bookingStatus";
 import { formatFinanceDueDate } from "../booking-finance/formatBookingFinance";
 import type { TransactionRow } from "../../../app/professionals/fixed-location/finance/data/transactions";
 import { useGetFinanceTransactionsQuery } from "../../../store/services/financeApi";
@@ -148,6 +149,7 @@ function resolveFinancePaymentDueMeta(
 export function useBookingPaymentDueMeta(event: {
   id: string;
   bookingCode?: string;
+  status?: string;
 } | null): BookingPaymentDueMeta | null {
   const [revision, setRevision] = React.useState(0);
   const preloadedRows = React.useContext(FinancePaymentDueRowsContext);
@@ -156,9 +158,13 @@ export function useBookingPaymentDueMeta(event: {
       parseApiCalendarEventId(event.id)?.id ||
       extractBookingId(event.id)
     : "";
+  const skipPaymentDue = isCancelledOrNoShowBookingStatus(event?.status);
   const { data: financeResponse } = useGetFinanceTransactionsQuery(
     { bookingId: bookingKey, limit: 50 },
-    { skip: preloadedRows !== null || !bookingKey, refetchOnMountOrArgChange: true },
+    {
+      skip: skipPaymentDue || preloadedRows !== null || !bookingKey,
+      refetchOnMountOrArgChange: true,
+    },
   );
 
   React.useEffect(() => {
@@ -173,26 +179,40 @@ export function useBookingPaymentDueMeta(event: {
   }, []);
 
   return React.useMemo(() => {
-    if (!event) return null;
+    if (!event || skipPaymentDue) return null;
+    const fromMeta = resolveBookingPaymentDueMeta({
+      bookingId: parseApiCalendarEventId(event.id)?.id ?? event.id,
+      bookingCode: event.bookingCode,
+      eventId: event.id,
+    });
+    let fromFinance: BookingPaymentDueMeta | null = null;
     if (preloadedRows !== null) {
       const bookingIds = new Set(resolveBookingIds(event));
-      return resolveFinancePaymentDueMeta(
+      fromFinance = resolveFinancePaymentDueMeta(
         preloadedRows.filter(
           (row) =>
             bookingIds.has(String(row.bookingId ?? "")) ||
             bookingIds.has(String(row.entryId ?? "")),
         ),
       );
+    } else if (financeResponse) {
+      fromFinance = resolveFinancePaymentDueMeta(
+        financeResponse.data?.rows ?? [],
+      );
     }
-    if (financeResponse) {
-      return resolveFinancePaymentDueMeta(financeResponse.data?.rows ?? []);
-    }
-    return resolveBookingPaymentDueMeta({
-      bookingId: parseApiCalendarEventId(event.id)?.id ?? event.id,
-      bookingCode: event.bookingCode,
-      eventId: event.id,
-    });
+    // Sales meta holds reissue due dates; finance list can lag until Sales mounts.
+    if (fromFinance?.reissued) return fromFinance;
+    if (fromMeta?.reissued) return fromMeta;
+    return fromFinance ?? fromMeta;
     // revision intentionally included so in-memory sales meta updates re-resolve
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [event?.id, event?.bookingCode, financeResponse, preloadedRows, revision]);
+  }, [
+    event?.id,
+    event?.bookingCode,
+    event?.status,
+    financeResponse,
+    preloadedRows,
+    revision,
+    skipPaymentDue,
+  ]);
 }

@@ -1,7 +1,10 @@
 import type { CalendarBooking } from "../../../store/services/businessApi";
 import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import { mapCalendarBookingToEvent } from "./calendar-overview.mappers";
-import { parseApiCalendarEventId } from "./bookingEventDetails";
+import {
+  parseApiCalendarEventId,
+  parseCalendarEntryNotes,
+} from "./bookingEventDetails";
 import {
   listRefundSalesCardMetaForBookings,
   listSalesAddonsForBookings,
@@ -111,20 +114,19 @@ export function buildSalesOverviewCards(input: BuildSalesOverviewInput): SalesOv
     const hasFinanceFee = Boolean(
       findProtectiveFeeFinanceHint(financeHints, bookingKey, bookingCode),
     );
-    // Paid protective finance row (or stamp) — never invent Fee Summary from policy alone.
+    const notesParsed = parseCalendarEntryNotes(booking.notes ?? null);
+    // Charged finance / late stamp — cancelled always builds Fee Summary (paid/due/early).
     const protectiveFeeActive =
-      (isCancelledStatus &&
-        (Boolean(event.details?.showLateCancellation) ||
-          notesFee.showLateCancellation ||
-          hasFinanceFee)) ||
+      isCancelledStatus ||
       (isNoShowStatus &&
         (Boolean(event.details?.showNoShowFee) ||
           notesFee.showNoShowFee ||
           hasFinanceFee)) ||
-      hasFinanceFee;
-
-    // Cancelled with neither fee nor prepaid → blank Sales (plain free cancel).
-    if (isCancelledStatus && !protectiveFeeActive && !prepaidCollected) continue;
+      hasFinanceFee ||
+      Boolean(event.details?.showLateRescheduling) ||
+      Boolean(notesParsed?.showLateRescheduling) ||
+      Boolean(event.details?.showLateCancellation) ||
+      notesFee.showLateCancellation;
 
     if (
       !protectiveFeeActive &&

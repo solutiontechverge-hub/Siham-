@@ -118,6 +118,14 @@ const planningMeta = planningScheduleMeta(planningSection!);
 assert.equal(Boolean(planningMeta.timeRange), true);
 assert.equal(planningMeta.durationLabel, "30 Mins");
 
+// Stale planning duration label must not win over the clock span.
+const mismatched = planningScheduleMeta({
+  startTime: "9:00 AM",
+  endTime: "9:35 AM",
+  planningItem: { activity: "Prep", duration: "18 Mins" },
+});
+assert.equal(mismatched.durationLabel, "35 Mins");
+
 const requesterItems =
   sections.find((section) => section.participantType === "requester")?.items ??
   [];

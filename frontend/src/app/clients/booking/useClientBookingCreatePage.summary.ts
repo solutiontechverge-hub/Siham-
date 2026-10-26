@@ -45,10 +45,17 @@ export function useClientBookingCreateSummary(
     () => parseTimeLabelToMinutes(selectedTime),
     [selectedTime],
   );
-  const bookingDurationMinutes = React.useMemo(
-    () => servicesDurationMins,
-    [servicesDurationMins],
-  );
+  const bookingDurationMinutes = React.useMemo(() => {
+    // Prefer max service end clock when draft carries start/end (EBR/API), else sum/max duration.
+    let fromEnds = 0;
+    for (const service of services) {
+      if (!service.startTime?.trim() || !service.endTime?.trim()) continue;
+      const start = parseTimeLabelToMinutes(service.startTime);
+      const end = parseTimeLabelToMinutes(service.endTime);
+      if (end > start) fromEnds = Math.max(fromEnds, end - bookingStartMinutes);
+    }
+    return fromEnds > 0 ? fromEnds : servicesDurationMins;
+  }, [bookingStartMinutes, services, servicesDurationMins]);
   const bookingEndMinutes = bookingStartMinutes + bookingDurationMinutes;
 
   const summaryGroups = React.useMemo(() => {

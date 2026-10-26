@@ -19,9 +19,7 @@ export type ClientBookingTimeSelectPanelProps = {
   timeValidationError: string | null;
   setTimeValidationError: (error: string | null) => void;
   selectedTimeTooSoon: boolean;
-  selectedDayNotAvailable: boolean;
   selectedDayClosedNote: string | null;
-  availableTimes: string[];
 };
 
 export default function ClientBookingTimeSelectPanel({
@@ -34,9 +32,7 @@ export default function ClientBookingTimeSelectPanel({
   timeValidationError,
   setTimeValidationError,
   selectedTimeTooSoon,
-  selectedDayNotAvailable,
   selectedDayClosedNote,
-  availableTimes,
 }: ClientBookingTimeSelectPanelProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -185,7 +181,8 @@ export default function ClientBookingTimeSelectPanel({
           </Typography>
         )}
 
-        {(selectedDayNotAvailable || availableTimes.length === 0) && (
+        {/* Same predicate as chips — never contradict a selectable/selected slot. */}
+        {times.every((t) => isTimeUnavailable(t)) && (
           <Typography
             sx={{
               mt: 0.9,

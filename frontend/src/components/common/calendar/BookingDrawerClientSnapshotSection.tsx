@@ -8,7 +8,10 @@ import { alpha, useTheme } from "@mui/material/styles";
 import type { CalendarBookingClientSnapshot } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import { ServiceSummaryMetaLine } from "../ServiceSummaryMetaLine";
 import ProjectUploadThumb from "../client-booking/ProjectUploadThumb";
-import { formatServiceTimeRange } from "../../../data/bookingServiceEdit.data";
+import {
+  formatServiceTimeRange,
+  formatTimeWindowDurationLabel,
+} from "../../../data/bookingServiceEdit.data";
 import {
   bookingParticipantDisplayHeading,
   planningScheduleMeta,
@@ -313,7 +316,13 @@ export default function BookingDrawerClientSnapshotSection({
                             service.startTime,
                             service.endTime,
                           )}
-                          durationLabel={`${service.durationMins} Mins`}
+                          durationLabel={
+                            formatTimeWindowDurationLabel(
+                              service.startTime,
+                              service.endTime,
+                              `${service.durationMins} Mins`,
+                            ) || `${service.durationMins} Mins`
+                          }
                           staffName={staff?.trim() || "Unassigned"}
                         />
                       </Box>

@@ -636,9 +636,7 @@ export function useClientBookingCreatePage() {
   }, [availableTimes, selectedTime]);
 
   const isSlotUnavailable = React.useCallback(
-    (t: string) =>
-      isTimeUnavailable(t) ||
-      (availableTimes.length > 0 && !availableTimes.includes(t)),
+    (t: string) => isTimeUnavailable(t) || !availableTimes.includes(t),
     [availableTimes, isTimeUnavailable],
   );
 

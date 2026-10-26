@@ -172,12 +172,26 @@ export function useClientBookingCreateAvailability(
             candidateMemberIds.includes(selectedTeamMemberId)
           ? [selectedTeamMemberId]
           : candidateMemberIds;
-    return computeUnionBookableSlots(
+    const slots = computeUnionBookableSlots(
       availabilitySnapshot,
       memberIdsForSlots,
       duration,
       minStart,
     );
+    // Narrowed TM had no free window — still offer union of leave-filtered roster.
+    if (
+      slots.length === 0 &&
+      memberIdsForSlots.length > 0 &&
+      memberIdsForSlots.length < candidateMemberIds.length
+    ) {
+      return computeUnionBookableSlots(
+        availabilitySnapshot,
+        candidateMemberIds,
+        duration,
+        minStart,
+      );
+    }
+    return slots;
   }, [
     availabilitySnapshot,
     candidateMemberIds,
@@ -191,7 +205,8 @@ export function useClientBookingCreateAvailability(
 
   const availableTimes = React.useMemo(() => {
     // Live Schedule slots are authoritative — do not clip to a fixed day window.
-    if (availabilityBookableTimes) return availabilityBookableTimes;
+    // `[]` means truly no bookable slots (do not fall back; `[]` is falsy).
+    if (availabilityBookableTimes != null) return availabilityBookableTimes;
     return baseAvailableTimes;
   }, [availabilityBookableTimes, baseAvailableTimes]);
 
@@ -267,7 +282,7 @@ export function useClientBookingCreateAvailability(
         sharedWindowMins,
       });
       const sharedMember =
-        assignments.find((row) => row.teamMemberId)?.teamMemberId ?? "";
+        mirror.find((row) => row.teamMemberId)?.teamMemberId ?? "";
       // Sync picker when assign finds someone. Do NOT clear to "" while the
       // current pick is still on the leave-filtered roster (just busy) — that
       // fought the ""→first repair effect and caused max update depth.

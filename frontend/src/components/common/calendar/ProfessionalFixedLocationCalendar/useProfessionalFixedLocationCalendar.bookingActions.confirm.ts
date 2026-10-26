@@ -87,28 +87,31 @@ export function useProfessionalFixedLocationCalendarBookingActionsConfirm(
         })
       : null;
 
+    const cancelStamp = activation
+      ? {
+          showLateCancellation: true,
+          lateCancellationFeePercent: activation.percent,
+          lateCancellationFeePercentCeiling: activation.ceiling,
+          cancellationFeeAt: activation.cancellationFeeAt,
+          exceededCancellationWindow: true as const,
+        }
+      : {
+          // Early cancel: Sales Fee Summary shows within-window / no-fee path.
+          cancellationFeeAt: new Date().toISOString(),
+          exceededCancellationWindow: false as const,
+        };
     const nextDetails = {
       ...current?.details,
-      ...(activation
-        ? {
-            showLateCancellation: true,
-            lateCancellationFeePercent: activation.percent,
-            lateCancellationFeePercentCeiling: activation.ceiling,
-            cancellationFeeAt: activation.cancellationFeeAt,
-            exceededCancellationWindow: true,
-          }
-        : {}),
+      ...cancelStamp,
     };
-    const nextNotes = activation
-      ? serializeCalendarEntryNotes(
-          current?.details?.internalNote ?? "",
-          nextDetails,
-        )
-      : undefined;
+    const nextNotes = serializeCalendarEntryNotes(
+      current?.details?.internalNote ?? "",
+      nextDetails,
+    );
 
     try {
       await persistEventStatus(editingEventId, "Cancelled", {
-        ...(nextNotes ? { notes: nextNotes } : {}),
+        notes: nextNotes,
       });
       if (activation) {
         setShowLateCancellation(true);
@@ -116,6 +119,9 @@ export function useProfessionalFixedLocationCalendarBookingActionsConfirm(
         setLateCancellationFeePercentCeiling(activation.ceiling);
         setCancellationFeeAt(activation.cancellationFeeAt);
         setExceededCancellationWindow(true);
+      } else {
+        setCancellationFeeAt(cancelStamp.cancellationFeeAt);
+        setExceededCancellationWindow(false);
       }
       setIsEditingExisting(false);
       setEvents((prev) =>
@@ -124,9 +130,8 @@ export function useProfessionalFixedLocationCalendarBookingActionsConfirm(
             ? {
                 ...event,
                 status: "Cancelled",
-                ...(activation
-                  ? { details: nextDetails, ...(nextNotes ? { notes: nextNotes } : {}) }
-                  : {}),
+                details: nextDetails,
+                notes: nextNotes,
               }
             : event,
         ),

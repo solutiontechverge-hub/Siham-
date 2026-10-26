@@ -44,7 +44,11 @@ export function useMessagingRealtimeSync(audience: MessagingAudience) {
     return fullName || (audience === "client" ? "Client" : "Professional");
   }, [audience, user]);
 
-  const { data: inbox, refetch: refetchInbox } = useGetMessagingInboxQuery(undefined, {
+  const {
+    data: inbox,
+    refetch: refetchInbox,
+    isUninitialized: inboxUninitialized,
+  } = useGetMessagingInboxQuery(undefined, {
     skip: !isAuthed,
     refetchOnMountOrArgChange: true,
     refetchOnFocus: true,
@@ -76,7 +80,7 @@ export function useMessagingRealtimeSync(audience: MessagingAudience) {
       const result = mergeIncomingSocketMessage(base, threadId, message, audience, currentUserName);
       if (result.unknownThread) {
         dispatch(messagingApi.util.invalidateTags(["Messaging"]));
-        void refetchInbox();
+        if (!inboxUninitialized) void refetchInbox();
         return;
       }
       if (!result.isNew) return;
@@ -108,5 +112,13 @@ export function useMessagingRealtimeSync(audience: MessagingAudience) {
       offDeleted();
       offRead();
     };
-  }, [audience, currentUserId, currentUserName, dispatch, isAuthed, refetchInbox]);
+  }, [
+    audience,
+    currentUserId,
+    currentUserName,
+    dispatch,
+    inboxUninitialized,
+    isAuthed,
+    refetchInbox,
+  ]);
 }

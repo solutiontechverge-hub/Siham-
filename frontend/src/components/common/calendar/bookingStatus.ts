@@ -324,6 +324,17 @@ export function isBookingRequestAccepted(
   return event.status === "Confirmed" || event.status === "Completed";
 }
 
+/** Cancelled / No Show — hide reissue due + payable footer; Fee Summary owns dues. */
+export function isCancelledOrNoShowBookingStatus(
+  status?: string | null,
+): boolean {
+  const s = String(status ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, " ");
+  return s === "cancelled" || s === "canceled" || s === "no show";
+}
+
 /** @deprecated BR badge is hidden after reject — kept for callers that still check. */
 export function isBookingRequestRejected(
   event: Pick<CalendarEvent, "status" | "bookingScenario"> | null | undefined,

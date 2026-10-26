@@ -9,9 +9,11 @@ import {
   buildCardsForEvent,
   collapseBurstDuplicateAddons,
   mergeAddonRecordsIntoCards,
+  resolveProtectiveFeeDuePresentation,
   resolveProtectiveFeeSalesCardSpec,
   shouldShowAfterTreatmentCard,
 } from "./buildSalesOverviewCards.helpers";
+import { isCancelledOrNoShowBookingStatus } from "./bookingStatus";
 import { buildSalesOverviewCards } from "./buildSalesOverviewCards";
 import { hydrateSalesCardMetadata, upsertSalesCardMeta } from "./salesOverview.storage";
 import {
@@ -143,26 +145,36 @@ assert.equal(
   "already-collected after-treatment stays visible",
 );
 
-assert.equal(
-  resolveProtectiveFeeSalesCardSpec({
-    status: "Cancelled",
-    showLateCancellation: false,
-    lateCancellationFeePercent: 50,
-    lineSubtotal: 100,
-  }),
-  null,
-  "plain cancel without fee section yields no invoice",
+const earlyCancelSpec = resolveProtectiveFeeSalesCardSpec({
+  status: "Cancelled",
+  showLateCancellation: false,
+  lateCancellationFeePercent: 50,
+  lineSubtotal: 100,
+  cancellationFeeAt: "2026-09-23T09:00:00.000Z",
+});
+assert.ok(earlyCancelSpec, "early cancel yields Fee Summary");
+assert.equal(earlyCancelSpec?.title, "Fee Summary");
+assert.equal(earlyCancelSpec?.feeAmount, 0);
+assert.equal(earlyCancelSpec?.feeLabel, "No late cancellation fee");
+assert.ok(
+  earlyCancelSpec?.metaLines.includes("Within preset cancellation window"),
+  "early cancel stamps within-window meta",
 );
 
+const stampOnlySpec = resolveProtectiveFeeSalesCardSpec({
+  status: "Cancelled",
+  showLateCancellation: true,
+  lateCancellationFeePercent: 50,
+  lineSubtotal: 100,
+  exceededCancellationWindow: true,
+  cancellationFeeAt: "2026-09-23T10:00:00.000Z",
+});
+assert.ok(stampOnlySpec, "stamp alone invents Fee Summary (pro cancel without finance)");
+assert.equal(stampOnlySpec?.title, "Fee Summary");
+assert.equal(stampOnlySpec?.feeAmount, 50);
 assert.equal(
-  resolveProtectiveFeeSalesCardSpec({
-    status: "Cancelled",
-    showLateCancellation: true,
-    lateCancellationFeePercent: 50,
-    lineSubtotal: 100,
-  }),
-  null,
-  "stamp alone without Paid LCF does not invent Fee Summary",
+  stampOnlySpec?.feeLabel,
+  "Late Cancellation Booking Fee (50% Of €100)",
 );
 
 const feeCard = resolveProtectiveFeeSalesCardSpec({
@@ -322,7 +334,9 @@ const plainCancelCards = buildCardsForEvent({
   clientName: "aliza",
   ctx: { financeHints: [] },
 });
-assert.equal(plainCancelCards.length, 0, "plain cancel without fee/prepaid stays empty");
+assert.equal(plainCancelCards.length, 1, "plain cancel shows early Fee Summary only");
+assert.equal(plainCancelCards[0]?.title, "Fee Summary");
+assert.equal(plainCancelCards[0]?.total, 0);
 
 // Stale calendar details + stamped booking.notes → still builds Fee Summary.
 const notesStamp = `note\n---mollure-meta---\n${JSON.stringify({
@@ -487,10 +501,13 @@ const alizaNoFeeCards = buildSalesOverviewCards({
   financeHints: [],
   lateCancellationFeePercentDefault: "10",
 });
-assert.equal(
-  alizaNoFeeCards.filter((c) => c.title === "Fee Summary").length,
-  0,
-  "cancelled + prepaid without Paid LCF does not invent Fee Summary",
+const alizaEarlyFee = alizaNoFeeCards.find((c) => c.title === "Fee Summary");
+assert.ok(alizaEarlyFee, "cancelled + prepaid without LCF still shows early Fee Summary");
+assert.equal(alizaEarlyFee?.total, 0, "early Fee Summary total €0");
+assert.equal(alizaEarlyFee?.paymentState, "paid", "early €0 Fee Summary settled");
+assert.ok(
+  alizaEarlyFee?.metaLines?.includes("Within preset cancellation window"),
+  "early Fee Summary within-window meta",
 );
 assert.ok(
   alizaNoFeeCards.some((c) => c.title === "Prepayment Summary"),
@@ -546,7 +563,7 @@ assert.ok(
   "healed Fee Summary uses policy 10% of €132",
 );
 
-// Policy % alone without prepaid / stamp / LCF → still no Fee Summary (plain free cancel).
+// Plain free cancel (policy % present but unused) → early €0 Fee Summary, not a charged fee.
 const plainPolicyCards = buildCardsForEvent({
   event: {
     ...alizaHealEvent,
@@ -567,11 +584,47 @@ const plainPolicyCards = buildCardsForEvent({
     lateCancellationFeePercentDefault: "10",
   },
 });
-assert.equal(
-  plainPolicyCards.filter((c) => c.title === "Fee Summary").length,
-  0,
-  "policy % without prepaid/stamp/LCF does not invent Fee Summary",
+const plainEarly = plainPolicyCards.find((c) => c.title === "Fee Summary");
+assert.ok(plainEarly, "plain cancel shows early Fee Summary");
+assert.equal(plainEarly?.total, 0, "policy % alone does not invent charged fee");
+assert.ok(
+  plainEarly?.lines.some((line) => line.label === "No late cancellation fee"),
+  "plain cancel line is no-fee",
 );
+
+// Payment-due LCF (reissued unpaid) → Fee Summary with payment_due, keeps title.
+const dueLcfCards = buildCardsForEvent({
+  event: {
+    ...cancelledPrepaidFeeEvent,
+    details: {
+      ...cancelledPrepaidFeeEvent.details,
+      showPrepayment: false,
+      prepaymentStatus: "none",
+    },
+  } as unknown as CalendarEvent,
+  booking: {
+    id: "due-lcf",
+    status: "cancelled",
+    prepayment_status: "none",
+  } as never,
+  clientName: "aliza",
+  ctx: {
+    financeHints: [
+      {
+        bookingId: "due-lcf",
+        bookingCode: "BK-CANCEL-FEE",
+        status: "Payment due",
+        entryLabel: "Late Cancellation Booking Fee",
+        amount: 50,
+        reissueLevel: 1,
+      },
+    ],
+  },
+});
+const dueFeeCard = dueLcfCards.find((c) => c.title === "Fee Summary");
+assert.ok(dueFeeCard, "Payment-due LCF builds Fee Summary");
+assert.equal(dueFeeCard?.title, "Fee Summary", "reissue must not rename Fee Summary");
+assert.equal(dueFeeCard?.paymentState, "payment_due", "unpaid LCF shows due state");
 
 const baseCard: SalesOverviewCardData = {
   id: "b1-after-treatment",
@@ -669,7 +722,7 @@ const splitEvent = {
     clientSnapshot: {
       people: [
         { id: "main", name: "Sara Johnson", isRequester: true },
-        { id: "g1", name: "Guest", participantType: "guest" },
+        { id: "g1", name: "Guest Maria", participantType: "guest" },
       ],
       services: [
         { id: "cut", name: "Scissor Cut", price: 20, guestId: null },
@@ -677,6 +730,7 @@ const splitEvent = {
         { id: "blow2", name: "Blow Dry", price: 30, guestId: "g1" },
       ],
     },
+    guests: [{ id: "g1", name: "Maria Lopez", services: [], products: [] }],
     splitBill: {
       mode: "split",
       prepaidAmount: 40,
@@ -695,7 +749,7 @@ const splitEvent = {
           key: "g1",
           role: "guest",
           label: "Guest",
-          displayName: "Guest",
+          displayName: "Guest 1",
           subtotal: 30,
           paymentAmount: 30,
           lineIds: [],
@@ -731,6 +785,11 @@ assert.ok(
 );
 assert.equal(after[0]?.subCards?.[1]?.payerRole, "guest");
 assert.equal(after[0]?.subCards?.[1]?.payerLabel, "Guest");
+assert.equal(
+  after[0]?.subCards?.[1]?.payerName,
+  "Maria",
+  "guest secondary name prefers real name over Guest 1 placeholder",
+);
 assert.equal(after[0]?.subCards?.[1]?.payerKey, "g1");
 assert.equal(after[0]?.subCards?.[1]?.showAddOns, true, "Add-Ons on guest subCard");
 assert.equal(after[0]?.statusBadge, "Paid", "parent Paid from main sub badge");
@@ -1141,5 +1200,64 @@ hydrateSalesCardMetadata([]);
   assert.equal(prepayCard?.total, 138, "e2e Total = 44+44+50");
   assert.equal(prepayCard?.highlightAmount, 27.6, "e2e Prepayment = 20% of 138");
 }
+
+// Cancel / No Show gates + Fee Summary payer labeling.
+assert.equal(isCancelledOrNoShowBookingStatus("Cancelled"), true);
+assert.equal(isCancelledOrNoShowBookingStatus("No Show"), true);
+assert.equal(isCancelledOrNoShowBookingStatus("no_show"), true);
+assert.equal(isCancelledOrNoShowBookingStatus("Confirmed"), false);
+
+assert.deepEqual(
+  resolveProtectiveFeeDuePresentation({
+    feeTotal: 13.06,
+    prepaidCollected: 11.1,
+    settled: false,
+  }),
+  { highlightAmount: 1.96, statusBadgeOverride: "Payment Due" },
+  "client owes remainder → Payment Due",
+);
+assert.deepEqual(
+  resolveProtectiveFeeDuePresentation({
+    feeTotal: 5,
+    prepaidCollected: 20,
+    settled: false,
+  }),
+  { highlightAmount: 15, statusBadgeOverride: "Payable by Professional" },
+  "prepaid surplus → Payable by Professional",
+);
+assert.deepEqual(
+  resolveProtectiveFeeDuePresentation({
+    feeTotal: 5,
+    prepaidCollected: 20,
+    settled: true,
+  }),
+  { highlightAmount: 0, statusBadgeOverride: null },
+  "settled fee keeps Paid path (no pro payable label)",
+);
+
+const proPayableCards = buildCardsForEvent({
+  event: {
+    ...cancelledPrepaidFeeEvent,
+    details: {
+      ...cancelledPrepaidFeeEvent.details,
+      // 50% of €100 = €50 fee; 80% prepaid → pro owes €30 surplus.
+      prepaymentPercent: "80",
+      showLateCancellation: true,
+      lateCancellationFeePercent: "50",
+    },
+  } as unknown as CalendarEvent,
+  booking: {
+    id: "pro-payable-1",
+    status: "cancelled",
+    prepayment_status: "paid",
+  } as never,
+  clientName: "aliza",
+  ctx: { financeHints: [] },
+});
+const proPayableFee = proPayableCards.find((c) => c.title === "Fee Summary");
+assert.ok(proPayableFee, "stamp Fee Summary for prepaid surplus");
+assert.equal(proPayableFee?.statusBadge, "Payable by Professional");
+assert.equal(proPayableFee?.highlightAmount, 30, "surplus = prepaid €80 − fee €50");
+assert.equal(proPayableFee?.paymentState, "payment_due");
 
 console.log("buildSalesOverviewCards.helpers.test.ts: all assertions passed");

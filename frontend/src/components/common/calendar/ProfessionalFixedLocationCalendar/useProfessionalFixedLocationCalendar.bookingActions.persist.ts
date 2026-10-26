@@ -50,17 +50,19 @@ export function useProfessionalFixedLocationCalendarBookingActionsPersist(
       const apiStatus =
         status === "Requested"
           ? "requested"
-          : status === "Confirmed"
-            ? "confirmed"
-            : status === "In Progress"
-              ? "in_progress"
-              : status === "Completed"
-                ? "completed"
-                : status === "No Show"
-                  ? "no_show"
-                  : status === "Invalid"
-                    ? "invalid"
-                    : "cancelled";
+          : status === "BR Accepted"
+            ? "br_accepted"
+            : status === "Confirmed"
+              ? "confirmed"
+              : status === "In Progress"
+                ? "in_progress"
+                : status === "Completed"
+                  ? "completed"
+                  : status === "No Show"
+                    ? "no_show"
+                    : status === "Invalid"
+                      ? "invalid"
+                      : "cancelled";
       if (parsed.kind === "booking") {
         if (onUpdateBookingStatus) {
           await onUpdateBookingStatus(parsed.id, apiStatus, options);

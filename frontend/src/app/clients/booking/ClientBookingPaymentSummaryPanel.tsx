@@ -353,6 +353,13 @@ export default function ClientBookingPaymentSummaryPanel({
                       : bookServicesAtSameTime
                         ? bookingStartMinutes
                         : sectionStartMinutes + serviceOffset;
+                    const rawDuration = Number(s.durationMins) || 0;
+                    const endMin = s.endTime?.trim()
+                      ? parseTimeLabelToMinutes(s.endTime)
+                      : startMin + rawDuration;
+                    // Prefer clock span when start+end exist (same rule as planningScheduleMeta).
+                    const displayDurationMins =
+                      endMin > startMin ? endMin - startMin : rawDuration;
                     // Same team-member line for client + guest service cards (FL).
                     const staffName = !isDesiredLocation
                       ? resolveServiceTeamMemberName(s as Service)
@@ -387,9 +394,9 @@ export default function ClientBookingPaymentSummaryPanel({
                           <ServiceSummaryMetaLine
                             timeRange={serviceTimeRangeLabel(
                               startMin,
-                              s.durationMins,
+                              displayDurationMins,
                             )}
-                            durationLabel={`${s.durationMins} Mins`}
+                            durationLabel={`${displayDurationMins} Mins`}
                           />
                           {staffName ? (
                             <Stack

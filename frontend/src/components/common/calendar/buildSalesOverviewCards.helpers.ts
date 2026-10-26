@@ -28,7 +28,12 @@ import type {
   SalesSubCardData,
 } from "./salesOverview.types";
 import { financeStatusToSalesPaymentState } from "./salesOverview.types";
-import { buildSplitPaymentAmounts, parseSplitBillState, resolveSalesPayerShares } from "./salesSplitBill";
+import {
+  buildSplitPaymentAmounts,
+  parseSplitBillState,
+  pickSalesPayerDisplayName,
+  resolveSalesPayerShares,
+} from "./salesSplitBill";
 import {
   formatFinanceDueDate,
   prepaidBreakdownLabel,
@@ -67,6 +72,20 @@ import {
 function isSettledProtectiveFeeStatus(status?: string | null): boolean {
   const s = String(status ?? "").toLowerCase();
   return s === "paid" || s === "prepaid" || s === "confirmed";
+}
+
+/** Charged protective fee row (Paid or open due) — exclude voided/refunded. */
+function isChargedProtectiveFeeStatus(status?: string | null): boolean {
+  const s = String(status ?? "").toLowerCase();
+  if (!s || s === "voided" || s === "void" || s === "refunded") return false;
+  return (
+    isSettledProtectiveFeeStatus(s) ||
+    s === "payment due" ||
+    s === "prepayment due" ||
+    s === "overdue" ||
+    s === "unpaid" ||
+    s === "pending"
+  );
 }
 
 /** Reconstruct booking services base from Paid fee amount ÷ % (cancel may store fee-only total_price). */
@@ -749,9 +768,13 @@ function applyFinanceAndMetaState(
         : null;
     const reissueLevel =
       Number(finance.reissueLevel ?? (meta?.reissuedAt ? 1 : 0)) || 0;
+    const keepFeeSummaryTitle =
+      "title" in next &&
+      (next.title === "Fee Summary" || next.title === "No-Show Fee Invoice");
     if (
       reissueLevel >= 1 &&
-      (financeState === "payment_due" || financeState === "overdue_invoice")
+      (financeState === "payment_due" || financeState === "overdue_invoice") &&
+      !keepFeeSummaryTitle
     ) {
       if ("title" in next && typeof next.title === "string") {
         next.title = "Reissued Invoice Summary";
@@ -830,9 +853,13 @@ function applyFinanceAndMetaState(
   next.markedUnpaid = Boolean(meta?.markedUnpaid) && open.state === "unpaid";
   next.paidAt = open.paidAt ?? null;
   const openReissueLevel = meta?.reissuedAt ? 1 : 0;
+  const keepFeeSummaryOpenTitle =
+    "title" in next &&
+    (next.title === "Fee Summary" || next.title === "No-Show Fee Invoice");
   if (
     openReissueLevel >= 1 &&
-    (open.state === "payment_due" || open.state === "overdue_invoice")
+    (open.state === "payment_due" || open.state === "overdue_invoice") &&
+    !keepFeeSummaryOpenTitle
   ) {
     if ("title" in next && typeof next.title === "string") {
       next.title = "Reissued Invoice Summary";
@@ -1250,7 +1277,7 @@ function protectiveFeeHintSortKey(entryLabel?: string | null): number {
   return 3;
 }
 
-/** All settled protective-fee finance rows — Fee Summary can stack LRF + LCF. */
+/** Charged protective-fee finance rows — Fee Summary stacks LRF + LCF (Paid or due). */
 export function findProtectiveFeeFinanceHints(
   hints: readonly SalesFinanceHint[],
   bookingId: string,
@@ -1260,7 +1287,7 @@ export function findProtectiveFeeFinanceHints(
     .filter((hint) => {
       if (!financeHintMatchesBooking(hint, bookingId, bookingCode)) return false;
       if (!isProtectiveFeeEntryLabel(hint.entryLabel)) return false;
-      return isSettledProtectiveFeeStatus(hint.status);
+      return isChargedProtectiveFeeStatus(hint.status);
     })
     .sort(
       (a, b) =>
@@ -1269,7 +1296,7 @@ export function findProtectiveFeeFinanceHints(
     );
 }
 
-/** Paid protective-fee finance row (LCF/LRF/NS) — Fee Summary only when fee is settled. */
+/** First charged protective-fee finance row (LCF/LRF/NS). */
 export function findProtectiveFeeFinanceHint(
   hints: readonly SalesFinanceHint[],
   bookingId: string,
@@ -1279,8 +1306,42 @@ export function findProtectiveFeeFinanceHint(
 }
 
 /**
- * Cancelled / No Show fee-only sales card when protective fee section is active.
- * Returns null when status/fee gate fails (caller keeps blank Sales for plain cancels).
+ * Fee Summary dues label after prepaid credit.
+ * Client remainder → Payment Due; prepaid surplus (unsettled) → Payable by Professional.
+ */
+export function resolveProtectiveFeeDuePresentation(input: {
+  feeTotal: number;
+  prepaidCollected: number;
+  settled: boolean;
+}): {
+  highlightAmount: number;
+  /** Override after applyMeta; null keeps Paid / finance badge. */
+  statusBadgeOverride: "Payment Due" | "Payable by Professional" | null;
+} {
+  const feeTotal = roundMoney(Math.max(0, Number(input.feeTotal) || 0));
+  const prepaid = roundMoney(Math.max(0, Number(input.prepaidCollected) || 0));
+  const net = roundMoney(feeTotal - prepaid);
+  if (input.settled) {
+    return {
+      highlightAmount: Math.max(0, net),
+      statusBadgeOverride: null,
+    };
+  }
+  if (net > 0) {
+    return { highlightAmount: net, statusBadgeOverride: "Payment Due" };
+  }
+  if (net < 0) {
+    return {
+      highlightAmount: roundMoney(-net),
+      statusBadgeOverride: "Payable by Professional",
+    };
+  }
+  return { highlightAmount: 0, statusBadgeOverride: null };
+}
+
+/**
+ * Cancelled / No Show / late-reschedule Fee Summary spec.
+ * Finance charged row → stamp invent (pro cancel) → early no-fee cancel.
  */
 export function resolveProtectiveFeeSalesCardSpec(input: {
   status?: string | null;
@@ -1288,16 +1349,18 @@ export function resolveProtectiveFeeSalesCardSpec(input: {
   lateCancellationFeePercent?: string | number | null;
   showNoShowFee?: boolean;
   noShowFeePercent?: string | number | null;
+  showLateRescheduling?: boolean;
   lateRescheduleFeePercent?: string | number | null;
   lineSubtotal: number;
   extrasAmount?: number;
   discount?: { type: "fixed" | "percentage"; amount: number } | null;
   cancellationFeeAt?: string | null;
   exceededCancellationWindow?: boolean;
-  /** Paid LCF/LRF/NS finance row — Fee Summary requires settled fee (product rule). */
+  /** Charged LCF/LRF/NS finance row (Paid or open due). */
   financeFeeHint?: SalesFinanceHint | null;
 }): ProtectiveFeeSalesCardSpec | null {
   const status = String(input.status ?? "").toLowerCase();
+  const isCancelled = status === "cancelled" || status === "canceled";
   const price = computeBookingPrice({
     lineSubtotal: input.lineSubtotal,
     extrasAmount: input.extrasAmount ?? 0,
@@ -1310,45 +1373,100 @@ export function resolveProtectiveFeeSalesCardSpec(input: {
 
   const hint = input.financeFeeHint;
   const hintAmount = Number(hint?.amount);
-  const hasPaidFeeHint =
+  const hasChargedFeeHint =
     Boolean(hint) &&
-    isSettledProtectiveFeeStatus(hint?.status) &&
+    isChargedProtectiveFeeStatus(hint?.status) &&
     Number.isFinite(hintAmount) &&
     hintAmount > 0 &&
     isProtectiveFeeEntryLabel(hint?.entryLabel);
 
-  // Product: Fee Summary only when protective fee is Paid (not unpaid due / policy invent).
-  if (!hasPaidFeeHint) return null;
+  if (hasChargedFeeHint) {
+    const label = String(hint!.entryLabel ?? "");
+    const isLateCancelLabel = label.startsWith(LATE_CANCELLATION_BOOKING_FEE);
+    const isLateRescheduleLabel = label === LATE_RESCHEDULING_FEE;
+    const isNoShowLabel = label.toLowerCase() === "no-show fee";
 
-  const label = String(hint!.entryLabel ?? "");
-  const isLateCancelLabel = label.startsWith(LATE_CANCELLATION_BOOKING_FEE);
-  const isLateRescheduleLabel = label === LATE_RESCHEDULING_FEE;
-  const isNoShowLabel = label.toLowerCase() === "no-show fee";
+    if (
+      isLateCancelLabel &&
+      (isCancelled || input.showLateCancellation)
+    ) {
+      const feeAmount =
+        price.lateCancellationFeeAmount > 0
+          ? price.lateCancellationFeeAmount
+          : roundMoney(hintAmount);
+      if (feeAmount > 0) {
+        const percent = Number(input.lateCancellationFeePercent) || 0;
+        const base =
+          price.lateCancellationFeeAmount > 0
+            ? price.afterDiscount
+            : percent > 0
+              ? roundMoney(feeAmount / (percent / 100))
+              : price.afterDiscount;
+        return {
+          title: "Fee Summary",
+          feeLabel:
+            percent > 0
+              ? formatProtectiveFeeLineDescription("lateCancellation", percent, base)
+              : LATE_CANCELLATION_BOOKING_FEE,
+          feeAmount,
+          entryLabel: LATE_CANCELLATION_BOOKING_FEE,
+          metaLines: buildCancellationFeeInvoiceMetaLines({
+            cancellationFeeAt: input.cancellationFeeAt,
+            exceededCancellationWindow: input.exceededCancellationWindow,
+          }),
+        };
+      }
+    }
 
-  if (
-    isLateCancelLabel &&
-    ((status === "cancelled" || status === "canceled") ||
-      input.showLateCancellation)
-  ) {
-    const feeAmount =
-      price.lateCancellationFeeAmount > 0
-        ? price.lateCancellationFeeAmount
-        : roundMoney(hintAmount);
-    if (feeAmount > 0) {
+    if (isNoShowLabel) {
+      const feeAmount =
+        price.noShowFeeAmount > 0
+          ? price.noShowFeeAmount
+          : roundMoney(hintAmount);
+      if (feeAmount > 0) {
+        return {
+          title: "No-Show Fee Invoice",
+          feeLabel: "No-show fee",
+          feeAmount,
+          entryLabel: "No-show fee",
+          metaLines: buildCancellationFeeInvoiceMetaLines({
+            cancellationFeeAt: input.cancellationFeeAt,
+            exceededCancellationWindow: input.exceededCancellationWindow,
+          }),
+        };
+      }
+    }
+
+    if (isLateRescheduleLabel) {
+      const lrfPercent = Number(input.lateRescheduleFeePercent) || 0;
+      const base =
+        lrfPercent > 0
+          ? roundMoney(hintAmount / (lrfPercent / 100))
+          : price.afterDiscount;
+      return {
+        title: "Fee Summary",
+        feeLabel:
+          lrfPercent > 0
+            ? formatProtectiveFeeLineDescription("lateRescheduling", lrfPercent, base)
+            : LATE_RESCHEDULING_FEE,
+        feeAmount: roundMoney(hintAmount),
+        entryLabel: LATE_RESCHEDULING_FEE,
+        metaLines: [],
+      };
+    }
+
+    // Charged protective fee with unrecognized status string — still surface Fee Summary.
+    if (isLateCancelLabel) {
       const percent = Number(input.lateCancellationFeePercent) || 0;
       const base =
-        price.lateCancellationFeeAmount > 0
-          ? price.afterDiscount
-          : percent > 0
-            ? roundMoney(feeAmount / (percent / 100))
-            : price.afterDiscount;
+        percent > 0 ? roundMoney(hintAmount / (percent / 100)) : price.afterDiscount;
       return {
         title: "Fee Summary",
         feeLabel:
           percent > 0
             ? formatProtectiveFeeLineDescription("lateCancellation", percent, base)
             : LATE_CANCELLATION_BOOKING_FEE,
-        feeAmount,
+        feeAmount: roundMoney(hintAmount),
         entryLabel: LATE_CANCELLATION_BOOKING_FEE,
         metaLines: buildCancellationFeeInvoiceMetaLines({
           cancellationFeeAt: input.cancellationFeeAt,
@@ -1358,59 +1476,78 @@ export function resolveProtectiveFeeSalesCardSpec(input: {
     }
   }
 
-  if (isNoShowLabel) {
-    const feeAmount =
-      price.noShowFeeAmount > 0
-        ? price.noShowFeeAmount
-        : roundMoney(hintAmount);
-    if (feeAmount > 0) {
-      return {
-        title: "No-Show Fee Invoice",
-        feeLabel: "No-show fee",
-        feeAmount,
-        entryLabel: "No-show fee",
-        metaLines: buildCancellationFeeInvoiceMetaLines({
-          cancellationFeeAt: input.cancellationFeeAt,
-          exceededCancellationWindow: input.exceededCancellationWindow,
-        }),
-      };
-    }
-  }
-
-  if (isLateRescheduleLabel) {
-    const lrfPercent = Number(input.lateRescheduleFeePercent) || 0;
-    const base =
-      lrfPercent > 0
-        ? roundMoney(hintAmount / (lrfPercent / 100))
-        : price.afterDiscount;
-    return {
-      title: "Fee Summary",
-      feeLabel:
-        lrfPercent > 0
-          ? formatProtectiveFeeLineDescription("lateRescheduling", lrfPercent, base)
-          : LATE_RESCHEDULING_FEE,
-      feeAmount: roundMoney(hintAmount),
-      entryLabel: LATE_RESCHEDULING_FEE,
-      metaLines: [],
-    };
-  }
-
-  // Paid protective fee with unrecognized status string — still surface Fee Summary.
-  if (isLateCancelLabel) {
+  // Stamp invent: pro late-cancel stamps notes without a finance row yet.
+  if (
+    (isCancelled || input.showLateCancellation) &&
+    input.showLateCancellation &&
+    price.lateCancellationFeeAmount > 0
+  ) {
     const percent = Number(input.lateCancellationFeePercent) || 0;
-    const base =
-      percent > 0 ? roundMoney(hintAmount / (percent / 100)) : price.afterDiscount;
     return {
       title: "Fee Summary",
       feeLabel:
         percent > 0
-          ? formatProtectiveFeeLineDescription("lateCancellation", percent, base)
+          ? formatProtectiveFeeLineDescription(
+              "lateCancellation",
+              percent,
+              price.afterDiscount,
+            )
           : LATE_CANCELLATION_BOOKING_FEE,
-      feeAmount: roundMoney(hintAmount),
+      feeAmount: price.lateCancellationFeeAmount,
       entryLabel: LATE_CANCELLATION_BOOKING_FEE,
       metaLines: buildCancellationFeeInvoiceMetaLines({
         cancellationFeeAt: input.cancellationFeeAt,
+        exceededCancellationWindow: input.exceededCancellationWindow ?? true,
+      }),
+    };
+  }
+
+  if (input.showNoShowFee && price.noShowFeeAmount > 0) {
+    return {
+      title: "No-Show Fee Invoice",
+      feeLabel: "No-show fee",
+      feeAmount: price.noShowFeeAmount,
+      entryLabel: "No-show fee",
+      metaLines: buildCancellationFeeInvoiceMetaLines({
+        cancellationFeeAt: input.cancellationFeeAt,
         exceededCancellationWindow: input.exceededCancellationWindow,
+      }),
+    };
+  }
+
+  const lrfPercent = Number(input.lateRescheduleFeePercent) || 0;
+  if (input.showLateRescheduling && lrfPercent > 0) {
+    const feeAmount = roundMoney((price.afterDiscount * lrfPercent) / 100);
+    if (feeAmount > 0) {
+      return {
+        title: "Fee Summary",
+        feeLabel: formatProtectiveFeeLineDescription(
+          "lateRescheduling",
+          lrfPercent,
+          price.afterDiscount,
+        ),
+        feeAmount,
+        entryLabel: LATE_RESCHEDULING_FEE,
+        metaLines: [],
+      };
+    }
+  }
+
+  // Early cancel: within window — Fee Summary with €0 + within-window meta.
+  if (
+    isCancelled &&
+    !input.showLateCancellation &&
+    !input.showNoShowFee &&
+    !input.showLateRescheduling
+  ) {
+    return {
+      title: "Fee Summary",
+      feeLabel: "No late cancellation fee",
+      feeAmount: 0,
+      entryLabel: LATE_CANCELLATION_BOOKING_FEE,
+      metaLines: buildCancellationFeeInvoiceMetaLines({
+        cancellationFeeAt: input.cancellationFeeAt,
+        exceededCancellationWindow: false,
       }),
     };
   }
@@ -1518,6 +1655,10 @@ export function buildCardsForEvent(input: {
     String(bookingCode),
   );
   const financeFeeHint = financeFeeHints[0];
+  const notesParsed = parseCalendarEntryNotes(booking?.notes ?? null);
+  const showLateRescheduling =
+    Boolean(event.details?.showLateRescheduling) ||
+    Boolean(notesParsed?.showLateRescheduling);
 
   // Percent: booking stamp → notes → business policy (label % for Fee Summary / invoice line).
   const stampedLateCancelPercent =
@@ -1526,17 +1667,23 @@ export function buildCardsForEvent(input: {
     Number(stampedLateCancelPercent) > 0
       ? stampedLateCancelPercent
       : ctx.lateCancellationFeePercentDefault;
-  // Paid finance hint heals missing stamp; do not invent Fee Summary from policy alone.
+  // Charged finance hint heals missing stamp; stamp invent covers pro cancel without finance.
   const showLateCancellation =
     Boolean(event.details?.showLateCancellation) ||
     notesFee.showLateCancellation ||
-    Boolean(financeFeeHint);
+    Boolean(
+      financeFeeHint &&
+        String(financeFeeHint.entryLabel ?? "").startsWith(
+          LATE_CANCELLATION_BOOKING_FEE,
+        ),
+    );
   const isNoShowStatus = status === "no_show" || status === "no show";
 
   // Cancel fee checkout writes total_price = fee — recover services base for Prepayment Total.
   const feeRecoveredBase = recoverBookingBaseFromFeeHints(financeFeeHints, {
     lateCancel: lateCancellationFeePercent,
-    lateReschedule: event.details?.lateRescheduleFeePercent,
+    lateReschedule:
+      event.details?.lateRescheduleFeePercent ?? notesParsed?.lateRescheduleFeePercent,
     noShow: noShowFeePercent,
   });
   const baseTotal = roundMoney(Math.max(rawBaseTotal, feeRecoveredBase));
@@ -1575,7 +1722,9 @@ export function buildCardsForEvent(input: {
     lateCancellationFeePercent,
     showNoShowFee,
     noShowFeePercent,
-    lateRescheduleFeePercent: event.details?.lateRescheduleFeePercent,
+    showLateRescheduling,
+    lateRescheduleFeePercent:
+      event.details?.lateRescheduleFeePercent ?? notesParsed?.lateRescheduleFeePercent,
     lineSubtotal: Math.max(lineSubtotalBeforeDiscount, feeRecoveredBase),
     extrasAmount: kilometerExtrasAmount(event),
     discount: event.details?.totalDiscount ?? null,
@@ -1584,8 +1733,8 @@ export function buildCardsForEvent(input: {
   };
 
   const buildProtectiveFeeSummaryCard = (): SalesOverviewCardData | null => {
-    // Stack all settled protective fees on one Fee Summary (LRF + LCF mocks).
-    const feeLines = financeFeeHints
+    // Stack charged protective fees on one Fee Summary (LRF + LCF).
+    let feeLines = financeFeeHints
       .map((hint, index) => {
         const spec = resolveProtectiveFeeSalesCardSpec({
           ...feeSpecInput,
@@ -1608,24 +1757,66 @@ export function buildCardsForEvent(input: {
         };
       })
       .filter((line): line is NonNullable<typeof line> => line != null);
+
+    // No finance row: stamp invent (pro late cancel) or early no-fee cancel.
+    if (!feeLines.length) {
+      const stampSpec = resolveProtectiveFeeSalesCardSpec({
+        ...feeSpecInput,
+        financeFeeHint: null,
+        // Early path needs a cancel time when notes never stamped one.
+        cancellationFeeAt: cancellationFeeAt || occurredAt,
+      });
+      if (stampSpec) {
+        const feeLineId =
+          stampSpec.entryLabel === LATE_CANCELLATION_BOOKING_FEE
+            ? `late-cancellation-${bookingId}`
+            : stampSpec.entryLabel === LATE_RESCHEDULING_FEE
+              ? `late-reschedule-${bookingId}`
+              : `no-show-${bookingId}`;
+        feeLines = [
+          {
+            id: `${feeLineId}-stamp`,
+            label: stampSpec.feeLabel,
+            amount: stampSpec.feeAmount,
+            entryLabel: stampSpec.entryLabel,
+            metaLines: stampSpec.metaLines,
+            title: stampSpec.title,
+          },
+        ];
+      }
+    }
     if (!feeLines.length) return null;
 
     const feeId = resolveLiveCardId(bookingId, `${bookingId}-protective-fee`);
     const feeTotal = roundMoney(
       feeLines.reduce((sum, line) => sum + line.amount, 0),
     );
-    // Mocks: Total → Prepaid applied → Payment (remainder). €0 when prepaid covers.
-    const prepaidCredit =
-      isPrepayPaid && prepaidAmount > 0
-        ? roundMoney(Math.min(prepaidAmount, feeTotal))
-        : 0;
-    const paymentAmount = roundMoney(Math.max(0, feeTotal - prepaidCredit));
+    // Full prepaid (not capped) so surplus can surface as Payable by Professional.
+    const prepaidCollected =
+      isPrepayPaid && prepaidAmount > 0 ? roundMoney(prepaidAmount) : 0;
+    // Paid only when settled finance (or €0 early). Stamp/due stays payment_due.
+    const feeSettled =
+      feeTotal === 0 ||
+      financeFeeHints.some((h) => isSettledProtectiveFeeStatus(h.status));
+    const due = resolveProtectiveFeeDuePresentation({
+      feeTotal,
+      prepaidCollected,
+      settled: feeSettled,
+    });
+    const paymentAmount = due.highlightAmount;
+    // Cap prepaid credit to fee unless unsettled surplus (pro payable needs full prepaid).
+    const prepaidRowAmount =
+      due.statusBadgeOverride === "Payable by Professional"
+        ? prepaidCollected
+        : prepaidCollected > 0
+          ? roundMoney(Math.min(prepaidCollected, feeTotal))
+          : 0;
     const title = feeLines.some((l) => l.entryLabel === "No-show fee")
       && feeLines.length === 1
       ? "No-Show Fee Invoice"
       : "Fee Summary";
     const metaLines = feeLines.flatMap((l) => l.metaLines);
-    return applyMeta(
+    const card = applyMeta(
       {
         id: feeId,
         bookingId,
@@ -1642,12 +1833,12 @@ export function buildCardsForEvent(input: {
         total: feeTotal,
         totalLabel: "Total",
         secondaryRows:
-          prepaidCredit > 0
+          prepaidRowAmount > 0
             ? [
                 {
                   id: "prepaid-credit",
                   label: "Prepaid",
-                  amount: prepaidCredit,
+                  amount: prepaidRowAmount,
                 },
               ]
             : undefined,
@@ -1672,12 +1863,18 @@ export function buildCardsForEvent(input: {
         isAfterTreatment: true,
         isPrepayPaid: false,
         isFailed: false,
-        paidHint: true,
+        paidHint: feeSettled,
       },
     );
+    if (due.statusBadgeOverride) {
+      card.statusBadge = due.statusBadgeOverride;
+      card.paymentState = "payment_due";
+      card.highlightAmount = paymentAmount;
+    }
+    return card;
   };
 
-  // Cancelled / no-show: prepaid receipt + Fee Summary when paid protective fee exists.
+  // Cancelled / no-show: prepaid receipt + dynamic Fee Summary (paid / due / early).
   if (isCancelled || isNoShowStatus) {
     const cancelledCards: SalesOverviewCardData[] = [];
     if (isPrepayPaid && prepaidAmount > 0) {
@@ -1877,13 +2074,17 @@ export function buildCardsForEvent(input: {
     const mainLines = withNegativeLines(mainShareBase.lines, effectiveLines);
     const mainTotal = sumLineAmounts(mainLines);
 
-    const subCards: SalesSubCardData[] = guestModelSharesBase.map((share) => ({
+    const subCards: SalesSubCardData[] = guestModelSharesBase.map((share, index) => ({
       id: `${summaryId}-sub-${share.key}`,
       bookingId,
       bookingCode,
       payerRole: share.role,
       payerLabel: share.label,
-      payerName: share.displayName,
+      payerName: pickSalesPayerDisplayName(
+        share.role === "model" ? "model" : "guest",
+        [share.displayName],
+        index + 1,
+      ),
       lines: share.lines,
       total: share.subtotal,
       highlightLabel: "Total Amount",
@@ -1971,16 +2172,21 @@ export function buildCardsForEvent(input: {
           mainListedTotal - (isPrepayPaid && prepaidAmount > 0 ? prepaidAmount : 0),
         ),
       );
-      const guestSubs: SalesSubCardData[] = guestModelShares.map((share) => {
+      const guestSubs: SalesSubCardData[] = guestModelShares.map((share, index) => {
         const subPaid = isSplitPayerPaid(splitState, share.key);
         const payer = splitState?.payers.find((row) => row.key === share.key);
+        const guestRole = share.role === "model" ? ("model" as const) : ("guest" as const);
         return {
           id: `${afterId}-sub-${share.key}`,
           bookingId,
           bookingCode,
           payerRole: share.role,
           payerLabel: share.label,
-          payerName: share.displayName,
+          payerName: pickSalesPayerDisplayName(
+            guestRole,
+            [share.displayName, payer?.displayName],
+            index + 1,
+          ),
           payerKey: share.key,
           lines: share.lines,
           total: share.subtotal,

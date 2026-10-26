@@ -159,8 +159,11 @@ export function useSalesOverview({
   const [upsertSalesAddonApi] = useUpsertSalesAddonMutation();
 
   React.useEffect(() => {
-    hydrateSalesCardMetadata((salesMetadataResponse?.data ?? []) as never[] as import("./salesOverview.types").SalesCardMetaRecord[]);
-  }, [salesMetadataResponse?.data]);
+    if (!salesMetadataResponse) return;
+    hydrateSalesCardMetadata(
+      (salesMetadataResponse.data ?? []) as never[] as import("./salesOverview.types").SalesCardMetaRecord[],
+    );
+  }, [salesMetadataResponse]);
 
   React.useEffect(() => {
     hydrateSalesAddons((salesAddonsResponse?.data ?? []) as never[] as import("./salesOverview.types").SalesAddonRecord[]);

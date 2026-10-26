@@ -298,6 +298,8 @@ export function useClientBookingCreateHydration(
           name: row.name,
           durationMins: row.durationMins,
           price: row.price,
+          startTime: row.startTime,
+          endTime: row.endTime,
           guestId: options.forceRequesterGuestId
             ? row.guestId != null && row.guestId !== ""
               ? row.guestId

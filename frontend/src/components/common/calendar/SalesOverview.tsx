@@ -108,18 +108,6 @@ export default function SalesOverview({
     );
   }, [cards, refundCard]);
 
-  // Split-bill payer entries use the same card component as every other sale.
-  // The parent is only a grouping shell, so it is not rendered as a second layout.
-  const displayCards = React.useMemo(
-    () =>
-      cards.flatMap((card) =>
-        card.subCards?.length
-          ? card.subCards.map((sub) => subToCard(sub, card))
-          : [card],
-      ),
-    [cards, subToCard],
-  );
-
   if (editingCard) {
     return (
       <SalesEditCheckout
@@ -232,23 +220,85 @@ export default function SalesOverview({
         </Typography>
       ) : (
         <Stack spacing={1.5}>
-          {displayCards.map((card) => (
-            <SalesOverviewCard
-              key={card.id}
-              card={card}
-              highlighted={
+          {cards.map((card) => {
+            // Split-bill: one shell around payer cards so they read as one entity.
+            if (card.subCards?.length) {
+              const subs = card.subCards.map((sub) => subToCard(sub, card));
+              const groupHighlighted =
                 Boolean(focusCardId) &&
-                card.id === focusCardId
-              }
-              highlightId={focusCardId}
-              onViewInvoice={() => openDocument(card, "invoice")}
-              onViewReceipt={() => openDocument(card, "receipt")}
-              onAddOns={() =>
-                openAddOns(card.bookingId, card.bookingCode, card.id)
-              }
-              onMenuAction={(action) => void handleMenuAction(card, action)}
-            />
-          ))}
+                subs.some((sub) => sub.id === focusCardId);
+              return (
+                <Box
+                  key={card.id}
+                  sx={{
+                    borderRadius: "12px",
+                    border: `1px solid ${
+                      groupHighlighted
+                        ? alpha(m.teal, 0.55)
+                        : alpha(m.navy, 0.1)
+                    }`,
+                    bgcolor: groupHighlighted
+                      ? alpha(m.teal, 0.05)
+                      : "#fff",
+                    boxShadow: groupHighlighted
+                      ? `0 0 0 3px ${alpha(m.teal, 0.12)}`
+                      : "none",
+                    px: 1.75,
+                    py: 1.5,
+                  }}
+                >
+                  <Stack
+                    spacing={1.5}
+                    divider={
+                      <Box
+                        sx={{
+                          borderTop: `1px solid ${alpha(m.navy, 0.08)}`,
+                        }}
+                      />
+                    }
+                  >
+                    {subs.map((sub, index) => (
+                      <SalesOverviewCard
+                        key={sub.id}
+                        card={sub}
+                        embedded
+                        hideTitle={index > 0}
+                        highlighted={
+                          Boolean(focusCardId) && sub.id === focusCardId
+                        }
+                        highlightId={focusCardId}
+                        onViewInvoice={() => openDocument(sub, "invoice")}
+                        onViewReceipt={() => openDocument(sub, "receipt")}
+                        onAddOns={() =>
+                          openAddOns(sub.bookingId, sub.bookingCode, sub.id)
+                        }
+                        onMenuAction={(action) =>
+                          void handleMenuAction(sub, action)
+                        }
+                      />
+                    ))}
+                  </Stack>
+                </Box>
+              );
+            }
+
+            return (
+              <SalesOverviewCard
+                key={card.id}
+                card={card}
+                highlighted={
+                  Boolean(focusCardId) && card.id === focusCardId
+                }
+                highlightId={focusCardId}
+                onViewInvoice={() => openDocument(card, "invoice")}
+                onViewReceipt={() => openDocument(card, "receipt")}
+                onAddOns={() =>
+                  openAddOns(card.bookingId, card.bookingCode, card.id)
+                }
+                onMenuAction={(action) => void handleMenuAction(card, action)}
+              />
+            );
+          })}
         </Stack>
       )}
 

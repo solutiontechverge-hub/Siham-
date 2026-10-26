@@ -31,6 +31,48 @@ function sumLines(lines: SalesLineItem[]): number {
   return roundMoney(lines.reduce((sum, line) => sum + line.amount, 0));
 }
 
+/** "Guest" / "Guest 1" / "Model 2" are placeholders — prefer a real person name. */
+function isGenericPayerName(name: string, role: "guest" | "model"): boolean {
+  const trimmed = name.trim();
+  if (!trimmed) return true;
+  if (role === "model") return /^model(\s*\d+)?$/i.test(trimmed);
+  return /^guest(\s*\d+)?$/i.test(trimmed);
+}
+
+/** "Guest Maria" / "Model Ada" → person name under the role label. */
+function stripRoleNamePrefix(name: string, role: "guest" | "model"): string {
+  const trimmed = name.trim();
+  const stripped = trimmed
+    .replace(role === "model" ? /^model\s+/i : /^guest\s+/i, "")
+    .trim();
+  // Keep "Guest 1" intact; only strip when a real token remains.
+  if (!stripped || /^\d+$/.test(stripped)) return trimmed;
+  return stripped;
+}
+
+function resolvePayerDisplayName(input: {
+  role: "guest" | "model";
+  names: Array<string | null | undefined>;
+  ordinal: number;
+}): string {
+  const real = input.names
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean)
+    .map((value) => stripRoleNamePrefix(value, input.role))
+    .find((value) => !isGenericPayerName(value, input.role));
+  if (real) return real;
+  return input.role === "model" ? `Model ${input.ordinal}` : `Guest ${input.ordinal}`;
+}
+
+/** Prefer a real guest/model name across live share + persisted split-bill rows. */
+export function pickSalesPayerDisplayName(
+  role: "guest" | "model",
+  names: Array<string | null | undefined>,
+  ordinal = 1,
+): string {
+  return resolvePayerDisplayName({ role, names, ordinal });
+}
+
 /**
  * Resolve per-payer service lines for split billing (main client / guests / models).
  * Prefers clientSnapshot people+services; falls back to details.guests; else all lines on main client.
@@ -50,6 +92,9 @@ export function resolveSalesPayerShares(input: {
 
   const serviceLineById = new Map(allLines.map((line) => [String(line.id), line]));
   const usedLineIds = new Set<string>();
+  const guestsById = new Map(
+    (details?.guests ?? []).map((guest) => [String(guest.id), guest]),
+  );
 
   const lineFromService = (
     service: { id: string; name: string; price: number; guestId?: string | null },
@@ -115,8 +160,8 @@ export function resolveSalesPayerShares(input: {
 
       let role: SalesPayerRole = "guest";
       let label = "Guest";
-      const trimmed = person.name?.trim() ?? "";
-      let displayName = trimmed || "Guest";
+      let displayName = person.name?.trim() || "Guest";
+      const guestRow = guestsById.get(personId);
 
       if (person.isRequester || personId === requesterId) {
         role = "main_client";
@@ -126,14 +171,20 @@ export function resolveSalesPayerShares(input: {
         role = "model";
         modelOrdinal += 1;
         label = "Model";
-        displayName =
-          trimmed && trimmed.toLowerCase() !== "model" ? trimmed : `Model ${modelOrdinal}`;
+        displayName = resolvePayerDisplayName({
+          role: "model",
+          names: [person.name, guestRow?.name],
+          ordinal: modelOrdinal,
+        });
       } else {
         role = "guest";
         guestOrdinal += 1;
         label = "Guest";
-        displayName =
-          trimmed && trimmed.toLowerCase() !== "guest" ? trimmed : `Guest ${guestOrdinal}`;
+        displayName = resolvePayerDisplayName({
+          role: "guest",
+          names: [person.name, guestRow?.name],
+          ordinal: guestOrdinal,
+        });
       }
 
       // Guests/models with no assigned services are skipped; main client always kept.
@@ -173,21 +224,22 @@ export function resolveSalesPayerShares(input: {
       }
 
       const person = peopleById.get(key);
-      const isModel = person?.participantType === "model";
+      const guestRow = guestsById.get(key);
+      const isModel =
+        person?.participantType === "model" ||
+        guestRow?.participantType === "model";
       if (isModel) modelOrdinal += 1;
       else guestOrdinal += 1;
-      const trimmed = person?.name?.trim() ?? "";
+      const role = isModel ? ("model" as const) : ("guest" as const);
       shares.push({
         key,
-        role: isModel ? "model" : "guest",
+        role,
         label: isModel ? "Model" : "Guest",
-        displayName: isModel
-          ? trimmed && trimmed.toLowerCase() !== "model"
-            ? trimmed
-            : `Model ${modelOrdinal}`
-          : trimmed && trimmed.toLowerCase() !== "guest"
-            ? trimmed
-            : `Guest ${guestOrdinal}`,
+        displayName: resolvePayerDisplayName({
+          role,
+          names: [person?.name, guestRow?.name],
+          ordinal: isModel ? modelOrdinal : guestOrdinal,
+        }),
         lines,
         subtotal: sumLines(lines),
       });
@@ -217,22 +269,20 @@ export function resolveSalesPayerShares(input: {
       ];
       if (!lines.length) continue;
 
-      const trimmed = guest.name?.trim() ?? "";
       const isModel = guest.participantType === "model";
       if (isModel) modelOrdinal += 1;
       else guestOrdinal += 1;
+      const role = isModel ? ("model" as const) : ("guest" as const);
 
       shares.push({
         key: guestId,
-        role: isModel ? "model" : "guest",
+        role,
         label: isModel ? "Model" : "Guest",
-        displayName: isModel
-          ? trimmed && trimmed.toLowerCase() !== "model"
-            ? trimmed
-            : `Model ${modelOrdinal}`
-          : trimmed && trimmed.toLowerCase() !== "guest"
-            ? trimmed
-            : `Guest ${guestOrdinal}`,
+        displayName: resolvePayerDisplayName({
+          role,
+          names: [guest.name, peopleById.get(guestId)?.name],
+          ordinal: isModel ? modelOrdinal : guestOrdinal,
+        }),
         lines,
         subtotal: sumLines(lines),
       });
@@ -287,22 +337,20 @@ export function resolveSalesPayerShares(input: {
       for (const line of lines) assignedIds.add(String(line.id));
       if (!lines.length) continue;
 
-      const trimmed = guest.name?.trim() ?? "";
       const isModel = guest.participantType === "model";
       if (isModel) modelOrdinal += 1;
       else guestOrdinal += 1;
+      const role = isModel ? ("model" as const) : ("guest" as const);
 
       guestShares.push({
         key: guestId,
-        role: isModel ? "model" : "guest",
+        role,
         label: isModel ? "Model" : "Guest",
-        displayName: isModel
-          ? trimmed && trimmed.toLowerCase() !== "model"
-            ? trimmed
-            : `Model ${modelOrdinal}`
-          : trimmed && trimmed.toLowerCase() !== "guest"
-            ? trimmed
-            : `Guest ${guestOrdinal}`,
+        displayName: resolvePayerDisplayName({
+          role,
+          names: [guest.name],
+          ordinal: isModel ? modelOrdinal : guestOrdinal,
+        }),
         lines,
         subtotal: sumLines(lines),
       });
@@ -348,22 +396,21 @@ export function resolveSalesPayerShares(input: {
       if (!lines.length) continue;
       for (const line of lines) assignedIds.add(String(line.id));
 
-      const trimmed = person.name?.trim() ?? "";
       const isModel = person.participantType === "model";
       if (isModel) modelOrdinal += 1;
       else guestOrdinal += 1;
+      const role = isModel ? ("model" as const) : ("guest" as const);
+      const guestRow = guestsById.get(personId);
 
       guestShares.push({
         key: personId,
-        role: isModel ? "model" : "guest",
+        role,
         label: isModel ? "Model" : "Guest",
-        displayName: isModel
-          ? trimmed && trimmed.toLowerCase() !== "model"
-            ? trimmed
-            : `Model ${modelOrdinal}`
-          : trimmed && trimmed.toLowerCase() !== "guest"
-            ? trimmed
-            : `Guest ${guestOrdinal}`,
+        displayName: resolvePayerDisplayName({
+          role,
+          names: [person.name, guestRow?.name],
+          ordinal: isModel ? modelOrdinal : guestOrdinal,
+        }),
         lines,
         subtotal: sumLines(lines),
       });

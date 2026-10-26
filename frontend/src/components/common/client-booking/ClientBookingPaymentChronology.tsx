@@ -202,8 +202,14 @@ export default function ClientBookingPaymentChronology({
     const serviceStartMinutes = service.startTime
       ? parseTimeLabelToMinutes(service.startTime)
       : sectionStartMinutes + serviceOffset;
+    const rawDuration = Number(service.durationMins) || 0;
+    const endMin = service.endTime?.trim()
+      ? parseTimeLabelToMinutes(service.endTime)
+      : serviceStartMinutes + rawDuration;
+    const displayDurationMins =
+      endMin > serviceStartMinutes ? endMin - serviceStartMinutes : rawDuration;
     const timeRange = draft?.selectedTime
-      ? serviceTimeRangeLabel(serviceStartMinutes, service.durationMins)
+      ? serviceTimeRangeLabel(serviceStartMinutes, displayDurationMins)
       : undefined;
     const changeTags = serviceChangeTags(service.id);
 
@@ -238,7 +244,7 @@ export default function ClientBookingPaymentChronology({
             </BodyText>
             <ServiceSummaryMetaLine
               timeRange={timeRange}
-              durationLabel={`${service.durationMins} Mins`}
+              durationLabel={`${displayDurationMins} Mins`}
             />
             {teamFirst ? (
               <Stack

@@ -133,6 +133,7 @@ export default function ClientBookingDetailsHeader({
   const messagingWidget = useMessagingWidgetOptional();
   const [openMessagingForBooking] = useOpenMessagingForBookingMutation();
   const [editAnchor, setEditAnchor] = React.useState<HTMLElement | null>(null);
+  const editButtonRef = React.useRef<HTMLSpanElement | null>(null);
   const unreadFromProfessional = useClientMessagingUnread(bookingRef);
   const editRequest = useBookingEditRequest(bookingRef);
 
@@ -377,27 +378,33 @@ export default function ClientBookingDetailsHeader({
               flexWrap="wrap"
             >
               {showEdit ? (
-                <AppButton
-                  tone="primary"
-                  disabled={editActionsDisabled}
-                  endIcon={
-                    <KeyboardArrowDownRoundedIcon
-                      sx={{ fontSize: 18, color: "#fff" }}
-                    />
-                  }
-                  onClick={(e) => {
-                    if (editActionsDisabled) return;
-                    setEditAnchor(e.currentTarget);
-                  }}
-                  sx={{
-                    borderRadius: "8px",
-                    fontSize: 12.5,
-                    px: 2,
-                    height: 34,
-                  }}
+                <Box
+                  ref={editButtonRef}
+                  component="span"
+                  sx={{ display: "inline-flex" }}
                 >
-                  Edit
-                </AppButton>
+                  <AppButton
+                    tone="primary"
+                    disabled={editActionsDisabled}
+                    endIcon={
+                      <KeyboardArrowDownRoundedIcon
+                        sx={{ fontSize: 18, color: "#fff" }}
+                      />
+                    }
+                    onClick={() => {
+                      if (editActionsDisabled) return;
+                      setEditAnchor(editButtonRef.current);
+                    }}
+                    sx={{
+                      borderRadius: "8px",
+                      fontSize: 12.5,
+                      px: 2,
+                      height: 34,
+                    }}
+                  >
+                    Edit
+                  </AppButton>
+                </Box>
               ) : null}
               <AppButton
                 tone="secondary"
@@ -479,8 +486,11 @@ export default function ClientBookingDetailsHeader({
         onClose={() => setEditAnchor(null)}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         transformOrigin={{ vertical: "top", horizontal: "right" }}
-        PaperProps={{
-          sx: { borderRadius: "10px", minWidth: 200, mt: 0.5, py: 0.5 },
+        marginThreshold={8}
+        slotProps={{
+          paper: {
+            sx: { borderRadius: "10px", minWidth: 200, mt: 0.5, py: 0.5 },
+          },
         }}
       >
         {showConfirmedEditMenu ? (

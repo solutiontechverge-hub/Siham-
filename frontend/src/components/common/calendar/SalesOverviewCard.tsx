@@ -69,6 +69,10 @@ type SalesOverviewCardProps = {
   card: SalesOverviewCardData;
   highlighted?: boolean;
   highlightId?: string | null;
+  /** Inside a split-bill group shell — drop outer chrome so siblings read as one card. */
+  embedded?: boolean;
+  /** Split-bill follow-on sections: hide repeated "After treatment Summary" title. */
+  hideTitle?: boolean;
   onViewInvoice?: () => void;
   onViewReceipt?: () => void;
   onAddOns?: () => void;
@@ -191,6 +195,29 @@ function statusBadgeSx(
     return { color: m.statusRedFg, bgcolor: m.statusRedBg };
   }
   return { color: m.statusGreyFg, bgcolor: m.fxGrayF2F4F7 };
+}
+
+/** Big Prepaid/Total accent — grey when Refunded/Voided (match badge). */
+function highlightAmountColor(
+  m: { teal: string; statusGreyFg: string },
+  paymentState?: SalesPaymentState,
+  statusBadge?: string,
+) {
+  const badge = String(statusBadge ?? "")
+    .toLowerCase()
+    .replace(/^!/, "")
+    .trim();
+  if (
+    paymentState === "refunded" ||
+    paymentState === "voided" ||
+    badge === "refunded" ||
+    badge === "partially refunded" ||
+    badge === "voided" ||
+    badge === "cancelled"
+  ) {
+    return m.statusGreyFg;
+  }
+  return m.teal;
 }
 
 function useActionsMenu(onAction?: (action: SalesCardMenuAction) => void) {
@@ -528,7 +555,14 @@ function SubSummaryCard({
             >
               {sub.highlightLabel}
             </Typography>
-            <Typography sx={{ fontSize: 22, fontWeight: 900, color: m.teal, lineHeight: 1.1 }}>
+            <Typography
+              sx={{
+                fontSize: 22,
+                fontWeight: 900,
+                color: highlightAmountColor(m, sub.paymentState, sub.statusBadge),
+                lineHeight: 1.1,
+              }}
+            >
               {formatCompactEuro(sub.highlightAmount)}
             </Typography>
           </Box>
@@ -546,7 +580,12 @@ function SubSummaryCard({
             {sub.highlightLabel}
           </Typography>
           <Typography
-            sx={{ fontSize: 22, fontWeight: 900, color: m.teal, lineHeight: 1.1 }}
+            sx={{
+              fontSize: 22,
+              fontWeight: 900,
+              color: highlightAmountColor(m, sub.paymentState, sub.statusBadge),
+              lineHeight: 1.1,
+            }}
           >
             {formatCompactEuro(sub.highlightAmount)}
           </Typography>
@@ -652,6 +691,8 @@ export default function SalesOverviewCard({
   card,
   highlighted = false,
   highlightId = null,
+  embedded = false,
+  hideTitle = false,
   onViewInvoice,
   onViewReceipt,
   onAddOns,
@@ -696,12 +737,26 @@ export default function SalesOverviewCard({
   const isFeeSummary =
     card.title === "Fee Summary" || card.title === "No-Show Fee Invoice";
   const badge = statusBadgeSx(card.statusBadge, m, card.paymentState);
+  const amountAccent = highlightAmountColor(
+    m,
+    card.paymentState,
+    card.statusBadge,
+  );
   // Individuals: no type badge. Business: BC only.
   const clientBadge =
     !isGuestOrModel && card.clientKind === "company" ? "BC Client" : null;
-  const payerHeading = isGuestOrModel
-    ? card.payerLabel || card.clientName
-    : card.clientName;
+  // Follow-on split section (title already hidden): skip "Guest"/"Model" role label.
+  const realGuestName =
+    isGuestOrModel &&
+    card.clientName &&
+    card.clientName !== card.payerLabel
+      ? card.clientName
+      : null;
+  const payerHeading = hideTitle
+    ? realGuestName
+    : isGuestOrModel
+      ? card.payerLabel || card.clientName
+      : card.clientName;
   const showReceipt =
     card.paymentState === "prepaid" ||
     card.paymentState === "paid" ||
@@ -713,7 +768,7 @@ export default function SalesOverviewCard({
     card.paymentState !== "refunded" &&
     card.paymentState !== "voided";
 
-  const clientHeader = (
+  const clientHeader = payerHeading ? (
     <>
       <Stack
         direction="row"
@@ -741,9 +796,7 @@ export default function SalesOverviewCard({
           </Box>
         ) : null}
       </Stack>
-      {isGuestOrModel &&
-      card.clientName &&
-      card.clientName !== card.payerLabel ? (
+      {!hideTitle && realGuestName ? (
         <Typography
           sx={{
             fontSize: 12,
@@ -752,22 +805,29 @@ export default function SalesOverviewCard({
             mb: 0.35,
           }}
         >
-          {card.clientName}
+          {realGuestName}
         </Typography>
       ) : null}
     </>
-  );
+  ) : null;
 
   return (
     <Box
       data-sales-card-id={card.id}
       sx={{
-        borderRadius: "12px",
-        border: `1px solid ${highlighted ? alpha(m.teal, 0.55) : alpha(m.navy, 0.1)}`,
-        bgcolor: highlighted ? alpha(m.teal, 0.05) : "#fff",
-        boxShadow: highlighted ? `0 0 0 3px ${alpha(m.teal, 0.12)}` : "none",
-        px: 1.75,
-        py: 1.5,
+        borderRadius: embedded ? 0 : "12px",
+        border: embedded
+          ? "none"
+          : `1px solid ${highlighted ? alpha(m.teal, 0.55) : alpha(m.navy, 0.1)}`,
+        bgcolor: embedded
+          ? "transparent"
+          : highlighted
+            ? alpha(m.teal, 0.05)
+            : "#fff",
+        boxShadow:
+          !embedded && highlighted ? `0 0 0 3px ${alpha(m.teal, 0.12)}` : "none",
+        px: embedded ? 0 : 1.75,
+        py: embedded ? 0 : 1.5,
         scrollMarginTop: 12,
       }}
     >
@@ -777,11 +837,13 @@ export default function SalesOverviewCard({
         justifyContent="space-between"
         sx={{ mb: 1.1 }}
       >
-        <Typography
-          sx={mollureSectionTitleSx(m.navy)}
-        >
-          {card.title}
-        </Typography>
+        {!hideTitle ? (
+          <Typography sx={mollureSectionTitleSx(m.navy)}>
+            {card.title}
+          </Typography>
+        ) : (
+          <Box sx={{ flex: 1 }} />
+        )}
         {card.statusBadge && !isFeeSummary ? (
           <Box sx={{ px: 1, py: 0.3, borderRadius: "999px", ...badge }}>
             <Typography sx={{ fontSize: 11, fontWeight: 800, color: "inherit" }}>
@@ -824,7 +886,9 @@ export default function SalesOverviewCard({
               py: 0.85,
             }}
           >
-            <Box sx={{ mb: 0.65 }}>{clientHeader}</Box>
+            {clientHeader ? (
+              <Box sx={{ mb: 0.65 }}>{clientHeader}</Box>
+            ) : null}
             <Stack spacing={0.65}>
               {highlightedLines.map((line) => (
                 <LineRow key={line.id} line={line} />
@@ -872,7 +936,7 @@ export default function SalesOverviewCard({
                 fontWeight: 900,
                 color:
                   guestTotalOnly || card.kind === "reissued_invoice"
-                    ? m.teal
+                    ? amountAccent
                     : alpha(m.navy, 0.88),
                 lineHeight: 1.1,
                 textAlign: "right",
@@ -934,7 +998,7 @@ export default function SalesOverviewCard({
                   sx={{
                     fontSize: 28,
                     fontWeight: 900,
-                    color: m.teal,
+                    color: amountAccent,
                     lineHeight: 1.1,
                     textAlign: "right",
                     flexShrink: 0,
@@ -959,7 +1023,7 @@ export default function SalesOverviewCard({
                   sx={{
                     fontSize: 28,
                     fontWeight: 900,
-                    color: m.teal,
+                    color: amountAccent,
                     lineHeight: 1.1,
                   }}
                 >

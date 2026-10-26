@@ -191,7 +191,11 @@ export function useClientBookingCancelFlow(input: {
               cancellationFeeAt: new Date().toISOString(),
               exceededCancellationWindow: true,
             }
-          : {}),
+          : {
+              // Early cancel: stamp window so Sales Fee Summary shows no-fee path.
+              cancellationFeeAt: new Date().toISOString(),
+              exceededCancellationWindow: false,
+            }),
         // Keep LRF stamps so finance Fee Summary can settle dynamically.
         ...(cancellationSettlement.rescheduleFee > 0
           ? {

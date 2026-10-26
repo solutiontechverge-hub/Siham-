@@ -55,10 +55,8 @@ export default function ClientBookingCreateView() {
     isDayNotAvailable,
     isDayUnselectable,
     getDayClosedNote,
-    selectedDayNotAvailable,
     selectedDayClosedNote,
     times,
-    availableTimes,
     isTimeUnavailable,
     timeScrollRef,
     scrollTimeSlots,
@@ -320,9 +318,7 @@ export default function ClientBookingCreateView() {
                     timeValidationError={timeValidationError}
                     setTimeValidationError={setTimeValidationError}
                     selectedTimeTooSoon={selectedTimeTooSoon}
-                    selectedDayNotAvailable={selectedDayNotAvailable}
                     selectedDayClosedNote={selectedDayClosedNote}
-                    availableTimes={availableTimes}
                   />
                 </Paper>
 

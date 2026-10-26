@@ -1,10 +1,17 @@
 "use client";
 
+import * as React from "react";
 import { Box, Paper, Stack } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import AppPillTabs from "../../AppPillTabs";
-import { useGetFinanceTransactionsQuery } from "../../../../store/services/financeApi";
+import {
+  useGetFinanceTransactionsQuery,
+  useGetSalesCardMetadataQuery,
+  useProcessFinanceInvoiceReissuesMutation,
+} from "../../../../store/services/financeApi";
 import { FinancePaymentDueRowsProvider } from "../resolveBookingPaymentDueMeta";
+import { hydrateSalesCardMetadata } from "../salesOverview.storage";
+import type { SalesCardMetaRecord } from "../salesOverview.types";
 import type { CalendarSubTab } from "../../../../app/professionals/fixed-location/calendar/calendar.data";
 import {
   useProfessionalFixedLocationCalendar,
@@ -28,6 +35,25 @@ export default function ProfessionalFixedLocationCalendar(
     { limit: 500 },
     { refetchOnMountOrArgChange: true, pollingInterval: 12_000 },
   );
+  // Prefetch on calendar load (fixed + desired share this shell) so Booking
+  // tab / cards show reissue due dates without visiting Sales first.
+  const { data: salesMetadataResponse } = useGetSalesCardMetadataQuery(
+    undefined,
+    { refetchOnMountOrArgChange: true },
+  );
+  const [processFinanceInvoiceReissues] =
+    useProcessFinanceInvoiceReissuesMutation();
+
+  React.useEffect(() => {
+    if (!salesMetadataResponse) return;
+    hydrateSalesCardMetadata(
+      (salesMetadataResponse.data ?? []) as SalesCardMetaRecord[],
+    );
+  }, [salesMetadataResponse]);
+
+  React.useEffect(() => {
+    void processFinanceInvoiceReissues();
+  }, [processFinanceInvoiceReissues]);
   const {
     activeDateIso,
     activeMonthIso,

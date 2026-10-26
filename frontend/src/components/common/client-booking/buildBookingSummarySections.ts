@@ -175,11 +175,11 @@ export function planningScheduleMeta(section: {
       : endMins == null
         ? fmtMinutesToTimeLabel(startMins)
         : `${fmtMinutesToTimeLabel(startMins)}–${fmtMinutesToTimeLabel(endMins)}`;
+  // Clock range wins when both ends exist (avoids "9:00–9:35 • 18 Mins").
   const durationMins =
-    parseDurationMinsLabel(section.planningItem?.duration) ??
-    (startMins != null && endMins != null && endMins > startMins
+    startMins != null && endMins != null && endMins > startMins
       ? endMins - startMins
-      : null);
+      : parseDurationMinsLabel(section.planningItem?.duration);
   const durationLabel =
     durationMins && durationMins > 0
       ? `${durationMins} Mins`

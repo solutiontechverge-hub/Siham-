@@ -93,7 +93,8 @@ function resolveActivePrepaid(
 }
 
 export function useActiveClientBooking() {
-  const { data, isLoading, isFetching, refetch } = useGetMyBookingsQuery(undefined, {
+  const { data, isLoading, isFetching, refetch, isUninitialized } =
+    useGetMyBookingsQuery(undefined, {
     // Keep details page fresh while open (pro edits arrive via tag invalidation + socket).
     refetchOnFocus: true,
     refetchOnReconnect: true,
@@ -223,7 +224,10 @@ export function useActiveClientBooking() {
   return {
     record,
     apiBookings: data?.data ?? [],
-    refresh: refetch,
+    refresh: () => {
+      if (isUninitialized) return;
+      return refetch();
+    },
     isLoading: isLoading || isFetching,
   };
 }

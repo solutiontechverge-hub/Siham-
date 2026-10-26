@@ -25,7 +25,7 @@ export function useBookingFinance(
   const id = String(bookingId ?? "").trim();
   const skip = Boolean(opts?.skip) || !id;
 
-  const { data, isLoading, isFetching, isError, refetch } =
+  const { data, isLoading, isFetching, isError, refetch, isUninitialized } =
     useGetBookingFinancialsQuery(id, {
       skip,
       refetchOnMountOrArgChange: true,
@@ -51,6 +51,7 @@ export function useBookingFinance(
     isError: !skip && isError,
     bookingId: id,
     refetch: () => {
+      if (isUninitialized) return;
       void refetch();
     },
   };

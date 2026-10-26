@@ -16,6 +16,7 @@ import {
 import {
   getEffectiveServicePrice,
   formatServiceTimeRange,
+  formatTimeWindowDurationLabel,
   type BookingServiceLineItem,
 } from "../../../data/bookingServiceEdit.data";
 import {
@@ -298,7 +299,13 @@ export default function BookingDrawerSelectedItemsSection({
                         service.startTime,
                         service.endTime,
                       )}
-                      durationLabel={`${service.durationMins} Mins`}
+                      durationLabel={
+                        formatTimeWindowDurationLabel(
+                          service.startTime,
+                          service.endTime,
+                          `${service.durationMins} Mins`,
+                        ) || `${service.durationMins} Mins`
+                      }
                       staffName={staff.staffName}
                       staffId={staff.staffId || undefined}
                       staffPhotoSrc={staff.staffPhotoSrc}
@@ -392,7 +399,13 @@ export default function BookingDrawerSelectedItemsSection({
                         service.startTime,
                         service.endTime,
                       )}
-                      durationLabel={`${service.durationMins} Mins`}
+                      durationLabel={
+                        formatTimeWindowDurationLabel(
+                          service.startTime,
+                          service.endTime,
+                          `${service.durationMins} Mins`,
+                        ) || `${service.durationMins} Mins`
+                      }
                       staffName={staffName}
                     />
                     <BookingChangeTags
