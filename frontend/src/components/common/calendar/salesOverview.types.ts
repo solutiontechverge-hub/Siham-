@@ -4,6 +4,9 @@ export type SalesLineItem = {
   id: string;
   label: string;
   amount: number;
+  /** List price when a professional line discount reduced `amount`. */
+  originalAmount?: number;
+  discountLabel?: string;
 };
 
 export type SalesCardKind =

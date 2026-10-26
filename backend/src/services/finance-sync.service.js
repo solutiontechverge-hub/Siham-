@@ -19,7 +19,7 @@ import {
 } from "./financeEmail.service.js";
 import { dispatchInvoiceReissuedNotification } from "./bookingNotification.service.js";
 import { computeFinanceFees } from "../utils/financeFees.js";
-import { normalizeMoneyJson, parseMoney, roundMoney } from "../utils/money.js";
+import { normalizeMoneyJson, parseMoney, roundMoney, serviceLineList, serviceLineNet } from "../utils/money.js";
 import {
   protectiveFeeNetsPrepaid,
   settleProtectiveFee,
@@ -342,12 +342,12 @@ function resolveMethod(booking, paymentMethod = "onlineDirect") {
 function snapshotServiceSubtotal(meta, booking) {
   const services = Array.isArray(meta?.clientSnapshot?.services) ? meta.clientSnapshot.services : [];
   if (services.length) {
-    return roundMoney(services.reduce((sum, row) => sum + (Number(row.price) || 0), 0));
+    return roundMoney(services.reduce((sum, row) => sum + serviceLineNet(row), 0));
   }
   const guests = Array.isArray(meta?.guests) ? meta.guests : [];
   let guestTotal = 0;
   for (const guest of guests) {
-    for (const service of guest.services ?? []) guestTotal += Number(service.price) || 0;
+    for (const service of guest.services ?? []) guestTotal += serviceLineNet(service);
     for (const product of guest.products ?? []) guestTotal += Number(product.price) || 0;
   }
   if (guestTotal > 0) return roundMoney(guestTotal);
@@ -438,8 +438,8 @@ function buildFallbackLineItems(booking, meta, invoiceSettings) {
             sourceType: "serviceId",
             quantity: 1,
             ...vatFieldsForService(sourceReference, invoiceSettings),
-            pricePerUnit: roundMoney(service.price),
-            totalPrice: roundMoney(service.price),
+            pricePerUnit: serviceLineNet(service),
+            totalPrice: serviceLineNet(service),
           };
         }),
       meta,
@@ -458,8 +458,8 @@ function buildFallbackLineItems(booking, meta, invoiceSettings) {
         sourceType: "serviceId",
         quantity: 1,
         ...vatFieldsForService(sourceReference, invoiceSettings),
-        pricePerUnit: roundMoney(service.price),
-        totalPrice: roundMoney(service.price),
+        pricePerUnit: serviceLineNet(service),
+        totalPrice: serviceLineNet(service),
       });
     }
     for (const product of guest.products ?? []) {
@@ -569,6 +569,50 @@ function resolveLateRescheduleFee(meta, booking) {
         : {}),
     },
   };
+}
+
+/**
+ * No-show fee from booking notes (stamped % may only decrease vs ceiling).
+ * Falls back to business_setups.no_show_fee_percentage when notes lack a stamp.
+ */
+function resolveNoShowFee(meta, booking) {
+  if (meta && meta.showNoShowFee === false) return null;
+  const ceiling =
+    meta?.noShowFeePercentCeiling ?? booking.no_show_fee_percentage ?? null;
+  const hasStamp =
+    Boolean(meta?.showNoShowFee) ||
+    (meta?.noShowFeePercent != null && String(meta.noShowFeePercent).trim() !== "");
+  const rawPercent = hasStamp
+    ? meta.noShowFeePercent
+    : booking.no_show_fee_percentage;
+  const percent = clampFeePercent(rawPercent, ceiling);
+  if (!(percent > 0)) return null;
+  const base = snapshotServiceSubtotal(meta, booking);
+  const amount = roundMoney((base * percent) / 100);
+  if (!(amount > 0)) return null;
+  return {
+    amount,
+    percent,
+    base,
+    netsPrepaid: protectiveFeeNetsPrepaid("noShow", true),
+    line: {
+      description: "No-show fee",
+      sourceType: "uniqueItemCode",
+      sourceReference: "no-show-fee",
+      quantity: 1,
+      vat: "0%",
+      vatRate: 0,
+      pricePerUnit: amount,
+      totalPrice: amount,
+      feePercent: percent,
+      feeBaseAmount: base,
+    },
+  };
+}
+
+/** Exported for a small unit check — stamped % must win over template. */
+export function resolveNoShowFeeAmountForTest(meta, booking) {
+  return resolveNoShowFee(meta, booking);
 }
 
 async function hasSettledFeeRow(booking, entryLabel) {
@@ -936,9 +980,9 @@ function resolveSplitPayers(booking, meta, invoiceSettings) {
         sourceType: "serviceId",
         quantity: 1,
         ...vatFieldsForService(sourceReference, invoiceSettings),
-        pricePerUnit: roundMoney(service.price),
-        totalPrice: roundMoney(service.price),
-        amount: roundMoney(service.price),
+        pricePerUnit: serviceLineNet(service),
+        totalPrice: serviceLineNet(service),
+        amount: serviceLineNet(service),
       });
       groups.set(assigneeId, prev);
     }
@@ -1022,9 +1066,9 @@ function resolveSplitPayers(booking, meta, invoiceSettings) {
             sourceType: "serviceId",
             quantity: 1,
             ...vatFieldsForService(sourceReference, invoiceSettings),
-            pricePerUnit: roundMoney(s.price),
-            totalPrice: roundMoney(s.price),
-            amount: roundMoney(s.price),
+            pricePerUnit: serviceLineNet(s),
+            totalPrice: serviceLineNet(s),
+            amount: serviceLineNet(s),
           };
         }),
         ...guestProducts.map((p) => {
@@ -1197,6 +1241,105 @@ async function healMissingKilometerAllowanceLine(financeTransactionId, lineItems
   );
 }
 
+function discountHitsFromMeta(meta) {
+  const services = [
+    ...(Array.isArray(meta?.clientSnapshot?.services) ? meta.clientSnapshot.services : []),
+    ...(Array.isArray(meta?.services) ? meta.services : []),
+    ...(Array.isArray(meta?.guests) ? meta.guests : []).flatMap((guest) =>
+      Array.isArray(guest?.services) ? guest.services : [],
+    ),
+  ];
+  const hits = [];
+  for (const service of services) {
+    const net = serviceLineNet(service);
+    const list = serviceLineList(service);
+    const id = String(service?.id || service?.serviceId || "").trim();
+    if (!id || !(list > net + 0.001)) continue;
+    hits.push({
+      id,
+      name: String(service?.name || "").trim().toLowerCase(),
+      list,
+      net,
+    });
+  }
+  return hits;
+}
+
+function patchDocumentServiceDiscounts(doc, hits) {
+  if (!doc || typeof doc !== "object" || !Array.isArray(doc.lineItems)) return null;
+  let changed = false;
+  const lineItems = doc.lineItems.map((line) => {
+    const ref = String(line?.sourceReference ?? "").split("::")[0].trim();
+    const name = String(line?.description ?? "").trim().toLowerCase();
+    const hit =
+      (ref && hits.find((row) => row.id === ref)) ||
+      (!ref && name ? hits.find((row) => row.name === name) : undefined);
+    if (!hit) return line;
+    const current = roundMoney(line?.totalPrice);
+    if (Math.abs(current - hit.list) > 0.02) return line;
+    changed = true;
+    const qty = Math.max(1, parseMoney(line?.quantity, 1));
+    return {
+      ...line,
+      pricePerUnit: roundMoney(hit.net / qty),
+      totalPrice: hit.net,
+    };
+  });
+  if (!changed) return null;
+  const oldSum = roundMoney(
+    doc.lineItems.reduce((sum, line) => sum + (Number(line?.totalPrice) || 0), 0),
+  );
+  const newSum = roundMoney(
+    lineItems.reduce((sum, line) => sum + (Number(line?.totalPrice) || 0), 0),
+  );
+  const bookingItems = Array.isArray(doc.bookingItems)
+    ? doc.bookingItems.map((item) => {
+        const name = String(item?.label ?? "").trim().toLowerCase();
+        const hit = hits.find((row) => row.name === name);
+        const value = Number(item?.value);
+        if (!hit || !Number.isFinite(value) || Math.abs(value - hit.list) > 0.02) return item;
+        return { ...item, value: hit.net };
+      })
+    : doc.bookingItems;
+  const total = Number(doc.totalPrice) || 0;
+  return {
+    ...doc,
+    lineItems,
+    ...(bookingItems ? { bookingItems } : {}),
+    ...(Math.abs(total - oldSum) < 0.02 ? { totalPrice: newSum } : {}),
+  };
+}
+
+/** Rewrite stored invoice/receipt service lines that still charge the pre-discount list price. */
+export async function healDiscountedServiceDocumentLines(booking, meta) {
+  const hits = discountHitsFromMeta(meta);
+  if (!hits.length || !booking?.id) return;
+  const rows = await query(
+    `SELECT id, document, issued_document
+       FROM finance_transactions
+      WHERE booking_id::text IN ($1, $2)
+        AND status <> 'Voided'`,
+    [String(booking.id), String(booking.unique_code || booking.id)],
+  );
+  for (const row of rows.rows) {
+    const nextDocument = patchDocumentServiceDiscounts(row.document, hits);
+    const nextIssued = patchDocumentServiceDiscounts(row.issued_document, hits);
+    if (!nextDocument && !nextIssued) continue;
+    await query(
+      `UPDATE finance_transactions
+          SET document = COALESCE($2::jsonb, document),
+              issued_document = COALESCE($3::jsonb, issued_document),
+              updated_at = NOW()
+        WHERE id = $1`,
+      [
+        row.id,
+        nextDocument ? JSON.stringify(normalizeMoneyJson(nextDocument)) : null,
+        nextIssued ? JSON.stringify(normalizeMoneyJson(nextIssued)) : null,
+      ],
+    );
+  }
+}
+
 async function linkSalesCardForInsertedTx(
   booking,
   fields,
@@ -1321,12 +1464,23 @@ async function insertFinanceTransaction({
       ],
     );
     if (exact.rows[0]) {
-      return linkSalesCardForInsertedTx(
-        booking,
-        salesCardFields,
-        exact.rows[0].id,
-        lineItems,
-      );
+      // Protective fee % edits (esp. no-show decrease) must rewrite Paid €0 fee docs too.
+      if (forceReplace && isProtectiveFeeEntryLabel(labelKey)) {
+        supersededOpenId = exact.rows[0].id;
+        await query(
+          `UPDATE finance_transactions
+              SET status = 'Voided', updated_at = NOW()
+            WHERE id = $1`,
+          [exact.rows[0].id],
+        );
+      } else {
+        return linkSalesCardForInsertedTx(
+          booking,
+          salesCardFields,
+          exact.rows[0].id,
+          lineItems,
+        );
+      }
     }
   }
 
@@ -1837,29 +1991,48 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
   }
 
   if (bookingStatus === "no_show") {
-    const rate = Math.max(0, Math.min(100, Number(booking.no_show_fee_percentage) || 0));
-    const grossFee = roundMoney(roundMoney(booking.total_price) * rate / 100);
-    const dueFee = roundMoney(
-      Number.isFinite(Number(booking.no_show_fee_due))
-        ? Math.max(0, roundMoney(booking.no_show_fee_due))
-        : Math.max(0, grossFee - prepaidAmount),
-    );
-    if (dueFee <= 0) return null;
+    const ns = resolveNoShowFee(meta, booking);
+    if (!ns) {
+      // Fee decreased to remove — drop open NS sales so Fee Summary clears.
+      await query(
+        `UPDATE finance_transactions
+            SET status = 'Voided', updated_at = NOW()
+          WHERE professional_profile_id = $1
+            AND booking_id = $2
+            AND entry_label = 'No-show fee'
+            AND status NOT IN ('Paid', 'Prepaid', 'Refunded', 'Voided')`,
+        [booking.professional_profile_id, booking.unique_code],
+      );
+      return null;
+    }
+    const settled = settleProtectiveFee({
+      feeTotal: ns.amount,
+      prepaidAvailable: prepaidAmount,
+      netsPrepaid: ns.netsPrepaid,
+    });
+    const feeStatus =
+      statusOverride ||
+      (settled.amountDue <= 0 && settled.prepaidApplied > 0 ? "Paid" : "Payment due");
     return insertFinanceTransaction({
       booking,
       paymentPhase: "full",
       paymentMethod,
-      amount: dueFee,
-      status: statusOverride || "Payment due",
+      amount: settled.amountDue,
+      status: feeStatus,
       clientName: booking.customer_name,
       clientEmail: booking.customer_email,
       clientType: resolveClientType(booking),
       payerKey: "main-client",
       payerRole: "main_client",
       payerLabel: booking.customer_name,
-      lineItems: [{ description: "No-show fee", sourceType: "uniqueItemCode", sourceReference: "no-show-fee", quantity: 1, vat: "0%", vatRate: 0, pricePerUnit: roundMoney(dueFee), totalPrice: roundMoney(dueFee) }],
+      lineItems: [ns.line],
       docSuffix: "-NS",
       entryLabel: "No-show fee",
+      feeSettlement: {
+        feeTotal: settled.feeTotal,
+        prepaidApplied: settled.prepaidApplied,
+      },
+      forceReplace,
     });
   }
 

@@ -78,4 +78,31 @@ assert.equal(
   false,
 );
 
+/** Mirrors PAST_END_SQL in bookingAutoComplete.job.js (confirmed → completed). */
+function isPastScheduledEnd(endTime, bookingDate, now) {
+  if (endTime != null) {
+    const endMs = new Date(endTime).getTime();
+    if (!Number.isNaN(endMs)) return now.getTime() >= endMs;
+  }
+  if (bookingDate != null) {
+    const day = String(bookingDate).slice(0, 10);
+    const today = now.toISOString().slice(0, 10);
+    return Boolean(day) && day < today;
+  }
+  return false;
+}
+
+assert.equal(
+  isPastScheduledEnd(end, null, new Date("2026-09-23T09:59:00.000Z")),
+  false,
+);
+assert.equal(
+  isPastScheduledEnd(end, null, new Date("2026-09-23T10:00:00.000Z")),
+  true,
+);
+assert.equal(
+  isPastScheduledEnd(null, "2026-09-22", new Date("2026-09-23T00:00:00.000Z")),
+  true,
+);
+
 console.log("bookingAutoCompleteCloseOut.test.js: ok");

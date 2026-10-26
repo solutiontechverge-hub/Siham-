@@ -45,6 +45,7 @@ import {
   salesCardKindToPaymentPhase,
   useProfessionalBusinessOverride,
 } from "../finance-documents";
+import { applyNetServicePricesToDocument } from "../finance-documents/applyNetServicePricesToDocument";
 import {
   filterRefundableCardRows,
   isOnlineRefundMethod,
@@ -494,7 +495,7 @@ export function useSalesOverview({
     async (card: SalesOverviewCardData, type: SalesDocumentType) => {
       const issued = await resolveIssuedFinanceRow(card, type);
       if (issued && hasStoredDocumentSnapshot(issued)) {
-        setDocRow(issued);
+        setDocRow(applyNetServicePricesToDocument(issued, card.lines));
         setDocType(type);
         setDocOpen(true);
         return;
@@ -580,8 +581,11 @@ export function useSalesOverview({
     async (card: SalesOverviewCardData, format: "pdf" | "excel") => {
       try {
         const issued = await resolveIssuedFinanceRow(card, "invoice");
-        if (format === "pdf") await downloadSalesInvoicePdf(card, issued);
-        else await downloadSalesInvoiceExcel(card, issued);
+        const priced = issued
+          ? applyNetServicePricesToDocument(issued, card.lines)
+          : issued;
+        if (format === "pdf") await downloadSalesInvoicePdf(card, priced);
+        else await downloadSalesInvoiceExcel(card, priced);
         showSnackbar({
           severity: "success",
           message: SALES_OVERVIEW_COPY.downloadSuccess(format),

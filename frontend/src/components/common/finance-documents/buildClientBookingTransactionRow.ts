@@ -75,6 +75,7 @@ export function buildClientBookingTransactionRow({
   const serviceLineItems = draft.services.map((service) => {
     const sourceReference = String(service.id).split("::")[0];
     const vat = resolveServiceVatLabel(sourceReference, financeSettings);
+    // Draft services are net after withClientDiscountFields / normalizeServiceLinePricing.
     return {
       description: service.name,
       sourceReference,

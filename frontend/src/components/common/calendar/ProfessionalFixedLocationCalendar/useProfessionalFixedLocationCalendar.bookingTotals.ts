@@ -3,6 +3,7 @@ import {
   getEffectiveServicePrice,
   type BookingServiceLineItem,
 } from "../../../../data/bookingServiceEdit.data";
+import { serviceListAmount } from "../../../../data/bookingLinePricing";
 import {
   productLineOriginalAmount,
   type BookingProductLineItem,
@@ -66,7 +67,7 @@ export function useProfessionalFixedLocationCalendarBookingTotals({
     servicesTotal + productsTotal + uniqueItemsTotal + guestsTotal;
   const lineActualAmount = React.useMemo(() => {
     const servicesActual = selectedServices.reduce(
-      (sum, service) => sum + service.price,
+      (sum, service) => sum + serviceListAmount(service),
       0,
     );
     const productsActual = selectedProducts.reduce(
@@ -81,7 +82,7 @@ export function useProfessionalFixedLocationCalendarBookingTotals({
       (sum, guest) =>
         sum +
         guest.services.reduce(
-          (serviceSum, service) => serviceSum + service.price,
+          (serviceSum, service) => serviceSum + serviceListAmount(service),
           0,
         ) +
         guest.products.reduce(

@@ -1,6 +1,7 @@
 import type {
   CalendarBookingDetails,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
+import { parseDiscountFields } from "../../../data/bookingLinePricing";
 import {
   mainDrawerServicesFromClientSnapshot,
 } from "./bookingEventDetails.guestScope";
@@ -571,6 +572,24 @@ export function normalizeNotesServiceLines(
     const id = String(row.id ?? row.service_id ?? "").trim() || `svc-${index}`;
     if (!name && !String(row.id ?? "").trim()) return;
     const teamMemberId = row.teamMemberId ?? row.staffResourceId;
+    const discountRaw =
+      row.discount && typeof row.discount === "object"
+        ? (row.discount as { type?: unknown; amount?: unknown })
+        : null;
+    const discountPct = Number(row.discountPct);
+    const discount =
+      parseDiscountFields(
+        typeof discountRaw?.type === "string" ? discountRaw.type : null,
+        discountRaw?.amount as string | number | null | undefined,
+      ) ??
+      (Number.isFinite(discountPct) && discountPct > 0
+        ? parseDiscountFields("percentage", discountPct)
+        : null);
+    const originalPrice = Number(row.originalPrice);
+    const pricingMode =
+      row.pricingMode === "net" || row.pricingMode === "list"
+        ? row.pricingMode
+        : undefined;
     lines.push({
       id,
       name: name || "Service",
@@ -580,6 +599,14 @@ export function normalizeNotesServiceLines(
         row.guestId == null || !String(row.guestId).trim()
           ? null
           : String(row.guestId),
+      ...(discount ? { discount } : {}),
+      ...(Number.isFinite(originalPrice) && originalPrice > 0
+        ? { originalPrice }
+        : {}),
+      ...(Number.isFinite(discountPct) && discountPct > 0
+        ? { discountPct }
+        : {}),
+      ...(pricingMode ? { pricingMode } : {}),
       ...(typeof row.startTime === "string" && row.startTime.trim()
         ? { startTime: row.startTime.trim() }
         : {}),
@@ -729,7 +756,21 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
         : ebr?.lastEditedBy === "client" && ebr.editedServiceIds?.length
           ? { clientEditedServiceIds: ebr.editedServiceIds }
           : {}),
-      ...(meta.clientSnapshot ? { clientSnapshot: meta.clientSnapshot } : {}),
+      ...(meta.clientSnapshot
+        ? {
+            clientSnapshot: {
+              ...meta.clientSnapshot,
+              // Same discount parse as flat services — Sales prefers this array.
+              ...(meta.clientSnapshot.services?.length
+                ? {
+                    services: normalizeNotesServiceLines(
+                      meta.clientSnapshot.services,
+                    ),
+                  }
+                : {}),
+            },
+          }
+        : {}),
       ...(() => {
         const fromMeta = normalizeNotesServiceLines(meta.services);
         const fromEbr =

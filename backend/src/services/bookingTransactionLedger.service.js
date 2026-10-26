@@ -4,7 +4,7 @@
  * opt in to dual-write and to apply deriveStatusesFromFinancials().
  */
 import { query } from "../db/index.js";
-import { parseMoney, roundMoney } from "../utils/money.js";
+import { parseMoney, roundMoney, serviceLineList, serviceLineNet } from "../utils/money.js";
 import {
   LEDGER_TYPES,
   computeBookingFinancials,
@@ -460,14 +460,18 @@ function splitBookingNotes(raw) {
 }
 
 function snapshotServiceBasePrice(meta, booking) {
-  if (meta?.financials?.basePrice != null) {
-    return roundMoney(Math.max(0, parseMoney(meta.financials.basePrice)));
-  }
   const services = Array.isArray(meta?.clientSnapshot?.services)
     ? meta.clientSnapshot.services
     : [];
+  const lineDiscount = services.some(
+    (row) => serviceLineNet(row) + 0.001 < serviceLineList(row),
+  );
+  // Stamped basePrice is the undiscounted service sum. Recompute when a line discount exists.
+  if (!lineDiscount && meta?.financials?.basePrice != null) {
+    return roundMoney(Math.max(0, parseMoney(meta.financials.basePrice)));
+  }
   if (services.length) {
-    return roundMoney(services.reduce((sum, row) => sum + (Number(row.price) || 0), 0));
+    return roundMoney(services.reduce((sum, row) => sum + serviceLineNet(row), 0));
   }
   const guests = Array.isArray(meta?.guests) ? meta.guests : [];
   let guestTotal = 0;
@@ -582,6 +586,15 @@ export async function recalculateBookingFinancials(bookingId) {
       derivedPrepay,
     ],
   );
+
+  try {
+    const { healDiscountedServiceDocumentLines } = await import(
+      "./finance-sync.service.js"
+    );
+    await healDiscountedServiceDocumentLines(booking, meta);
+  } catch {
+    /* document line heal is best-effort */
+  }
 
   return {
     bookingId: bookingUuid,

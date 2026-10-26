@@ -21,6 +21,7 @@ import {
 } from "../../../data/bookingServiceEdit.data";
 import {
   formatLineDiscountLabel,
+  serviceListAmount,
   type BookingLineDiscount,
 } from "../../../data/bookingLinePricing";
 import { BookingChangeTags } from "./BookingEditedTag";
@@ -335,7 +336,9 @@ export default function BookingDrawerSelectedItemsSection({
                     <BookingLineAmount
                       amount={getEffectiveServicePrice(service)}
                       originalAmount={
-                        service.discount?.amount ? service.price : undefined
+                        service.discount?.amount
+                          ? serviceListAmount(service)
+                          : undefined
                       }
                       discountLabel={formatLineDiscountLabel(service.discount)}
                     />

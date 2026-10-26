@@ -74,6 +74,7 @@ export default function ProfessionalFixedLocationCalendar(
     grid,
     hasScheduleAvailabilityOnDate,
     isAddMenuBookingDisabled,
+    isAddMenuBlockedDisabled,
     isSaving,
     m,
     monthCells,
@@ -163,6 +164,7 @@ export default function ProfessionalFixedLocationCalendar(
             getAvailabilityFor={getAvailabilityFor}
             grid={grid}
             isAddMenuBookingDisabled={isAddMenuBookingDisabled}
+            isAddMenuBlockedDisabled={isAddMenuBlockedDisabled}
             m={m}
             nowMin={nowMin}
             onNext={onNext}

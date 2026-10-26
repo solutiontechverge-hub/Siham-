@@ -29,6 +29,30 @@ export function roundMoney(value) {
   return Math.round((parseMoney(value) + Number.EPSILON) * 100) / 100;
 }
 
+/**
+ * Net service amount. Matches frontend normalizeServiceLinePricing:
+ * `pricingMode: "net"` means `price` is already net; otherwise discount applies to list `price`.
+ */
+export function serviceLineNet(service) {
+  const price = roundMoney(Math.max(0, parseMoney(service?.price)));
+  if (service?.pricingMode === "net") return price;
+  const discount = service?.discount;
+  const amount = Number(discount?.amount);
+  if (!discount || !Number.isFinite(amount) || amount <= 0 || price <= 0) return price;
+  if (discount.type === "percentage") {
+    return roundMoney(Math.max(0, price - (price * amount) / 100));
+  }
+  return roundMoney(Math.max(0, price - amount));
+}
+
+/** Strike-through list. Legacy rows keep the list in `price`; net rows keep it in `originalPrice`. */
+export function serviceLineList(service) {
+  const net = serviceLineNet(service);
+  const original = roundMoney(service?.originalPrice);
+  if (service?.pricingMode === "net" && original > net + 0.001) return original;
+  return roundMoney(Math.max(0, parseMoney(service?.price)));
+}
+
 export const MONEY_JSON_KEYS = new Set([
   "price",
   "amount",

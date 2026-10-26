@@ -7,6 +7,7 @@ import type {
 import type { BookingDrawerHydration } from "../bookingEventDetails";
 import { isExtraBookingParticipant } from "../../../../data/bookingChronologicalBlocks";
 import { stampProductsToEarliestBlock } from "../../../../data/bookingProductPlacement";
+import { normalizeServiceLinePricing } from "../../../../data/bookingLinePricing";
 import { resolveMediaUrl } from "../../../../lib/resolveMediaUrl";
 
 export function resolveDrawerAddClientSource(
@@ -39,18 +40,25 @@ export function mapSnapshotPersonToDrawerGuest(
         (service) =>
           String(service.guestId ?? "").trim() === String(person.id),
       )
-      .map((service) => ({
-        id: service.id,
-        name: service.name,
-        price: service.price,
-        durationMins: service.durationMins,
-        startTime: service.startTime,
-        endTime: service.endTime,
-        staffResourceId: service.teamMemberId ?? undefined,
-        guestId: service.guestId ?? person.id,
-        discount: service.discount ?? null,
-        originalPrice: service.originalPrice,
-      })),
+      .map((service) => {
+        const priced = normalizeServiceLinePricing({
+          price: service.price,
+          originalPrice: service.originalPrice,
+          discount: service.discount ?? null,
+          pricingMode: service.pricingMode,
+          discountPct: service.discountPct,
+        });
+        return {
+          id: service.id,
+          name: service.name,
+          durationMins: service.durationMins,
+          startTime: service.startTime,
+          endTime: service.endTime,
+          staffResourceId: service.teamMemberId ?? undefined,
+          guestId: service.guestId ?? person.id,
+          ...priced,
+        };
+      }),
     products: products.filter(
       (product) =>
         String(product.guestId ?? "").trim() === String(person.id),

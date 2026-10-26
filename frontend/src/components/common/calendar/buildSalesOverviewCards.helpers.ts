@@ -42,7 +42,14 @@ import {
   bookingFinanceBadgeLabel,
   deriveBookingFinanceBadge,
 } from "../booking-finance/mapBookingFinance";
-import { roundBookingMoney as roundMoney } from "../../../data/bookingLinePricing";
+import {
+  coerceLineDiscount,
+  formatLineDiscountLabel,
+  normalizeServiceLinePricing,
+  roundBookingMoney as roundMoney,
+  serviceListAmount,
+  type BookingLinePriceFields,
+} from "../../../data/bookingLinePricing";
 import { computeBookingPrice } from "./bookingTotal";
 import {
   formatProtectiveFeeLineDescription,
@@ -68,6 +75,61 @@ import {
   addDaysToIsoDate,
   durationToDays,
 } from "./buildSalesOverviewCards.format";
+
+/** Overlay discount fields from flat details.services when snapshot omitted them. */
+function enrichServicePricing<
+  T extends BookingLinePriceFields & { id: string; name: string },
+>(service: T, overlays: readonly BookingLinePriceFields[] | undefined): T {
+  if (!overlays?.length) {
+    return {
+      ...service,
+      discount: coerceLineDiscount(service),
+    };
+  }
+  const match = overlays.find(
+    (row) =>
+      String((row as { id?: string }).id ?? "") === String(service.id) ||
+      // fall back: same name when ids drift across snapshot vs notes
+      (typeof (row as { name?: string }).name === "string" &&
+        String((row as { name?: string }).name).trim().toLowerCase() ===
+          service.name.trim().toLowerCase()),
+  );
+  if (!match) {
+    return {
+      ...service,
+      discount: coerceLineDiscount(service),
+    };
+  }
+  const merged: BookingLinePriceFields = {
+    price: Number(service.price) || 0,
+    originalPrice: service.originalPrice ?? match.originalPrice,
+    discount: service.discount ?? match.discount,
+    discountPct: service.discountPct ?? match.discountPct,
+    pricingMode: service.pricingMode ?? match.pricingMode,
+  };
+  // Snapshot kept list price; notes/details already hold net — prefer lower net candidate.
+  const fromService = normalizeServiceLinePricing({
+    ...merged,
+    discount: coerceLineDiscount(merged),
+  });
+  const fromMatch = normalizeServiceLinePricing({
+    price: Number(match.price) || 0,
+    originalPrice: match.originalPrice ?? service.originalPrice,
+    discount: coerceLineDiscount({
+      price: Number(match.price) || 0,
+      discount: match.discount ?? service.discount,
+      discountPct: match.discountPct ?? service.discountPct,
+      pricingMode: match.pricingMode,
+    }),
+    pricingMode: match.pricingMode,
+  });
+  const priced =
+    fromMatch.price + Number.EPSILON < fromService.price ? fromMatch : fromService;
+  return {
+    ...service,
+    ...priced,
+  };
+}
 
 function isSettledProtectiveFeeStatus(status?: string | null): boolean {
   const s = String(status ?? "").toLowerCase();
@@ -122,34 +184,72 @@ export type BuilderCtx = {
   /** Live GET /bookings/:id/financials — preferred over notes.financials stamp. */
   liveFinancials?: BookingFinancialsSnapshot | null;
 };
+function appendServiceSalesLine(
+  lines: SalesLineItem[],
+  service: {
+    id: string;
+    name: string;
+    price: number;
+    originalPrice?: number;
+    discount?: { type: "fixed" | "percentage"; amount: number } | null;
+    pricingMode?: "net" | "list";
+    discountPct?: number;
+  },
+  id: string,
+  overlays?: readonly BookingLinePriceFields[],
+): number {
+  const enriched = enrichServicePricing(service, overlays);
+  const priced = normalizeServiceLinePricing(enriched);
+  const amount = roundMoney(priced.price);
+  const list = roundMoney(serviceListAmount(priced));
+  const discountLabel = formatLineDiscountLabel(priced.discount);
+  lines.push({
+    id,
+    label: service.name,
+    amount,
+    ...(discountLabel && list > amount
+      ? { originalAmount: list, discountLabel }
+      : {}),
+  });
+  return amount;
+}
+
 function buildLinesFromEvent(event: CalendarEvent): { lines: SalesLineItem[]; subtotal: number } {
   const details = event.details;
   const lines: SalesLineItem[] = [];
   let subtotal = 0;
+  // Flat notes.services often carry discount while clientSnapshot only has list price.
+  const pricingOverlays: BookingLinePriceFields[] = [
+    ...(details?.services ?? []),
+    ...(details?.guests ?? []).flatMap((guest) => guest.services ?? []),
+  ];
 
   const snapshotServices = details?.clientSnapshot?.services;
   if (snapshotServices?.length) {
     snapshotServices.forEach((service, index) => {
       // Same catalog service can appear for main + guest — keep line keys unique.
       const lineId = `${service.id}::${String(service.guestId ?? "")}::${index}`;
-      lines.push({
-        id: lineId,
-        label: service.name,
-        amount: roundMoney(service.price),
-      });
-      subtotal += service.price;
+      subtotal += appendServiceSalesLine(lines, service, lineId, pricingOverlays);
     });
   } else {
     for (const service of details?.services ?? []) {
-      lines.push({ id: service.id, label: service.name, amount: roundMoney(service.price) });
-      subtotal += service.price;
+      subtotal += appendServiceSalesLine(
+        lines,
+        service,
+        service.id,
+        pricingOverlays,
+      );
     }
     for (const guest of details?.guests ?? []) {
       for (const [index, service] of (guest.services ?? []).entries()) {
         // Same catalog id on main + guest must both survive — composite keys.
         const lineId = `${service.id}::${String(guest.id)}::${index}`;
-        lines.push({ id: lineId, label: service.name, amount: roundMoney(service.price) });
-        subtotal += service.price;
+        subtotal += appendServiceSalesLine(
+          lines,
+          service,
+          lineId,
+          pricingOverlays,
+        );
       }
       for (const [index, product] of (guest.products ?? []).entries()) {
         const lineId = `${product.id}::${String(guest.id)}::${index}`;
@@ -1425,7 +1525,7 @@ export function resolveProtectiveFeeSalesCardSpec(input: {
           : roundMoney(hintAmount);
       if (feeAmount > 0) {
         return {
-          title: "No-Show Fee Invoice",
+          title: "Fee Summary",
           feeLabel: "No-show fee",
           feeAmount,
           entryLabel: "No-show fee",
@@ -1504,7 +1604,7 @@ export function resolveProtectiveFeeSalesCardSpec(input: {
 
   if (input.showNoShowFee && price.noShowFeeAmount > 0) {
     return {
-      title: "No-Show Fee Invoice",
+      title: "Fee Summary",
       feeLabel: "No-show fee",
       feeAmount: price.noShowFeeAmount,
       entryLabel: "No-show fee",
@@ -1627,13 +1727,15 @@ export function buildCardsForEvent(input: {
   const totalFromBooking = Number(booking?.total_price);
   const bookingFinancials =
     ctx.liveFinancials ?? parseBookingFinancialsFromNotes(booking?.notes);
-  // Listed services + allowances win when ledger basePrice omits extras (e.g. km).
+  // Itemized lines (after line discounts) are authoritative for Sales totals/prepaid.
+  // Do not let a stale ledger basePrice / total_price inflate past discounted lines.
   const rawBaseTotal = roundMoney(
-    Math.max(
-      bookingFinancials?.basePrice != null ? bookingFinancials.basePrice : 0,
-      lines.length ? lineSubtotalBeforeDiscount : 0,
-      !lines.length && Number.isFinite(totalFromBooking) ? totalFromBooking : 0,
-    ),
+    lines.length
+      ? lineSubtotalBeforeDiscount
+      : Math.max(
+          bookingFinancials?.basePrice != null ? bookingFinancials.basePrice : 0,
+          Number.isFinite(totalFromBooking) ? totalFromBooking : 0,
+        ),
   );
 
   // Prefer live event details; fall back to booking.notes when calendar state is stale.
@@ -1811,10 +1913,7 @@ export function buildCardsForEvent(input: {
         : prepaidCollected > 0
           ? roundMoney(Math.min(prepaidCollected, feeTotal))
           : 0;
-    const title = feeLines.some((l) => l.entryLabel === "No-show fee")
-      && feeLines.length === 1
-      ? "No-Show Fee Invoice"
-      : "Fee Summary";
+    const title = "Fee Summary";
     const metaLines = feeLines.flatMap((l) => l.metaLines);
     const card = applyMeta(
       {

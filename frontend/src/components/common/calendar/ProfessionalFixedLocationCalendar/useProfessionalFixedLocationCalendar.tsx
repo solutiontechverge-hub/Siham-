@@ -1430,11 +1430,13 @@ export function useProfessionalFixedLocationCalendar({
     [activeResource?.id, data.resources, selectedResourceId],
   );
 
-  /** Add Ã¢â€ â€™ Booking disabled when the selected team member has no Schedule that day. */
-  const isAddMenuBookingDisabled = !hasScheduleAvailabilityOnDate(
-    activeDateIso,
-    addMenuBookingResourceId,
-  );
+  const isSelectedDatePast = activeDateIso < todayIso;
+  /** Add → Booking: past day or selected team member has no Schedule that day. */
+  const isAddMenuBookingDisabled =
+    isSelectedDatePast ||
+    !hasScheduleAvailabilityOnDate(activeDateIso, addMenuBookingResourceId);
+  /** Add → Blocked time: past selected day only (schedule not required). */
+  const isAddMenuBlockedDisabled = isSelectedDatePast;
 
   const lateCancelNoticeLabel = React.useMemo(
     () =>
@@ -2302,6 +2304,7 @@ export function useProfessionalFixedLocationCalendar({
     inlineGuestFormRef,
     inlineGuestParticipantType,
     isAddMenuBookingDisabled,
+    isAddMenuBlockedDisabled,
     isAddingClient,
     isBookingDetailsSubScreen,
     isBookingDirty,

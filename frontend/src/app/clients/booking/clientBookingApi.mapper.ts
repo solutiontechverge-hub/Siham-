@@ -29,25 +29,30 @@ import { isProjectUploadImage, resolveBookingProjectUploads } from "../../../lib
 import { isUuid } from "../../../lib/uuid";
 import type { BusinessSetupListing, CalendarBooking, CreateBookingRequest } from "../../../store/services/businessApi";
 import { mapApiBookingStatusToClient, mapClientStatusToApi } from "./clientBookingStatus";
-import { effectiveServiceAmount } from "../../../data/bookingLinePricing";
+import {
+  effectiveServiceAmount,
+  normalizeServiceLinePricing,
+} from "../../../data/bookingLinePricing";
 
 function withClientDiscountFields(service: {
   price: number;
   originalPrice?: number;
   discountPct?: number;
   discount?: { type: "fixed" | "percentage"; amount: number } | null;
+  pricingMode?: "net" | "list";
 }) {
-  const net = effectiveServiceAmount(service);
-  const original = Number(service.originalPrice ?? service.price) || net;
+  const normalized = normalizeServiceLinePricing(service);
+  const net = normalized.price;
+  const list = Number(normalized.originalPrice ?? net) || net;
   return {
     price: net,
-    originalPrice: original > net ? original : undefined,
+    originalPrice: list > net ? list : undefined,
     discountPct:
-      service.discount?.type === "percentage"
-        ? service.discount.amount
+      normalized.discount?.type === "percentage"
+        ? normalized.discount.amount
         : service.discountPct,
-    discountType: service.discount?.type,
-    discountAmount: service.discount?.amount,
+    discountType: normalized.discount?.type,
+    discountAmount: normalized.discount?.amount,
   };
 }
 
@@ -551,7 +556,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
     ? Number(booking.no_show_fee_due)
     : activeEbr?.suggestedServices?.length
     ? activeEbr.suggestedServices.reduce(
-        (sum, s) => sum + effectiveServiceAmount(s),
+        (sum, s) => sum + effectiveServiceAmount(normalizeServiceLinePricing(s)),
         0,
       ) +
       (activeEbr.suggestedProducts ?? []).reduce(
@@ -560,7 +565,8 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
       )
     : notesDetails?.services?.length
       ? notesDetails.services.reduce(
-          (sum, s) => sum + effectiveServiceAmount(s),
+          (sum, s) =>
+            sum + effectiveServiceAmount(normalizeServiceLinePricing(s)),
           0,
         ) +
         (notesDetails.products ?? []).reduce(

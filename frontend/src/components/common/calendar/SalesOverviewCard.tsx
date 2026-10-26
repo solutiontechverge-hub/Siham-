@@ -22,6 +22,7 @@ import {
   formatFinanceDueDate,
 } from "../booking-finance/formatBookingFinance";
 import { isOfflinePaymentMethod } from "../client-booking/checkoutPaymentOptions";
+import BookingLineAmount from "./BookingLineAmount";
 import type {
   SalesLineItem,
   SalesOverviewCardData,
@@ -126,18 +127,29 @@ function MethodDateLine({
 
 function LineRow({ line }: { line: SalesLineItem }) {
   const m = useTheme().palette.mollure;
+  const showDiscount =
+    Boolean(line.discountLabel) ||
+    (typeof line.originalAmount === "number" && line.originalAmount > line.amount);
   return (
-    <Stack direction="row" justifyContent="space-between" spacing={1.5}>
+    <Stack direction="row" justifyContent="space-between" spacing={1.5} alignItems="flex-start">
       <Typography sx={mollureBodySx(m.navy)}>{line.label}</Typography>
-      <Typography
-        sx={mollureLabelSx(m.navy, {
-          color: line.amount < 0 ? alpha(m.navy, 0.55) : alpha(m.navy, 0.82),
-          flexShrink: 0,
-          textAlign: "right",
-        })}
-      >
-        {formatCompactEuro(line.amount)}
-      </Typography>
+      {showDiscount ? (
+        <BookingLineAmount
+          amount={line.amount}
+          originalAmount={line.originalAmount}
+          discountLabel={line.discountLabel}
+        />
+      ) : (
+        <Typography
+          sx={mollureLabelSx(m.navy, {
+            color: line.amount < 0 ? alpha(m.navy, 0.55) : alpha(m.navy, 0.82),
+            flexShrink: 0,
+            textAlign: "right",
+          })}
+        >
+          {formatCompactEuro(line.amount)}
+        </Typography>
+      )}
     </Stack>
   );
 }
@@ -919,146 +931,147 @@ export default function SalesOverviewCard({
 
       {!isPayerShell ? (
         <>
-          <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.85 }}>
-            <Typography
-              sx={{
-                fontSize: guestTotalOnly ? 12 : 13,
-                fontWeight: guestTotalOnly ? 700 : 900,
-                color: alpha(m.navy, guestTotalOnly ? 0.55 : 0.82),
-              }}
-            >
-              {card.totalLabel || "Total"}
-            </Typography>
-            <Typography
-              sx={{
-                fontSize:
-                  guestTotalOnly || card.kind === "reissued_invoice" ? 22 : 13,
-                fontWeight: 900,
-                color:
-                  guestTotalOnly || card.kind === "reissued_invoice"
-                    ? amountAccent
-                    : alpha(m.navy, 0.88),
-                lineHeight: 1.1,
-                textAlign: "right",
-                flexShrink: 0,
-              }}
-            >
-              {formatCompactEuro(guestTotalOnly ? card.highlightAmount : card.total)}
-            </Typography>
-          </Stack>
-
-          {card.secondaryRows?.map((row) => (
-            <Stack
-              key={row.id}
-              direction="row"
-              justifyContent="space-between"
-              sx={{ mb: 0.55 }}
-            >
+          <Stack spacing={0.55} sx={{ mb: 0.85 }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="baseline">
               <Typography
                 sx={{
-                  fontSize: 12.5,
-                  fontWeight: 600,
-                  color: alpha(m.navy, 0.45),
+                  fontSize: guestTotalOnly ? 12 : 13,
+                  fontWeight: guestTotalOnly ? 700 : 900,
+                  color: alpha(m.navy, guestTotalOnly ? 0.55 : 0.82),
                 }}
               >
-                {row.label}
+                {card.totalLabel || "Total"}
               </Typography>
               <Typography
                 sx={{
-                  fontSize: 12.5,
-                  fontWeight: 700,
-                  color: alpha(m.navy, 0.45),
+                  fontSize:
+                    guestTotalOnly || card.kind === "reissued_invoice" ? 22 : 13,
+                  fontWeight: 900,
+                  color:
+                    guestTotalOnly || card.kind === "reissued_invoice"
+                      ? amountAccent
+                      : alpha(m.navy, 0.88),
+                  lineHeight: 1.1,
                   textAlign: "right",
                   flexShrink: 0,
                 }}
               >
-                {formatCompactEuro(row.amount)}
+                {formatCompactEuro(guestTotalOnly ? card.highlightAmount : card.total)}
               </Typography>
             </Stack>
-          ))}
 
-          {!guestTotalOnly ? (
-            isFeeSummary ? (
+            {card.secondaryRows?.map((row) => (
               <Stack
+                key={row.id}
                 direction="row"
                 justifyContent="space-between"
                 alignItems="baseline"
-                sx={{ mt: 0.75, mb: 0.85 }}
               >
                 <Typography
                   sx={{
-                    fontSize: 13,
-                    fontWeight: 900,
-                    color: alpha(m.navy, 0.82),
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    color: alpha(m.navy, 0.45),
                   }}
                 >
-                  {card.highlightLabel || "Payment"}
+                  {row.label}
                 </Typography>
                 <Typography
                   sx={{
-                    fontSize: 28,
-                    fontWeight: 900,
-                    color: amountAccent,
-                    lineHeight: 1.1,
+                    fontSize: 12.5,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.45),
                     textAlign: "right",
                     flexShrink: 0,
                   }}
                 >
-                  {formatCompactEuro(Number(card.highlightAmount) || 0)}
+                  {formatCompactEuro(row.amount)}
                 </Typography>
               </Stack>
-            ) : (
-              <Box sx={{ mt: 0.75, mb: 0.85 }}>
-                <Typography
-                  sx={{
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: alpha(m.navy, 0.55),
-                    mb: 0.2,
-                  }}
-                >
-                  {card.highlightLabel}
-                </Typography>
-                <Typography
-                  sx={{
-                    fontSize: 28,
-                    fontWeight: 900,
-                    color: amountAccent,
-                    lineHeight: 1.1,
-                  }}
-                >
-                  {formatCompactEuro(card.highlightAmount)}
-                </Typography>
-              </Box>
-            )
-          ) : null}
+            ))}
 
-          {isFeeSummary ? (
-            <Stack spacing={0.2} sx={{ mb: 0.85 }}>
-              {card.statusBadge ? (
-                <Typography
-                  sx={{
-                    fontSize: 11.5,
-                    fontWeight: 700,
-                    color: alpha(m.navy, 0.55),
-                  }}
+            {!guestTotalOnly ? (
+              isFeeSummary ? (
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  sx={{ mt: 0.2 }}
                 >
-                  {card.statusBadge}
-                </Typography>
-              ) : null}
-              {(card.paymentMethodLabel || card.methodDateLine) && (
-                <Typography
-                  sx={{
-                    fontSize: 11.5,
-                    fontWeight: 650,
-                    color: alpha(m.navy, 0.5),
-                  }}
-                >
-                  {card.paymentMethodLabel || card.methodDateLine}
-                </Typography>
-              )}
-            </Stack>
-          ) : card.methodDateLine || card.dueDate ? (
+                  <Stack spacing={0.2} sx={{ minWidth: 0, pr: 1.5 }}>
+                    <Typography
+                      sx={{
+                        fontSize: 13,
+                        fontWeight: 900,
+                        color: alpha(m.navy, 0.82),
+                      }}
+                    >
+                      {card.highlightLabel || "Payment"}
+                    </Typography>
+                    {card.statusBadge ? (
+                      <Typography
+                        sx={{
+                          fontSize: 11.5,
+                          fontWeight: 700,
+                          color: alpha(m.navy, 0.55),
+                        }}
+                      >
+                        {card.statusBadge}
+                      </Typography>
+                    ) : null}
+                    {card.paymentMethodLabel || card.methodDateLine ? (
+                      <Typography
+                        sx={{
+                          fontSize: 11.5,
+                          fontWeight: 650,
+                          color: alpha(m.navy, 0.5),
+                        }}
+                      >
+                        {card.paymentMethodLabel || card.methodDateLine}
+                      </Typography>
+                    ) : null}
+                  </Stack>
+                  <Typography
+                    sx={{
+                      fontSize: 28,
+                      fontWeight: 900,
+                      color: amountAccent,
+                      lineHeight: 1.1,
+                      textAlign: "right",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {formatCompactEuro(Number(card.highlightAmount) || 0)}
+                  </Typography>
+                </Stack>
+              ) : (
+                <Box sx={{ mt: 0.2 }}>
+                  <Typography
+                    sx={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: alpha(m.navy, 0.55),
+                      mb: 0.2,
+                    }}
+                  >
+                    {card.highlightLabel}
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontSize: 28,
+                      fontWeight: 900,
+                      color: amountAccent,
+                      lineHeight: 1.1,
+                    }}
+                  >
+                    {formatCompactEuro(card.highlightAmount)}
+                  </Typography>
+                </Box>
+              )
+            ) : null}
+          </Stack>
+
+          {!isFeeSummary && (card.methodDateLine || card.dueDate) ? (
             <MethodDateLine
               methodDateLine={card.methodDateLine}
               // Prepayment Due: source label only (no calendar / due-date suffix).

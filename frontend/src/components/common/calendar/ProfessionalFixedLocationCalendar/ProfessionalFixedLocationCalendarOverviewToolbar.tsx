@@ -44,6 +44,7 @@ export type ProfessionalFixedLocationCalendarOverviewToolbarProps = Pick<
   | "getAvailabilityFor"
   | "grid"
   | "isAddMenuBookingDisabled"
+  | "isAddMenuBlockedDisabled"
   | "m"
   | "nowMin"
   | "onNext"
@@ -87,6 +88,7 @@ export default function ProfessionalFixedLocationCalendarOverviewToolbar(
     getAvailabilityFor,
     grid,
     isAddMenuBookingDisabled,
+    isAddMenuBlockedDisabled,
     m,
     nowMin,
     onNext,
@@ -277,6 +279,7 @@ export default function ProfessionalFixedLocationCalendarOverviewToolbar(
     <AppButton
       tone="primary"
       endIcon={<KeyboardArrowDownRoundedIcon />}
+      disabled={isAddMenuBookingDisabled && isAddMenuBlockedDisabled}
       onClick={(e) => setAddAnchor(e.currentTarget)}
       sx={{
         fontSize: 10.5,
@@ -290,7 +293,9 @@ export default function ProfessionalFixedLocationCalendarOverviewToolbar(
     <CalendarAddMenu
       anchorEl={addAnchor}
       bookingDisabled={isAddMenuBookingDisabled}
+      blockedDisabled={isAddMenuBlockedDisabled}
       onBlockedTime={() => {
+        if (isAddMenuBlockedDisabled) return;
         setBlockDraft(
           createEmptyBlockTimeDraft(
             activeResource
@@ -303,6 +308,7 @@ export default function ProfessionalFixedLocationCalendarOverviewToolbar(
         setBlockTimeOpen(true);
       }}
       onBooking={() => {
+        if (isAddMenuBookingDisabled) return;
         const bookingDate = activeDateIso;
         const resourceId =
           addMenuBookingResourceId ||

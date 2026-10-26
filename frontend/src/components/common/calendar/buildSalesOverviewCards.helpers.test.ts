@@ -203,6 +203,17 @@ assert.ok(
   feeCard?.metaLines.some((line) => line.startsWith("Cancellation time:")),
   "stamps cancellation time",
 );
+
+const noShowSpec = resolveProtectiveFeeSalesCardSpec({
+  status: "No Show",
+  showNoShowFee: true,
+  noShowFeePercent: 4,
+  lineSubtotal: 138,
+});
+assert.ok(noShowSpec, "no-show stamp yields Fee Summary");
+assert.equal(noShowSpec?.title, "Fee Summary", "no-show uses Fee Summary title");
+assert.equal(noShowSpec?.feeLabel, "No-show fee");
+assert.equal(noShowSpec?.feeAmount, 5.52);
 assert.ok(
   feeCard?.metaLines.includes("Breached preset cancellation window"),
   "stamps window breach",
@@ -1259,5 +1270,114 @@ assert.ok(proPayableFee, "stamp Fee Summary for prepaid surplus");
 assert.equal(proPayableFee?.statusBadge, "Payable by Professional");
 assert.equal(proPayableFee?.highlightAmount, 30, "surplus = prepaid €80 − fee €50");
 assert.equal(proPayableFee?.paymentState, "payment_due");
+
+{
+  const cards = buildCardsForEvent({
+    event: {
+      id: "b-discount",
+      bookingCode: "BK-DISC",
+      title: "Cut",
+      start: "2026-10-27T09:00:00.000Z",
+      end: "2026-10-27T09:30:00.000Z",
+      status: "Requested",
+      details: {
+        showPrepayment: true,
+        prepaymentPercent: "20",
+        prepaymentStatus: "pending",
+        kilometerAllowance: { eurPerKm: "1", totalKilometer: "100" },
+        products: [{ id: "lash", name: "Eye Lashes", price: 50, quantity: 1, unitPrice: 50 }],
+        clientSnapshot: {
+          services: [
+            { id: "hair", name: "hair dye", price: 44, durationMins: 15 },
+            {
+              id: "buzz",
+              name: "buzz cutt",
+              price: 44,
+              durationMins: 15,
+              discount: { type: "percentage", amount: 20 },
+            },
+          ],
+        },
+      },
+    } as unknown as CalendarEvent,
+    booking: {
+      id: "b-discount",
+      unique_code: "BK-DISC",
+      status: "requested",
+      prepayment_status: "pending",
+      total_price: 238,
+    } as never,
+    clientName: "aliza",
+    ctx: { financeHints: [], liveFinancials: { prepayment_total: 0, basePrice: 88 } },
+  });
+  const card = cards.find((row) => row.title === "Prepayment Summary");
+  const buzz = card?.lines.find((line) => line.label === "buzz cutt");
+  assert.equal(buzz?.amount, 35.2);
+  assert.equal(buzz?.originalAmount, 44);
+  assert.equal(buzz?.discountLabel, "20% Discount");
+  assert.equal(card?.lines.find((line) => line.label === "Kilometer Allowance")?.amount, 100);
+  assert.equal(card?.total, 229.2);
+  assert.equal(card?.highlightAmount, 45.84);
+}
+
+// Snapshot has list price only; discount lives on flat details.services (Sales real path).
+{
+  const cards = buildCardsForEvent({
+    event: {
+      id: "b-discount-overlay",
+      bookingCode: "BK-DISC2",
+      title: "Cut",
+      start: "2026-10-27T09:00:00.000Z",
+      end: "2026-10-27T09:30:00.000Z",
+      status: "Confirmed",
+      details: {
+        showPrepayment: true,
+        prepaymentPercent: "20",
+        prepaymentStatus: "confirmed",
+        kilometerAllowance: { eurPerKm: "1", totalKilometer: "100" },
+        products: [
+          { id: "lash", name: "Eye Lashes", price: 50, quantity: 1, unitPrice: 50 },
+        ],
+        services: [
+          {
+            id: "buzz",
+            name: "buzz cutt",
+            price: 44,
+            durationMins: 15,
+            discount: { type: "percentage", amount: 20 },
+          },
+        ],
+        clientSnapshot: {
+          services: [
+            { id: "hair", name: "hair dye", price: 44, durationMins: 15 },
+            { id: "buzz", name: "buzz cutt", price: 44, durationMins: 15 },
+          ],
+        },
+      },
+    } as unknown as CalendarEvent,
+    booking: {
+      id: "b-discount-overlay",
+      unique_code: "BK-DISC2",
+      status: "confirmed",
+      prepayment_status: "confirmed",
+      total_price: 238,
+    } as never,
+    clientName: "aliza",
+    ctx: {
+      financeHints: [],
+      liveFinancials: { prepayment_total: 37.6, basePrice: 238 },
+    },
+  });
+  const card =
+    cards.find((row) => row.title === "Payment Summary") ??
+    cards.find((row) => row.lines?.some((line) => line.label === "buzz cutt"));
+  const buzz = card?.lines.find((line) => line.label === "buzz cutt");
+  assert.equal(buzz?.amount, 35.2, "overlay discount from details.services");
+  assert.equal(buzz?.originalAmount, 44);
+  assert.ok(
+    (card?.total ?? 0) <= 229.2 + 0.01,
+    `total should use discounted lines, got ${card?.total}`,
+  );
+}
 
 console.log("buildSalesOverviewCards.helpers.test.ts: all assertions passed");

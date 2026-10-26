@@ -4,6 +4,7 @@ import type {
   CalendarBookingServiceItem,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import { extraBookingParticipantIds, isExtraBookingParticipant } from "../../../data/bookingChronologicalBlocks";
+import { normalizeServiceLinePricing } from "../../../data/bookingLinePricing";
 
 export function normalizeAssignmentId(value: string | null | undefined): string {
   return value != null ? String(value).trim() : "";
@@ -85,23 +86,30 @@ export function guestFromSnapshotPerson(
             normalizeAssignmentId(service.guestId) ===
             normalizeAssignmentId(person.id),
         )
-        .map((service) => ({
-          id: service.id,
-          name: service.name,
-          price: service.price,
-          durationMins: service.durationMins,
-          startTime: service.startTime,
-          endTime: service.endTime,
-          ...(service.teamMemberId
-            ? {
-                teamMemberId: String(service.teamMemberId),
-                staffResourceId: String(service.teamMemberId),
-              }
-            : {}),
-          guestId: service.guestId ?? person.id,
-          discount: service.discount ?? null,
-          originalPrice: service.originalPrice,
-        })),
+        .map((service) => {
+          const priced = normalizeServiceLinePricing({
+            price: service.price,
+            originalPrice: service.originalPrice,
+            discount: service.discount ?? null,
+            pricingMode: service.pricingMode,
+            discountPct: service.discountPct,
+          });
+          return {
+            id: service.id,
+            name: service.name,
+            durationMins: service.durationMins,
+            startTime: service.startTime,
+            endTime: service.endTime,
+            ...(service.teamMemberId
+              ? {
+                  teamMemberId: String(service.teamMemberId),
+                  staffResourceId: String(service.teamMemberId),
+                }
+              : {}),
+            guestId: service.guestId ?? person.id,
+            ...priced,
+          };
+        }),
       details.services,
       person.id,
     ),
@@ -159,7 +167,9 @@ export function mainDrawerServicesFromClientSnapshot(
         ? null
         : String(service.guestId),
       ...(service.originalPrice != null ? { originalPrice: Number(service.originalPrice) } : {}),
+      ...(service.discountPct != null ? { discountPct: Number(service.discountPct) } : {}),
       ...(service.discount ? { discount: service.discount } : {}),
+      ...(service.pricingMode ? { pricingMode: service.pricingMode } : {}),
     };
   });
 }

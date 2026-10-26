@@ -1,6 +1,7 @@
 import type { BookingServiceLineItem } from "../../../../data/bookingServiceEdit.data";
 import type { BookingProductLineItem } from "../../../../data/bookingProductCatalog.data";
 import type { BookingUniqueItemLine } from "../../../../data/bookingUniqueItem.data";
+import { normalizeServiceLinePricing } from "../../../../data/bookingLinePricing";
 import type {
   CalendarBookingLocation,
   CalendarBookingStatus,
@@ -70,12 +71,18 @@ export function buildDrawerDocumentDraft(input: {
     selectedDateISO: viewingBookingEvent?.date ?? selectedSlot?.date ?? "",
     selectedTime: viewingBookingEvent?.start ?? selectedSlot?.start ?? "",
     combineServices: false,
-    services: selectedServices.map((service) => ({
-      id: service.id,
-      name: service.name,
-      price: Number(service.price) || 0,
-      durationMins: Number(service.durationMins) || 30,
-    })),
+    services: selectedServices.map((service) => {
+      const priced = normalizeServiceLinePricing(service);
+      return {
+        id: service.id,
+        name: service.name,
+        price: priced.price,
+        originalPrice: priced.originalPrice,
+        discountType: priced.discount?.type,
+        discountAmount: priced.discount?.amount,
+        durationMins: Number(service.durationMins) || 30,
+      };
+    }),
     products,
     total: bookingTotalForSave,
   };

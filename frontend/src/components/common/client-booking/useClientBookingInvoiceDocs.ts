@@ -9,6 +9,7 @@ import {
   findIssuedFinanceTransaction,
   hasStoredDocumentSnapshot,
 } from "../finance-documents";
+import { applyNetServicePricesToDocument } from "../finance-documents/applyNetServicePricesToDocument";
 import type { FinanceInvoiceTemplateType } from "../finance-documents/useFinanceInvoiceSettings";
 import { useGetFinanceTransactionsQuery } from "../../../store/services/financeApi";
 import {
@@ -149,6 +150,20 @@ export function useClientBookingInvoiceDocs(input: {
       ensureKilometerAllowanceOnTransactionRow(row, kmOpts),
     [kmOpts],
   );
+  const discountedServiceLines = React.useMemo(
+    () =>
+      (input.draft?.services ?? []).map((service) => ({
+        label: service.name,
+        amount: service.price,
+        originalAmount: service.originalPrice,
+      })),
+    [input.draft?.services],
+  );
+  const withDiscountedIssued = React.useCallback(
+    (row: TransactionRow) =>
+      withKm(applyNetServicePricesToDocument(row, discountedServiceLines)),
+    [discountedServiceLines, withKm],
+  );
 
   /** After-treatment / non-fee full invoice — never bind LCF when opening service docs. */
   const bookingTransactionRow = React.useMemo(() => {
@@ -158,7 +173,7 @@ export function useClientBookingInvoiceDocs(input: {
       phase: "full",
       protectiveFee: false,
     });
-    if (issued && hasStoredDocumentSnapshot(issued)) return withKm(issued);
+    if (issued && hasStoredDocumentSnapshot(issued)) return withDiscountedIssued(issued);
 
     if (!input.draft?.services?.length) return null;
     return withKm(
@@ -195,6 +210,7 @@ export function useClientBookingInvoiceDocs(input: {
     input.requiresPrepayment,
     methodDetail,
     methodTitle,
+    withDiscountedIssued,
     withKm,
   ]);
 
@@ -206,7 +222,7 @@ export function useClientBookingInvoiceDocs(input: {
       phase: "prepay",
       protectiveFee: false,
     });
-    if (issued && hasStoredDocumentSnapshot(issued)) return withKm(issued);
+    if (issued && hasStoredDocumentSnapshot(issued)) return withDiscountedIssued(issued);
 
     if (!input.draft?.services?.length) return null;
     if (!input.isPrepaymentPaid && !input.isOfflinePay) return null;
@@ -242,6 +258,7 @@ export function useClientBookingInvoiceDocs(input: {
     input.requesterName,
     methodDetail,
     methodTitle,
+    withDiscountedIssued,
     withKm,
   ]);
 
@@ -252,7 +269,7 @@ export function useClientBookingInvoiceDocs(input: {
       phase: "prepay",
       protectiveFee: false,
     });
-    if (issued && hasStoredDocumentSnapshot(issued)) return withKm(issued);
+    if (issued && hasStoredDocumentSnapshot(issued)) return withDiscountedIssued(issued);
 
     if (!input.draft?.services?.length) return null;
     if (!input.isPrepaymentPaid && !input.isOfflinePay) return null;
@@ -288,6 +305,7 @@ export function useClientBookingInvoiceDocs(input: {
     input.requesterName,
     methodDetail,
     methodTitle,
+    withDiscountedIssued,
     withKm,
   ]);
 

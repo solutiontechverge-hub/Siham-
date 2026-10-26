@@ -1318,7 +1318,8 @@ export const businessApi = baseApi.injectEndpoints({
 
         return { data };
       },
-      invalidatesTags: ["Calendar", "Bookings", "ProfessionalClients"],
+      // FinanceTransactions: no-show / protective fee edits in notes must refresh Sales + Finance.
+      invalidatesTags: ["Calendar", "Bookings", "ProfessionalClients", "FinanceTransactions"],
     }),
     updateMyBooking: builder.mutation<ApiEnvelope<CalendarBooking>, UpdateMyBookingRequest>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
@@ -1840,7 +1841,8 @@ export const businessApi = baseApi.injectEndpoints({
       invalidatesTags: ["BusinessSetup", "BusinessSetupsListing"],
     }),
   }),
-  overrideExisting: false,
+  // Turbopack/HMR can re-eval this module while baseApi survives; allow re-inject in dev.
+  overrideExisting: process.env.NODE_ENV === "development",
 });
 
 export const {

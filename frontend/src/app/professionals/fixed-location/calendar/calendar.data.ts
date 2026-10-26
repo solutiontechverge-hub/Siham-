@@ -38,6 +38,8 @@ export type CalendarBookingServiceItem = {
   discount?: CalendarLineDiscount | null;
   originalPrice?: number;
   discountPct?: number;
+  /** `net` when price is already after line discount. */
+  pricingMode?: "net" | "list";
 };
 
 export type CalendarBookingProductItem = {
@@ -108,6 +110,7 @@ export type CalendarBookingClientSnapshot = {
     originalPrice?: number;
     discountPct?: number;
     discount?: CalendarLineDiscount | null;
+    pricingMode?: "net" | "list";
   }>;
   projectDetails?: {
     description: string;

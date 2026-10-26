@@ -77,6 +77,16 @@ function mergeServices(
         guestId: existing.guestId ?? row.guestId,
         originalPrice: existing.originalPrice ?? row.originalPrice,
         discount: existing.discount ?? row.discount,
+        discountPct: existing.discountPct ?? row.discountPct,
+        pricingMode: existing.pricingMode ?? row.pricingMode,
+        // Prefer net price when one side already applied a line discount.
+        price:
+          existing.discount || row.discount || existing.discountPct || row.discountPct
+            ? Math.min(Number(existing.price) || 0, Number(row.price) || 0) ||
+              Number(existing.price) ||
+              Number(row.price) ||
+              0
+            : (existing.price ?? row.price),
       };
       continue;
     }

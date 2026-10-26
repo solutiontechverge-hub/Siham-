@@ -1,5 +1,10 @@
 import { fmtTimeLabel, minutesSinceMidnight } from "../components/common/calendar/calendar.utils";
 import type { BookingCatalogService } from "./bookingServiceCatalog.data";
+import {
+  applyLineDiscount,
+  effectiveServiceAmount,
+  serviceListAmount,
+} from "./bookingLinePricing";
 
 export type BookingServicePriceType = "fixed" | "starting_from";
 export type BookingServiceDiscountType = "fixed" | "percentage";
@@ -7,12 +12,17 @@ export type BookingServiceDiscountType = "fixed" | "percentage";
 export type BookingServiceLineItem = {
   id: string;
   name: string;
+  /** Net amount after line discount (same convention as products). */
   price: number;
   durationMins: number;
   startTime?: string;
   endTime?: string;
   priceType?: BookingServicePriceType;
   discount?: { type: BookingServiceDiscountType; amount: number } | null;
+  /** List/base price when a line discount is applied. */
+  originalPrice?: number;
+  /** `net` when `price` is already discounted (see bookingLinePricing). */
+  pricingMode?: "net" | "list";
   staffResourceId?: string;
   teamMemberId?: string | null;
   teamMemberName?: string | null;
@@ -118,7 +128,10 @@ export function buildServiceEditDraftFromCatalog(
     startTime,
     endTime,
     priceType: override?.priceType ?? "fixed",
-    price: String(override?.price ?? service.price),
+    // Edit form edits list/base price; net is derived on save.
+    price: String(
+      override?.originalPrice ?? override?.price ?? service.price,
+    ),
     discountType: override?.discount?.type ?? "fixed",
     discountAmount: override?.discount?.amount ? String(override.discount.amount) : "",
     staffResourceId: override?.staffResourceId ?? options?.defaultStaffResourceId ?? "",
@@ -129,6 +142,8 @@ export function lineItemToOverride(item: BookingServiceLineItem): Partial<Bookin
   return {
     name: item.name,
     price: item.price,
+    originalPrice: item.originalPrice,
+    pricingMode: item.pricingMode,
     durationMins: item.durationMins,
     startTime: item.startTime,
     endTime: item.endTime,
@@ -174,32 +189,31 @@ export function buildBookingServiceLineItem(
       ? windowMins
       : Number.parseInt(draft.durationMins, 10) || catalogService.durationMins;
 
+  const listPrice = Number.parseFloat(draft.price.replace(",", ".")) || 0;
+  const priced = applyLineDiscount(listPrice, discount);
+
   return {
     id: catalogService.id,
     name: draft.name.trim(),
-    price: Number.parseFloat(draft.price.replace(",", ".")) || 0,
+    price: priced.price,
+    originalPrice: priced.discountAmount > 0 ? priced.original : undefined,
     durationMins,
     startTime,
     endTime,
     priceType: draft.priceType || "fixed",
-    discount,
+    discount: priced.discountAmount > 0 ? discount : null,
+    pricingMode: "net",
     staffResourceId: draft.staffResourceId || undefined,
   };
 }
 
 export function getEffectiveServicePrice(service: BookingServiceLineItem) {
-  const base = service.price;
-  if (!service.discount?.amount || base <= 0) return base;
-  const discounted =
-    service.discount.type === "percentage"
-      ? Math.max(0, base - (base * service.discount.amount) / 100)
-      : Math.max(0, base - service.discount.amount);
-  return Math.round((discounted + Number.EPSILON) * 100) / 100;
+  return effectiveServiceAmount(service);
 }
 
 export function getServiceDiscountAmount(service: BookingServiceLineItem) {
   return Math.round(
-    (Math.max(0, service.price - getEffectiveServicePrice(service)) +
+    (Math.max(0, serviceListAmount(service) - getEffectiveServicePrice(service)) +
       Number.EPSILON) *
       100,
   ) / 100;

@@ -3846,7 +3846,7 @@ export const updateBookingStatus = async (req, res) => {
       const prepay = String(booking.prepayment_status ?? "").toLowerCase();
       const st = String(booking.status ?? "").toLowerCase();
       const shouldSyncFinance =
-        ["confirmed", "completed", "br_accepted"].includes(st) ||
+        ["confirmed", "completed", "no_show", "br_accepted"].includes(st) ||
         (st === "requested" && ["pending", "required", "paid"].includes(prepay));
       if (shouldSyncFinance) {
         try {
@@ -3856,6 +3856,8 @@ export const updateBookingStatus = async (req, res) => {
             String(booking.notes ?? "") !== String(existingBooking.notes ?? "");
           const negotiationReplace =
             st === "requested" && (scheduleOrTotalChanged || notesChanged);
+          // No-show fee % edits live in notes — forceReplace so Fee Summary / Finance update.
+          const noShowFeeReplace = st === "no_show" && notesChanged;
           await syncBookingToFinanceTransaction(booking.id, {
             paymentMethod:
               booking.booking_type === "offline" ? "offlineDirect" : "onlineDirect",
@@ -3865,7 +3867,8 @@ export const updateBookingStatus = async (req, res) => {
             prepay === "required"
               ? { paymentPhase: "prepay" }
               : {}),
-            ...(negotiationReplace ? { forceReplace: true } : {}),
+            ...(st === "no_show" ? { paymentPhase: "full" } : {}),
+            ...(negotiationReplace || noShowFeeReplace ? { forceReplace: true } : {}),
           });
         } catch {
           // best-effort

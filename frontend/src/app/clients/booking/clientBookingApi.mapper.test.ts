@@ -379,4 +379,48 @@ assert.equal(
   2,
 );
 
+const discountedBooking = mapApiBookingToClientRecord(
+  bookingWithNotes({
+    showPrepayment: true,
+    prepaymentPercent: "20",
+    services: [
+      { id: "hair", name: "hair dye", price: 44, durationMins: 15, startTime: "09:00", endTime: "09:15" },
+      {
+        id: "buzz",
+        name: "buzz cutt",
+        price: 44,
+        durationMins: 15,
+        startTime: "09:15",
+        endTime: "09:30",
+        discount: { type: "percentage", amount: 20 },
+      },
+    ],
+    products: [{ id: "lash", name: "Eye Lashes", price: 50, quantity: 1, unitPrice: 50 }],
+    clientSnapshot: {
+      people: [{ id: "p1", name: "aliza", isRequester: true }],
+      services: [
+        { id: "hair", name: "hair dye", price: 44, durationMins: 15, startTime: "09:00", endTime: "09:15" },
+        {
+          id: "buzz",
+          name: "buzz cutt",
+          price: 44,
+          durationMins: 15,
+          startTime: "09:15",
+          endTime: "09:30",
+          discount: { type: "percentage", amount: 20 },
+          originalPrice: 55,
+        },
+      ],
+    },
+  }),
+);
+const buzz = (discountedBooking.draft?.services ?? []).find((row) => row.name === "buzz cutt");
+const hair = (discountedBooking.draft?.services ?? []).find((row) => row.name === "hair dye");
+assert.equal(buzz?.price, 35.2);
+assert.equal(buzz?.originalPrice, 44);
+assert.equal(buzz?.discountPct, 20);
+assert.equal(hair?.price, 44);
+assert.equal(hair?.originalPrice, undefined);
+assert.equal(discountedBooking.draft?.total, 129.2);
+
 console.log("clientBookingApi.mapper.test.ts: all assertions passed");

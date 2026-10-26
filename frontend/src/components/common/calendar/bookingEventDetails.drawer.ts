@@ -4,6 +4,7 @@
   CalendarEvent,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import { ensureGroupedServiceStartEndTimes } from "../../../data/bookingServiceEdit.data";
+import { normalizeServiceLinePricing } from "../../../data/bookingLinePricing";
 import { splitContactPhone } from "../../../lib/phone-validation";
 import type { ManualEntryDiscount } from "../../sections/finance/manualEntry.data";
 import {
@@ -184,9 +185,12 @@ export function hydrateBookingDrawerFromEvent(ev: CalendarEvent): BookingDrawerH
   const rawServices = [
     ...snapshotMainServices,
     ...filterMainClientAssignedLines(details.services, requesterIds),
-  ].filter((service, index, all) =>
-    all.findIndex((candidate) => String(candidate.id) === String(service.id)) === index,
-  );
+  ]
+    .filter((service, index, all) =>
+      all.findIndex((candidate) => String(candidate.id) === String(service.id)) ===
+      index,
+    )
+    .map((service) => ({ ...service, ...normalizeServiceLinePricing(service) }));
   const rawProducts = filterMainClientAssignedLines(
     details.products ?? [],
     requesterIds,
@@ -194,7 +198,15 @@ export function hydrateBookingDrawerFromEvent(ev: CalendarEvent): BookingDrawerH
 
   // One shared timeline: client lines first, then each guest's lines.
   const [services, ...guestServiceGroups] = ensureGroupedServiceStartEndTimes(
-    [rawServices, ...guests.map((guest) => guest.services)],
+    [
+      rawServices,
+      ...guests.map((guest) =>
+        guest.services.map((service) => ({
+          ...service,
+          ...normalizeServiceLinePricing(service),
+        })),
+      ),
+    ],
     ev.start,
   );
   const guestsWithTimes = guests.map((guest, index) => ({
