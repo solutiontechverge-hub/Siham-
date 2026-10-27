@@ -158,6 +158,8 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsBag = Pick<
   | "setBookingUniqueItems"
   | "setCancellationFeeAt"
   | "setDesiredLocationDraft"
+  | "setDiscardBrOpen"
+  | "setDiscardEbrOpen"
   | "setEditingInlineGuestId"
   | "setExceededCancellationWindow"
   | "setFocusSalesCardId"
@@ -190,6 +192,8 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsBag = Pick<
   | "setSlotDrawerTab"
   | "setSlotLocation"
   | "showClientRemoveButton"
+  | "showDiscardBr"
+  | "showDiscardEbr"
   | "showExpiredResponseBanner"
   | "showIncomingErActions"
   | "showIncomingRequestActions"
@@ -236,8 +240,9 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetails({ 
       {slotClientAdded ? (
         <>
           <ProfessionalFixedLocationCalendarBookingDrawerDetailsPlanning bag={bag} />
-          <ProfessionalFixedLocationCalendarBookingDrawerDetailsFeesPayment bag={bag} />
+          {/* Total Price then Discard BR then Location — mock order. */}
           <ProfessionalFixedLocationCalendarBookingDrawerDetailsNotesTotals bag={bag} />
+          <ProfessionalFixedLocationCalendarBookingDrawerDetailsFeesPayment bag={bag} />
           <Box sx={{ flex: 1, minHeight: 40 }} />
         </>
       ) : (

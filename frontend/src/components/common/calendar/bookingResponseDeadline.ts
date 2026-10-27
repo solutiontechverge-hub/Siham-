@@ -30,10 +30,36 @@ type ResponseDeadline = Required<
 type PendingNegotiationEvent = {
   status?: string | null;
   bookingScenario?: string | null;
-  details?: ResponseDeadlineFields | null;
+  details?: (ResponseDeadlineFields & {
+    showPrepayment?: boolean;
+    prepaymentStatus?: string;
+  }) | null;
   date?: string | null;
   start?: string | null;
+  end?: string | null;
 } | null | undefined;
+
+/** Appointment end (else start) instant from calendar `date` + `HH:MM` (local). */
+export function resolveBookingSlotMs(
+  event?: Pick<NonNullable<PendingNegotiationEvent>, "date" | "start" | "end"> | null,
+): number | null {
+  const date = String(event?.date ?? "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const time = (
+    String(event?.end ?? "").trim() || String(event?.start ?? "").trim()
+  ).slice(0, 5);
+  if (!/^\d{2}:\d{2}$/.test(time)) return null;
+  const ms = Date.parse(`${date}T${time}:00`);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+export function isAppointmentSlotPast(
+  event?: Pick<NonNullable<PendingNegotiationEvent>, "date" | "start" | "end"> | null,
+  now: Date = new Date(),
+): boolean {
+  const slotMs = resolveBookingSlotMs(event);
+  return slotMs != null && slotMs < now.getTime();
+}
 
 /** True when the business actually configured a response window (not blank/zero). */
 export function isResponseTimeConfigured(
@@ -166,9 +192,10 @@ export function isPendingResponseNegotiation(
 }
 
 /**
- * Expiry banner: pending BR/EBR/ER/prepay only when the stamped response
- * deadline has elapsed (`now > respondBy`). Never use appointment start as a
- * proxy — that falsely warns on new Requested BRs whose slot is already past.
+ * Expiry banner for pending BR/EBR/ER/prepay:
+ * - stamped respondBy elapsed → show
+ * - no usable respondBy + appointment slot already past → show
+ * - active (future) respondBy → hide even if appointment is past (Restart clears banner)
  */
 export function shouldShowExpiredResponseBanner(
   event: PendingNegotiationEvent,
@@ -176,8 +203,15 @@ export function shouldShowExpiredResponseBanner(
   now: Date = new Date(),
 ): boolean {
   if (!isPendingResponseNegotiation(event)) return false;
-  if (!hasStoredResponseDeadline(event?.details)) return false;
-  return isResponseWindowOverdue(event?.details, now, responseTimeInput);
+
+  const dueMs = resolveEffectiveRespondByMs(event?.details, responseTimeInput);
+  if (dueMs != null) {
+    return now.getTime() > dueMs;
+  }
+
+  if (event?.details?.responseStatus === "overdue_response") return true;
+  // ponytail: appointment-past fallback when respondBy missing — Restart stamps a new window.
+  return isAppointmentSlotPast(event, now);
 }
 
 export function isResponseWindowOverdue(

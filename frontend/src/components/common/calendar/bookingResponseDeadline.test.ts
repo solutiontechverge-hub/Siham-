@@ -93,18 +93,55 @@ assert.equal(
   false,
 );
 
-// Past appointment + no stamped respondBy → still active BR (no false overdue).
+// Past appointment + no stamped respondBy → overdue banner (screenshot path).
 assert.equal(
   shouldShowExpiredResponseBanner(
     {
       status: "Requested",
       bookingScenario: "BR",
       details: {},
-      date: "2026-09-21",
-      start: "11:15",
+      date: "2026-10-26",
+      start: "09:00",
+      end: "09:30",
     },
     blank,
-    new Date("2026-09-28T12:00:00"),
+    new Date("2026-10-27T12:00:00"),
+  ),
+  true,
+);
+// Future appointment + no stamp → no banner.
+assert.equal(
+  shouldShowExpiredResponseBanner(
+    {
+      status: "Requested",
+      bookingScenario: "BR",
+      details: {},
+      date: "2099-10-26",
+      start: "09:00",
+      end: "09:30",
+    },
+    blank,
+    new Date("2026-10-27T12:00:00"),
+  ),
+  false,
+);
+// Past appointment but Restart stamped a future respondBy → banner cleared.
+assert.equal(
+  shouldShowExpiredResponseBanner(
+    {
+      status: "Requested",
+      bookingScenario: "BR",
+      details: {
+        responseStartedAt: "2026-10-27T12:00:00.000Z",
+        respondBy: "2026-10-27T12:30:00.000Z",
+        responseWindowMinutes: 30,
+      },
+      date: "2026-10-26",
+      start: "09:00",
+      end: "09:30",
+    },
+    blank,
+    new Date("2026-10-27T12:10:00.000Z"),
   ),
   false,
 );
@@ -113,12 +150,13 @@ const pastStartFlags = resolveProfessionalBookingActions(
     status: "Requested",
     bookingScenario: "BR",
     details: { requestDirection: "outgoing" },
-    date: "2026-09-21",
-    start: "11:15",
+    date: "2026-10-26",
+    start: "09:00",
+    end: "09:30",
   },
   { responseTime: blank },
 );
-assert.equal(pastStartFlags.restart_response, false);
+assert.equal(pastStartFlags.restart_response, true);
 
 // Active stamped window: Requested BR must not show expiry banner / restart.
 const activeDue = "2099-06-01T12:30:00.000Z";

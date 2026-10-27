@@ -3,8 +3,7 @@ import type { BookingIndicatorVariant } from "./BookingIndicatorIcon";
 import { prepayBlocksConfirmation } from "./bookingAcknowledgment";
 import { resolvePostBookingPendingPayment } from "./bookingCheckout";
 import {
-  hasStoredResponseDeadline,
-  isResponseWindowOverdue,
+  shouldShowExpiredResponseBanner,
   type ResponseWindowInput,
 } from "./bookingResponseDeadline";
 import { resolveCalendarPrepaymentStatus } from "./prepaymentStatus";
@@ -72,16 +71,11 @@ export function resolveBookingResponseIndicators(
   }
 
   if (pendingNegotiation && opts?.responseTimeConfigured !== false) {
-    const deadlineFields = {
-      responseStatus: details?.responseStatus,
-      responseStartedAt: details?.responseStartedAt,
-      respondBy: details?.respondBy,
-      responseWindowMinutes: details?.responseWindowMinutes,
-    };
-    // ⚠️ only when stamped respondBy has elapsed — not appointment start.
-    const overdue =
-      hasStoredResponseDeadline(deadlineFields) &&
-      isResponseWindowOverdue(deadlineFields, new Date(), opts?.responseTime);
+    // Same gate as Booking Details expiry banner (respondBy or past appointment).
+    const overdue = shouldShowExpiredResponseBanner(
+      event,
+      opts?.responseTime,
+    );
     indicators.push(overdue ? "overdue_response" : "response_time_active");
   }
 

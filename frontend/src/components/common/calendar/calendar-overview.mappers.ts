@@ -501,7 +501,12 @@ export function mapCalendarBookingToEvent(
           ? { lastEditedBy: erMeta.initiatedBy }
           : parsedNotes?.lastEditedBy
             ? { lastEditedBy: parsedNotes.lastEditedBy }
-            : {}),
+            : isOutgoingProfessionalEbr
+              ? {
+                  lastEditedBy:
+                    ebrMeta?.lastEditedBy ?? ("professional" as const),
+                }
+              : {}),
       ...(!isIncomingClientEbr && parsedNotes?.responseStatus
         ? { responseStatus: parsedNotes.responseStatus }
         : {}),

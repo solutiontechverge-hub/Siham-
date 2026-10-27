@@ -167,7 +167,12 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
               : undefined
           }
           onRestart={() => void handleRestartResponseTime()}
-          onDiscard={() => void handleDiscardBr()}
+          // Requested BR: Discard lives mid-panel (below Total Price). Prepay wait keeps banner Discard.
+          onDiscard={
+            viewingBookingEvent.status === "BR Accepted"
+              ? () => void handleDiscardBr()
+              : undefined
+          }
         />
       ) : null}
 
@@ -312,6 +317,15 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
                         ))}
                         {indicator === "ER" &&
                         !badgeResponses.includes("suggestion_for_change") ? (
+                          resolveProfessionalBookingRequestDirection(
+                            viewingBookingEvent,
+                          ) === "incoming" ? (
+                            <BookingRequestReceivedIcon size={12} />
+                          ) : (
+                            <BookingRequestSentIcon size={12} />
+                          )
+                        ) : null}
+                        {indicator === "EBR" ? (
                           resolveProfessionalBookingRequestDirection(
                             viewingBookingEvent,
                           ) === "incoming" ? (

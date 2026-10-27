@@ -67,6 +67,32 @@ export type StoredEbrNotePayload = {
   lastEditedBy?: CalendarBookingDetails["lastEditedBy"];
 };
 
+/**
+ * Client POV: professional Restart→EBR (pending) or suggested EBR.
+ * Notes requestDirection is professional POV (outgoing = pro sent).
+ */
+export function isClientIncomingProfessionalEbr(
+  ebr?: {
+    status?: string;
+    lastEditedBy?: "professional" | "client" | null;
+    requestDirection?: "outgoing" | "incoming" | null;
+  } | null,
+  notesRequestDirection?: "outgoing" | "incoming" | null,
+): boolean {
+  if (!ebr) return false;
+  if (ebr.status !== "pending" && ebr.status !== "suggested") return false;
+  if (ebr.lastEditedBy === "client") return false;
+  if (ebr.lastEditedBy === "professional") return true;
+  if (
+    ebr.requestDirection === "outgoing" ||
+    notesRequestDirection === "outgoing"
+  ) {
+    return true;
+  }
+  // Legacy suggested EBR without editor stamp.
+  return ebr.status === "suggested";
+}
+
 /** Confirmed booking Edit Request (ER) â€” note-only permission handshake. */
 export type StoredErNotePayload = {
   status: "pending" | "approved" | "rejected" | "suggested" | "none";
@@ -250,7 +276,10 @@ export function serializeCalendarEntryNotes(
     paymentMethod: details?.paymentMethod,
     showKilometerAllowance: details?.showKilometerAllowance,
     kilometerAllowance: details?.kilometerAllowance,
-    cancellationReason: details?.cancellationReason?.trim() || undefined,
+    cancellationReason:
+      typeof details?.cancellationReason === "string"
+        ? details.cancellationReason.trim() || undefined
+        : undefined,
     responseStatus: details?.responseStatus,
     responseStartedAt: details?.responseStartedAt,
     respondBy: details?.respondBy,

@@ -80,11 +80,9 @@ export function useProfessionalFixedLocationCalendarBookingPersistEr(
       );
     } catch (error) {
       restoreIncomingActions();
-      showSnackbar({
-        severity: "error",
-        message: getApiErrorMessage(error, "Unable to accept edit request."),
-      });
-      throw error;
+      const message = getApiErrorMessage(error, "Unable to accept edit request.");
+      showSnackbar({ severity: "error", message });
+      throw new Error(message || "Unable to accept edit request.");
     }
   }, [
     editingEventId,
@@ -136,11 +134,9 @@ export function useProfessionalFixedLocationCalendarBookingPersistEr(
       );
     } catch (error) {
       restoreIncomingActions();
-      showSnackbar({
-        severity: "error",
-        message: getApiErrorMessage(error, "Unable to reject edit request."),
-      });
-      throw error;
+      const message = getApiErrorMessage(error, "Unable to reject edit request.");
+      showSnackbar({ severity: "error", message });
+      throw new Error(message || "Unable to reject edit request.");
     }
   }, [
     editingEventId,

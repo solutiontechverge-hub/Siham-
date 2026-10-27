@@ -275,6 +275,13 @@ function renderScenarioBadge(
       >
         {badge.label}
       </BodyText>
+      {badge.showRequestSentIcon && badge.label === "EBR" ? (
+        badge.requestDirection === "incoming" ? (
+          <BookingRequestReceivedIcon size={10} />
+        ) : (
+          <BookingRequestSentIcon size={10} />
+        )
+      ) : null}
       {!badge.showRequestSentIcon && badge.responseIndicators?.length
         ? renderResponseIndicators(badge.responseIndicators)
         : !badge.showRequestSentIcon && badge.showAcceptedIcon

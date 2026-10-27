@@ -88,6 +88,8 @@ export type UseProfessionalFixedLocationCalendarBookingPersistArgs = {
   setIncomingRequestEditMode: React.Dispatch<React.SetStateAction<boolean>>;
   setIsEditingExisting: React.Dispatch<React.SetStateAction<boolean>>;
   setAllowDrawerTimeSelection: React.Dispatch<React.SetStateAction<boolean>>;
+  setSlotCalendarOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setSlotCalendarTouched: React.Dispatch<React.SetStateAction<boolean>>;
   setOriginalServicesSnapshot: React.Dispatch<
     React.SetStateAction<BookingServiceLineItem[]>
   >;

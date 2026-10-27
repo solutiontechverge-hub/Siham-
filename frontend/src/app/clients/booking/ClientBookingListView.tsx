@@ -34,7 +34,9 @@ import {
   bookingStatusChipColors,
 } from "./clientBookingStatus";
 import BookingRequestBadge from "../../../components/common/calendar/BookingRequestBadge";
+import BookingRequestReceivedIcon from "../../../components/common/calendar/BookingRequestReceivedIcon";
 import BookingIndicatorIcon from "../../../components/common/calendar/BookingIndicatorIcon";
+import { isClientIncomingProfessionalEbr } from "../../../components/common/calendar/bookingEventDetails";
 import PrepaymentStatusIcon from "../../../components/common/calendar/PrepaymentStatusIcon";
 import { AppPagination, AppSearchField } from "../../../components/common";
 import { getBookingEditRequest } from "../../../components/common/client-booking/bookingEditRequest";
@@ -240,9 +242,15 @@ export default function ClientBookingListView({ listTab }: Props) {
                 const paymentDue = isClientBookingPaymentDue(b);
                 const displayStatus: ClientBookingStatus = status;
                 // BR only while pending — hide once accepted (confirmed) or rejected.
+                const isEbrIncoming = isClientIncomingProfessionalEbr(
+                  b.incomingEditRequest,
+                );
+                const showEbrBadge =
+                  isEbrIncoming && status === "requested";
                 const showBrBadge =
-                  status === "requested" ||
-                  (status === "draft" && Boolean(b.bookingRequestSent));
+                  !showEbrBadge &&
+                  (status === "requested" ||
+                    (status === "draft" && Boolean(b.bookingRequestSent)));
                 // Pending Confirmed ER — show on list for both directions.
                 const pendingEr =
                   displayStatus === "confirmed"
@@ -518,6 +526,22 @@ export default function ClientBookingListView({ listTab }: Props) {
                                   size={24}
                                 />
                               </Box>
+                            ) : null}
+                            {showEbrBadge ? (
+                              <Chip
+                                size="small"
+                                label={
+                                  <Stack
+                                    direction="row"
+                                    alignItems="center"
+                                    spacing={0.35}
+                                  >
+                                    <span>EBR</span>
+                                    <BookingRequestReceivedIcon size={10} />
+                                  </Stack>
+                                }
+                                sx={bookingSecondaryStatusChipSx}
+                              />
                             ) : null}
                             {showBrBadge ? (
                               <BookingRequestBadge

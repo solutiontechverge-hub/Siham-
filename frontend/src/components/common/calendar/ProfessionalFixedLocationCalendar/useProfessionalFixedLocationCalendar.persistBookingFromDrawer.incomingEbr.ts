@@ -320,6 +320,7 @@ export async function persistIncomingEbrFromDrawer(input: {
             ...event,
             status: "Requested",
             bookingScenario: "EBR",
+            notes: persistedNotes,
             date: selectedSlot.date,
             start: selectedSlot.start,
             end: selectedSlot.end,

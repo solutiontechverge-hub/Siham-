@@ -14,13 +14,17 @@ export type CancelBookingPayload = {
   details: string;
 };
 
+export type CalendarCancelBookingModalVariant = "cancel" | "reject";
+
 type CalendarCancelBookingModalProps = {
   open: boolean;
   onClose: () => void;
   onConfirm: (payload: CancelBookingPayload) => void;
+  /** Incoming BR reject uses the same shell with Reject copy. */
+  variant?: CalendarCancelBookingModalVariant;
 };
 
-const REASON_OPTIONS = [
+export const BOOKING_REJECT_REASON_OPTIONS = [
   { label: "No availability / Fully booked", value: "no_availability" },
   {
     label: "Service not available on selected date/time",
@@ -28,19 +32,33 @@ const REASON_OPTIONS = [
   },
   { label: "Invalid booking details", value: "invalid_details" },
   { label: "Other reason", value: "other" },
-];
+] as const;
+
+export function formatBookingRejectReasonNote(
+  payload: CancelBookingPayload,
+): string {
+  const labels = BOOKING_REJECT_REASON_OPTIONS.filter((o) =>
+    payload.reasons.includes(o.value),
+  ).map((o) => o.label);
+  const head = labels.join("; ");
+  const details = payload.details.trim();
+  if (head && details) return `${head} — ${details}`;
+  return details || head;
+}
 
 export default function CalendarCancelBookingModal({
   open,
   onClose,
   onConfirm,
+  variant = "cancel",
 }: CalendarCancelBookingModalProps) {
+  const isReject = variant === "reject";
   const [reasons, setReasons] = React.useState<string[]>([]);
   const [details, setDetails] = React.useState("");
 
   React.useEffect(() => {
     if (open) {
-      setReasons(REASON_OPTIONS.map((o) => o.value));
+      setReasons(BOOKING_REJECT_REASON_OPTIONS.map((o) => o.value));
       setDetails("");
     }
   }, [open]);
@@ -49,7 +67,7 @@ export default function CalendarCancelBookingModal({
     <AppModal
       open={open}
       onClose={onClose}
-      title="Cancel Booking"
+      title={isReject ? "Reject Booking" : "Cancel Booking"}
       maxWidth="sm"
       fullWidth
       headerTone="danger"
@@ -57,8 +75,8 @@ export default function CalendarCancelBookingModal({
         <ModalCancelApplyFooter
           onCancel={onClose}
           onPrimary={() => onConfirm({ reasons, details: details.trim() })}
-          primaryLabel="Yes, Reject"
-          primaryTone="danger"
+          primaryLabel={isReject ? "Yes, Reject" : "Yes, Reject"}
+          primaryTone={isReject ? "primary" : "danger"}
           justifyContent="center"
           buttonSx={{ height: 40, minWidth: 120 }}
         />
@@ -74,7 +92,11 @@ export default function CalendarCancelBookingModal({
           iconSize={52}
           py={0}
           px={0}
-          body="Are you sure you want to Cancel this booking?"
+          body={
+            isReject
+              ? "Are you sure you want to Reject this booking?"
+              : "Are you sure you want to Cancel this booking?"
+          }
           bodySx={{ fontSize: 16, lineHeight: 1.4 }}
         />
 
@@ -87,13 +109,16 @@ export default function CalendarCancelBookingModal({
             renderValue={(selected) => {
               const ids = selected as readonly string[];
               if (!ids.length) return "Select Reason";
-              if (ids.length === REASON_OPTIONS.length) return "All Reasons";
-              return REASON_OPTIONS.filter((o) => ids.includes(o.value))
+              if (ids.length === BOOKING_REJECT_REASON_OPTIONS.length)
+                return "All Reasons";
+              return BOOKING_REJECT_REASON_OPTIONS.filter((o) =>
+                ids.includes(o.value),
+              )
                 .map((o) => o.label)
                 .join(", ");
             }}
             onChange={(val) => setReasons(val as string[])}
-            options={REASON_OPTIONS}
+            options={[...BOOKING_REJECT_REASON_OPTIONS]}
             fullWidth
           />
 
@@ -101,9 +126,9 @@ export default function CalendarCancelBookingModal({
             label="Additional Details"
             value={details}
             onChange={(e) => setDetails(e.target.value)}
-            placeholder="..."
+            placeholder="Write a note…"
             multiline
-            minRows={2}
+            minRows={3}
             fullWidth
           />
         </Stack>

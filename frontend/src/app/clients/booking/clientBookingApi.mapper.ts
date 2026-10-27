@@ -9,7 +9,12 @@ import type {
 import type { ClientBookingRecord, ClientBookingStatus } from "./clientBookingRecords";
 import { fmtMinutesToTimeLabel, parseTimeLabelToMinutes, buildWallClockDateTimeIso } from "./booking-time";
 import { wallClockDateFromDateTime, wallClockTimeFromDateTime } from "../../../components/common/calendar/calendar.utils";
-import { parseCalendarEntryNotes, parseStoredEbrFromNotes, resolveKilometerAllowanceAmount } from "../../../components/common/calendar/bookingEventDetails";
+import {
+  isClientIncomingProfessionalEbr,
+  parseCalendarEntryNotes,
+  parseStoredEbrFromNotes,
+  resolveKilometerAllowanceAmount,
+} from "../../../components/common/calendar/bookingEventDetails";
 import { unpaidSplitPayers, parseSplitBillState } from "../../../components/common/calendar/salesSplitBill";
 import { summarizeClientBookingPrice } from "../../../components/common/calendar/bookingTotal";
 import { buildResponseDeadline } from "../../../components/common/calendar/bookingResponseDeadline";
@@ -531,6 +536,8 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
           suggestedTime: ebr.suggestedTime,
           originalDateISO: ebr.originalDateISO,
           originalTime: ebr.originalTime,
+          lastEditedBy: ebr.lastEditedBy,
+          requestDirection: ebr.requestDirection ?? notesDetails?.requestDirection,
         }
       : null;
   const serviceNames = parseServiceNamesFromNotes(
@@ -601,8 +608,12 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
           ? true
           : undefined
       : undefined;
-  const isEbrIncoming = incomingEditRequest?.status === "suggested";
   const notesRequestDirection = notesDetails?.requestDirection;
+  // Restart→EBR (pending) or suggested EBR from professional — client sees EBR↗.
+  const isEbrIncoming = isClientIncomingProfessionalEbr(
+    activeEbr,
+    notesRequestDirection,
+  );
   // Notes requestDirection is from the professional's perspective:
   // outgoing = pro sent BR → client sees incoming; incoming = client sent → outgoing.
   const bookingRequestDirection = isEbrIncoming

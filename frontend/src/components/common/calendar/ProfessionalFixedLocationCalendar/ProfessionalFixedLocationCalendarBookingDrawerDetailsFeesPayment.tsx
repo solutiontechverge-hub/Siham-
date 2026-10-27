@@ -57,6 +57,8 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsFeesPaymentBag 
   | "setBookingPhoneDraft"
   | "setCancellationFeeAt"
   | "setDesiredLocationDraft"
+  | "setDiscardBrOpen"
+  | "setDiscardEbrOpen"
   | "setExceededCancellationWindow"
   | "setKilometerAllowanceDraft"
   | "setLateCancellationFeePercent"
@@ -73,6 +75,8 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsFeesPaymentBag 
   | "setShowLateRescheduling"
   | "setShowNoShowFee"
   | "setShowPrepayment"
+  | "showDiscardBr"
+  | "showDiscardEbr"
   | "showKilometerAllowance"
   | "showLateCancellation"
   | "showLateRescheduling"
@@ -88,10 +92,21 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsFeesPaymentProp
   bag: ProfessionalFixedLocationCalendarBookingDrawerDetailsFeesPaymentBag;
 };
 
-/** Location, phone, fees, payment method */
+/** Discard BR (when shown) → Location, phone, fees, payment method */
 export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsFeesPayment({ bag }: ProfessionalFixedLocationCalendarBookingDrawerDetailsFeesPaymentProps) {
   return (
     <>
+      {bag.showDiscardEbr ? (
+        <WithdrawErButton
+          label="Discard EBR"
+          onClick={() => bag.setDiscardEbrOpen(true)}
+        />
+      ) : bag.showDiscardBr ? (
+        <WithdrawErButton
+          label="Discard BR"
+          onClick={() => bag.setDiscardBrOpen(true)}
+        />
+      ) : null}
       {bag.showWithdrawEr ? (
         <WithdrawErButton
           isLoading={bag.isWithdrawingEr}

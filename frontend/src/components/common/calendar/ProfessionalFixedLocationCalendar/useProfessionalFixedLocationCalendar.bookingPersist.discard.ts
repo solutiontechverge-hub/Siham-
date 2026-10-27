@@ -5,6 +5,7 @@ import {
   parseStoredEbrFromNotes,
   parseStoredErFromNotes,
   serializeCalendarEntryNotes,
+  type StoredEbrNotePayload,
 } from "../bookingEventDetails";
 import {
   isPendingPrepaymentResponse,
@@ -28,16 +29,23 @@ export function useProfessionalFixedLocationCalendarBookingPersistDiscard(
     setEvents,
     setSlotStatus,
     setIncomingRequestEditMode,
+    setIsEditingExisting,
+    setAllowDrawerTimeSelection,
+    setSlotCalendarOpen,
+    setSlotCalendarTouched,
   } = args;
 
   const handleDiscardBr = React.useCallback(async () => {
     if (!editingEventId) return;
     try {
       await persistEventStatus(editingEventId, "Invalid");
-    } catch {
+    } catch (error) {
       showSnackbar({
         severity: "error",
-        message: "Unable to discard booking request.",
+        message: getApiErrorMessage(
+          error,
+          "Unable to discard booking request.",
+        ),
       });
       return;
     }
@@ -206,25 +214,41 @@ export function useProfessionalFixedLocationCalendarBookingPersistDiscard(
       details,
       businessResponseWindowInput,
     );
+    // Overdue Restart on Requested BR → enter outgoing EBR + unlock reschedule.
+    const promoteToEbr = viewingBookingEvent.status === "Requested";
+    const ebrPayload: StoredEbrNotePayload | null = promoteToEbr
+      ? {
+          status: "pending",
+          suggestedAt: new Date().toISOString(),
+          requestDirection: "outgoing",
+          lastEditedBy: "professional",
+        }
+      : parseStoredEbrFromNotes(viewingBookingEvent.notes);
     const nextDetails = {
       ...details,
       ...deadline,
       responseStatus: undefined,
+      ...(promoteToEbr
+        ? {
+            requestDirection: "outgoing" as const,
+            lastEditedBy: "professional" as const,
+          }
+        : {}),
     };
     const nextNotes = serializeCalendarEntryNotes(
       details.internalNote ?? "",
       nextDetails,
-      parseStoredEbrFromNotes(viewingBookingEvent.notes),
+      ebrPayload,
       parseStoredErFromNotes(viewingBookingEvent.notes),
     );
     try {
       await persistEventStatus(editingEventId, viewingBookingEvent.status, {
         notes: nextNotes,
       });
-    } catch {
+    } catch (error) {
       showSnackbar({
         severity: "error",
-        message: "Unable to restart response time.",
+        message: getApiErrorMessage(error, "Unable to restart response time."),
       });
       return;
     }
@@ -234,18 +258,26 @@ export function useProfessionalFixedLocationCalendarBookingPersistDiscard(
           ? {
               ...event,
               notes: nextNotes,
+              ...(promoteToEbr ? { bookingScenario: "EBR" as const } : {}),
               details: {
                 ...(event.details ?? {}),
-                ...deadline,
-                responseStatus: undefined,
+                ...nextDetails,
               },
             }
           : event,
       ),
     );
+    if (promoteToEbr) {
+      setIsEditingExisting(true);
+      setAllowDrawerTimeSelection(true);
+      setSlotCalendarOpen(true);
+      setSlotCalendarTouched(true);
+    }
     showSnackbar({
       severity: "success",
-      message: "Response time restarted.",
+      message: promoteToEbr
+        ? "Response restarted — pick a new date/time (EBR)."
+        : "Response time restarted.",
     });
   }, [
     businessResponseWindowInput,
@@ -255,6 +287,10 @@ export function useProfessionalFixedLocationCalendarBookingPersistDiscard(
     showSnackbar,
     viewingBookingEvent,
     setEvents,
+    setIsEditingExisting,
+    setAllowDrawerTimeSelection,
+    setSlotCalendarOpen,
+    setSlotCalendarTouched,
   ]);
 
   const handleDiscardEbr = React.useCallback(async () => {
@@ -263,10 +299,13 @@ export function useProfessionalFixedLocationCalendarBookingPersistDiscard(
       await persistEventStatus(editingEventId, "Invalid", {
         notification_event: "ebr_discarded",
       });
-    } catch {
+    } catch (error) {
       showSnackbar({
         severity: "error",
-        message: "Unable to discard edited booking request.",
+        message: getApiErrorMessage(
+          error,
+          "Unable to discard edited booking request.",
+        ),
       });
       return;
     }

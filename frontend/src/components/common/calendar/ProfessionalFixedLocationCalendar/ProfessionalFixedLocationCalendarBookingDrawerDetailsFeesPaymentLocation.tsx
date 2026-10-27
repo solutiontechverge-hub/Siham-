@@ -253,7 +253,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsFee
                       mb: 1,
                     })}
                   >
-                    Visit Address
+                    Desired Location
                   </BodyText>
                   <Stack spacing={1}>
                     <AppTextField
@@ -296,12 +296,20 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsFee
                       fullWidth
                     />
                     {isViewingExisting ? (
-                      <AppTextField
-                        label="Municipality"
-                        value={desiredLocationDraft.municipality}
-                        disabled
-                        fullWidth
-                      />
+                      <>
+                        <AppTextField
+                          label="Province"
+                          value={desiredLocationDraft.province}
+                          disabled
+                          fullWidth
+                        />
+                        <AppTextField
+                          label="Municipality"
+                          value={desiredLocationDraft.municipality}
+                          disabled
+                          fullWidth
+                        />
+                      </>
                     ) : (
                       <AppDropdown
                         label="Municipality"

@@ -379,10 +379,18 @@ const fallbackUniqueCode = (booking) => {
 const isOfflineBookingType = (bookingType) =>
   String(bookingType ?? "").trim().toLowerCase() === "offline";
 
-const assertOfflineAllowsStatus = (bookingType, status) => {
+const assertOfflineAllowsStatus = (bookingType, status, previousStatus) => {
   if (!isOfflineBookingType(bookingType)) return null;
   let next = String(status ?? "").trim().toLowerCase();
   if (next === "canceled") next = "cancelled";
+  const prev = String(previousStatus ?? "").trim().toLowerCase();
+  // Discard/reject of Requested (or BR Accepted) → Invalid even if booking_type was mis-stamped offline.
+  if (
+    next === "invalid" &&
+    (prev === "requested" || prev === "br_accepted")
+  ) {
+    return null;
+  }
   if (!OFFLINE_ALLOWED_STATUSES.has(next)) {
     return "Offline bookings only allow Confirmed, In Progress, Completed, or Cancelled status.";
   }
@@ -3374,7 +3382,11 @@ export const updateMyBooking = async (req, res) => {
     let nextStatus = existing.status;
     if (hasStatus) {
       nextStatus = normalizeBookingStatus(req.body.status, existing.status);
-      const offlineStatusError = assertOfflineAllowsStatus(existing.booking_type, nextStatus);
+      const offlineStatusError = assertOfflineAllowsStatus(
+        existing.booking_type,
+        nextStatus,
+        previousStatus,
+      );
       if (offlineStatusError) {
         return res.status(400).json({
           success: false,
@@ -3674,7 +3686,11 @@ export const updateBookingStatus = async (req, res) => {
     const customerId = existingResult.rows[0].customer_id;
     const existingBooking = existingResult.rows[0];
 
-    const offlineStatusError = assertOfflineAllowsStatus(existingBooking.booking_type, status);
+    const offlineStatusError = assertOfflineAllowsStatus(
+      existingBooking.booking_type,
+      status,
+      previousStatus,
+    );
     if (offlineStatusError) {
       return res.status(400).json({
         success: false,

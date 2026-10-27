@@ -71,15 +71,13 @@ export function useProfessionalFixedLocationCalendarBookingPersistIncomingAccept
           notes: nextNotes,
         });
       } catch (error) {
-        showSnackbar({
-          severity: "error",
-          message: getApiErrorMessage(
-            error,
-            "Unable to accept booking request.",
-          ),
-        });
+        const message = getApiErrorMessage(
+          error,
+          "Unable to accept booking request.",
+        );
+        showSnackbar({ severity: "error", message });
         restoreIncomingActions();
-        throw error;
+        throw new Error(message || "Unable to accept booking request.");
       }
       setEvents((prev) =>
         prev.map((event) =>
@@ -348,11 +346,12 @@ export function useProfessionalFixedLocationCalendarBookingPersistIncomingAccept
       setIsEditingExisting(false);
     } catch (error) {
       restoreIncomingActions();
-      showSnackbar({
-        severity: "error",
-        message: getApiErrorMessage(error, "Unable to accept booking request."),
-      });
-      throw error;
+      const message = getApiErrorMessage(
+        error,
+        "Unable to accept booking request.",
+      );
+      showSnackbar({ severity: "error", message });
+      throw new Error(message || "Unable to accept booking request.");
     }
   }, [
     bookingGuests,

@@ -8,10 +8,16 @@ import AppButton from "../AppButton";
 type Props = {
   onClick: () => void;
   isLoading?: boolean;
+  /** Mock mid-panel discard actions reuse this shell (e.g. Discard BR). */
+  label?: string;
 };
 
-/** Full-width soft outline — same shell as Cancel Booking. */
-export default function WithdrawErButton({ onClick, isLoading }: Props) {
+/** Full-width soft outline — same shell as Cancel Booking / Discard BR. */
+export default function WithdrawErButton({
+  onClick,
+  isLoading,
+  label = "Withdraw ER",
+}: Props) {
   const m = useTheme().palette.mollure;
   return (
     <AppButton
@@ -35,7 +41,7 @@ export default function WithdrawErButton({ onClick, isLoading }: Props) {
         },
       }}
     >
-      Withdraw ER
+      {label}
     </AppButton>
   );
 }

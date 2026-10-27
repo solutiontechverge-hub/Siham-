@@ -397,11 +397,11 @@ export default function CalendarBookingCard({
             : []),
           ...scenarioIndicators.map((indicator) => ({
             label: scenarioIndicatorDisplayLabel(indicator),
-            showRequestSentIcon: indicator === "BR",
+            showRequestSentIcon: indicator === "BR" || indicator === "EBR",
             requestAccepted:
               indicator === "BR" && event.status === "BR Accepted",
             requestDirection:
-              indicator === "BR" || indicator === "ER"
+              indicator === "BR" || indicator === "ER" || indicator === "EBR"
                 ? resolveProfessionalBookingRequestDirection(event)
                 : undefined,
             responseIndicators:

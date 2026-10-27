@@ -88,6 +88,8 @@ type Props = {
   onEditTagSignpostClick?: () => void;
   /** BR/EBR/ER response window elapsed. */
   responseOverdue?: boolean;
+  /** API-backed professional EBR (Restart/suggest) — drives EBR↗ over localStorage. */
+  isEbrIncoming?: boolean;
   messagingHref?: string;
   onWaitingForPrepaymentClick?: () => void;
 };
@@ -125,6 +127,7 @@ export default function ClientBookingDetailsHeader({
   editTagSignpostTitle,
   onEditTagSignpostClick,
   responseOverdue = false,
+  isEbrIncoming = false,
   messagingHref,
   onWaitingForPrepaymentClick,
 }: Props) {
@@ -177,11 +180,13 @@ export default function ClientBookingDetailsHeader({
     ? "cancelled"
     : bookingStatus;
 
-  const requestRowMode: BookingRequestRowMode = editRequest.isSuggested
+  const requestRowMode: BookingRequestRowMode = isEbrIncoming
     ? "professional_suggested"
-    : editRequest.isRejected
-      ? "professional_rejected"
-      : "default";
+    : editRequest.isSuggested
+      ? "professional_suggested"
+      : editRequest.isRejected
+        ? "professional_rejected"
+        : "default";
 
   const isOutgoingBookingRequest =
     bookingStatus === "requested" &&

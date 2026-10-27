@@ -80,6 +80,10 @@ export type BookingEditRequestRecord = {
   suggestedTime?: string;
   originalDateISO?: string;
   originalTime?: string;
+  /** Who last edited this EBR (Restart stamps professional). */
+  lastEditedBy?: EditRequestInitiator;
+  /** Professional-POV request direction stored in notes. */
+  requestDirection?: "outgoing" | "incoming";
 };
 
 const STORAGE_KEY = "mollure:booking_edit_requests";

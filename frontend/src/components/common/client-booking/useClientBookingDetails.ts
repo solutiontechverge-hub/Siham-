@@ -18,6 +18,7 @@ import { useCheckoutBookingRef } from "./useCheckoutBookingRef";
 import type { ClientEbrActionKind } from "./ClientEbrActionDialog";
 import { useBookingEditRequest } from "./useBookingEditRequest";
 import {
+  isClientIncomingProfessionalEbr,
   parseCalendarEntryNotes,
   resolveKilometerAllowanceAmount,
 } from "../calendar/bookingEventDetails";
@@ -159,9 +160,13 @@ export function useClientBookingDetails({
     ClientBookingDetailsActionFeedback | null
   >(null);
   const isCancelled = bookingStatus === "cancelled";
-  /** Accept / Suggest / Reject when professional sent an EBR (API notes). */
+  /** Accept / Suggest / Reject when professional sent/restarted an EBR (API notes). */
   const isEbrIncoming =
-    activeBooking?.incomingEditRequest?.status === "suggested";
+    bookingStatus === "requested" &&
+    isClientIncomingProfessionalEbr(
+      activeBooking?.incomingEditRequest,
+      parseCalendarEntryNotes(activeBooking?.notes)?.requestDirection,
+    );
   const apiEditRequest = activeBooking?.editRequest;
   const apiErInitiatedBy =
     apiEditRequest?.initiated_by ??
@@ -195,6 +200,8 @@ export function useClientBookingDetails({
   )?.trim();
   const showRequestResponseActions =
     !responseActionsDismissed &&
+    bookingStatus !== "invalid" &&
+    bookingStatus !== "cancelled" &&
     (isEbrIncoming || isIncomingBr || isIncomingConfirmedEr);
   const { invoiceSettings: financeSettings, transactionOptions } =
     usePublicFinanceSettings(shop?.shopId);

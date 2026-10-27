@@ -25,7 +25,10 @@ import ClientEbrResponseActions from "./ClientEbrResponseActions";
 import EditRequestIncomingNote from "./EditRequestIncomingNote";
 import WithdrawErButton from "./WithdrawErButton";
 import InlineTimedSnackbar from "../InlineTimedSnackbar";
-import { isResponseWindowOverdue } from "../calendar/bookingResponseDeadline";
+import {
+  isResponseWindowOverdue,
+  shouldShowExpiredResponseBanner,
+} from "../calendar/bookingResponseDeadline";
 import ClientBookingPaymentMethodSelector from "./ClientBookingPaymentMethodSelector";
 import ClientBookingDetailsOverlays from "./ClientBookingDetailsOverlays";
 import { CLIENT_BOOKING_DETAILS_COPY } from "./clientBookingDetails.data";
@@ -239,7 +242,10 @@ export default function ClientBookingDetailsView({
           sx={{
             borderRadius: "12px",
             border: `1px solid ${alpha(m.navy, 0.08)}`,
-            bgcolor: isCancelled ? m.cancelledSurface : m.white,
+            bgcolor:
+              isCancelled || bookingStatus === "invalid"
+                ? m.cancelledSurface
+                : m.white,
             overflow: "hidden",
             boxShadow: "0 10px 22px rgba(16, 35, 63, 0.05)",
           }}
@@ -253,6 +259,7 @@ export default function ClientBookingDetailsView({
             bookingStatus={bookingStatus}
             bookingRequestSent={isBookingRequestSent}
             bookingRequestDirection={activeBooking?.bookingRequestDirection}
+            isEbrIncoming={isEbrIncoming}
             locationMode={locationMode}
             isCancelled={isCancelled}
             requiresPrepayment={
@@ -313,16 +320,50 @@ export default function ClientBookingDetailsView({
             onEbrClick={() => openActivityComparison("ebr")}
             erSignpostTitle={ACTIVITY_COMPARISON_SIGNPOST}
             onErClick={() => openActivityComparison("er")}
-            responseOverdue={isResponseWindowOverdue(
-              {
-                responseStatus: bookingNotesMeta?.responseStatus,
-                responseStartedAt: bookingNotesMeta?.responseStartedAt,
-                respondBy: bookingNotesMeta?.respondBy,
-                responseWindowMinutes: bookingNotesMeta?.responseWindowMinutes,
-              },
-              new Date(),
-              bookingSetup?.responseTime ?? null,
-            )}
+            responseOverdue={
+              bookingStatus === "requested" || bookingStatus === "br_accepted"
+                ? shouldShowExpiredResponseBanner(
+                    {
+                      status:
+                        bookingStatus === "br_accepted"
+                          ? "BR Accepted"
+                          : "Requested",
+                      bookingScenario: isEbrIncoming ? "EBR" : "BR",
+                      date: displayDraft?.selectedDateISO,
+                      start: (
+                        displayDraft?.services?.[0]?.startTime || ""
+                      ).slice(0, 5),
+                      end: (
+                        displayDraft?.services?.[0]?.endTime || ""
+                      ).slice(0, 5),
+                      details: {
+                        responseStatus: bookingNotesMeta?.responseStatus,
+                        responseStartedAt: bookingNotesMeta?.responseStartedAt,
+                        respondBy: bookingNotesMeta?.respondBy,
+                        responseWindowMinutes:
+                          bookingNotesMeta?.responseWindowMinutes,
+                        showPrepayment:
+                          requiresPrepayment && !isPrepaymentPaid,
+                        prepaymentStatus:
+                          requiresPrepayment && !isPrepaymentPaid
+                            ? "pending"
+                            : undefined,
+                      },
+                    },
+                    bookingSetup?.responseTime ?? null,
+                  )
+                : isResponseWindowOverdue(
+                    {
+                      responseStatus: bookingNotesMeta?.responseStatus,
+                      responseStartedAt: bookingNotesMeta?.responseStartedAt,
+                      respondBy: bookingNotesMeta?.respondBy,
+                      responseWindowMinutes:
+                        bookingNotesMeta?.responseWindowMinutes,
+                    },
+                    new Date(),
+                    bookingSetup?.responseTime ?? null,
+                  )
+            }
             onWaitingForPrepaymentClick={() => {
               if (isPrepaid) {
                 void handlePayNow();

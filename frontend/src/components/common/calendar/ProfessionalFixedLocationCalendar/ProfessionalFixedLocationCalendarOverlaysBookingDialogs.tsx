@@ -120,7 +120,10 @@ export default function ProfessionalFixedLocationCalendarOverlaysBookingDialogs(
         onConfirm={handleDiscardConfirmedEr}
       />
       <BookingRequestConfirmDialog
-        open={Boolean(incomingConfirmAction)}
+        open={
+          Boolean(incomingConfirmAction) &&
+          !(incomingConfirmAction === "reject" && !showIncomingErActions)
+        }
         action={incomingConfirmAction}
         scenario={viewingBookingEvent?.bookingScenario}
         onClose={() => setIncomingConfirmAction(null)}
@@ -161,14 +164,10 @@ export default function ProfessionalFixedLocationCalendarOverlaysBookingDialogs(
             return;
           }
           if (action === "accept") await handleAcceptIncomingRequest();
-          else if (action === "reject") await handleRejectIncomingRequest();
           setResponseActionsDismissed(true);
           showSnackbar({
             severity: "success",
-            message:
-              action === "accept"
-                ? "Booking request accepted."
-                : "Booking request rejected.",
+            message: "Booking request accepted.",
           });
         }}
       />
@@ -179,9 +178,44 @@ export default function ProfessionalFixedLocationCalendarOverlaysBookingDialogs(
         onConfirm={(selectedIds) => void handleConfirmNoShow(selectedIds)}
       />
       <CalendarCancelBookingModal
-        open={cancelModalOpen}
-        onClose={() => setCancelModalOpen(false)}
-        onConfirm={() => void handleConfirmCancel()}
+        open={
+          cancelModalOpen ||
+          (incomingConfirmAction === "reject" && !showIncomingErActions)
+        }
+        variant={
+          incomingConfirmAction === "reject" && !showIncomingErActions
+            ? "reject"
+            : "cancel"
+        }
+        onClose={() => {
+          setCancelModalOpen(false);
+          if (incomingConfirmAction === "reject") {
+            setIncomingConfirmAction(null);
+          }
+        }}
+        onConfirm={(payload) => {
+          const isBrReject =
+            incomingConfirmAction === "reject" && !showIncomingErActions;
+          if (isBrReject) {
+            // Close before await so a failed RTK object never paints over an open modal.
+            setIncomingConfirmAction(null);
+            setCancelModalOpen(false);
+            void (async () => {
+              try {
+                await handleRejectIncomingRequest(payload);
+                setResponseActionsDismissed(true);
+                showSnackbar({
+                  severity: "success",
+                  message: "Booking request rejected.",
+                });
+              } catch {
+                // reject handler already toasts (+ rethrows Error, not a plain object)
+              }
+            })();
+            return;
+          }
+          void handleConfirmCancel();
+        }}
       />
       <CalendarBookingActionConfirmDialog
         open={Boolean(pendingBookingAction)}

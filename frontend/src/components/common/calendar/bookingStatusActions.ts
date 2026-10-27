@@ -73,7 +73,13 @@ const falseClientFlags = (): ClientActionFlags => ({
 export function resolveProfessionalBookingActions(
   event: Pick<
     CalendarEvent,
-    "status" | "bookingScenario" | "bookingType" | "details" | "date" | "start"
+    | "status"
+    | "bookingScenario"
+    | "bookingType"
+    | "details"
+    | "date"
+    | "start"
+    | "end"
   > | null | undefined,
   opts?: {
     protectiveFeeCheckoutApplicable?: boolean;
@@ -279,7 +285,13 @@ export function resolveClientBookingActions(input: {
 export function showProfessionalActionMenu(
   event: Pick<
     CalendarEvent,
-    "status" | "bookingScenario" | "bookingType" | "details" | "date" | "start"
+    | "status"
+    | "bookingScenario"
+    | "bookingType"
+    | "details"
+    | "date"
+    | "start"
+    | "end"
   > | null | undefined,
   opts?: { responseTime?: ResponseWindowInput | null },
 ): boolean {

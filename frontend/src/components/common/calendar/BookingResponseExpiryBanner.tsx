@@ -23,25 +23,28 @@ export default function BookingResponseExpiryBanner({
   restartDisabled = false,
 }: Props) {
   const m = useTheme().palette.mollure;
+  // Mock: light teal info strip (#E6F7F8-ish) — not orange warning.
+  const fg = m.teal;
+  const bg = alpha(m.teal, 0.12);
 
   return (
     <Box
       sx={{
         borderRadius: "12px",
-        border: `1px solid ${alpha(m.statusOrangeFg, 0.5)}`,
-        bgcolor: alpha(m.statusOrangeFg, 0.12),
+        border: `1px solid ${alpha(fg, 0.35)}`,
+        bgcolor: bg,
         px: 1.5,
         py: 1.25,
       }}
     >
       <Stack direction="row" spacing={1.25} alignItems="flex-start">
         <InfoOutlinedIcon
-          sx={{ fontSize: 20, color: m.statusOrangeFg, mt: 0.15, flexShrink: 0 }}
+          sx={{ fontSize: 20, color: fg, mt: 0.15, flexShrink: 0 }}
         />
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography
-            sx={mollureLabelSx(m.statusOrangeFg, {
-              color: m.statusOrangeFg,
+            sx={mollureLabelSx(fg, {
+              color: fg,
               lineHeight: 1.45,
             })}
           >
