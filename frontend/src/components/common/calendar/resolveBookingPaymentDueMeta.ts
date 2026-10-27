@@ -7,12 +7,15 @@ import { isCancelledOrNoShowBookingStatus } from "./bookingStatus";
 import { formatFinanceDueDate } from "../booking-finance/formatBookingFinance";
 import type { TransactionRow } from "../../../app/professionals/fixed-location/finance/data/transactions";
 import { useGetFinanceTransactionsQuery } from "../../../store/services/financeApi";
+import { isDueDatePast } from "./buildSalesOverviewCards.format";
 
 export type BookingPaymentDueMeta = {
   dueDateIso: string;
   dateLabel: string;
   reissued: boolean;
   paymentDue: boolean;
+  /** True when dueDate is before today (needs reissue / wait state). */
+  pastDue: boolean;
 };
 
 const FinancePaymentDueRowsContext = React.createContext<TransactionRow[] | null>(null);
@@ -95,6 +98,7 @@ export function resolveBookingPaymentDueMeta(input: {
     reissued:
       meta.cardKind === "reissued_invoice" || Boolean(meta.reissuedAt),
     paymentDue: true,
+    pastDue: isDueDatePast(meta.dueDate),
   };
 }
 
@@ -143,6 +147,7 @@ function resolveFinancePaymentDueMeta(
       Boolean(document?.reissuedAt || document?.reissuedFrom) ||
       Number(document?.reissueLevel ?? 0) > 0,
     paymentDue: true,
+    pastDue: isDueDatePast(dueDate),
   };
 }
 

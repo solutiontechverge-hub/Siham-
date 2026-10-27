@@ -86,6 +86,8 @@ export type BookingTimelineCardPaymentDue = {
   /** Formatted due/reissue date, e.g. 25/07/2026 */
   dateLabel: string;
   showIcon?: boolean;
+  /** Due date before today — red badge (matches calendar drawer). */
+  pastDue?: boolean;
 };
 
 export type BookingTimelineCardProps = {
@@ -783,9 +785,18 @@ export default function BookingTimelineCard({
                 height: 20,
                 px: 0.7,
                 borderRadius: "999px",
-                bgcolor: alpha(m.teal, 0.12),
-                border: `1px solid ${alpha(m.teal, 0.28)}`,
-                boxShadow: `0 1px 4px ${alpha(m.teal, 0.08)}`,
+                bgcolor: alpha(
+                  paymentDue.pastDue ? "#E85D5D" : m.teal,
+                  paymentDue.pastDue ? 0.1 : 0.12,
+                ),
+                border: `1px solid ${alpha(
+                  paymentDue.pastDue ? "#E85D5D" : m.teal,
+                  0.28,
+                )}`,
+                boxShadow: `0 1px 4px ${alpha(
+                  paymentDue.pastDue ? "#E85D5D" : m.teal,
+                  0.08,
+                )}`,
                 pointerEvents: "auto",
               }}
             >
@@ -793,7 +804,7 @@ export default function BookingTimelineCard({
                 sx={{
                   fontSize: 8.5,
                   fontWeight: 800,
-                  color: m.teal,
+                  color: paymentDue.pastDue ? "#E85D5D" : m.teal,
                   lineHeight: 1,
                   letterSpacing: "0.01em",
                   whiteSpace: "nowrap",
@@ -808,7 +819,10 @@ export default function BookingTimelineCard({
                   width: 3,
                   height: 3,
                   borderRadius: "50%",
-                  bgcolor: alpha(m.teal, 0.55),
+                  bgcolor: alpha(
+                    paymentDue.pastDue ? "#E85D5D" : m.teal,
+                    0.55,
+                  ),
                   flexShrink: 0,
                 }}
               />
@@ -816,7 +830,9 @@ export default function BookingTimelineCard({
                 sx={{
                   fontSize: 8.5,
                   fontWeight: 900,
-                  color: alpha(m.navy, 0.72),
+                  color: paymentDue.pastDue
+                    ? "#E85D5D"
+                    : alpha(m.navy, 0.72),
                   lineHeight: 1,
                   whiteSpace: "nowrap",
                   flexShrink: 0,

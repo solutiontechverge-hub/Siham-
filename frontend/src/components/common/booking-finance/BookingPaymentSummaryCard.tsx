@@ -201,7 +201,8 @@ export default function BookingPaymentSummaryCard({
                           </>
                         ) : null}
                       </Stack>
-                    ) : line.note ? (
+                    ) : null}
+                    {line.note ? (
                       <Typography
                         sx={{
                           mt: 0.55,

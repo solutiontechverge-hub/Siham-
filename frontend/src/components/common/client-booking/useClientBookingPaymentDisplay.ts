@@ -35,17 +35,22 @@ export function useClientBookingPaymentDisplay(input: {
   isPrepaymentPaid: boolean;
   isCompleted: boolean;
   isPaymentDue: boolean;
+  paymentOverdue?: boolean;
+  invoiceDueDateLabel?: string | null;
   requiresPrepayment: boolean;
   bookingStatus: ClientBookingStatus;
   requesterName: string;
   selectedPaymentMethod: CheckoutPaymentMethodId;
   shopDisplayName: string;
-  /** Paid LCF/LRF/NS rows from finance — drives Fee Summary under Prepayment. */
+  /** Charged LCF/LRF/NS rows from finance — drives Fee Summary under Prepayment. */
   paidProtectiveFees?: ReadonlyArray<{
     entryLabel?: string | null;
     amount: number;
     dateLabel?: string;
     methodLabel?: string;
+    status?: string;
+    transactionId?: string;
+    settled?: boolean;
   }>;
 }) {
   const kilometerAllowanceAmount = React.useMemo(
@@ -156,6 +161,8 @@ export function useClientBookingPaymentDisplay(input: {
         prepaymentPercent:
           input.activeBooking?.prepaymentPercent ?? input.prepaymentPercent,
         paymentDue: input.isPaymentDue,
+        paymentOverdue: Boolean(input.paymentOverdue),
+        invoiceDueDateLabel: input.invoiceDueDateLabel ?? null,
         hasEditPrepayment: input.editRequestIsSuggested,
         paymentDateIso: input.draft?.selectedDateISO,
         paymentTime: input.draft?.selectedTime,
@@ -176,9 +183,11 @@ export function useClientBookingPaymentDisplay(input: {
       input.draft,
       input.editRequestIsSuggested,
       input.isOfflinePay,
+      input.invoiceDueDateLabel,
       input.isPaymentDue,
       input.isPrepaymentPaid,
       input.paidProtectiveFees,
+      input.paymentOverdue,
       input.prepaymentPercent,
       input.requesterName,
       input.requiresPrepayment,
@@ -196,9 +205,12 @@ export function useClientBookingPaymentDisplay(input: {
         isOfflinePay: input.isOfflinePay,
         isCompleted: input.isCompleted,
         isPaymentDue: input.isPaymentDue,
-        isCancelled: input.isCancelled,
+        // Cancelled + No Show: keep Prepayment + Fee Summary only.
+        isCancelled:
+          input.isCancelled || input.bookingStatus === "no_show",
       }),
     [
+      input.bookingStatus,
       input.isCancelled,
       input.isCompleted,
       input.isOfflinePay,
@@ -211,6 +223,7 @@ export function useClientBookingPaymentDisplay(input: {
   const showPaymentSummary =
     visiblePaymentSummarySections.length > 0 &&
     (input.isCancelled ||
+      input.bookingStatus === "no_show" ||
       input.isPrepaymentPaid ||
       input.activeBooking?.paid === true ||
       Boolean(input.paidProtectiveFees?.length) ||

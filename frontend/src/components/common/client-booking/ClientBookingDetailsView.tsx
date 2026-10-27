@@ -117,6 +117,7 @@ export default function ClientBookingDetailsView({
     isPaymentDue,
     isPrepaid,
     isPrepaymentPaid,
+    paymentOverdue,
     isSubmittingRequest,
     isWithdrawingEr,
     kilometerAllowanceAmount,
@@ -268,6 +269,7 @@ export default function ClientBookingDetailsView({
               paymentCardPrepaymentState === "paid" || isPrepaymentPaid
             }
             paymentDue={isPaymentDue}
+            paymentOverdue={paymentOverdue}
             scheduleChangeTags={clientScheduleChangeTags}
             editTagSignpostTitle={ACTIVITY_COMPARISON_SIGNPOST}
             onEditTagSignpostClick={() =>
@@ -372,7 +374,8 @@ export default function ClientBookingDetailsView({
                   prepaymentOffline={isOfflinePay}
                   products={paymentProducts}
                   onPayNow={
-                    paymentCardPrepaymentState === "required" && canActOnPayment
+                    canActOnPayment &&
+                    paymentCardPrepaymentState === "required"
                       ? handlePayNow
                       : undefined
                   }
@@ -385,6 +388,11 @@ export default function ClientBookingDetailsView({
                         }
                         onViewReceipt={
                           hasAnyDocument ? openReceipt : undefined
+                        }
+                        onPayNow={
+                          canActOnPayment && isPaymentDue && !paymentOverdue
+                            ? () => setStripeDialogOpen(true)
+                            : undefined
                         }
                       />
                     ) : undefined
@@ -519,6 +527,11 @@ export default function ClientBookingDetailsView({
         stripeDialogOpen={stripeDialogOpen}
         setStripeDialogOpen={setStripeDialogOpen}
         prepaidAmount={prepaidAmount}
+        invoicePayAmount={
+          isPaymentDue && !paymentOverdue
+            ? Math.max(0, displayTotal - (displayPrepaidAmount || 0))
+            : null
+        }
         bookingRef={bookingRef}
         completePrepayment={completePrepayment}
         cancelFeeStripeOpen={cancelFeeStripeOpen}

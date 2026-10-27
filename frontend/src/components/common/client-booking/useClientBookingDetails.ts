@@ -113,9 +113,17 @@ export function useClientBookingDetails({
   const isPaymentDue = Boolean(
     activeBooking && isClientBookingPaymentDue(activeBooking),
   );
-  const storedPaymentMethod = parseCalendarEntryNotes(
-    activeBooking?.notes,
-  )?.paymentMethod;
+  const earlyNotesMeta = parseCalendarEntryNotes(activeBooking?.notes);
+  const invoiceDueDateIsoEarly = String(
+    earlyNotesMeta?.invoiceDueDate ?? "",
+  ).trim();
+  const paymentOverdueEarly =
+    isPaymentDue &&
+    Boolean(invoiceDueDateIsoEarly) &&
+    !Number.isNaN(new Date(`${invoiceDueDateIsoEarly}T00:00:00`).getTime()) &&
+    new Date(`${invoiceDueDateIsoEarly}T00:00:00`).getTime() <
+      new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00`).getTime();
+  const storedPaymentMethod = earlyNotesMeta?.paymentMethod;
   const isPrepaymentPaid =
     Boolean(activeBooking?.prepaid) &&
     !isOfflinePaymentMethod(storedPaymentMethod);
@@ -215,8 +223,9 @@ export function useClientBookingDetails({
   const canActOnPayment =
     !isCompleted &&
     !isCancelled &&
-    prepaymentState === "required" &&
-    !isOfflinePay;
+    !isOfflinePay &&
+    (prepaymentState === "required" ||
+      (isPaymentDue && !paymentOverdueEarly));
   const [syncFinanceFromBooking] =
     useSyncFinanceTransactionFromBookingMutation();
   const [updateMyBooking] = useUpdateMyBookingMutation();
@@ -383,22 +392,45 @@ export function useClientBookingDetails({
     bookingTotal: draft?.total,
   });
 
+  /** Charged LCF/LRF/NS rows (due or settled) — drives client Fee Summary. */
   const paidProtectiveFees = React.useMemo(
     () =>
       (financeRows ?? [])
         .filter((row) => {
+          if (!isProtectiveFeeEntryLabel(row.entryLabel)) return false;
           const status = String(row.status ?? "").toLowerCase();
-          if (status !== "paid" && status !== "prepaid") return false;
-          return isProtectiveFeeEntryLabel(row.entryLabel);
+          return (
+            status === "paid" ||
+            status === "prepaid" ||
+            status === "payment due" ||
+            status === "pending" ||
+            status === "overdue"
+          );
         })
-        .map((row) => ({
-          entryLabel: row.entryLabel,
-          amount: Number(row.grossAmount ?? row.netAmount ?? 0),
-          dateLabel: row.date
-            ? new Date(`${row.date}T12:00:00`).toLocaleDateString("en-GB")
-            : undefined,
-          methodLabel: row.methodTitle || undefined,
-        }))
+        .map((row) => {
+          const status = String(row.status ?? "");
+          const settled =
+            status.toLowerCase() === "paid" ||
+            status.toLowerCase() === "prepaid";
+          const feeTotal = Number(
+            (row.document as { feeSettlement?: { feeTotal?: number } } | null)
+              ?.feeSettlement?.feeTotal ??
+              row.grossAmount ??
+              row.netAmount ??
+              0,
+          );
+          return {
+            entryLabel: row.entryLabel,
+            amount: feeTotal,
+            dateLabel: row.date
+              ? new Date(`${row.date}T12:00:00`).toLocaleDateString("en-GB")
+              : undefined,
+            methodLabel: row.methodTitle || undefined,
+            status,
+            transactionId: row.id ? String(row.id) : undefined,
+            settled,
+          };
+        })
         .filter((fee) => fee.amount > 0),
     [financeRows],
   );
@@ -517,6 +549,10 @@ export function useClientBookingDetails({
     () => parseCalendarEntryNotes(activeBooking?.notes),
     [activeBooking?.notes],
   );
+  const paymentOverdue = paymentOverdueEarly;
+  const invoiceDueDateLabel = invoiceDueDateIsoEarly
+    ? invoiceDueDateIsoEarly.split("-").reverse().join("/")
+    : null;
 
   const {
     activityOpen,
@@ -597,6 +633,8 @@ export function useClientBookingDetails({
     isPrepaymentPaid,
     isCompleted,
     isPaymentDue,
+    paymentOverdue,
+    invoiceDueDateLabel,
     requiresPrepayment,
     bookingStatus,
     requesterName,
@@ -682,8 +720,10 @@ export function useClientBookingDetails({
     isIncomingConfirmedEr,
     isOfflinePay,
     isPaymentDue,
+    invoiceDueDateLabel,
     isPrepaid,
     isPrepaymentPaid,
+    paymentOverdue,
     isSubmittingRequest,
     isWithdrawingEr,
     kilometerAllowanceAmount,

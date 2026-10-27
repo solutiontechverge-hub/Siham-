@@ -65,6 +65,8 @@ export function findIssuedFinanceTransaction(
      * Omit: prefer fee among full-phase matches (Fee Summary); never for prepay.
      */
     protectiveFee?: boolean;
+    /** Pin a specific protective fee row (LCF / LRF / No-show fee). */
+    entryLabel?: string | null;
   },
 ): TransactionRow | null {
   if (opts.transactionId) {
@@ -75,8 +77,12 @@ export function findIssuedFinanceTransaction(
   }
   const phase = opts.phase ?? null;
   const addonId = opts.addonId ? String(opts.addonId) : "";
+  const wantLabel = String(opts.entryLabel ?? "").trim();
   const candidates = rows.filter((row) => {
     if (!matchesFinanceBooking(row, opts.bookingId, opts.bookingCode)) return false;
+    if (wantLabel && String(row.entryLabel ?? "").trim() !== wantLabel) {
+      return false;
+    }
     const doc = docPhaseFields(row);
     const rowPhase = doc.paymentPhase;
     if (addonId) {
@@ -98,7 +104,7 @@ export function findIssuedFinanceTransaction(
   });
 
   const feeFiltered =
-    opts.protectiveFee === true
+    opts.protectiveFee === true || wantLabel
       ? candidates.filter((row) => isFeeInvoiceRow(row))
       : opts.protectiveFee === false
         ? candidates.filter((row) => !isFeeInvoiceRow(row))
@@ -110,7 +116,14 @@ export function findIssuedFinanceTransaction(
   const live = pool.filter((row) => row.status !== "Voided");
   const prefer = live.length ? live : pool;
   // Fee Summary (full, unspecified): prefer LCF/LRF/NS over voided service sales.
-  if (opts.protectiveFee !== false && phase === "full") {
+  if ((opts.protectiveFee !== false || wantLabel) && phase === "full") {
+    if (wantLabel) {
+      return (
+        prefer.find((row) => String(row.entryLabel ?? "").trim() === wantLabel) ??
+        prefer[0] ??
+        null
+      );
+    }
     return prefer.find((row) => isFeeInvoiceRow(row)) ?? prefer[0] ?? null;
   }
   return prefer[0] ?? null;

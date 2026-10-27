@@ -19,9 +19,28 @@ import {
 } from "./checkoutPaymentOptions";
 import type { ClientBookingDetailsActiveDocument } from "./clientBookingDetails.helpers";
 import type { ClientBookingDraft } from "./types";
+import {
+  LATE_CANCELLATION_BOOKING_FEE,
+  LATE_RESCHEDULING_FEE,
+} from "../finance-documents/protectiveFeeInvoice";
 
 function isFeeSummaryLineId(lineId?: string | null) {
   return Boolean(lineId && String(lineId).startsWith("fee-"));
+}
+
+/** Parse Fee Summary line id → finance match keys. */
+function parseFeeSummaryLineId(lineId?: string | null): {
+  transactionId?: string;
+  entryLabel?: string;
+} {
+  const raw = String(lineId ?? "");
+  if (!raw.startsWith("fee-")) return {};
+  if (raw.startsWith("fee-tx-")) {
+    return { transactionId: raw.slice("fee-tx-".length) };
+  }
+  if (raw === "fee-lrf") return { entryLabel: LATE_RESCHEDULING_FEE };
+  if (raw === "fee-ns") return { entryLabel: "No-show fee" };
+  return { entryLabel: LATE_CANCELLATION_BOOKING_FEE };
 }
 
 function isPrepaymentLineId(lineId?: string | null) {
@@ -331,7 +350,17 @@ export function useClientBookingInvoiceDocs(input: {
   const resolveRowForLine = React.useCallback(
     (lineId: string | undefined, type: "invoice" | "receipt"): TransactionRow | null => {
       if (isFeeSummaryLineId(lineId)) {
-        return feeInvoiceRow ?? bookingTransactionRow;
+        const parsed = parseFeeSummaryLineId(lineId);
+        const matched = findIssuedFinanceTransaction(financeRows, {
+          bookingId: input.bookingId,
+          bookingCode: input.bookingRef,
+          phase: "full",
+          protectiveFee: true,
+          transactionId: parsed.transactionId,
+          entryLabel: parsed.entryLabel,
+        });
+        // Never fall back to after-treatment booking row for fee lines.
+        return matched ?? feeInvoiceRow;
       }
       if (isPrepaymentLineId(lineId)) {
         return type === "receipt"
@@ -345,6 +374,9 @@ export function useClientBookingInvoiceDocs(input: {
     [
       bookingTransactionRow,
       feeInvoiceRow,
+      financeRows,
+      input.bookingId,
+      input.bookingRef,
       prepaymentInvoiceRow,
       prepaymentReceiptRow,
     ],

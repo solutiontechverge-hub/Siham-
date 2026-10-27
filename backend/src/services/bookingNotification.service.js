@@ -28,6 +28,7 @@ export const NOTIFICATION_TYPES = {
   PRO_BOOKING_SERVICE_EDITED: "pro.booking.service_edited",
   PRO_BOOKING_UNIQUE_ITEM_EDITED: "pro.booking.unique_item_edited",
   PRO_PREPAYMENT_RECEIVED: "pro.payment.prepayment_received",
+  PRO_PAYMENT_OVERDUE: "pro.payment.overdue",
   PRO_ER_INCOMING: "pro.er.incoming",
   PRO_ER_ACCEPTED: "pro.er.accepted",
   PRO_ER_REJECTED: "pro.er.rejected",
@@ -158,6 +159,11 @@ const NOTIFICATION_META = {
   [NOTIFICATION_TYPES.PRO_PREPAYMENT_RECEIVED]: {
     title: "Prepayment Received",
     statusType: "accepted",
+    audience: "professional",
+  },
+  [NOTIFICATION_TYPES.PRO_PAYMENT_OVERDUE]: {
+    title: "Invoice Past Due",
+    statusType: "rejected",
     audience: "professional",
   },
   [NOTIFICATION_TYPES.PRO_REMINDER_RESPOND]: {
@@ -889,12 +895,29 @@ const loadFinanceNotificationContext = async (transactionId) => {
        ft.booking_id,
        ft.status,
        ft.document,
+       ft.payment_deadline,
        b.id AS booking_uuid,
        b.customer_id,
-       COALESCE(NULLIF(bs.salon_name, ''), NULLIF(bs.business_name, ''), 'Salon') AS salon_name
+       pp.user_id AS professional_user_id,
+       COALESCE(NULLIF(bs.salon_name, ''), NULLIF(bs.business_name, ''), 'Salon') AS salon_name,
+       COALESCE(
+         CASE
+           WHEN cu.user_type = 'company' THEN NULLIF(TRIM(cp.legal_name), '')
+           ELSE NULLIF(TRIM(CONCAT_WS(' ', ip.first_name, ip.last_name)), '')
+         END,
+         NULLIF(TRIM(ip.display_name), ''),
+         NULLIF(TRIM(cp.legal_name), ''),
+         cu.email,
+         'Client'
+       ) AS client_name
      FROM finance_transactions ft
-     LEFT JOIN bookings b ON b.unique_code = ft.booking_id
+     LEFT JOIN bookings b
+       ON b.unique_code = ft.booking_id OR b.id::text = ft.booking_id
      LEFT JOIN business_setups bs ON bs.id = b.business_setup_id
+     LEFT JOIN professional_profiles pp ON pp.id = bs.professional_profile_id
+     LEFT JOIN users cu ON cu.id = b.customer_id
+     LEFT JOIN individual_profiles ip ON ip.user_id = cu.id
+     LEFT JOIN company_profiles cp ON cp.user_id = cu.id
      WHERE ft.id = $1
      LIMIT 1`,
     [transactionId],
@@ -1015,31 +1038,59 @@ export async function processPaymentOverdueNotifications() {
      WHERE ft.status IN ('Payment due', 'Pending')
        AND COALESCE(ft.payment_deadline, NULLIF(ft.document->>'dueDate', '')::date) IS NOT NULL
        AND COALESCE(ft.payment_deadline, NULLIF(ft.document->>'dueDate', '')::date) < CURRENT_DATE
-     RETURNING ft.id, ft.booking_id`,
+     RETURNING
+       ft.id,
+       ft.booking_id,
+       COALESCE(ft.payment_deadline, NULLIF(ft.document->>'dueDate', '')::date)::text AS due_iso`,
   );
 
   for (const row of overdueResult.rows) {
     const ctx = await loadFinanceNotificationContext(row.id);
-    if (!ctx?.customer_id || !ctx.booking_uuid) continue;
+    if (!ctx?.booking_uuid) continue;
 
-    const alreadySent = await hasInAppNotification(
-      ctx.customer_id,
-      NOTIFICATION_TYPES.CLIENT_PAYMENT_OVERDUE,
-      ctx.booking_id,
-    );
-    if (alreadySent) continue;
+    const dueIso = String(row.due_iso || ctx.payment_deadline || ctx.document?.dueDate || "")
+      .slice(0, 10);
+    const dueLabel = dueIso.includes("-")
+      ? dueIso.split("-").reverse().join("/")
+      : dueIso;
+    const proMessage = dueLabel
+      ? `Invoice past due (${dueLabel}). Reissue with updated terms.`
+      : "Invoice past due. Reissue with updated terms.";
 
-    await createInAppNotification({
-      recipientUserId: ctx.customer_id,
-      notificationType: NOTIFICATION_TYPES.CLIENT_PAYMENT_OVERDUE,
-      bookingId: ctx.booking_uuid,
-      bookingRef: ctx.booking_id,
-      actorName: ctx.salon_name,
-      message: "Your payment is now overdue.",
-      href: clientHref(ctx.booking_id),
-      skipEmail: true,
+    // Professional: in-app + email (once per due date / reissue cycle).
+    if (ctx.professional_user_id) {
+      const existingPro = await query(
+        `SELECT 1
+         FROM in_app_notifications
+         WHERE recipient_user_id = $1
+           AND notification_type = $2
+           AND booking_ref IS NOT DISTINCT FROM $3
+           AND message IS NOT DISTINCT FROM $4
+         LIMIT 1`,
+        [
+          ctx.professional_user_id,
+          NOTIFICATION_TYPES.PRO_PAYMENT_OVERDUE,
+          ctx.booking_id,
+          proMessage,
+        ],
+      );
+      if (existingPro.rowCount === 0) {
+        await createInAppNotification({
+          recipientUserId: ctx.professional_user_id,
+          notificationType: NOTIFICATION_TYPES.PRO_PAYMENT_OVERDUE,
+          bookingId: ctx.booking_uuid,
+          bookingRef: ctx.booking_id,
+          actorName: ctx.client_name || "Client",
+          message: proMessage,
+          href: proHref(ctx.booking_id),
+        });
+      }
+    }
+
+    // Client: wait email only — no in-app / Pay Now until pro reissues.
+    void sendFinanceClientEmail(row.id, FINANCE_EMAIL_TYPES.INVOICE_POST_DUE, {
+      forceKey: dueIso || "post_due",
     });
-    void sendFinanceClientEmail(row.id, FINANCE_EMAIL_TYPES.INVOICE_POST_DUE);
   }
 
   return overdueResult.rowCount;

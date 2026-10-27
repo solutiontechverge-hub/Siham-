@@ -26,7 +26,7 @@ const EMAIL_BUILDERS = {
     build: buildInvoicePreDueReminderEmail,
   },
   [FINANCE_EMAIL_TYPES.INVOICE_POST_DUE]: {
-    subject: "Overdue invoice — payment required",
+    subject: "Invoice due date passed — please wait",
     build: buildInvoicePostDueReminderEmail,
   },
   [FINANCE_EMAIL_TYPES.INVOICE_REISSUED]: {

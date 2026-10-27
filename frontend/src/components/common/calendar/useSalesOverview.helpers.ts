@@ -61,7 +61,25 @@ export function toFinanceHints(rows: TransactionRow[]): SalesFinanceHint[] {
           ? `${row.date}T12:00:00`
           : null
         : null;
-    const amount = Number(row.grossAmount ?? row.netAmount);
+    const netAmount = Number(row.grossAmount ?? row.netAmount);
+    // Protective fees: net may be €0 after prepaid netting — keep gross fee for Sales.
+    const docAny = (row.issuedDocument ?? row.document) as
+      | {
+          feeSettlement?: { feeTotal?: number };
+          totalPrice?: number;
+        }
+      | undefined;
+    const feeTotalRaw = Number(
+      docAny?.feeSettlement?.feeTotal ?? docAny?.totalPrice,
+    );
+    const feeTotal =
+      Number.isFinite(feeTotalRaw) && feeTotalRaw > 0 ? feeTotalRaw : undefined;
+    const amount =
+      feeTotal != null
+        ? feeTotal
+        : Number.isFinite(netAmount)
+          ? netAmount
+          : undefined;
     const lineItems = financeDocumentLinesToSalesLines(row);
     const paymentTerms = doc?.issuedSnapshot?.invoiceSettings?.paymentTerms;
     return {
@@ -80,7 +98,8 @@ export function toFinanceHints(rows: TransactionRow[]): SalesFinanceHint[] {
       reissueLevel: Number(doc?.reissueLevel ?? row.document?.reissueLevel ?? 0) || 0,
       ...(paymentTerms ? { paymentTerms } : {}),
       entryLabel: row.entryLabel,
-      amount: Number.isFinite(amount) ? amount : undefined,
+      amount,
+      ...(feeTotal != null ? { feeTotal } : {}),
       ...(lineItems.length ? { lineItems } : {}),
     };
   });

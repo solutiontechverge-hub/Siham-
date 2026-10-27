@@ -56,7 +56,10 @@ export type SalesFinanceHint = {
   paymentTerms?: SalesPaymentTermsInput;
   /** Finance `entry_label` — used to heal protective-fee Sales cards. */
   entryLabel?: string;
+  /** Net amount due on the finance row (may be €0 when prepaid covered the fee). */
   amount?: number;
+  /** Gross fee total from document.feeSettlement / totalPrice — Fee Summary display. */
+  feeTotal?: number;
   /**
    * Stored `document.lineItems` / issued snapshot — single source for Sales Card
    * line count when a finance row is matched.

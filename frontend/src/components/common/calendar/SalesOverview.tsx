@@ -3,23 +3,22 @@
 import * as React from "react";
 import { Box, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import { mollureSectionTitleSx, mollureLabelSx, mollureBodyMutedSx } from "../../../theme/mollureHierarchy";
-import AppButton from "../AppButton";
+import {
+  mollureSectionTitleSx,
+  mollureBodyMutedSx,
+} from "../../../theme/mollureHierarchy";
 import { FinanceDocumentPreviewDrawer } from "../finance-documents";
-import PaymentDueIcon from "../client-booking/PaymentDueIcon";
 import TransactionDateModal from "../../sections/finance/TransactionDateModal";
 import TransactionNoteModal from "../../sections/finance/TransactionNoteModal";
 import SalesAddOnCheckout from "./SalesAddOnCheckout";
 import SalesCancelModal from "./SalesCancelModal";
 import SalesEditCheckout from "./SalesEditCheckout";
 import SalesOverdueReissueModal from "./SalesOverdueReissueModal";
+import SalesOverdueReissuePanel from "./SalesOverdueReissuePanel";
 import SalesOverviewCard from "./SalesOverviewCard";
 import RefundSalesDrawer from "../../sections/finance/RefundSalesDrawer";
 import { refundItemsFromSaleLines } from "../../sections/finance/refundSales.data";
-import {
-  SALES_OVERVIEW_COPY,
-  SALES_OVERVIEW_OVERDUE_COLOR,
-} from "./salesOverview.data";
+import { SALES_OVERVIEW_COPY } from "./salesOverview.data";
 import {
   useSalesOverview,
   type SalesOverviewArgs,
@@ -144,74 +143,14 @@ export default function SalesOverview({
       </Typography>
 
       {overdueManualCard ? (
-        <Box
-          sx={{
-            width: "100%",
-            borderRadius: "12px",
-            px: 1.35,
-            py: 1.05,
-            mb: 1.5,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 1,
-            bgcolor: alpha(SALES_OVERVIEW_OVERDUE_COLOR, 0.08),
-            border: `1px solid ${alpha(SALES_OVERVIEW_OVERDUE_COLOR, 0.28)}`,
+        <SalesOverdueReissuePanel
+          unpaidAmount={overdueManualCard.highlightAmount ?? 0}
+          paymentTerms={overduePaymentTerms}
+          alreadyReissued={overdueManualCard.kind === "reissued_invoice"}
+          onConfirm={(payload) => {
+            void handleReissue(payload, overdueManualCard);
           }}
-        >
-          <Stack direction="row" alignItems="center" spacing={0.85} sx={{ minWidth: 0 }}>
-            <Box
-              sx={{
-                display: "grid",
-                placeItems: "center",
-                width: 28,
-                height: 28,
-                borderRadius: "9px",
-                bgcolor: alpha(SALES_OVERVIEW_OVERDUE_COLOR, 0.16),
-                flexShrink: 0,
-              }}
-            >
-              <PaymentDueIcon size={24} />
-            </Box>
-            <Box sx={{ minWidth: 0 }}>
-              <Typography
-                sx={{
-                  ...mollureLabelSx(m.navy),
-                  lineHeight: 1.2,
-                }}
-              >
-                {SALES_OVERVIEW_COPY.penaltyInvoiceTitle}
-              </Typography>
-              <Typography
-                sx={{
-                  mt: 0.2,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: alpha(m.navy, 0.5),
-                  lineHeight: 1.2,
-                }}
-              >
-                {SALES_OVERVIEW_COPY.penaltyInvoiceSubtitle}
-              </Typography>
-            </Box>
-          </Stack>
-          <AppButton
-            size="small"
-            onClick={() => setOverdueCard(overdueManualCard)}
-            sx={{
-              flexShrink: 0,
-              textTransform: "none",
-              fontWeight: 800,
-              fontSize: 12,
-              borderRadius: "8px",
-              bgcolor: SALES_OVERVIEW_OVERDUE_COLOR,
-              color: "#fff",
-              "&:hover": { bgcolor: "#DC6803" },
-            }}
-          >
-            {SALES_OVERVIEW_COPY.sendPenaltyInvoice}
-          </AppButton>
-        </Box>
+        />
       ) : null}
 
       {cards.length === 0 ? (
@@ -356,7 +295,7 @@ export default function SalesOverview({
         paymentTerms={overduePaymentTerms}
         alreadyReissued={overdueCard?.kind === "reissued_invoice"}
         onClose={() => setOverdueCard(null)}
-        onConfirm={handleReissue}
+        onConfirm={(payload) => void handleReissue(payload)}
       />
 
       <TransactionDateModal

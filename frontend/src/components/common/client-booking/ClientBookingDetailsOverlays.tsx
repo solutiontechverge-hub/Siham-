@@ -69,6 +69,8 @@ type Props = {
   stripeDialogOpen: boolean;
   setStripeDialogOpen: (open: boolean) => void;
   prepaidAmount: number;
+  /** When set, Stripe dialog charges remaining invoice balance instead of prepayment. */
+  invoicePayAmount?: number | null;
   bookingRef: string;
   completePrepayment: () => void | Promise<void>;
   cancelFeeStripeOpen: boolean;
@@ -133,6 +135,7 @@ export default function ClientBookingDetailsOverlays(props: Props) {
     stripeDialogOpen,
     setStripeDialogOpen,
     prepaidAmount,
+    invoicePayAmount = null,
     bookingRef,
     completePrepayment,
     cancelFeeStripeOpen,
@@ -262,9 +265,14 @@ export default function ClientBookingDetailsOverlays(props: Props) {
         onSend={handleEbrSuggestSend}
       />
 
+      {/* ponytail: invoice Pay Now reuses Stripe shell + prepay success; wire full-invoice settle when Connect invoice pay lands */}
       <StripePrepaymentDialog
         open={stripeDialogOpen}
-        amount={prepaidAmount}
+        amount={
+          invoicePayAmount != null && invoicePayAmount > 0
+            ? invoicePayAmount
+            : prepaidAmount
+        }
         bookingRef={bookingRef}
         onClose={() => setStripeDialogOpen(false)}
         onSuccess={completePrepayment}

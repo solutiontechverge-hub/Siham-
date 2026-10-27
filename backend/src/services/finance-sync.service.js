@@ -1845,8 +1845,9 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
   if (bookingStatus === "cancelled" || bookingStatus === "canceled") {
     const showLateCancellation = Boolean(meta.showLateCancellation);
     const percent = Math.max(0, Math.min(100, Number(meta.lateCancellationFeePercent) || 0));
-    const feeStatus = statusOverride || "Payment due";
     let lastId = null;
+    // Consume prepaid across stacked LCF then LRF (same wallet, no double-credit).
+    let prepaidRemaining = prepaidAmount;
 
     // Keep prepaid receipt when it was collected before cancel.
     if (prepayStatus === "paid" && prepaidAmount > 0) {
@@ -1885,11 +1886,24 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
             : percent > 0
               ? roundMoney(dueFee / (percent / 100))
               : serviceBase;
+        const settled = settleProtectiveFee({
+          feeTotal: dueFee,
+          prepaidAvailable: prepaidRemaining,
+          netsPrepaid: protectiveFeeNetsPrepaid("lateCancellation", true),
+        });
+        prepaidRemaining = roundMoney(
+          Math.max(0, prepaidRemaining - settled.prepaidApplied),
+        );
+        const feeStatus =
+          statusOverride ||
+          (settled.amountDue <= 0 && settled.prepaidApplied > 0
+            ? "Paid"
+            : "Payment due");
         lastId = await insertFinanceTransaction({
           booking,
           paymentPhase: "full",
           paymentMethod,
-          amount: dueFee,
+          amount: settled.amountDue,
           status: feeStatus,
           clientName: booking.customer_name,
           clientEmail: booking.customer_email,
@@ -1911,22 +1925,39 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
           }],
           docSuffix: "-LCF",
           entryLabel: "Late Cancellation Booking Fee",
+          feeSettlement: {
+            feeTotal: settled.feeTotal,
+            prepaidApplied: settled.prepaidApplied,
+          },
         });
       }
     } else {
       // Paid fee sync when stamp is partial (show flag XOR percent) but amount was paid.
       const overrideFee = roundMoney(Number(amountOverride));
+      const settledOverride = settleProtectiveFee({
+        feeTotal: overrideFee,
+        prepaidAvailable: prepaidRemaining,
+        netsPrepaid: protectiveFeeNetsPrepaid("lateCancellation", true),
+      });
+      const overrideStatus =
+        statusOverride ||
+        (settledOverride.amountDue <= 0 && settledOverride.prepaidApplied > 0
+          ? "Paid"
+          : "Payment due");
       if (
         (showLateCancellation || percent > 0) &&
         overrideFee > 0 &&
-        isSettledFinanceStatus(feeStatus)
+        isSettledFinanceStatus(overrideStatus)
       ) {
+        prepaidRemaining = roundMoney(
+          Math.max(0, prepaidRemaining - settledOverride.prepaidApplied),
+        );
         lastId = await insertFinanceTransaction({
           booking,
           paymentPhase: "full",
           paymentMethod,
-          amount: overrideFee,
-          status: feeStatus,
+          amount: settledOverride.amountDue,
+          status: overrideStatus,
           clientName: booking.customer_name,
           clientEmail: booking.customer_email,
           clientType: resolveClientType(booking),
@@ -1958,6 +1989,10 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
           }],
           docSuffix: "-LCF",
           entryLabel: "Late Cancellation Booking Fee",
+          feeSettlement: {
+            feeTotal: settledOverride.feeTotal,
+            prepaidApplied: settledOverride.prepaidApplied,
+          },
         });
       }
     }
@@ -1969,12 +2004,22 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
       lrf.amount > 0 &&
       !(await hasSettledFeeRow(booking, "Late Rescheduling Fee"))
     ) {
+      const settledLrf = settleProtectiveFee({
+        feeTotal: lrf.amount,
+        prepaidAvailable: prepaidRemaining,
+        netsPrepaid: lrf.netsPrepaid,
+      });
+      const lrfStatus =
+        statusOverride ||
+        (settledLrf.amountDue <= 0 && settledLrf.prepaidApplied > 0
+          ? "Paid"
+          : "Payment due");
       lastId = await insertFinanceTransaction({
         booking,
         paymentPhase: "full",
         paymentMethod,
-        amount: lrf.amount,
-        status: feeStatus,
+        amount: settledLrf.amountDue,
+        status: lrfStatus,
         clientName: booking.customer_name,
         clientEmail: booking.customer_email,
         clientType: resolveClientType(booking),
@@ -1984,6 +2029,10 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
         lineItems: [lrf.line],
         docSuffix: "-LRF",
         entryLabel: "Late Rescheduling Fee",
+        feeSettlement: {
+          feeTotal: settledLrf.feeTotal,
+          prepaidApplied: settledLrf.prepaidApplied,
+        },
       });
     }
 
@@ -2193,12 +2242,29 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
       phase === "full" &&
       fullLines.length === 1 &&
       String(fullLines[0]?.sourceReference ?? "").startsWith("late-reschedule");
+    const lrfOnly = lateRescheduleOnly ? resolveLateRescheduleFee(meta, booking) : null;
+    const settledLrfOnly = lrfOnly
+      ? settleProtectiveFee({
+          feeTotal: lrfOnly.amount,
+          prepaidAvailable: prepaidAmount,
+          netsPrepaid: lrfOnly.netsPrepaid,
+        })
+      : null;
+    const lrfOnlyStatus = settledLrfOnly
+      ? statusOverride ||
+        (settledLrfOnly.amountDue <= 0 && settledLrfOnly.prepaidApplied > 0
+          ? "Paid"
+          : "Payment due")
+      : status;
     const id = await insertFinanceTransaction({
       booking,
       paymentPhase: phase,
       paymentMethod,
-      amount: amountOverride ?? (phase === "prepay" ? prepaidAmount : roundMoney(booking.total_price)),
-      status,
+      amount: settledLrfOnly
+        ? settledLrfOnly.amountDue
+        : amountOverride ??
+          (phase === "prepay" ? prepaidAmount : roundMoney(booking.total_price)),
+      status: lateRescheduleOnly ? lrfOnlyStatus : status,
       clientName: booking.customer_name,
       clientEmail: booking.customer_email,
       clientType: resolveClientType(booking),
@@ -2213,6 +2279,14 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
           : lateRescheduleOnly
             ? "Late Rescheduling Fee"
             : null,
+      ...(settledLrfOnly
+        ? {
+            feeSettlement: {
+              feeTotal: settledLrfOnly.feeTotal,
+              prepaidApplied: settledLrfOnly.prepaidApplied,
+            },
+          }
+        : {}),
     });
     return id;
   }

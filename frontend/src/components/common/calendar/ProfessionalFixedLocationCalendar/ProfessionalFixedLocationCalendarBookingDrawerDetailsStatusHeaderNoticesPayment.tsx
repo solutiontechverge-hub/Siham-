@@ -1,21 +1,12 @@
 "use client";
 
-import {
-  mollureLabelSx,
-} from "../../../../theme/mollureHierarchy";
+import { mollureLabelSx } from "../../../../theme/mollureHierarchy";
 
-import {
-  Box,
-  Stack,
-} from "@mui/material";
+import { Box, Stack } from "@mui/material";
 
-import {
-  alpha,
-} from "@mui/material/styles";
+import { alpha } from "@mui/material/styles";
 
-import {
-  BodyText,
-} from "../../../ui/typography";
+import { BodyText } from "../../../ui/typography";
 
 import AppButton from "../../AppButton";
 
@@ -25,14 +16,15 @@ import { useProfessionalFixedLocationCalendar } from "./useProfessionalFixedLoca
 
 type Vm = ReturnType<typeof useProfessionalFixedLocationCalendar>;
 
-export type ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderNoticesPaymentBag = Pick<
-  Vm,
-  | "m"
-  | "postBookingPendingPayment"
-  | "setFocusSalesCardId"
-  | "setSlotDrawerTab"
-  | "viewingBookingPaymentDue"
->;
+export type ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderNoticesPaymentBag =
+  Pick<
+    Vm,
+    | "m"
+    | "postBookingPendingPayment"
+    | "setFocusSalesCardId"
+    | "setSlotDrawerTab"
+    | "viewingBookingPaymentDue"
+  >;
 
 type Props = {
   bag: ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderNoticesPaymentBag;
@@ -49,6 +41,9 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
     viewingBookingPaymentDue,
   } = bag;
 
+  const pastDue = Boolean(viewingBookingPaymentDue?.pastDue);
+  const accent = pastDue ? "#E85D5D" : m.teal;
+
   return (
     <>
       {viewingBookingPaymentDue ? (
@@ -62,9 +57,11 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
             alignItems: "center",
             justifyContent: "space-between",
             gap: 1,
-            bgcolor: alpha(m.teal, 0.07),
-            border: `1px solid ${alpha(m.teal, 0.22)}`,
-            backgroundImage: `linear-gradient(135deg, ${alpha("#fff", 0.7)} 0%, ${alpha(m.teal, 0.04)} 100%)`,
+            bgcolor: alpha(accent, pastDue ? 0.1 : 0.07),
+            border: `1px solid ${alpha(accent, pastDue ? 0.28 : 0.22)}`,
+            backgroundImage: pastDue
+              ? undefined
+              : `linear-gradient(135deg, ${alpha("#fff", 0.7)} 0%, ${alpha(m.teal, 0.04)} 100%)`,
           }}
         >
           <Stack
@@ -80,7 +77,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
                 width: 28,
                 height: 28,
                 borderRadius: "9px",
-                bgcolor: alpha(m.teal, 0.12),
+                bgcolor: alpha(accent, pastDue ? 0.16 : 0.12),
                 flexShrink: 0,
               }}
             >
@@ -93,7 +90,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
                   lineHeight: 1.2,
                 }}
               >
-                {viewingBookingPaymentDue.reissued
+                {viewingBookingPaymentDue.reissued || pastDue
                   ? "Reissue Invoice"
                   : "Payment Due"}
               </BodyText>
@@ -110,17 +107,35 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
               </BodyText>
             </Box>
           </Stack>
-          <BodyText
-            sx={{
-              fontSize: 13,
-              fontWeight: 900,
-              color: m.teal,
-              flexShrink: 0,
-              letterSpacing: "0.01em",
-            }}
-          >
-            {viewingBookingPaymentDue.dateLabel}
-          </BodyText>
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ flexShrink: 0 }}>
+            <BodyText
+              sx={{
+                fontSize: 13,
+                fontWeight: 900,
+                color: pastDue ? accent : m.teal,
+                letterSpacing: "0.01em",
+              }}
+            >
+              {viewingBookingPaymentDue.dateLabel}
+            </BodyText>
+            {pastDue ? (
+              <AppButton
+                tone="secondary"
+                onClick={() => {
+                  setFocusSalesCardId(null);
+                  setSlotDrawerTab("sales");
+                }}
+                sx={{
+                  height: 32,
+                  minWidth: 64,
+                  px: 1.5,
+                  fontSize: 12,
+                }}
+              >
+                View
+              </AppButton>
+            ) : null}
+          </Stack>
         </Box>
       ) : null}
 

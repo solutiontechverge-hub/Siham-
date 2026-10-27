@@ -188,11 +188,20 @@ export function useSalesOverview({
   const parsedCurrentId = currentEvent
     ? parseApiCalendarEventId(currentEvent.id)
     : null;
+  // Prefer this booking's code/uuid — never fall back to another client booking first.
   const financeBookingId =
     currentEvent?.bookingCode ||
-    bookings[0]?.unique_code ||
     (parsedCurrentId?.kind === "booking" ? parsedCurrentId.id : null) ||
-    bookings[0]?.id ||
+    bookings.find((b) =>
+      parsedCurrentId?.kind === "booking"
+        ? String(b.id) === String(parsedCurrentId.id)
+        : false,
+    )?.unique_code ||
+    bookings.find((b) =>
+      parsedCurrentId?.kind === "booking"
+        ? String(b.id) === String(parsedCurrentId.id)
+        : false,
+    )?.id ||
     "";
   // Live while Sales is open: remount refetch + short poll so Paid LCF/LRF/NS appear without manual refresh.
   const { data: financeResponse, isError: financeQueryError } =
@@ -459,6 +468,18 @@ export function useSalesOverview({
         card.kind === "addon"
           ? card.id.replace(/^addon-/, "").replace(/-v\d+$/, "")
           : undefined;
+      const isFeeSummaryCard =
+        card.title === "Fee Summary" || card.title === "No-Show Fee Invoice";
+      const firstFeeLineId = String(card.lines?.[0]?.id ?? "");
+      const feeEntryLabel = isFeeSummaryCard
+        ? firstFeeLineId.includes("late-reschedule")
+          ? "Late Rescheduling Fee"
+          : firstFeeLineId.includes("no-show")
+            ? "No-show fee"
+            : firstFeeLineId.includes("late-cancellation")
+              ? "Late Cancellation Booking Fee"
+              : undefined
+        : undefined;
       const matchOpts = {
         bookingId: card.bookingId,
         bookingCode: card.bookingCode,
@@ -466,12 +487,12 @@ export function useSalesOverview({
         addonId,
         transactionId: card.financeTransactionId,
         // Fee Summary / No-Show cards share after_treatment kind — pin protective fee docs.
-        protectiveFee:
-          card.title === "Fee Summary" || card.title === "No-Show Fee Invoice"
-            ? true
-            : card.kind === "after_treatment"
-              ? false
-              : undefined,
+        protectiveFee: isFeeSummaryCard
+          ? true
+          : card.kind === "after_treatment"
+            ? false
+            : undefined,
+        entryLabel: feeEntryLabel,
       };
       const cached = findIssuedFinanceTransaction(
         financeResponse?.data?.rows ?? [],
@@ -1339,14 +1360,17 @@ export function useSalesOverview({
     }
   };
 
-  const handleReissue = async (payload: {
-    penaltyType: "fixed" | "percentage";
-    penaltyValue: number;
-    penaltyAmount: number;
-    dueDate: string;
-  }) => {
-    if (!overdueCard) return;
-    const card = overdueCard;
+  const handleReissue = async (
+    payload: {
+      penaltyType: "fixed" | "percentage";
+      penaltyValue: number;
+      penaltyAmount: number;
+      dueDate: string;
+    },
+    cardOverride?: SalesOverviewCardData | null,
+  ) => {
+    const card = cardOverride ?? overdueCard;
+    if (!card) return;
     upsertSalesCardMeta({
       bookingId: card.bookingId,
       cardKind: "reissued_invoice",
@@ -1365,6 +1389,36 @@ export function useSalesOverview({
       severity: "success",
       message: SALES_OVERVIEW_COPY.invoiceReissued,
     });
+
+    // Keep client booking notes in sync so Pay Now + new due date appear.
+    const booking = bookings.find(
+      (b) =>
+        String(b.id) === String(card.bookingId) ||
+        b.unique_code === card.bookingCode,
+    );
+    if (booking) {
+      const parsed = parseCalendarEntryNotes(booking.notes);
+      const nextDetails = {
+        ...(parsed ?? {}),
+        waitingForPayment: true,
+        invoiceDueDate: payload.dueDate,
+      };
+      const nextNotes = serializeCalendarEntryNotes(
+        nextDetails.internalNote ?? "",
+        nextDetails,
+        parseStoredEbrFromNotes(booking.notes),
+        parseStoredErFromNotes(booking.notes),
+      );
+      try {
+        await updateBookingStatus({
+          id: String(booking.id),
+          status: allowedBookingStatus(booking.status),
+          notes: nextNotes,
+        }).unwrap();
+      } catch {
+        // Finance reissue is authoritative; notes sync is best-effort.
+      }
+    }
 
     await notifyClientInvoiceReissue({
       bookingId: card.bookingId,
@@ -1493,9 +1547,11 @@ export function useSalesOverview({
     }
   };
 
-  // Manual reissue modal seeds from issued snapshot terms when available.
+  // Manual reissue seeds from issued snapshot terms when available.
   const overduePaymentTerms = React.useMemo(() => {
-    const txId = overdueCard?.financeTransactionId;
+    const txId =
+      overdueCard?.financeTransactionId ??
+      overdueManualCard?.financeTransactionId;
     if (!txId) return financeSettings.paymentTerms;
     const snap = financeHints.find(
       (hint) => String(hint.transactionId) === String(txId),
@@ -1503,7 +1559,12 @@ export function useSalesOverview({
     return snap
       ? { ...financeSettings.paymentTerms, ...snap }
       : financeSettings.paymentTerms;
-  }, [financeHints, financeSettings.paymentTerms, overdueCard?.financeTransactionId]);
+  }, [
+    financeHints,
+    financeSettings.paymentTerms,
+    overdueCard?.financeTransactionId,
+    overdueManualCard?.financeTransactionId,
+  ]);
 
   return {
     cancelling,

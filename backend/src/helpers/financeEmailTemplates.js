@@ -51,12 +51,11 @@ export const buildInvoicePreDueReminderEmail = (ctx) => {
 };
 
 export const buildInvoicePostDueReminderEmail = (ctx) => {
-  const paymentUrl = ctx.paymentUrl || buildPaymentUrl(ctx.bookingId);
   const invoiceUrl = ctx.invoiceUrl || buildInvoiceUrl(ctx.bookingId);
   const html = wrapEmail(`
-    <h1 style="margin:0 0 8px;font-size:24px;color:#1a2b42;">Overdue invoice</h1>
+    <h1 style="margin:0 0 8px;font-size:24px;color:#1a2b42;">Invoice due date passed</h1>
     <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#5c6778;">
-      Your invoice is now overdue. Please complete your payment as soon as possible.
+      The payment due date for your invoice has passed. Please wait while your professional reissues the invoice with updated terms. You will be notified when you can pay.
     </p>
     ${detailsBox([
       { label: "Invoice", value: ctx.documentNumber || "—" },
@@ -66,10 +65,9 @@ export const buildInvoicePostDueReminderEmail = (ctx) => {
     ])}
     <div style="margin-top:8px;">
       ${secondaryButton("Invoice PDF", invoiceUrl)}
-      ${primaryButton("Payment link", paymentUrl)}
     </div>
   `);
-  const text = `Overdue invoice\nDue: ${formatDate(ctx.dueDate)}\nAmount: ${formatEuro(ctx.amount)}\nPay: ${paymentUrl}`;
+  const text = `Invoice due date passed\nDue: ${formatDate(ctx.dueDate)}\nAmount: ${formatEuro(ctx.amount)}\nPlease wait while your professional reissues the invoice.`;
   return { html, text };
 };
 

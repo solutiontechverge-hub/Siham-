@@ -19,6 +19,7 @@ export type PaymentSummaryLine = {
   amount: number;
   showInvoice?: boolean;
   showReceipt?: boolean;
+  showPayNow?: boolean;
   note?: string;
 };
 
@@ -32,6 +33,10 @@ type BuildInput = {
   requiresPrepayment?: boolean;
   prepaymentPercent?: number;
   paymentDue?: boolean;
+  /** Invoice due date is before today — hide Pay Now, show wait note. */
+  paymentOverdue?: boolean;
+  /** Label for the active invoice due date (shown after reissue). */
+  invoiceDueDateLabel?: string | null;
   hasEditPrepayment?: boolean;
   paymentDateIso?: string | null;
   paymentTime?: string | null;
@@ -40,14 +45,28 @@ type BuildInput = {
   /** Offline prepayment still appears as "Prepayment" before online capture. */
   showUnpaidPrepayment?: boolean;
   shopName?: string | null;
-  /** Paid LCF/LRF/NS finance rows — Fee Summary only when fee is settled. */
+  /** Charged LCF/LRF/NS finance rows (due or settled) for Fee Summary. */
   paidProtectiveFees?: ReadonlyArray<{
     entryLabel?: string | null;
     amount: number;
     dateLabel?: string;
     methodLabel?: string;
+    status?: string;
+    transactionId?: string;
+    settled?: boolean;
   }>;
 };
+
+function protectiveFeeLineId(fee: {
+  entryLabel?: string | null;
+  transactionId?: string;
+}): string {
+  if (fee.transactionId) return `fee-tx-${fee.transactionId}`;
+  const label = String(fee.entryLabel ?? "").trim();
+  if (label === LATE_RESCHEDULING_FEE) return "fee-lrf";
+  if (label.toLowerCase() === "no-show fee") return "fee-ns";
+  return "fee-lcf";
+}
 
 function sumServices(services: ClientBookingDraftService[]): number {
   return Math.round((services.reduce((sum, s) => sum + s.price, 0) + Number.EPSILON) * 100) / 100;
@@ -78,6 +97,8 @@ export function buildClientBookingPaymentSummary(input: BuildInput): PaymentSumm
     requiresPrepayment = false,
     prepaymentPercent = 0,
     paymentDue = false,
+    paymentOverdue = false,
+    invoiceDueDateLabel = null,
     hasEditPrepayment = false,
     paymentDateIso,
     paymentTime,
@@ -87,6 +108,18 @@ export function buildClientBookingPaymentSummary(input: BuildInput): PaymentSumm
     shopName,
     paidProtectiveFees = [],
   } = input;
+  const dueStatus = paymentOverdue
+    ? "Overdue"
+    : paymentDue
+      ? "Payment Due"
+      : paid
+        ? "Paid"
+        : "Pending";
+  const dueNote = paymentOverdue
+    ? "Due date passed — please wait while the professional reissues your invoice."
+    : paymentDue && invoiceDueDateLabel
+      ? `Due date ${invoiceDueDateLabel}`
+      : undefined;
 
   if (!draft?.services?.length && !paidProtectiveFees.length) return [];
 
@@ -96,6 +129,7 @@ export function buildClientBookingPaymentSummary(input: BuildInput): PaymentSumm
   );
   const methodLabel = formatFinanceMethodLabel(paymentMethod);
   const offline = isOfflinePaymentMethod(paymentMethod);
+  const canPayNow = paymentDue && !paymentOverdue && !offline;
   const visitNote = formatOfflinePrepaymentVisitNote(shopName, bookingDate);
   const total =
     draft?.total ??
@@ -142,28 +176,37 @@ export function buildClientBookingPaymentSummary(input: BuildInput): PaymentSumm
     }
   }
 
-  const paidFees = paidProtectiveFees.filter(
+  const chargedFees = paidProtectiveFees.filter(
     (fee) =>
       isProtectiveFeeEntryLabel(fee.entryLabel) &&
       Number.isFinite(fee.amount) &&
       fee.amount > 0,
   );
-  if (paidFees.length) {
-    const feeLines: PaymentSummaryLine[] = paidFees.map((fee, index) => {
+  if (chargedFees.length) {
+    const feeLines: PaymentSummaryLine[] = chargedFees.map((fee) => {
       const label =
         fee.entryLabel === LATE_RESCHEDULING_FEE
           ? LATE_RESCHEDULING_FEE
           : String(fee.entryLabel ?? "").toLowerCase() === "no-show fee"
             ? "No-show fee"
             : String(fee.entryLabel || LATE_CANCELLATION_BOOKING_FEE);
+      const settled =
+        fee.settled === true ||
+        ["paid", "prepaid"].includes(String(fee.status ?? "").toLowerCase());
+      const statusLabel = settled
+        ? "Paid"
+        : String(fee.status ?? "").toLowerCase() === "overdue"
+          ? "Overdue"
+          : "Payment Due";
       const when = fee.dateLabel || bookingDate;
       const method = fee.methodLabel || methodLabel;
       return {
-        id: `fee-${index}`,
-        label: `${label} - ${when} - ${method}`,
+        id: protectiveFeeLineId(fee),
+        label: `${label} - ${statusLabel} - ${when} - ${method}`,
         amount: fee.amount,
         showInvoice: true,
-        showReceipt: true,
+        showReceipt: settled,
+        note: settled ? undefined : "Invoice issued — payment pending",
       };
     });
     sections.push({
@@ -187,15 +230,16 @@ export function buildClientBookingPaymentSummary(input: BuildInput): PaymentSumm
     const amount = sumServices(standard);
     const isRequester = section.isRequester ?? section.title === requesterName;
     const labelName = isRequester ? "Main Client" : personLabel(section.title, false);
-    const status = paymentDue ? "Payment Due" : paid ? "Paid" : "Pending";
     const method = isRequester ? methodLabel : "Offline Direct";
 
     afterTreatmentLines.push({
       id: `after-treatment-${section.key}`,
-      label: `${labelName} - ${status} - ${bookingDate} - ${method}`,
+      label: `${labelName} - ${dueStatus} - ${bookingDate} - ${method}`,
       amount,
       showInvoice: isRequester && paid && !paymentDue,
       showReceipt: isRequester && paid && !paymentDue,
+      showPayNow: isRequester && canPayNow,
+      note: isRequester ? dueNote : undefined,
     });
   }
 
@@ -203,13 +247,14 @@ export function buildClientBookingPaymentSummary(input: BuildInput): PaymentSumm
     const { standard } = splitServices(draft.services);
     if (standard.length) {
       const amount = sumServices(standard);
-      const status = paymentDue ? "Payment Due" : paid ? "Paid" : "Pending";
       afterTreatmentLines.push({
         id: "after-treatment-main",
-        label: `Main Client - ${status} - ${bookingDate} - ${methodLabel}`,
+        label: `Main Client - ${dueStatus} - ${bookingDate} - ${methodLabel}`,
         amount,
         showInvoice: paid && !paymentDue,
         showReceipt: paid && !paymentDue,
+        showPayNow: canPayNow,
+        note: dueNote,
       });
     }
   }
@@ -231,11 +276,10 @@ export function buildClientBookingPaymentSummary(input: BuildInput): PaymentSumm
     const amount = sumServices(addOns);
     const isRequester = section.isRequester ?? section.title === requesterName;
     const labelName = isRequester ? "Main Client" : personLabel(section.title, false);
-    const status = paymentDue ? "Payment Due" : paid ? "Paid" : "Pending";
 
     addOnLines.push({
       id: `addon-${section.key}`,
-      label: `${labelName} - ${status} - ${bookingDate} - Offline Direct`,
+      label: `${labelName} - ${dueStatus} - ${bookingDate} - Offline Direct`,
       amount,
     });
   }
@@ -244,10 +288,9 @@ export function buildClientBookingPaymentSummary(input: BuildInput): PaymentSumm
     const { addOns } = splitServices(draft.services);
     if (addOns.length) {
       const amount = sumServices(addOns);
-      const status = paymentDue ? "Payment Due" : paid ? "Paid" : "Pending";
       addOnLines.push({
         id: "addon-main",
-        label: `Main Client - ${status} - ${bookingDate} - Offline Direct`,
+        label: `Main Client - ${dueStatus} - ${bookingDate} - Offline Direct`,
         amount,
       });
     }

@@ -1472,7 +1472,8 @@ export function resolveProtectiveFeeSalesCardSpec(input: {
   });
 
   const hint = input.financeFeeHint;
-  const hintAmount = Number(hint?.amount);
+  // Prefer gross feeTotal — net amount can be €0 when prepaid covered the fee.
+  const hintAmount = Number(hint?.feeTotal ?? hint?.amount);
   const hasChargedFeeHint =
     Boolean(hint) &&
     isChargedProtectiveFeeStatus(hint?.status) &&
@@ -1696,7 +1697,13 @@ export function buildCardsForEvent(input: {
 }): SalesOverviewCardData[] {
   const { event, booking, clientName, clientEmail, clientPhone, clientKind, ctx } = input;
   const { lines } = buildLinesFromEvent(event);
-  const status = String(booking?.status ?? event.status ?? "").toLowerCase();
+  // Drawer currentEvent is live UI status; stale myBookings row must not win over it.
+  const status = String(
+    (input.isCurrent ? event.status : null) ??
+      booking?.status ??
+      event.status ??
+      "",
+  ).toLowerCase();
   const isCancelled = status === "cancelled" || status === "canceled";
   const isInvalid = status === "invalid" || isBookingRequestRejected(event);
 
@@ -1969,6 +1976,11 @@ export function buildCardsForEvent(input: {
       card.statusBadge = due.statusBadgeOverride;
       card.paymentState = "payment_due";
       card.highlightAmount = paymentAmount;
+    }
+    // Pin first charged fee tx so View Invoice opens the matching finance doc.
+    const firstFeeTx = financeFeeHints[0]?.transactionId;
+    if (firstFeeTx && !card.financeTransactionId) {
+      card.financeTransactionId = String(firstFeeTx);
     }
     return card;
   };

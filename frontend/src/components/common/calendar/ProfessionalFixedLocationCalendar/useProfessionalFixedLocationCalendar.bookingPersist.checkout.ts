@@ -142,9 +142,18 @@ export function useProfessionalFixedLocationCalendarBookingPersistCheckout(
         (payer) => !payer.paid && payer.paymentAmount > 0,
       ).length;
       const allSettled = stillUnpaid === 0 && isDirect;
-      const nextStatus: CalendarEvent["status"] = allSettled
-        ? "Completed"
-        : "In Progress";
+      // Protective-fee checkout on Cancelled / No Show must keep that status.
+      const statusLower = String(current.status ?? "").toLowerCase();
+      const isProtectiveFeeCheckout =
+        statusLower === "cancelled" ||
+        statusLower === "canceled" ||
+        statusLower === "no show" ||
+        statusLower === "no_show";
+      const nextStatus: CalendarEvent["status"] = isProtectiveFeeCheckout
+        ? current.status
+        : allSettled
+          ? "Completed"
+          : "In Progress";
       const nextDetails = {
         ...(current.details ?? {}),
         ...basePatch,

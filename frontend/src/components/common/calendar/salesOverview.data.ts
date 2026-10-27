@@ -17,6 +17,9 @@ export const SALES_OVERVIEW_COPY = {
   afterTreatmentSummary: "After treatment Summary",
   totalAmount: "Total Amount",
   payment: "Payment",
+  pastDueAlert:
+    "This Invoice Is Past Due Date. You Can Reissue It With Updated Terms.",
+  reissueInvoiceTitle: "Reissue invoice",
   penaltyInvoiceTitle: "Penalty invoice",
   penaltyInvoiceSubtitle:
     "This invoice is overdue. Send a penalty invoice to the client.",
