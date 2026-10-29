@@ -242,7 +242,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsCal
                           }
                         }}
                         sx={{
-                          height: 28,
+                          height: 34,
                           fontSize: 10,
                           fontWeight: 900,
                           bgcolor: active ? m.teal : "#fff",

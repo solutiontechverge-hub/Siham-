@@ -16,7 +16,49 @@ import type {
 import { isOutgoingBookingRequest } from "./bookingRequestNegotiation";
 import { parseStoredEbrFromNotes } from "./bookingEventDetails";
 import { prepayBlocksConfirmation } from "./bookingAcknowledgment";
+import { parseClockToMinutes } from "./calendar.utils";
 import { resolveCalendarPrepaymentStatus } from "./prepaymentStatus";
+
+/** Local wall-clock ms for calendar `date` + `start`/`end` (HH:MM). */
+function bookingSlotMs(dateIso: string | undefined, hhmm: string | undefined): number | null {
+  if (!dateIso || !hhmm || !/^\d{4}-\d{2}-\d{2}$/.test(dateIso)) return null;
+  const mins = parseClockToMinutes(hhmm);
+  if (mins == null) return null;
+  return new Date(
+    Number(dateIso.slice(0, 4)),
+    Number(dateIso.slice(5, 7)) - 1,
+    Number(dateIso.slice(8, 10)),
+    Math.floor(mins / 60),
+    mins % 60,
+    0,
+    0,
+  ).getTime();
+}
+
+/**
+ * Time-based status (mirrors backend auto jobs).
+ * Cancelled / No Show / Invalid / etc. are never overridden.
+ * Confirmed: start→In Progress, end→Completed.
+ * In Progress: end→Completed (auto checkout trigger).
+ */
+export function resolveTimeBasedCalendarStatus(
+  event: Pick<CalendarEvent, "status"> &
+    Partial<Pick<CalendarEvent, "date" | "start" | "end">>,
+  now: Date = new Date(),
+): CalendarBookingStatus {
+  const endMs = bookingSlotMs(event.date, event.end);
+  const t = now.getTime();
+  if (event.status === "In Progress") {
+    if (endMs != null && t >= endMs) return "Completed";
+    return "In Progress";
+  }
+  if (event.status !== "Confirmed") return event.status;
+  const startMs = bookingSlotMs(event.date, event.start);
+  if (startMs == null || endMs == null) return event.status;
+  if (t >= startMs && t < endMs) return "In Progress";
+  if (t >= endMs) return "Completed";
+  return event.status;
+}
 
 export type BookingScenarioIndicator = "BR" | "EBR" | "ER" | "E";
 
@@ -94,22 +136,30 @@ export function professionalCalendarDisplayStatus(
   event: Pick<
     CalendarEvent,
     "status" | "details" | "bookingType" | "bookingScenario"
-  >,
+  > &
+    Partial<Pick<CalendarEvent, "date" | "start" | "end">>,
 ): CalendarBookingStatus {
   // Finance refund stamps notes.refunded — Status chip must follow, not stay Confirmed.
   if (event.details?.refunded) return "Refunded";
   if (professionalWaitingForClientPrepay(event)) return "Requested";
   if (event.status === "BR Accepted") return "Confirmed";
-  return event.status;
+  return resolveTimeBasedCalendarStatus(event);
 }
 
 /** Professional calendar chip — BR Accepted with unpaid prepay reads as Requested. */
 export function professionalCalendarStatusLabel(
-  event: Pick<CalendarEvent, "status" | "details" | "bookingType" | "bookingScenario">,
+  event: Pick<
+    CalendarEvent,
+    "status" | "details" | "bookingType" | "bookingScenario"
+  > &
+    Partial<Pick<CalendarEvent, "date" | "start" | "end">>,
 ): string {
   if (event.details?.refunded) return "Refunded";
   if (professionalWaitingForClientPrepay(event)) return "Requested";
-  return calendarBookingStatusLabel(event);
+  return calendarBookingStatusLabel({
+    ...event,
+    status: resolveTimeBasedCalendarStatus(event),
+  });
 }
 
 type StatusTheme = {

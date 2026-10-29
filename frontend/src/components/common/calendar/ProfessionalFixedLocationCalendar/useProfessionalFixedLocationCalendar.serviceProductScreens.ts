@@ -159,6 +159,7 @@ export function useProfessionalFixedLocationCalendarServiceProductScreens(
     draftFromBookingLine: uniqueItems.draftFromBookingLine,
     isBookingDetailsSubScreen: bookingDetailsSubScreen,
     leaveUniqueItemScreen: uniqueItems.leaveUniqueItemScreen,
+    openAddProduct: uniqueItems.openAddProduct,
     openAddUniqueItem: uniqueItems.openAddUniqueItem,
     openEditBookingProductLine: uniqueItems.openEditBookingProductLine,
     openEditBookingUniqueLine: uniqueItems.openEditBookingUniqueLine,

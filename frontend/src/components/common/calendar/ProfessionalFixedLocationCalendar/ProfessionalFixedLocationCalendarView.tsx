@@ -8,9 +8,13 @@ import {
   useGetFinanceTransactionsQuery,
   useGetSalesCardMetadataQuery,
   useProcessFinanceInvoiceReissuesMutation,
+  useUpsertSalesCardMetadataMutation,
 } from "../../../../store/services/financeApi";
 import { FinancePaymentDueRowsProvider } from "../resolveBookingPaymentDueMeta";
-import { hydrateSalesCardMetadata } from "../salesOverview.storage";
+import {
+  configureSalesCardMetadataPersistence,
+  hydrateSalesCardMetadata,
+} from "../salesOverview.storage";
 import type { SalesCardMetaRecord } from "../salesOverview.types";
 import type { CalendarSubTab } from "../../../../app/professionals/fixed-location/calendar/calendar.data";
 import {
@@ -43,6 +47,7 @@ export default function ProfessionalFixedLocationCalendar(
   );
   const [processFinanceInvoiceReissues] =
     useProcessFinanceInvoiceReissuesMutation();
+  const [saveSalesCardMetadata] = useUpsertSalesCardMetadataMutation();
 
   React.useEffect(() => {
     if (!salesMetadataResponse) return;
@@ -50,6 +55,17 @@ export default function ProfessionalFixedLocationCalendar(
       (salesMetadataResponse.data ?? []) as SalesCardMetaRecord[],
     );
   }, [salesMetadataResponse]);
+
+  // Checkout runs from the booking drawer — persist sales meta without requiring Sales tab.
+  // Return the RTK promise so checkout can await PUT /api/finance/sales-card-metadata.
+  React.useEffect(() => {
+    configureSalesCardMetadataPersistence((record) =>
+      saveSalesCardMetadata(record as never)
+        .unwrap()
+        .then(() => undefined),
+    );
+    return () => configureSalesCardMetadataPersistence(null);
+  }, [saveSalesCardMetadata]);
 
   React.useEffect(() => {
     void processFinanceInvoiceReissues();

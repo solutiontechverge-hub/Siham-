@@ -147,6 +147,15 @@ export default function ProfessionalFixedLocationCalendarBookingDrawer({
                   .join(" ")
                   .trim() || undefined
               }
+              clientKind={
+                selectedClient?.clientKind ??
+                viewingBookingEvent.clientKind ??
+                viewingBookingEvent.details?.clientKind ??
+                null
+              }
+              clientPhotoSrc={
+                (selectedClient as { photoSrc?: string } | null)?.photoSrc
+              }
               // Show the configured prepayment amount during testing as well.
               // `isDrawerPrepaymentPaid` controls payment status only; it must
               // not hide the amount from the checkout/details breakdown.

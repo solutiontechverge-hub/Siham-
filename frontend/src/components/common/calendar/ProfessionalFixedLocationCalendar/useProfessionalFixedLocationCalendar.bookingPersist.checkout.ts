@@ -7,6 +7,7 @@ import {
   serializeCalendarEntryNotes,
 } from "../bookingEventDetails";
 import { extractBookingId } from "../calendar.utils";
+import { manualLinesFromBookingEvent } from "../bookingCheckoutItems";
 import {
   buildSplitBillNotesPatch,
   buildSplitPaymentAmounts,
@@ -22,6 +23,7 @@ import {
   LATE_CANCELLATION_BOOKING_FEE,
   LATE_RESCHEDULING_FEE,
 } from "../../finance-documents/protectiveFeeInvoice";
+import { getApiErrorMessage } from "../../../../lib/api-error";
 import type { UseProfessionalFixedLocationCalendarBookingPersistArgs } from "./useProfessionalFixedLocationCalendar.bookingPersist";
 
 /** Payload clientType for finance create — must not map Mollure IC → nonMollure via "individual". */
@@ -93,19 +95,21 @@ export function useProfessionalFixedLocationCalendarBookingPersistCheckout(
       if (!editingEventId || !viewingBookingEvent) return;
       const current = viewingBookingEvent;
       const prepaidApplied = isDrawerPrepaymentPaid ? prepaymentAmount : 0;
-      const allLines = (current.details?.clientSnapshot?.services ?? []).map(
-        (service, index) => ({
-          id: `${service.id}::${String(service.guestId ?? "")}::${index}`,
-          label: service.name,
-          amount: Number(service.price) || 0,
-        }),
-      );
+      // Full services+products+unique (not snapshot services only) so split notes match checkout.
+      const seededLines = manualLinesFromBookingEvent(current).map((line) => ({
+        id: line.id,
+        label:
+          line.quantity > 1 ? `${line.name} ×${line.quantity}` : line.name,
+        amount:
+          Math.round(
+            (line.quantity * line.unitPrice + Number.EPSILON) * 100,
+          ) / 100,
+      }));
+      const allLines = seededLines.length ? seededLines : result.lines;
       const shares = buildSplitPaymentAmounts({
         shares: resolveSalesPayerShares({
           event: current,
-          allLines: allLines.length
-            ? allLines
-            : result.lines,
+          allLines,
           mainClientName: selectedClient?.name || current.showClientName || "Client",
           mainClientEmail: selectedClient?.email || current.details?.clientEmail,
           mainClientPhone: [
@@ -134,7 +138,7 @@ export function useProfessionalFixedLocationCalendarBookingPersistCheckout(
       const isDirect =
         result.paymentMethod === "onlineDirect" ||
         result.paymentMethod === "offlineDirect";
-      // Invoice / non-direct leaves payers unpaid — stay In Progress until paid.
+      // Non-direct: payers stay unpaid (invoice); booking still Completes with due date.
       const nextSplit = isDirect
         ? markSplitPayersPaid(splitBase, result.payerKeys, result.paymentMethod)
         : splitBase;
@@ -142,6 +146,7 @@ export function useProfessionalFixedLocationCalendarBookingPersistCheckout(
         (payer) => !payer.paid && payer.paymentAmount > 0,
       ).length;
       const allSettled = stillUnpaid === 0 && isDirect;
+      const invoiceIssued = !isDirect && Boolean(result.dueDate);
       // Protective-fee checkout on Cancelled / No Show must keep that status.
       const statusLower = String(current.status ?? "").toLowerCase();
       const isProtectiveFeeCheckout =
@@ -151,7 +156,7 @@ export function useProfessionalFixedLocationCalendarBookingPersistCheckout(
         statusLower === "no_show";
       const nextStatus: CalendarEvent["status"] = isProtectiveFeeCheckout
         ? current.status
-        : allSettled
+        : allSettled || invoiceIssued
           ? "Completed"
           : "In Progress";
       const nextDetails = {
@@ -167,9 +172,18 @@ export function useProfessionalFixedLocationCalendarBookingPersistCheckout(
         parseStoredEbrFromNotes(current.notes),
         parseStoredErFromNotes(current.notes),
       );
-      await persistEventStatus(editingEventId, nextStatus, {
-        notes: nextNotes,
-      });
+      try {
+        await persistEventStatus(editingEventId, nextStatus, {
+          notes: nextNotes,
+        });
+      } catch (error) {
+        // Toast only — return false so BookingCheckoutFlow stays on summary (no Next overlay).
+        showSnackbar({
+          severity: "error",
+          message: getApiErrorMessage(error, "Unable to complete checkout."),
+        });
+        return false;
+      }
       setEvents((prev) =>
         prev.map((event) =>
           event.id === editingEventId
@@ -198,17 +212,44 @@ export function useProfessionalFixedLocationCalendarBookingPersistCheckout(
                 ? `${bookingId}-after-treatment`
                 : `${bookingId}-after-treatment-sub-${key}`,
             );
-      for (const cardId of cardIds) {
-        upsertSalesCardMeta({
-          bookingId,
-          cardKind: "after_treatment",
-          cardId,
-          paymentMethod: metaMethod,
-          dueDate: result.dueDate,
-          paid: isDirect,
-          paidAt: isDirect ? paidAt : null,
-          totalPrice: result.amount,
-        });
+      const mainShare = shares.find((share) => share.role === "main_client");
+      const financePayerKey =
+        result.mode === "single"
+          ? mainShare?.key || result.payerKey || "main-client"
+          : result.payerKey || "main-client";
+      const financePayerRole =
+        shares.find((share) => share.key === financePayerKey)?.role ||
+        (financePayerKey === mainShare?.key ? "main_client" : "guest");
+      const discountAmount = result.lines
+        .filter((line) => line.amount < 0)
+        .reduce((sum, line) => sum + Math.abs(line.amount), 0);
+      const chargeLines = result.lines.filter((line) => line.amount >= 0);
+
+      const persistCardMeta = (financeTransactionId?: string) =>
+        Promise.all(
+          cardIds.map((cardId) =>
+            Promise.resolve(
+              upsertSalesCardMeta({
+                bookingId,
+                cardKind: "after_treatment",
+                cardId,
+                ...(financeTransactionId ? { financeTransactionId } : {}),
+                paymentMethod: metaMethod,
+                dueDate: result.dueDate,
+                paid: isDirect,
+                paidAt: isDirect ? paidAt : null,
+                totalPrice: result.amount,
+                ...(discountAmount > 0 ? { discountAmount } : {}),
+              }),
+            ),
+          ),
+        );
+
+      // Await PUT so Sales meta survives refresh even if finance create fails.
+      try {
+        await persistCardMeta();
+      } catch {
+        // Booking notes already saved; finance create may still write sales_card_metadata.
       }
 
       try {
@@ -228,15 +269,24 @@ export function useProfessionalFixedLocationCalendarBookingPersistCheckout(
             (guest.services ?? []).map((service) => String(service.id)),
           ),
         ]);
-        await createFinanceTransaction({
+        const created = await createFinanceTransaction({
           clientName: result.payerName || selectedClient?.name || "Client",
           clientEmail: result.clientEmail || selectedClient?.email || "",
           clientType: resolveCheckoutFinanceClientType(selectedClient),
           paymentMethod: result.paymentMethod,
           totalPrice: result.amount,
-          dueDate: result.dueDate,
-          lines: result.lines.map((line) => {
-            const sourceReference = String(line.id).split("::")[0];
+          dueDate: result.dueDate ?? undefined,
+          ...(prepaidApplied > 0 ? { prepaymentAmount: prepaidApplied } : {}),
+          ...(discountAmount > 0 ? { discountAmount } : {}),
+          lines: chargeLines.map((line) => {
+            const parts = String(line.id).split("::");
+            const sourceReference = parts[0];
+            const assigneeKey = parts.length >= 2 ? parts[1] : "";
+            const ownerShare =
+              shares.find((share) => share.key === assigneeKey) ||
+              (!assigneeKey
+                ? shares.find((share) => share.role === "main_client")
+                : undefined);
             const sourceType =
               productIds.has(sourceReference)
                 ? "productId"
@@ -246,21 +296,39 @@ export function useProfessionalFixedLocationCalendarBookingPersistCheckout(
                       sourceReference === "kilometer-allowance" ||
                       sourceReference.startsWith("late-reschedule") ||
                       sourceReference.startsWith("late-cancellation") ||
-                      sourceReference.startsWith("no-show") ||
-                      sourceReference === "discount"
+                      sourceReference.startsWith("no-show")
                     ? "uniqueItemCode"
                     : "serviceId";
+            // Unique catalog ids are product-shaped in booking bags — prefer uniqueItemCode.
+            const resolvedType =
+              sourceReference.startsWith("unique-") ||
+              sourceReference === "kilometer-allowance"
+                ? "uniqueItemCode"
+                : sourceType;
             return {
               name: line.label,
               quantity: 1,
               unitPrice: line.amount,
               sourceReference,
-              sourceType,
+              sourceType: resolvedType,
+              ...(assigneeKey ? { assigneeKey } : {}),
+              partyRole: ownerShare?.role ?? financePayerRole,
+              partyName:
+                ownerShare?.displayName ||
+                ownerShare?.label ||
+                result.payerName ||
+                selectedClient?.name ||
+                "Client",
             };
           }),
           bookingId,
           bookingRef: current.bookingCode,
           paymentPhase: "full",
+          payerKey: financePayerKey,
+          payerRole: financePayerRole,
+          entryType: String(result.paymentMethod).startsWith("offline")
+            ? "offlineBooking"
+            : "onlineBooking",
           entryLabel: resolveCheckoutEntryLabel({
             mode: result.mode,
             payerLabel: result.payerLabel,
@@ -268,6 +336,14 @@ export function useProfessionalFixedLocationCalendarBookingPersistCheckout(
             lines: result.lines,
           }),
         }).unwrap();
+        const financeTransactionId = created?.data?.id;
+        if (financeTransactionId) {
+          try {
+            await persistCardMeta(financeTransactionId);
+          } catch {
+            // Backend createFinanceTransaction already ensureSalesCardMetadataForFinanceRow.
+          }
+        }
       } catch {
         showSnackbar({
           severity: "warning",
@@ -275,12 +351,13 @@ export function useProfessionalFixedLocationCalendarBookingPersistCheckout(
         });
       }
 
-      if (allSettled) {
+      if (allSettled || invoiceIssued) {
         showSnackbar({
           severity: "success",
-          message: "Checkout complete.",
+          message: invoiceIssued ? "Invoice issued." : "Checkout complete.",
         });
       }
+      return true;
     },
     [
       bookingPhoneDraft.phoneCode,

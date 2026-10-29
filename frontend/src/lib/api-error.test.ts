@@ -1,39 +1,38 @@
-import { describe, expect, it } from "vitest";
+/**
+ * Run with: npx --yes tsx src/lib/api-error.test.ts
+ */
+import assert from "node:assert/strict";
 import { getApiErrorMessage, isApiRequestAborted } from "./api-error";
 
-describe("api-error", () => {
-  it("does not treat aborted requests as offline", () => {
-    const aborted = {
-      status: "FETCH_ERROR",
-      error: "AbortError: The user aborted a request.",
-    };
-    expect(isApiRequestAborted(aborted)).toBe(true);
-    expect(getApiErrorMessage(aborted, "fallback")).toBe("");
-  });
+const aborted = {
+  status: "FETCH_ERROR",
+  error: "AbortError: The user aborted a request.",
+};
+assert.equal(isApiRequestAborted(aborted), true);
+assert.equal(getApiErrorMessage(aborted, "fallback"), "");
 
-  it("maps failed fetch to the shared offline message", () => {
-    const offline = {
-      status: "FETCH_ERROR",
-      error: "TypeError: Failed to fetch",
-    };
-    expect(isApiRequestAborted(offline)).toBe(false);
-    expect(getApiErrorMessage(offline, "fallback")).toBe(
-      "Unable to connect right now. Please check your connection and try again.",
-    );
-  });
+const offline = {
+  status: "FETCH_ERROR",
+  error: "TypeError: Failed to fetch",
+};
+assert.equal(isApiRequestAborted(offline), false);
+assert.equal(
+  getApiErrorMessage(offline, "fallback"),
+  "Unable to connect right now. Please check your connection and try again.",
+);
 
-  it("prefers API validation messages", () => {
-    expect(
-      getApiErrorMessage(
-        {
-          status: 400,
-          data: {
-            message: "Validation failed.",
-            data: { errors: [{ message: "business_setup_id must be a valid UUID." }] },
-          },
-        },
-        "fallback",
-      ),
-    ).toBe("Validation failed. business_setup_id must be a valid UUID.");
-  });
-});
+assert.equal(
+  getApiErrorMessage(
+    {
+      status: 400,
+      data: {
+        message: "Validation failed.",
+        data: { errors: [{ message: "business_setup_id must be a valid UUID." }] },
+      },
+    },
+    "fallback",
+  ),
+  "Validation failed. business_setup_id must be a valid UUID.",
+);
+
+console.log("api-error.test.ts: ok");

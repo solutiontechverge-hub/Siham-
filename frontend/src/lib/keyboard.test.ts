@@ -1,32 +1,27 @@
-import { describe, expect, it } from "vitest";
+/**
+ * Run with: npx --yes tsx src/lib/keyboard.test.ts
+ */
+import assert from "node:assert/strict";
 import { isModKey, resolveListboxNavKey } from "./keyboard";
 
-describe("isModKey", () => {
-  it("treats meta and ctrl as modifiers", () => {
-    expect(isModKey({ metaKey: true, ctrlKey: false })).toBe(true);
-    expect(isModKey({ metaKey: false, ctrlKey: true })).toBe(true);
-    expect(isModKey({ metaKey: false, ctrlKey: false })).toBe(false);
-  });
+assert.equal(isModKey({ metaKey: true, ctrlKey: false }), true);
+assert.equal(isModKey({ metaKey: false, ctrlKey: true }), true);
+assert.equal(isModKey({ metaKey: false, ctrlKey: false }), false);
+
+assert.deepEqual(resolveListboxNavKey("ArrowDown", 0, 3), {
+  type: "move",
+  index: 1,
+});
+assert.deepEqual(resolveListboxNavKey("ArrowUp", 1, 3), {
+  type: "move",
+  index: 0,
+});
+assert.deepEqual(resolveListboxNavKey("Enter", 1, 3), { type: "select" });
+assert.deepEqual(resolveListboxNavKey("Escape", 1, 3), { type: "close" });
+
+assert.deepEqual(resolveListboxNavKey(" ", 0, 2), { type: "none" });
+assert.deepEqual(resolveListboxNavKey(" ", 0, 2, { spaceSelects: true }), {
+  type: "select",
 });
 
-describe("resolveListboxNavKey", () => {
-  it("moves highlight with arrows and selects with Enter", () => {
-    expect(resolveListboxNavKey("ArrowDown", 0, 3)).toEqual({
-      type: "move",
-      index: 1,
-    });
-    expect(resolveListboxNavKey("ArrowUp", 1, 3)).toEqual({
-      type: "move",
-      index: 0,
-    });
-    expect(resolveListboxNavKey("Enter", 1, 3)).toEqual({ type: "select" });
-    expect(resolveListboxNavKey("Escape", 1, 3)).toEqual({ type: "close" });
-  });
-
-  it("only selects on Space when spaceSelects is enabled", () => {
-    expect(resolveListboxNavKey(" ", 0, 2)).toEqual({ type: "none" });
-    expect(resolveListboxNavKey(" ", 0, 2, { spaceSelects: true })).toEqual({
-      type: "select",
-    });
-  });
-});
+console.log("keyboard.test.ts: ok");

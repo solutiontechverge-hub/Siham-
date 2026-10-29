@@ -53,6 +53,7 @@ import {
   upsertFinanceUniqueItem,
 } from "../../sections/finance/financeCatalogPersist";
 import { AppCalendarPanel } from "../AppDatePicker";
+import { resolveSalesCheckoutPaymentOptions } from "./bookingCheckout";
 import { tomorrowIso } from "./calendar.utils";
 import type {
   SalesCheckoutPaymentMethod,
@@ -290,8 +291,12 @@ export default function SalesEditCheckout({
   const hasItems = lines.length > 0;
   const needsDueDate =
     paymentMethod === "onlineNonDirect" || paymentMethod === "offlineNonDirect";
+  // Guest/model only — IC/BC already have email on file.
+  const isGuestPayer =
+    card.payerRole === "guest" || card.payerRole === "model";
   const needsOnlineEmail =
-    paymentMethod === "onlineDirect" || paymentMethod === "onlineNonDirect";
+    isGuestPayer &&
+    (paymentMethod === "onlineDirect" || paymentMethod === "onlineNonDirect");
 
   const addLinesFromCatalog = (
     kind: ManualEntryLineKind,
@@ -341,15 +346,23 @@ export default function SalesEditCheckout({
     });
   };
 
-  const paymentOptions: Array<{
-    id: SalesCheckoutPaymentMethod;
-    label: string;
-  }> = [
-    { id: "onlineDirect", label: "Online Direct" },
-    { id: "offlineDirect", label: "Offline Direct" },
-    { id: "onlineNonDirect", label: "Online Non-Direct" },
-    { id: "offlineNonDirect", label: "Offline Non-Direct" },
-  ];
+  // Guest/model payers always get the 2 direct methods; BC main gets all 4.
+  const resolvedClientKind =
+    card.payerRole === "guest" || card.payerRole === "model"
+      ? "individual"
+      : clientKind === "company" || card.clientKind === "company"
+        ? "company"
+        : clientKind ?? card.clientKind;
+  const paymentOptions = React.useMemo(
+    () => resolveSalesCheckoutPaymentOptions(resolvedClientKind),
+    [resolvedClientKind],
+  );
+
+  React.useEffect(() => {
+    if (!paymentOptions.some((option) => option.id === paymentMethod)) {
+      setPaymentMethod(paymentOptions[0]?.id ?? "onlineDirect");
+    }
+  }, [paymentMethod, paymentOptions]);
 
   const paymentLabel =
     paymentOptions.find((o) => o.id === paymentMethod)?.label ||
@@ -692,27 +705,19 @@ export default function SalesEditCheckout({
 
           {needsOnlineEmail ? (
             <Box sx={{ mt: 1.5 }} onClick={(e) => e.stopPropagation()}>
-              {checkoutEmail.trim() && card.clientEmail?.trim() ? (
-                <Typography
-                  sx={mollureBodyMutedSx(m.navy, { fontWeight: 650 })}
-                >
-                  Email: {checkoutEmail.trim()}
-                </Typography>
-              ) : (
-                <AppTextField
-                  label="Email"
-                  placeholder="Email for online payment"
-                  value={checkoutEmail}
-                  onChange={(e) => setCheckoutEmail(e.target.value)}
-                  fullWidth
-                  helperText={
-                    !checkoutEmail.trim()
-                      ? "Required for online payment"
-                      : undefined
-                  }
-                  error={!checkoutEmail.trim()}
-                />
-              )}
+              <AppTextField
+                label="Email for Guest"
+                placeholder="Guest email for online payment"
+                value={checkoutEmail}
+                onChange={(e) => setCheckoutEmail(e.target.value)}
+                fullWidth
+                helperText={
+                  !checkoutEmail.trim()
+                    ? "Required for online payment"
+                    : undefined
+                }
+                error={!checkoutEmail.trim()}
+              />
             </Box>
           ) : null}
 

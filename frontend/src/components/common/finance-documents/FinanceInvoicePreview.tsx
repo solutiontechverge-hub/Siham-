@@ -42,6 +42,7 @@ import {
   getInvoiceLineItemColumns,
   getProfessionalProfile,
   getIssuedDocument,
+  groupInvoiceDisplayLineItemsByParty,
   hasStoredDocumentSnapshot,
   parseCurrencyValue,
   professionalBusinessInfoLines,
@@ -126,6 +127,10 @@ export default function FinanceInvoicePreview({
       return aFee - bFee;
     });
   }, [effectiveInvoiceType, lineItems]);
+  const partySections = React.useMemo(
+    () => groupInvoiceDisplayLineItemsByParty(displayLineItems),
+    [displayLineItems],
+  );
   const lineItemColumns = React.useMemo(
     () => getInvoiceLineItemColumns(lineItemLayout),
     [lineItemLayout],
@@ -316,9 +321,9 @@ export default function FinanceInvoicePreview({
       });
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10.5);
-      displayLineItems.forEach((item, index) => {
+      let rowY = tableTop + 26;
+      const drawPdfItemRow = (item: (typeof displayLineItems)[number]) => {
         let cursorX = left;
-        const rowY = tableTop + 26 + index * 18;
         cols.forEach((col) => {
           const cell = getInvoiceLineItemCellValue(item, col.key);
           const centered = col.key === "vat" || col.key === "unit";
@@ -334,8 +339,34 @@ export default function FinanceInvoicePreview({
         });
         doc.setDrawColor(220);
         doc.line(left, rowY + 6, left + tableWidth, rowY + 6);
-      });
-      let totalsY = tableTop + 26 + displayLineItems.length * 18 + 22;
+        rowY += 18;
+      };
+      if (partySections?.length) {
+        for (const section of partySections) {
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(10.5);
+          doc.text(
+            `${section.title}${section.name ? ` · ${section.name}` : ""}`,
+            left,
+            rowY,
+          );
+          rowY += 16;
+          for (const group of section.groups) {
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(9.5);
+            doc.setTextColor(110);
+            doc.text(group.label, left, rowY);
+            doc.setTextColor(0);
+            rowY += 14;
+            doc.setFontSize(10.5);
+            group.items.forEach(drawPdfItemRow);
+          }
+          rowY += 4;
+        }
+      } else {
+        displayLineItems.forEach(drawPdfItemRow);
+      }
+      let totalsY = rowY + 22;
       const drawTotalRow = (
         label: string,
         value: string,
@@ -397,6 +428,7 @@ export default function FinanceInvoicePreview({
     displayLineItems,
     effectiveInvoiceType,
     lineItemColumns,
+    partySections,
     penaltySummary,
     prepaidAmountLabel,
     prepaidAmountValue,
@@ -563,41 +595,138 @@ export default function FinanceInvoicePreview({
             </TableRow>
           </TableHead>
           <TableBody>
-            {displayLineItems.map((item, index) => (
-              <TableRow key={`${item.displayDescription}-${index}`} hover>
-                {lineItemColumns.map((column) => {
-                  const isVat = column.key === "vat";
-                  const isQty = column.key === "unit";
-                  const cellAlign =
-                    column.align === "right"
-                      ? "right"
-                      : isVat || isQty
-                        ? "center"
-                        : "left";
-                  return (
-                  <TableCell
-                    key={column.key}
-                    align={cellAlign}
-                    sx={mollureBodyMutedSx(m.navy, {
-                      color: alpha(m.navy, 0.75),
-                      // Divider under service row(s), not under Description header.
-                      borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
-                      py: 3,
-                      ...(isQty
-                        ? { width: 88, minWidth: 88, px: 1, whiteSpace: "nowrap" }
-                        : isVat
-                          ? { width: 72, minWidth: 72, px: 1, whiteSpace: "nowrap" }
-                          : column.align === "right"
-                            ? { ...financePriceTextSx, whiteSpace: "nowrap" }
-                            : { wordBreak: "break-word" }),
+            {partySections
+              ? partySections.flatMap((section) => [
+                  <TableRow key={`party-${section.key}`}>
+                    <TableCell
+                      colSpan={lineItemColumns.length}
+                      sx={mollureLabelSx(m.navy, {
+                        borderBottom: "none",
+                        pt: 1.5,
+                        pb: 0.25,
+                        pl: 0,
+                      })}
+                    >
+                      {section.title}
+                      {section.name ? ` · ${section.name}` : ""}
+                    </TableCell>
+                  </TableRow>,
+                  ...section.groups.flatMap((group) => [
+                    <TableRow key={`kind-${section.key}-${group.kind}`}>
+                      <TableCell
+                        colSpan={lineItemColumns.length}
+                        sx={mollureBodyMutedSx(m.navy, {
+                          color: alpha(m.navy, 0.55),
+                          borderBottom: "none",
+                          pt: 1,
+                          pb: 0.25,
+                          pl: 0,
+                          fontSize: 12,
+                        })}
+                      >
+                        {group.label}
+                      </TableCell>
+                    </TableRow>,
+                    ...group.items.map((item, index) => (
+                      <TableRow
+                        key={`${section.key}-${group.kind}-${item.displayDescription}-${index}`}
+                        hover
+                      >
+                        {lineItemColumns.map((column) => {
+                          const isVat = column.key === "vat";
+                          const isQty = column.key === "unit";
+                          const cellAlign =
+                            column.align === "right"
+                              ? "right"
+                              : isVat || isQty
+                                ? "center"
+                                : "left";
+                          return (
+                            <TableCell
+                              key={column.key}
+                              align={cellAlign}
+                              sx={mollureBodyMutedSx(m.navy, {
+                                color: alpha(m.navy, 0.75),
+                                borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
+                                py: 2,
+                                ...(isQty
+                                  ? {
+                                      width: 88,
+                                      minWidth: 88,
+                                      px: 1,
+                                      whiteSpace: "nowrap",
+                                    }
+                                  : isVat
+                                    ? {
+                                        width: 72,
+                                        minWidth: 72,
+                                        px: 1,
+                                        whiteSpace: "nowrap",
+                                      }
+                                    : column.align === "right"
+                                      ? {
+                                          ...financePriceTextSx,
+                                          whiteSpace: "nowrap",
+                                        }
+                                      : { wordBreak: "break-word" }),
+                              })}
+                            >
+                              {getInvoiceLineItemCellValue(item, column.key)}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    )),
+                  ]),
+                ])
+              : displayLineItems.map((item, index) => (
+                  <TableRow key={`${item.displayDescription}-${index}`} hover>
+                    {lineItemColumns.map((column) => {
+                      const isVat = column.key === "vat";
+                      const isQty = column.key === "unit";
+                      const cellAlign =
+                        column.align === "right"
+                          ? "right"
+                          : isVat || isQty
+                            ? "center"
+                            : "left";
+                      return (
+                        <TableCell
+                          key={column.key}
+                          align={cellAlign}
+                          sx={mollureBodyMutedSx(m.navy, {
+                            color: alpha(m.navy, 0.75),
+                            // Divider under service row(s), not under Description header.
+                            borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
+                            py: 3,
+                            ...(isQty
+                              ? {
+                                  width: 88,
+                                  minWidth: 88,
+                                  px: 1,
+                                  whiteSpace: "nowrap",
+                                }
+                              : isVat
+                                ? {
+                                    width: 72,
+                                    minWidth: 72,
+                                    px: 1,
+                                    whiteSpace: "nowrap",
+                                  }
+                                : column.align === "right"
+                                  ? {
+                                      ...financePriceTextSx,
+                                      whiteSpace: "nowrap",
+                                    }
+                                  : { wordBreak: "break-word" }),
+                          })}
+                        >
+                          {getInvoiceLineItemCellValue(item, column.key)}
+                        </TableCell>
+                      );
                     })}
-                  >
-                    {getInvoiceLineItemCellValue(item, column.key)}
-                  </TableCell>
-                  );
-                })}
-              </TableRow>
-            ))}
+                  </TableRow>
+                ))}
           </TableBody>
         </Table>
         <Stack spacing={0.75} sx={{ mt: 1.5 }}>

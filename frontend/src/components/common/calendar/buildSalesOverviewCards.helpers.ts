@@ -251,28 +251,44 @@ function buildLinesFromEvent(event: CalendarEvent): { lines: SalesLineItem[]; su
           pricingOverlays,
         );
       }
-      for (const [index, product] of (guest.products ?? []).entries()) {
-        const lineId = `${product.id}::${String(guest.id)}::${index}`;
-        const amount = roundMoney(product.price);
-        lines.push({
-          id: lineId,
-          label: product.quantity > 1 ? `${product.name} ×${product.quantity}` : product.name,
-          amount,
-        });
-        subtotal += product.price;
-      }
     }
   }
 
-  for (const product of details?.products ?? []) {
-    if (lines.some((line) => line.id === product.id)) continue;
+  // Products/unique always — snapshot path used to skip guests[].products.
+  const seenProductIds = new Set(lines.map((line) => String(line.id)));
+  const pushProduct = (
+    product: {
+      id: string;
+      name: string;
+      price: number;
+      quantity: number;
+      guestId?: string | null;
+    },
+    index: number,
+    guestId?: string | null,
+  ) => {
+    const gid = String(guestId ?? product.guestId ?? "");
+    const lineId = `${product.id}::${gid}::${index}`;
+    if (seenProductIds.has(lineId)) return;
+    seenProductIds.add(lineId);
     const amount = roundMoney(product.price);
     lines.push({
-      id: product.id,
-      label: product.quantity > 1 ? `${product.name} ×${product.quantity}` : product.name,
+      id: lineId,
+      label:
+        product.quantity > 1
+          ? `${product.name} ×${product.quantity}`
+          : product.name,
       amount,
     });
     subtotal += product.price;
+  };
+  for (const guest of details?.guests ?? []) {
+    for (const [index, product] of (guest.products ?? []).entries()) {
+      pushProduct(product, index, guest.id);
+    }
+  }
+  for (const [index, product] of (details?.products ?? []).entries()) {
+    pushProduct(product, index, product.guestId);
   }
 
   const kmAmount = resolveKilometerAllowanceAmount(details?.kilometerAllowance);
@@ -404,18 +420,24 @@ export function applyLedgerFinancialsToCards(
     next.statusBadge = badgeLabel;
 
     // Subcards keep their own share totals (guest/model ≠ booking outstanding).
-    // Booking Amount Due stays on the payable footer only.
+    // Booking Partially Paid / due stays on main only; guests may show own Paid.
     if (next.subCards?.length) {
       next.subCards = next.subCards.map((sub) => {
-        const shareTotal = roundMoney(
-          (sub.lines ?? []).reduce((sum, line) => sum + (Number(line.amount) || 0), 0),
-        );
+        const isMain = sub.payerRole === "main_client";
+        const ownGuestBadge =
+          sub.paymentState === "paid"
+            ? "Paid"
+            : sub.paymentState === "voided"
+              ? "Voided"
+              : sub.paymentState === "refunded"
+                ? "Refunded"
+                : undefined;
         return {
           ...sub,
-          statusBadge: badgeLabel,
-          paymentState: paymentState ?? sub.paymentState,
-          highlightAmount: shareTotal > 0 ? shareTotal : sub.highlightAmount,
-          highlightLabel: "Total",
+          statusBadge: isMain ? badgeLabel : ownGuestBadge,
+          paymentState: isMain
+            ? (paymentState ?? sub.paymentState)
+            : sub.paymentState,
         };
       });
     }
@@ -1012,9 +1034,14 @@ function applySubMeta(
     isAfterTreatment: extras.isAfterTreatment ?? true,
   });
 
-  // Linked finance status is SSOT — do not re-badge from due-date heuristics.
+  // Linked finance status is SSOT — except local reissue ahead of finance refetch.
+  const optimisticSubReissue =
+    Boolean(meta?.reissuedAt) &&
+    Boolean(meta?.dueDate) &&
+    !isDueDatePast(meta?.dueDate) &&
+    (next.paymentState === "overdue_invoice" || next.paymentState === "overdue");
   if (
-    !usedFinance &&
+    (!usedFinance || optimisticSubReissue) &&
     (meta?.dueDate || next.dueDate) &&
     next.paymentState !== "paid" &&
     next.paymentState !== "refunded"
@@ -1033,6 +1060,13 @@ function applySubMeta(
     ctx.paymentTerms,
     meta?.reissuedAt ? 1 : 0,
   );
+  // Guest/model: own Paid/Voided/Refunded only — never booking Partially Paid / due.
+  if (next.payerRole === "guest" || next.payerRole === "model") {
+    if (next.paymentState === "paid") next.statusBadge = "Paid";
+    else if (next.paymentState === "voided") next.statusBadge = "Voided";
+    else if (next.paymentState === "refunded") next.statusBadge = "Refunded";
+    else next.statusBadge = undefined;
+  }
   return next;
 }
 
@@ -1081,7 +1115,13 @@ function applyMeta(
   });
 
   if (meta) {
-    if (!usedFinance) applyDueDateMeta(next, meta, next.kind);
+    // Local reissue (future due) ahead of finance refetch → flip Off overdue immediately.
+    const optimisticReissue =
+      Boolean(meta.reissuedAt) &&
+      Boolean(meta.dueDate) &&
+      !isDueDatePast(meta.dueDate) &&
+      (next.paymentState === "overdue_invoice" || next.paymentState === "overdue");
+    if (!usedFinance || optimisticReissue) applyDueDateMeta(next, meta, next.kind);
     applyPenaltyAmount(next, meta.penaltyAmount);
     if (meta.canceled) {
       next.canceled = true;
@@ -2301,10 +2341,11 @@ export function buildCardsForEvent(input: {
           payerKey: share.key,
           lines: share.lines,
           total: share.subtotal,
-          highlightLabel: "Total Amount",
+          highlightLabel: "Payment",
           highlightAmount: share.paymentAmount,
           paidAt: payer?.paidAt ?? (subPaid ? occurredAt : null),
           paymentState: subPaid ? ("paid" as const) : undefined,
+          statusBadge: subPaid ? "Paid" : undefined,
           dueDate: invoiceDueFromNotes,
           methodDateLine: method,
           showAddOns: true,

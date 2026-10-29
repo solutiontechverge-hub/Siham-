@@ -45,6 +45,7 @@ export type ProfessionalFixedLocationCalendarBookingDrawerSubScreensBag = Pick<
   | "mergedCustomBookingProducts"
   | "nonMollureClientType"
   | "nonMollureDraft"
+  | "openAddProduct"
   | "openAddUniqueItem"
   | "persistedUniqueCatalog"
   | "platformEmailInput"

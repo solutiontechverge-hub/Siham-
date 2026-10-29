@@ -1,6 +1,15 @@
 import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import { isOfflinePaymentMethod } from "../client-booking/checkoutPaymentOptions";
+import {
+  formatProtectiveFeeLineDescription,
+} from "../finance-documents/protectiveFeeInvoice";
 import { parseApiCalendarEventId } from "./bookingEventDetails";
+import { resolveTimeBasedCalendarStatus } from "./bookingStatus";
+import { computeBookingPrice } from "./bookingTotal";
+import type {
+  SalesCheckoutPaymentMethod,
+  SalesClientKind,
+} from "./salesOverview.types";
 import {
   parseSplitBillState,
   unpaidSplitPayers,
@@ -109,13 +118,18 @@ function remainingFromEvent(event: Pick<CalendarEvent, "details">): number {
 /**
  * Post-booking (In Progress / Completed) unpaid shares — banner + Sales focus.
  * Pre-booking prepayment wait is excluded on purpose (icon only).
+ * Uses time-based status so Confirmed past end counts as Completed.
  */
 export function resolvePostBookingPendingPayment(
   event: CalendarEvent | null | undefined,
+  now: Date = new Date(),
 ): PostBookingPendingPayment | null {
   if (!event) return null;
-  if (event.status !== "In Progress" && event.status !== "Completed") return null;
+  const status = resolveTimeBasedCalendarStatus(event, now);
+  if (status !== "In Progress" && status !== "Completed") return null;
   if (event.details?.refunded) return null;
+  // Non-direct invoice already issued — Sales/Finance collects; not a Checkout reopen.
+  if (event.details?.invoiceDueDate) return null;
 
   const bookingId = parseApiCalendarEventId(event.id)?.id ?? event.id;
   const split = parseSplitBillState(event.details?.splitBill);
@@ -137,6 +151,11 @@ export function resolvePostBookingPendingPayment(
     };
   }
 
+  // Checkout wrote splitBill with every payer settled — don't re-owe from service totals.
+  if (split && split.payers.length > 0) {
+    return null;
+  }
+
   if (event.details?.waitingForPayment) {
     return {
       count: 1,
@@ -145,16 +164,84 @@ export function resolvePostBookingPendingPayment(
     };
   }
 
-  if (event.status === "In Progress") {
-    const remaining = remainingFromEvent(event);
-    if (remaining > 0) {
-      return {
-        count: 1,
-        label: "One payment pending",
-        focusCardId: afterTreatmentCardId(bookingId),
-      };
-    }
+  const remaining = remainingFromEvent(event);
+  if (remaining > 0) {
+    return {
+      count: 1,
+      label: "One payment pending",
+      focusCardId: afterTreatmentCardId(bookingId),
+    };
   }
 
   return null;
+}
+
+/** Auto-open booking checkout when display status hits Completed with unpaid balance. */
+export function shouldAutoOpenBookingCheckout(
+  event: CalendarEvent | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  if (!event || event.details?.refunded) return false;
+  if (resolveTimeBasedCalendarStatus(event, now) !== "Completed") return false;
+  return resolvePostBookingPendingPayment(event, now) != null;
+}
+
+const SALES_CHECKOUT_PAYMENT_OPTIONS: Array<{
+  id: SalesCheckoutPaymentMethod;
+  label: string;
+}> = [
+  { id: "onlineDirect", label: "Online Direct" },
+  { id: "offlineDirect", label: "Offline Direct" },
+  { id: "onlineNonDirect", label: "Online Non-Direct" },
+  { id: "offlineNonDirect", label: "Offline Non-Direct" },
+];
+
+/** BC / company → 4 methods; individual / guest → Online + Offline Direct only. */
+export function resolveSalesCheckoutPaymentOptions(
+  clientKind?: SalesClientKind | "individual" | "company" | null,
+): Array<{ id: SalesCheckoutPaymentMethod; label: string }> {
+  if (clientKind === "company") return SALES_CHECKOUT_PAYMENT_OPTIONS;
+  return SALES_CHECKOUT_PAYMENT_OPTIONS.filter(
+    (option) =>
+      option.id === "onlineDirect" || option.id === "offlineDirect",
+  );
+}
+
+/**
+ * Late reschedule fee for checkout Summary — same math as drawer `computeBookingPrice`.
+ * `baseAmount` = share/subtotal used as the fee % base (after line discounts).
+ */
+export function resolveCheckoutLateRescheduleFee(input: {
+  event: Pick<CalendarEvent, "details"> | null | undefined;
+  baseAmount: number;
+}): { amount: number; label: string; percent: number } | null {
+  const details = input.event?.details;
+  if (!details?.showLateRescheduling) return null;
+  const baseAmount = Math.max(0, Number(input.baseAmount) || 0);
+  if (!(baseAmount > 0)) return null;
+
+  const price = computeBookingPrice({
+    lineSubtotal: baseAmount,
+    showLateRescheduling: true,
+    lateRescheduleFeePercent: details.lateRescheduleFeePercent,
+    lateRescheduleFeePercentCeiling: details.lateRescheduleFeePercentCeiling,
+  });
+  if (!(price.lateRescheduleFeeAmount > 0)) return null;
+
+  const requested = Math.max(0, Number(details.lateRescheduleFeePercent) || 0);
+  const ceiling = Number(details.lateRescheduleFeePercentCeiling);
+  const percent =
+    Number.isFinite(ceiling) && ceiling >= 0
+      ? Math.min(requested, ceiling)
+      : requested;
+
+  return {
+    amount: price.lateRescheduleFeeAmount,
+    percent,
+    label: formatProtectiveFeeLineDescription(
+      "lateRescheduling",
+      percent,
+      price.afterDiscount,
+    ),
+  };
 }

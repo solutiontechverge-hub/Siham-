@@ -325,6 +325,7 @@ const flat = flattenBookingServices({
       services: [
         { id: "lash", name: "eyelash", price: 20, durationMins: 10, guestId: "guest-1" },
       ],
+      products: [],
     },
   ],
 });

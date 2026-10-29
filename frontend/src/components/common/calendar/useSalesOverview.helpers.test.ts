@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import type { TransactionRow } from "../../../app/professionals/fixed-location/finance/data/transactions";
 import {
   financeDocumentLinesToSalesLines,
+  salesPaymentMethodFromMethodTitle,
   toFinanceHints,
 } from "./useSalesOverview.helpers";
 
@@ -16,7 +17,7 @@ const row = {
   entryLabel: "After treatment · Main Client",
   clientName: "Ada",
   clientEmail: "a@b.c",
-  clientType: "individual",
+  clientType: "nonMollure",
   netAmount: 90,
   grossAmount: 90,
   methodTitle: "Online - Direct",
@@ -64,6 +65,20 @@ assert.equal(hints[0]?.transactionId, row.id);
 assert.equal(hints[0]?.lineItems?.length, 2);
 assert.equal(hints[0]?.phase, "full");
 assert.equal(hints[0]?.dueDate, "2026-10-14");
+assert.equal(hints[0]?.paymentMethod, "onlineDirect");
+
+assert.equal(
+  salesPaymentMethodFromMethodTitle("Online – invoice with due date"),
+  "onlineNonDirect",
+);
+assert.equal(
+  salesPaymentMethodFromMethodTitle("Offline – invoice with due date"),
+  "offlineNonDirect",
+);
+assert.equal(
+  salesPaymentMethodFromMethodTitle("Offline – direct"),
+  "offlineDirect",
+);
 
 // payment_deadline column wins over document.dueDate (backend COALESCE).
 const withColumn = toFinanceHints([

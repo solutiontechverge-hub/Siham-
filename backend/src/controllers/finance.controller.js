@@ -1225,6 +1225,12 @@ export const createFinanceTransaction = async (req, res) => {
       ? submittedLines.map((line) => {
           const quantity = parseMoney(line.quantity ?? 1, 1);
           const unitPrice = moneyNumber(line.unitPrice);
+          const assigneeKey =
+            typeof line.assigneeKey === "string" ? line.assigneeKey.trim() : "";
+          const partyRole =
+            typeof line.partyRole === "string" ? line.partyRole.trim() : "";
+          const partyName =
+            typeof line.partyName === "string" ? line.partyName.trim() : "";
           return {
             description: line.name,
             sourceReference: String(line.sourceReference),
@@ -1234,6 +1240,9 @@ export const createFinanceTransaction = async (req, res) => {
             vatRate: 21,
             pricePerUnit: unitPrice,
             totalPrice: moneyNumber(quantity * unitPrice),
+            ...(assigneeKey ? { assigneeKey } : {}),
+            ...(partyRole ? { partyRole } : {}),
+            ...(partyName ? { partyName } : {}),
           };
         })
       : [];
@@ -1327,6 +1336,12 @@ export const createFinanceTransaction = async (req, res) => {
     } else if (clientParty.isMollure && clientType === "nonMollure") {
       clientType = "mollure";
     }
+    const prepaidOnDoc = moneyNumber(body.prepaymentAmount);
+    const discountOnDoc = moneyNumber(body.discountAmount);
+    const resolvedPayerKey = addonId
+      ? addonId
+      : (typeof body.payerKey === "string" && body.payerKey.trim()) ||
+        "main-client";
     // ponytail: JSON issued snapshot only — store PDF bytes/S3 at issue-time if auditors need binary immutability.
     const document = {
       documentNumber: `INV-G${resolvedEntryId}`,
@@ -1338,7 +1353,10 @@ export const createFinanceTransaction = async (req, res) => {
       lineItems,
       totalPrice: moneyNumber(gross),
       ...(paymentPhase ? { paymentPhase } : {}),
-      ...(addonId ? { addonId, payerKey: addonId } : {}),
+      ...(addonId ? { addonId } : {}),
+      payerKey: resolvedPayerKey,
+      ...(prepaidOnDoc > 0 ? { prepaymentAmount: prepaidOnDoc } : {}),
+      ...(discountOnDoc > 0 ? { discountAmount: discountOnDoc } : {}),
       issuedSnapshot: {
         // Client type alone selects the template — never the pro's defaultInvoiceType.
         templateType: clientType === "business" ? "company" : "individual",
@@ -1406,6 +1424,7 @@ export const createFinanceTransaction = async (req, res) => {
     const createdTx = result.rows[0];
     if (createdTx?.id && bookingUuid && paymentPhase && paymentPhase !== "addon") {
       try {
+        const settled = status === "Paid" || status === "Prepaid";
         await ensureSalesCardMetadataForFinanceRow({
           professionalProfileId: profile.id,
           bookingId: bookingUuid,
@@ -1414,6 +1433,14 @@ export const createFinanceTransaction = async (req, res) => {
           payerRole: body.payerRole || "main_client",
           entryLabel,
           financeTransactionId: createdTx.id,
+          // Checkout path: persist method/due/paid so Sales survives without Sales-tab mount.
+          metadata: {
+            paymentMethod,
+            dueDate: isNonDirect ? dueDate : null,
+            paid: settled,
+            paidAt: settled ? new Date().toISOString() : null,
+            totalPrice: moneyNumber(gross),
+          },
         });
       } catch {
         // sales card link is best-effort

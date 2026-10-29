@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import {
   buildPreviewLineItems,
   getInvoiceLineItemColumns,
+  groupInvoiceDisplayLineItemsByParty,
   INVOICE_TOTAL_VAT_INCLUDED_LABEL,
   resolveInvoiceTemplateType,
   toInvoiceDisplayLineItems,
@@ -112,6 +113,69 @@ assert.notEqual(
   shares.find((s) => s.role === "guest")?.lines[0]?.id,
 );
 
+// Guest products must land on the guest share (not dumped onto main).
+const eventWithProducts = {
+  ...event,
+  details: {
+    ...event.details,
+    guests: [
+      {
+        id: "guest-1",
+        name: "Bea",
+        participantType: "guest",
+        services: [],
+        products: [
+          {
+            id: "prod-lash",
+            name: "Eye Lashes",
+            price: 50,
+            quantity: 1,
+            unitPrice: 50,
+          },
+        ],
+      },
+    ],
+    products: [
+      {
+        id: "unique-shampoo",
+        name: "shampoo",
+        price: 35,
+        quantity: 1,
+        unitPrice: 35,
+      },
+    ],
+  },
+} as CalendarEvent;
+const productShares = resolveSalesPayerShares({
+  event: eventWithProducts,
+  allLines: [
+    { id: "svc-same::::0", label: "Cut", amount: 40 },
+    { id: "svc-same::guest-1::1", label: "Cut", amount: 40 },
+    { id: "prod-lash::guest-1::0", label: "Eye Lashes", amount: 50 },
+    { id: "unique-shampoo::::0", label: "shampoo", amount: 35 },
+  ],
+  mainClientName: "Ada",
+});
+assert.ok(
+  productShares
+    .find((s) => s.role === "guest")
+    ?.lines.some((line) => line.label === "Eye Lashes"),
+  "guest product line must stay on guest share",
+);
+assert.ok(
+  productShares
+    .find((s) => s.role === "main_client")
+    ?.lines.some((line) => line.label === "shampoo"),
+  "main unique item stays on main share",
+);
+assert.equal(
+  productShares
+    .find((s) => s.role === "main_client")
+    ?.lines.some((line) => line.label === "Eye Lashes"),
+  false,
+  "guest product must not be dumped onto main",
+);
+
 // BC mock: Description | Quantity | VAT % | Price Per Unit | Total Price
 assert.deepEqual(
   getInvoiceLineItemColumns("itemized").map((c) => c.label),
@@ -191,5 +255,77 @@ assert.equal(
     ?.label,
   "Price (Incl. VAT)",
 );
+
+// Client + Guest invoice sections from party metadata on lines.
+const partyDisplay = toInvoiceDisplayLineItems(
+  [
+    {
+      description: "hair dye",
+      quantity: 1,
+      vat: "21%",
+      pricePerUnit: 44,
+      totalPrice: 44,
+      sourceType: "serviceId",
+      partyRole: "main_client",
+      partyName: "aliza",
+    },
+    {
+      description: "Eye Lashes",
+      quantity: 1,
+      vat: "21%",
+      pricePerUnit: 50,
+      totalPrice: 50,
+      sourceType: "productId",
+      partyRole: "main_client",
+      partyName: "aliza",
+    },
+    {
+      description: "shampoo",
+      quantity: 1,
+      vat: "21%",
+      pricePerUnit: 35.2,
+      totalPrice: 35.2,
+      sourceType: "uniqueItemCode",
+      partyRole: "main_client",
+      partyName: "aliza",
+    },
+    {
+      description: "buzz cutt",
+      quantity: 1,
+      vat: "21%",
+      pricePerUnit: 28.16,
+      totalPrice: 28.16,
+      sourceType: "serviceId",
+      assigneeKey: "g1",
+      partyRole: "guest",
+      partyName: "ALI",
+    },
+    {
+      description: "CONDITIONER",
+      quantity: 1,
+      vat: "21%",
+      pricePerUnit: 21.6,
+      totalPrice: 21.6,
+      sourceType: "uniqueItemCode",
+      assigneeKey: "g1",
+      partyRole: "guest",
+      partyName: "ALI",
+    },
+  ],
+  "individual",
+  true,
+);
+const sections = groupInvoiceDisplayLineItemsByParty(partyDisplay);
+assert.ok(sections, "party metadata must build Client/Guest sections");
+assert.equal(sections!.length, 2);
+assert.equal(sections![0]?.title, "Client");
+assert.equal(sections![0]?.name, "aliza");
+assert.deepEqual(
+  sections![0]?.groups.map((g) => g.label),
+  ["Service", "Product", "Unique item"],
+);
+assert.equal(sections![1]?.title, "Guest");
+assert.equal(sections![1]?.name, "ALI");
+assert.ok(sections![1]?.groups.some((g) => g.label === "Unique item"));
 
 console.log("lineItemsCoverage.test.ts: ok");

@@ -104,6 +104,8 @@ export type CreateFinanceTransactionRequest = {
     | "offlineInvoice";
   totalPrice: number;
   discountAmount?: number;
+  /** Prepaid already collected — shown on invoice/receipt document. */
+  prepaymentAmount?: number;
   dueDate?: string;
   lines: Array<{
     name: string;
@@ -111,12 +113,19 @@ export type CreateFinanceTransactionRequest = {
     unitPrice: number;
     sourceReference: string;
     sourceType: "serviceId" | "productId" | "uniqueItemCode";
+    /** Composite line assignee (guest/person id) for Client/Guest invoice sections. */
+    assigneeKey?: string;
+    partyRole?: "main_client" | "guest" | "model" | string;
+    partyName?: string;
   }>;
   /** Link to booking unique_code or UUID for add-on / booking-linked sales */
   bookingId?: string;
   bookingRef?: string;
   paymentPhase?: "full" | "prepay" | "addon";
   addonId?: string;
+  /** Split-bill payer — links sales_card_metadata card id. */
+  payerKey?: string;
+  payerRole?: "main_client" | "guest" | "model" | string;
   entryType?: "onlineBooking" | "offlineBooking" | "manualEntry";
   entryLabel?: string;
 };

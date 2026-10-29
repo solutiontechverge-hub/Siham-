@@ -142,10 +142,24 @@ export function resolveSalesPayerShares(input: {
       groups.set(assigneeId, prev);
     });
 
-    // Products stay on main client (anything not claimed by snapshot service lines).
-    const productLines = allLines.filter((line) => !usedLineIds.has(String(line.id)));
-    if (productLines.length) {
-      groups.set(requesterId, [...(groups.get(requesterId) ?? []), ...productLines]);
+    // Products/unique/km: assign by composite `catalogId::assigneeKey::index`.
+    // (Previously dumped every leftover onto main — guest products vanished from guest shares.)
+    for (const line of allLines) {
+      const id = String(line.id);
+      if (usedLineIds.has(id)) continue;
+      const parts = id.split("::");
+      const assigneeFromId = parts.length >= 2 ? parts[1] : "";
+      const target =
+        id === "kilometer-allowance" ||
+        id === "discount" ||
+        id.startsWith("discount::") ||
+        !assigneeFromId
+          ? requesterId
+          : assigneeFromId;
+      const prev = groups.get(target) ?? [];
+      prev.push(line);
+      groups.set(target, prev);
+      usedLineIds.add(id);
     }
 
     const shares: SalesPayerShare[] = [];
@@ -569,22 +583,30 @@ export function markSplitPayersPaid(
   };
 }
 
-/** One selected person covers every unpaid share (and already-paid ones stay). */
+/**
+ * Assign covered shares onto one payer.
+ * `identityShares` looks up the payer when they are outside the covered set
+ * (Split Bill → Who pays? vs For Who?).
+ */
 export function collapseSharesOntoPayer(
   shares: Array<SalesPayerShare & { paymentAmount: number }>,
   payerKey: string,
+  identityShares: Array<SalesPayerShare & { paymentAmount: number }> = shares,
 ): Array<SalesPayerShare & { paymentAmount: number }> {
-  const chosen = shares.find((share) => share.key === payerKey) ?? shares[0];
+  if (!shares.length) return [];
+  const chosen =
+    identityShares.find((share) => share.key === payerKey) ??
+    shares.find((share) => share.key === payerKey) ??
+    shares[0];
   if (!chosen) return shares;
-  const others = shares.filter((share) => share.key !== chosen.key);
-  const extraLines = others.flatMap((share) => share.lines);
-  const extraAmount = others.reduce((sum, share) => sum + share.paymentAmount, 0);
   return [
     {
       ...chosen,
-      lines: [...chosen.lines, ...extraLines],
-      subtotal: roundMoney(chosen.subtotal + extraAmount),
-      paymentAmount: roundMoney(chosen.paymentAmount + extraAmount),
+      lines: shares.flatMap((share) => share.lines),
+      subtotal: roundMoney(shares.reduce((sum, share) => sum + share.subtotal, 0)),
+      paymentAmount: roundMoney(
+        shares.reduce((sum, share) => sum + share.paymentAmount, 0),
+      ),
     },
   ];
 }

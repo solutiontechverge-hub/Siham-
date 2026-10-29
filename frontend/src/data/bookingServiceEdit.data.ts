@@ -259,7 +259,10 @@ export function ensureServiceStartEndTimes<
  */
 export function recalculateServiceStartEndTimes<
   T extends BookingServiceLineItem,
->(services: readonly T[], bookingStart?: string): T[] {
+>(
+  services: readonly T[],
+  bookingStart?: string,
+): Array<T & { startTime: string; endTime: string }> {
   if (!services.length) return [];
   let cursor =
     bookingStart?.trim() ||

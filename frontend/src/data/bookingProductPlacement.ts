@@ -20,12 +20,13 @@ export function stampProductsToEarliestBlock<
     guestId?: string | null;
   },
 >(
-  products: readonly T[],
+  products: readonly T[] | undefined,
   services: ReadonlyArray<{ startTime?: string | null }>,
   guestId: string | null = null,
 ): T[] {
   const attachedStartTime = earliestStartAmong(services);
-  return products.map((product) => ({
+  // ponytail: guests omit products; callers shouldn't each `?? []`
+  return (products ?? []).map((product) => ({
     ...product,
     ...(attachedStartTime ? { attachedStartTime } : { attachedStartTime: undefined }),
     guestId,

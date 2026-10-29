@@ -313,14 +313,14 @@ assert.equal(
     silentUpdated: false,
     phoneCode: "+31",
     phoneNumber: "611111111",
-    guests: [{ id: "g1", name: "ali khan", services: [] }],
+    guests: [{ id: "g1", name: "ali khan", services: [], products: [] }],
     services: [
       { id: "eyelash", name: "eyelash", price: 111, durationMins: 11 },
     ],
     silentUpdateSnapshot: {
       phoneCode: "+31",
       phoneNumber: "600000000",
-      guests: [{ id: "g1", name: "ali", services: [] }],
+      guests: [{ id: "g1", name: "ali", services: [], products: [] }],
       services: [
         { id: "eyelash", name: "eyelash", price: 111, durationMins: 11 },
       ],

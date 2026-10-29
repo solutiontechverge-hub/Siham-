@@ -16,7 +16,6 @@ import {
   useUpdateFinanceTransactionMutation,
   useProcessFinanceInvoiceReissuesMutation,
   useGetSalesCardMetadataQuery,
-  useUpsertSalesCardMetadataMutation,
   useGetSalesAddonsQuery,
   useUpsertSalesAddonMutation,
 } from "../../../store/services/financeApi";
@@ -70,7 +69,6 @@ import {
   saveSalesAddon,
   updateSalesAddon,
   upsertSalesCardMeta,
-  configureSalesCardMetadataPersistence,
   hydrateSalesCardMetadata,
   hydrateSalesAddons,
   listSalesAddons,
@@ -155,7 +153,6 @@ export function useSalesOverview({
     // ponytail: same 12s cadence as finance poll so Add-ons Summary tracks API.
     pollingInterval: 12_000,
   });
-  const [saveSalesCardMetadata] = useUpsertSalesCardMetadataMutation();
   // Do not shadow storage `saveSalesAddon` — local list must update before cards rebuild.
   const [upsertSalesAddonApi] = useUpsertSalesAddonMutation();
 
@@ -170,12 +167,8 @@ export function useSalesOverview({
     hydrateSalesAddons((salesAddonsResponse?.data ?? []) as never[] as import("./salesOverview.types").SalesAddonRecord[]);
   }, [salesAddonsResponse?.data]);
 
-  React.useEffect(() => {
-    configureSalesCardMetadataPersistence((record) => {
-      void saveSalesCardMetadata(record as never);
-    });
-    return () => configureSalesCardMetadataPersistence(null);
-  }, [saveSalesCardMetadata]);
+  // Sales-card meta persistence is owned by ProfessionalFixedLocationCalendarView
+  // so booking-drawer checkout keeps writing after Sales unmounts.
 
   React.useEffect(() => {
     configureSalesAddonPersistence((record) => {
@@ -347,45 +340,58 @@ export function useSalesOverview({
     (
       sub: SalesSubCardData,
       parent: SalesOverviewCardData,
-    ): SalesOverviewCardData => ({
-      id: sub.id,
-      bookingId: sub.bookingId || parent.bookingId,
-      bookingCode: sub.bookingCode || parent.bookingCode,
-      kind: "after_treatment",
-      title: SALES_OVERVIEW_COPY.afterTreatmentSummary,
-      clientName: sub.payerName,
-      payerLabel: sub.payerLabel,
-      payerRole: sub.payerRole,
-      payerKey: sub.payerKey,
-      clientEmail: sub.clientEmail || parent.clientEmail,
-      clientPhone: parent.clientPhone,
-      clientKind: parent.clientKind,
-      lines: sub.lines,
-      highlightedLineIds: sub.lines.map((line) => line.id),
-      total: sub.total,
-      totalLabel: sub.totalLabel || SALES_OVERVIEW_COPY.totalAmount,
-      secondaryRows: sub.secondaryRows,
-      highlightLabel:
-        sub.payerRole === "main_client"
-          ? sub.highlightLabel || SALES_OVERVIEW_COPY.payment
-          : sub.highlightLabel || SALES_OVERVIEW_COPY.totalAmount,
-      highlightAmount: sub.highlightAmount,
-      methodDateLine: sub.methodDateLine,
-      dueDate: sub.dueDate,
-      showAddOns: sub.showAddOns,
-      paymentState: sub.paymentState,
-      statusBadge: sub.statusBadge,
-      markedUnpaid: sub.markedUnpaid,
-      paidAt: sub.paidAt,
-      penaltyPrompt: sub.penaltyPrompt,
-      overdueKind: sub.overdueKind,
-      financeTransactionId: sub.financeTransactionId,
-      documentAmount: sub.highlightAmount,
-      occurredAt: parent.occurredAt,
-      paymentMethodLabel: parent.paymentMethodLabel,
-      paymentMethod: parent.paymentMethod,
-      limitedMenu: parent.limitedMenu,
-    }),
+    ): SalesOverviewCardData => {
+      const isMain = sub.payerRole === "main_client";
+      // Guest/model keep own Paid; never inherit booking Partially Paid from parent.
+      const guestBadge =
+        sub.statusBadge ||
+        (sub.paymentState === "paid"
+          ? "Paid"
+          : sub.paymentState === "voided"
+            ? "Voided"
+            : sub.paymentState === "refunded"
+              ? "Refunded"
+              : undefined);
+      return {
+        id: sub.id,
+        bookingId: sub.bookingId || parent.bookingId,
+        bookingCode: sub.bookingCode || parent.bookingCode,
+        kind: "after_treatment",
+        title: SALES_OVERVIEW_COPY.afterTreatmentSummary,
+        clientName: isMain ? sub.payerName : sub.payerLabel || sub.payerName,
+        payerLabel: sub.payerLabel,
+        payerRole: sub.payerRole,
+        payerKey: sub.payerKey,
+        // Guests don't inherit the main client's email.
+        clientEmail: isMain
+          ? sub.clientEmail || parent.clientEmail
+          : sub.clientEmail,
+        clientPhone: isMain ? parent.clientPhone : undefined,
+        clientKind: isMain ? parent.clientKind : undefined,
+        lines: sub.lines,
+        highlightedLineIds: sub.lines.map((line) => line.id),
+        total: sub.total,
+        totalLabel: sub.totalLabel || SALES_OVERVIEW_COPY.totalAmount,
+        secondaryRows: sub.secondaryRows,
+        highlightLabel: sub.highlightLabel || SALES_OVERVIEW_COPY.payment,
+        highlightAmount: sub.highlightAmount,
+        methodDateLine: sub.methodDateLine,
+        dueDate: sub.dueDate,
+        showAddOns: sub.showAddOns,
+        paymentState: sub.paymentState,
+        statusBadge: isMain ? sub.statusBadge : guestBadge,
+        markedUnpaid: sub.markedUnpaid,
+        paidAt: sub.paidAt,
+        penaltyPrompt: sub.penaltyPrompt,
+        overdueKind: sub.overdueKind,
+        financeTransactionId: sub.financeTransactionId,
+        documentAmount: sub.highlightAmount,
+        occurredAt: parent.occurredAt,
+        paymentMethodLabel: parent.paymentMethodLabel,
+        paymentMethod: parent.paymentMethod,
+        limitedMenu: parent.limitedMenu,
+      };
+    },
     [],
   );
 

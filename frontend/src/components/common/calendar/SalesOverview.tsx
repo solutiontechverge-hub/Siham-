@@ -91,6 +91,11 @@ export default function SalesOverview({
     onBookingCompleted,
   });
 
+  const [hideReissuePanel, setHideReissuePanel] = React.useState(false);
+  React.useEffect(() => {
+    setHideReissuePanel(false);
+  }, [overdueManualCard?.id]);
+
   // Booking-wide sale lines for Refund-by-Item (not only the active card).
   // Memoized so RefundSalesDrawer does not see a new fallbackItems array every render.
   const refundFallbackItems = React.useMemo(() => {
@@ -142,7 +147,7 @@ export default function SalesOverview({
         {SALES_OVERVIEW_COPY.title}
       </Typography>
 
-      {overdueManualCard ? (
+      {overdueManualCard && !hideReissuePanel ? (
         <SalesOverdueReissuePanel
           unpaidAmount={overdueManualCard.highlightAmount ?? 0}
           paymentTerms={overduePaymentTerms}
@@ -150,6 +155,7 @@ export default function SalesOverview({
           onConfirm={(payload) => {
             void handleReissue(payload, overdueManualCard);
           }}
+          onCancel={() => setHideReissuePanel(true)}
         />
       ) : null}
 
@@ -159,84 +165,30 @@ export default function SalesOverview({
         </Typography>
       ) : (
         <Stack spacing={1.5}>
-          {cards.map((card) => {
-            // Split-bill: one shell around payer cards so they read as one entity.
-            if (card.subCards?.length) {
-              const subs = card.subCards.map((sub) => subToCard(sub, card));
-              const groupHighlighted =
-                Boolean(focusCardId) &&
-                subs.some((sub) => sub.id === focusCardId);
-              return (
-                <Box
-                  key={card.id}
-                  sx={{
-                    borderRadius: "12px",
-                    border: `1px solid ${
-                      groupHighlighted
-                        ? alpha(m.teal, 0.55)
-                        : alpha(m.navy, 0.1)
-                    }`,
-                    bgcolor: groupHighlighted
-                      ? alpha(m.teal, 0.05)
-                      : "#fff",
-                    boxShadow: groupHighlighted
-                      ? `0 0 0 3px ${alpha(m.teal, 0.12)}`
-                      : "none",
-                    px: 1.75,
-                    py: 1.5,
-                  }}
-                >
-                  <Stack
-                    spacing={1.5}
-                    divider={
-                      <Box
-                        sx={{
-                          borderTop: `1px solid ${alpha(m.navy, 0.08)}`,
-                        }}
-                      />
-                    }
-                  >
-                    {subs.map((sub, index) => (
-                      <SalesOverviewCard
-                        key={sub.id}
-                        card={sub}
-                        embedded
-                        hideTitle={index > 0}
-                        highlighted={
-                          Boolean(focusCardId) && sub.id === focusCardId
-                        }
-                        highlightId={focusCardId}
-                        onViewInvoice={() => openDocument(sub, "invoice")}
-                        onViewReceipt={() => openDocument(sub, "receipt")}
-                        onAddOns={() =>
-                          openAddOns(sub.bookingId, sub.bookingCode, sub.id)
-                        }
-                        onMenuAction={(action) =>
-                          void handleMenuAction(sub, action)
-                        }
-                      />
-                    ))}
-                  </Stack>
-                </Box>
-              );
-            }
-
-            return (
+          {/* Split bill: separate After Treatment cards per payer (not one shell). */}
+          {cards.flatMap((card) => {
+            const renderCard = (full: (typeof cards)[number]) => (
               <SalesOverviewCard
-                key={card.id}
-                card={card}
-                highlighted={
-                  Boolean(focusCardId) && card.id === focusCardId
-                }
+                key={full.id}
+                card={full}
+                highlighted={Boolean(focusCardId) && full.id === focusCardId}
                 highlightId={focusCardId}
-                onViewInvoice={() => openDocument(card, "invoice")}
-                onViewReceipt={() => openDocument(card, "receipt")}
+                onViewInvoice={() => openDocument(full, "invoice")}
+                onViewReceipt={() => openDocument(full, "receipt")}
                 onAddOns={() =>
-                  openAddOns(card.bookingId, card.bookingCode, card.id)
+                  openAddOns(full.bookingId, full.bookingCode, full.id)
                 }
-                onMenuAction={(action) => void handleMenuAction(card, action)}
+                onMenuAction={(action) => void handleMenuAction(full, action)}
               />
             );
+            if (!card.subCards?.length) return [renderCard(card)];
+            const subs = card.subCards.map((sub) => subToCard(sub, card));
+            // After-treatment shell already nests main in subCards — emit those only.
+            if (card.subCards.some((sub) => sub.payerRole === "main_client")) {
+              return subs.map(renderCard);
+            }
+            // Parent still holds main body (e.g. pending Summary) + guest subs.
+            return [renderCard({ ...card, subCards: undefined }), ...subs.map(renderCard)];
           })}
         </Stack>
       )}

@@ -10,7 +10,10 @@ import {
   shouldShowExpiredResponseBanner,
   type ResponseWindowInput,
 } from "./bookingResponseDeadline";
-import { canDiscardBookingRequest } from "./bookingStatus";
+import {
+  canDiscardBookingRequest,
+  resolveTimeBasedCalendarStatus,
+} from "./bookingStatus";
 
 export type ProfessionalBookingAction =
   | "edit"
@@ -71,16 +74,14 @@ const falseClientFlags = (): ClientActionFlags => ({
  * Professional booking Action menu / footer visibility per Booking Status Guideline.
  */
 export function resolveProfessionalBookingActions(
-  event: Pick<
-    CalendarEvent,
-    | "status"
-    | "bookingScenario"
-    | "bookingType"
-    | "details"
-    | "date"
-    | "start"
-    | "end"
-  > | null | undefined,
+  event:
+    | (Pick<
+        CalendarEvent,
+        "status" | "bookingScenario" | "bookingType" | "details"
+      > &
+        Partial<Pick<CalendarEvent, "date" | "start" | "end">>)
+    | null
+    | undefined,
   opts?: {
     protectiveFeeCheckoutApplicable?: boolean;
     responseTime?: ResponseWindowInput | null;
@@ -89,7 +90,8 @@ export function resolveProfessionalBookingActions(
   const flags = falseProfessionalFlags();
   if (!event) return flags;
 
-  const status = event.status;
+  // Confirmed within/past schedule mirrors cron so Action menu matches the chip.
+  const status = resolveTimeBasedCalendarStatus(event);
   const isOffline = event.bookingType === "Offline";
   const feeCheckoutOk = Boolean(opts?.protectiveFeeCheckoutApplicable);
   const expiredBanner = shouldShowExpiredResponseBanner(
@@ -313,11 +315,20 @@ export function showProfessionalActionMenu(
   );
 }
 
-/** In Progress checkout stays pinned at the panel footer across tabs. */
+/**
+ * Pin Checkout for In Progress / Completed.
+ * Enable only while `resolvePostBookingPendingPayment` is non-null (footer disables otherwise).
+ */
 export function showPersistentCheckoutButton(
-  event: Pick<CalendarEvent, "status"> | null | undefined,
+  event:
+    | (Pick<CalendarEvent, "id" | "status" | "details"> &
+        Partial<Pick<CalendarEvent, "date" | "start" | "end">>)
+    | null
+    | undefined,
 ): boolean {
-  return event?.status === "In Progress";
+  if (!event) return false;
+  const status = resolveTimeBasedCalendarStatus(event);
+  return status === "In Progress" || status === "Completed";
 }
 
 export function isOutgoingBookingRequestEvent(

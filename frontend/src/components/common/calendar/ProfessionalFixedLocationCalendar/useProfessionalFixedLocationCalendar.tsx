@@ -78,6 +78,7 @@ import { useProfessionalFixedLocationCalendarDrawerUiGates } from "./useProfessi
 import { useProfessionalFixedLocationCalendarOverviewSync } from "./useProfessionalFixedLocationCalendar.overviewSync";
 import { useProfessionalFixedLocationCalendarNoShowParticipants } from "./useProfessionalFixedLocationCalendar.noShowParticipants";
 import { useProfessionalFixedLocationCalendarDrawerLineItemsState } from "./useProfessionalFixedLocationCalendar.drawerLineItemsState";
+import { useAutoOpenBookingCheckout } from "./useAutoOpenBookingCheckout";
 import { useProfessionalFixedLocationCalendarDrawerParticipantState } from "./useProfessionalFixedLocationCalendar.drawerParticipantState";
 import { useProfessionalFixedLocationCalendarIncomingUiState } from "./useProfessionalFixedLocationCalendar.incomingUiState";
 import { useProfessionalFixedLocationCalendarClientIdentityDrafts } from "./useProfessionalFixedLocationCalendar.clientIdentityDrafts";
@@ -621,6 +622,15 @@ export function useProfessionalFixedLocationCalendar({
     drawerReissueRunRef.current = viewingBookingEvent.id;
     void processFinanceInvoiceReissues();
   }, [processFinanceInvoiceReissues, slotDrawerOpen, viewingBookingEvent]);
+
+  useAutoOpenBookingCheckout({
+    slotDrawerOpen,
+    viewingBookingEvent,
+    bookingCheckoutOpen,
+    nowMin,
+    setBookingCheckoutOpen,
+    setSlotDrawerTab,
+  });
 
   const {
     postBookingPendingPayment,
@@ -1812,6 +1822,7 @@ export function useProfessionalFixedLocationCalendar({
     draftFromBookingLine,
     isBookingDetailsSubScreen,
     leaveUniqueItemScreen,
+    openAddProduct,
     openAddUniqueItem,
     openEditBookingProductLine,
     openEditBookingUniqueLine,
@@ -2368,6 +2379,7 @@ export function useProfessionalFixedLocationCalendar({
     onTeamHeaderScroll,
     onToday,
     onlinePrepayBlocksAccept,
+    openAddProduct,
     openAddUniqueItem,
     openBookingDrawer,
     openBookingLocation,

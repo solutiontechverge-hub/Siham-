@@ -1,7 +1,10 @@
 import type { SalesAddonRecord, SalesCardMetaRecord } from "./salesOverview.types";
 
 let cardMetadata: SalesCardMetaRecord[] = [];
-let persistSalesCardMeta: ((record: SalesCardMetaRecord) => void) | null = null;
+/** Backend PUT via CalendarView — not localStorage. May return a Promise. */
+let persistSalesCardMeta:
+  | ((record: SalesCardMetaRecord) => void | Promise<void>)
+  | null = null;
 let addonRecords: SalesAddonRecord[] = [];
 let persistSalesAddon: ((record: SalesAddonRecord) => void) | null = null;
 
@@ -29,7 +32,7 @@ export function configureSalesAddonPersistence(persist: ((record: SalesAddonReco
 }
 
 export function configureSalesCardMetadataPersistence(
-  persist: ((record: SalesCardMetaRecord) => void) | null,
+  persist: ((record: SalesCardMetaRecord) => void | Promise<void>) | null,
 ) {
   persistSalesCardMeta = persist;
 }
@@ -78,14 +81,16 @@ export function listRefundSalesCardMetaForBookings(
   );
 }
 
-export function upsertSalesCardMeta(record: SalesCardMetaRecord) {
+export function upsertSalesCardMeta(
+  record: SalesCardMetaRecord,
+): void | Promise<void> {
   const all = cardMetadata;
   const existing = all.find((row) => row.cardId === record.cardId);
   const merged = existing ? { ...existing, ...record } : record;
   const next = [...all.filter((row) => row.cardId !== record.cardId), merged];
   cardMetadata = next;
-  persistSalesCardMeta?.(merged);
   emitSalesMetaChanged();
+  return persistSalesCardMeta?.(merged);
 }
 
 function seqFromCardId(baseId: string, cardId: string): number {

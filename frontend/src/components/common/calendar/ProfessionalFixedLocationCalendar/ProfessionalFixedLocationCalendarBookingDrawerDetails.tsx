@@ -162,6 +162,8 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsBag = Pick<
   | "setDiscardEbrOpen"
   | "setEditingInlineGuestId"
   | "setExceededCancellationWindow"
+  | "setDrawerDocOpen"
+  | "setDrawerDocType"
   | "setFocusSalesCardId"
   | "setIncomingConfirmAction"
   | "setInlineGuestDraft"

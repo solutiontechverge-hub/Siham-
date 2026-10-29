@@ -1,8 +1,5 @@
 import * as React from "react";
-import type {
-  BookingServiceLineItem,
-} from "../../../../data/bookingServiceEdit.data";
-import type { BookingProductLineItem } from "../../../../data/bookingProductCatalog.data";
+import type { CalendarBookingGuestItem } from "../../../../app/professionals/fixed-location/calendar/calendar.data";
 import { resolveDesiredVisitMunicipalityOptions } from "../../../../data/businessPublicProfile.data";
 import type { BusinessPublicProfileDesiredLocation } from "../../../../data/businessPublicProfile.data";
 
@@ -56,23 +53,7 @@ export function useProfessionalFixedLocationCalendarDrawerParticipantState({
     null,
   );
   const [bookingGuests, setBookingGuests] = React.useState<
-    Array<{
-      id: string;
-      name: string;
-      email?: string;
-      phoneCode?: string;
-      phoneNumber?: string;
-      services: BookingServiceLineItem[];
-      products: BookingProductLineItem[];
-      participantType?: "model" | "planning" | "guest" | "buffer" | "notes";
-      planningActivity?: string;
-      planningDuration?: string;
-      planningStartTime?: string;
-      planningEndTime?: string;
-      bufferTeamMemberId?: string;
-      bufferStartTime?: string;
-      bufferEndTime?: string;
-    }>
+    CalendarBookingGuestItem[]
   >([]);
   const [desiredLocationDraft, setDesiredLocationDraft] = React.useState<{
     street: string;

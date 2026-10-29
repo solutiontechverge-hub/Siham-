@@ -44,7 +44,7 @@ assert.ok(
   "expired window must not use waiting alarm",
 );
 
-// Past appointment start alone must not flip to ⚠️ without stamped respondBy.
+// Same gate as expiry banner: past slot + no respondBy → overdue_response.
 const pastSlotNoDeadline = resolveBookingResponseIndicators({
   ...base,
   date: "2020-01-01",
@@ -52,12 +52,46 @@ const pastSlotNoDeadline = resolveBookingResponseIndicators({
   details: {},
 });
 assert.ok(
-  pastSlotNoDeadline.includes("response_time_active"),
-  "no stamped deadline → waiting alarm, not overdue",
+  pastSlotNoDeadline.includes("overdue_response"),
+  "past slot without respondBy → overdue (banner parity)",
 );
 assert.ok(
-  !pastSlotNoDeadline.includes("overdue_response"),
-  "past slot without respondBy must not show overdue triangle",
+  !pastSlotNoDeadline.includes("response_time_active"),
+  "past slot without respondBy must not show waiting alarm",
+);
+
+const completedKeepsBrScenario = resolveBookingResponseIndicators({
+  ...base,
+  status: "Completed" as const,
+  bookingScenario: "BR" as const,
+});
+assert.ok(
+  !completedKeepsBrScenario.includes("response_time_active"),
+  "Completed must not show waiting-for-response even if scenario is still BR",
+);
+assert.ok(
+  !completedKeepsBrScenario.includes("overdue_response"),
+  "Completed must not show overdue-response",
+);
+
+const confirmedBr = resolveBookingResponseIndicators({
+  ...base,
+  status: "Confirmed" as const,
+  bookingScenario: "BR" as const,
+});
+assert.ok(
+  !confirmedBr.includes("response_time_active"),
+  "Confirmed (accepted) BR must not show waiting-for-response",
+);
+
+const pendingEr = resolveBookingResponseIndicators({
+  ...base,
+  status: "Confirmed" as const,
+  bookingScenario: "ER" as const,
+});
+assert.ok(
+  pendingEr.includes("response_time_active"),
+  "Confirmed + ER still awaiting accept → waiting-for-response",
 );
 
 console.log("bookingResponseStatus.test.ts: ok");

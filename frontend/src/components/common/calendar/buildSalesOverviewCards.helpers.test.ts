@@ -651,6 +651,7 @@ const baseCard: SalesOverviewCardData = {
   total: 64,
   highlightLabel: "Payment",
   highlightAmount: 64,
+  documentAmount: 64,
   showAddOns: true,
   occurredAt: "2026-09-28T00:00:00.000Z",
 };
@@ -810,6 +811,55 @@ assert.notEqual(
   "paid",
   "unpaid guest sub is not Paid",
 );
+assert.equal(
+  after[0]?.subCards?.[1]?.statusBadge,
+  undefined,
+  "unpaid guest must not inherit Partially Paid / Paid",
+);
+// Paid guest gets own Paid badge (not booking Partially Paid).
+const splitGuestPaidEvent = {
+  ...splitEvent,
+  details: {
+    ...(splitEvent.details as object),
+    splitBill: {
+      mode: "split",
+      prepaidAmount: 40,
+      payers: [
+        {
+          key: "main",
+          role: "main_client",
+          label: "Sara Johnson",
+          displayName: "Sara Johnson",
+          subtotal: 50,
+          paymentAmount: 10,
+          lineIds: [],
+          paid: true,
+        },
+        {
+          key: "g1",
+          role: "guest",
+          label: "Guest",
+          displayName: "Guest 1",
+          subtotal: 30,
+          paymentAmount: 30,
+          lineIds: [],
+          paid: true,
+        },
+      ],
+    },
+  },
+} as unknown as CalendarEvent;
+const splitGuestPaidCards = buildCardsForEvent({
+  event: splitGuestPaidEvent,
+  clientName: "Sara Johnson",
+  clientEmail: "sara@example.com",
+  ctx: { financeHints: [] },
+});
+const guestPaidSub = splitGuestPaidCards
+  .find((c) => c.kind === "after_treatment")
+  ?.subCards?.find((s) => s.payerRole === "guest");
+assert.equal(guestPaidSub?.paymentState, "paid", "paid guest paymentState");
+assert.equal(guestPaidSub?.statusBadge, "Paid", "paid guest shows own Paid badge");
 
 // Finance document.lineItems override calendar-derived lines (count sync).
 const financeLineEvent = {
@@ -980,6 +1030,50 @@ upsertSalesCardMeta({
   assert.equal(after?.paymentState, "payment_due");
   assert.equal(after?.statusBadge, "Payment Due");
   assert.equal(after?.dueDate, "2026-12-31");
+}
+hydrateSalesCardMetadata([]);
+
+// Local reissue meta (future due) ahead of finance refetch → Payment Due, not !Overdue.
+upsertSalesCardMeta({
+  bookingId: "status-sync-1",
+  cardKind: "reissued_invoice",
+  cardId: "status-sync-1-after-treatment",
+  dueDate: "2026-12-31",
+  paymentMethod: "offlineNonDirect",
+  penaltyAmount: 5,
+  reissuedAt: "2026-10-29T12:00:00.000Z",
+});
+{
+  const cards = buildCardsForEvent({
+    event: {
+      ...statusSyncEvent,
+      details: {
+        ...statusSyncEvent.details,
+        paymentMethod: "offlineNonDirect",
+      },
+    } as unknown as CalendarEvent,
+    clientName: "Bea",
+    ctx: {
+      financeHints: [
+        {
+          transactionId: "tx-reissue-optimistic",
+          bookingId: "status-sync-1",
+          bookingCode: "BK-STATUS",
+          phase: "full",
+          status: "Overdue",
+          dueDate: "2020-01-01",
+          reissueLevel: 0,
+          lineItems: [{ id: "s1", label: "Cut", amount: 40 }],
+        },
+      ],
+    },
+  });
+  const after = cards.find((c) => c.kind === "reissued_invoice" || c.kind === "after_treatment");
+  assert.equal(after?.paymentState, "payment_due", "optimistic reissue clears overdue");
+  assert.equal(after?.statusBadge, "Payment Due");
+  assert.equal(after?.dueDate, "2026-12-31");
+  assert.equal(after?.penaltyPrompt, "none");
+  assert.ok((after?.penaltyAmount ?? 0) >= 5);
 }
 hydrateSalesCardMetadata([]);
 

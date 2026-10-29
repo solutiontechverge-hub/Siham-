@@ -40,6 +40,8 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderBag
   | "selectedServices"
   | "selectedSlot"
   | "setBookingActionAnchor"
+  | "setDrawerDocOpen"
+  | "setDrawerDocType"
   | "setFocusSalesCardId"
   | "setSlotDrawerTab"
   | "showExpiredResponseBanner"

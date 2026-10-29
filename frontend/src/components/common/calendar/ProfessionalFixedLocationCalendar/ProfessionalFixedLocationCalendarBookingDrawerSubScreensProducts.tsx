@@ -17,6 +17,7 @@ export type ProfessionalFixedLocationCalendarBookingDrawerSubScreensProductsBag 
   | "editingCatalogProductId"
   | "isViewingExisting"
   | "mergedCustomBookingProducts"
+  | "openAddProduct"
   | "openAddUniqueItem"
   | "persistedUniqueCatalog"
   | "productCatalog"
@@ -38,6 +39,7 @@ export function ProfessionalFixedLocationCalendarBookingDrawerSubScreensSelectPr
     adjustProductQuantityDraft,
     isViewingExisting,
     mergedCustomBookingProducts,
+    openAddProduct,
     productCatalog,
     productSelectionDraft,
     toggleProductSelectionDraft,
@@ -52,6 +54,9 @@ export function ProfessionalFixedLocationCalendarBookingDrawerSubScreensSelectPr
           toggleProductSelectionDraft(product.id)
         }
         onQuantityChange={adjustProductQuantityDraft}
+        onAddProduct={
+          isViewingExisting ? undefined : () => openAddProduct()
+        }
         disabled={isViewingExisting}
       />
   );
@@ -74,6 +79,8 @@ export function ProfessionalFixedLocationCalendarBookingDrawerSubScreensSelectUn
         heading="Select Unique Item"
         searchPlaceholder="Search unique items..."
         addButtonLabel="Add new unique item"
+        emptyLabel="No unique items yet. Add one to get started."
+        emptySearchLabel="No unique items match your search."
         onToggle={(item) =>
           toggleUniqueItemSelectionDraft(item.id)
         }

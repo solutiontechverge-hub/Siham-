@@ -2,6 +2,7 @@ import type { TransactionRow } from "../../../app/professionals/fixed-location/f
 import { roundBookingMoney as roundMoney } from "../../../data/bookingLinePricing";
 import type { ClientBookingDraft } from "../client-booking/types";
 import type {
+  SalesCheckoutPaymentMethod,
   SalesFinanceHint,
   SalesLineItem,
   SalesOverviewCardData,
@@ -10,6 +11,24 @@ import {
   ALLOWED_BOOKING_STATUSES,
   type AllowedBookingStatus,
 } from "./salesOverview.data";
+
+/** Map finance_transactions.method_title → Sales checkout paymentMethod. */
+export function salesPaymentMethodFromMethodTitle(
+  methodTitle?: string | null,
+): SalesCheckoutPaymentMethod | undefined {
+  const t = String(methodTitle ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[–—]/g, "-");
+  if (!t) return undefined;
+  const online = t.startsWith("online");
+  const offline = t.startsWith("offline");
+  if (!online && !offline) return undefined;
+  const invoice =
+    t.includes("invoice") || t.includes("non-direct") || t.includes("non direct");
+  if (online) return invoice ? "onlineNonDirect" : "onlineDirect";
+  return invoice ? "offlineNonDirect" : "offlineDirect";
+}
 
 export function allowedBookingStatus(
   status: string | null | undefined,
@@ -82,6 +101,7 @@ export function toFinanceHints(rows: TransactionRow[]): SalesFinanceHint[] {
           : undefined;
     const lineItems = financeDocumentLinesToSalesLines(row);
     const paymentTerms = doc?.issuedSnapshot?.invoiceSettings?.paymentTerms;
+    const paymentMethod = salesPaymentMethodFromMethodTitle(row.methodTitle);
     return {
       transactionId: row.id,
       bookingId: row.bookingId,
@@ -94,6 +114,7 @@ export function toFinanceHints(rows: TransactionRow[]): SalesFinanceHint[] {
       // Column first (payment_deadline), then document/meta — match backend COALESCE.
       dueDate:
         row.paymentDeadline || doc?.dueDate || row.document?.dueDate || null,
+      ...(paymentMethod ? { paymentMethod } : {}),
       penaltyAmount: doc?.penaltyAmount,
       reissueLevel: Number(doc?.reissueLevel ?? row.document?.reissueLevel ?? 0) || 0,
       ...(paymentTerms ? { paymentTerms } : {}),

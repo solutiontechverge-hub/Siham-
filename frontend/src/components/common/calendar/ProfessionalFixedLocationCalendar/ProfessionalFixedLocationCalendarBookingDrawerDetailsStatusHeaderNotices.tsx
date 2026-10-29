@@ -10,8 +10,6 @@ import ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderNoticesA
 
 import ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderNoticesStatus from "./ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderNoticesStatus";
 
-import ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderNoticesPayment from "./ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderNoticesPayment";
-
 type Vm = ReturnType<typeof useProfessionalFixedLocationCalendar>;
 
 export type ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderNoticesBag = Pick<
@@ -24,6 +22,8 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderNot
   | "postBookingPendingPayment"
   | "responseTimeConfigured"
   | "selectedSlot"
+  | "setDrawerDocOpen"
+  | "setDrawerDocType"
   | "setFocusSalesCardId"
   | "setSlotDrawerTab"
   | "showExpiredResponseBanner"
@@ -47,7 +47,6 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
     <Stack spacing={1.25} sx={{ mt: 1.25 }}>
       <ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderNoticesAlerts bag={bag} />
       <ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderNoticesStatus bag={bag} />
-      <ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderNoticesPayment bag={bag} />
     </Stack>
   );
 }

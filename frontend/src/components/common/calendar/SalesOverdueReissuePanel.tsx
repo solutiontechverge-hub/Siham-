@@ -183,6 +183,9 @@ export default function SalesOverdueReissuePanel({
         <Typography sx={{ ...mollureLabelSx(m.navy), mb: 1 }}>
           {SALES_OVERVIEW_COPY.reissueInvoiceTitle}
         </Typography>
+        <Typography sx={{ ...mollureLabelSx(alpha(m.navy, 0.7)), mb: 0.75 }}>
+          Penalty
+        </Typography>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
           <MollureFormField
             required

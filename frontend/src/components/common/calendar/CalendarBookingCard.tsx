@@ -432,8 +432,9 @@ export default function CalendarBookingCard({
     prepaymentStatus: prepaymentIconVariant,
     paymentDue: paymentDueMeta
       ? {
-          label:
-            paymentDueMeta.reissued || paymentDueMeta.pastDue
+          label: paymentDueMeta.pastDue
+            ? "Payment Overdue"
+            : paymentDueMeta.reissued
               ? "Reissue Invoice"
               : "Payment Due",
           dateLabel: paymentDueMeta.dateLabel,

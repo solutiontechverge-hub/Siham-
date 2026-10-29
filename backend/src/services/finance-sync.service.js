@@ -422,37 +422,48 @@ function applyCatalogVat(line, invoiceSettings) {
  * Catalog-backed document lines from booking notes — prefer full snapshot/guest
  * arrays over collapsing to a single booking.service_id row.
  */
+function productSourceType(sourceReference) {
+  const ref = String(sourceReference || "");
+  return ref.startsWith("unique-") || ref === "kilometer-allowance"
+    ? "uniqueItemCode"
+    : "productId";
+}
+
+function mapProductDocLine(product, invoiceSettings, party = {}) {
+  const sourceReference = String(product.id || product.productId || "");
+  if (!sourceReference) return null;
+  const sourceType = productSourceType(sourceReference);
+  return {
+    description: product.name || (sourceType === "uniqueItemCode" ? "Unique item" : "Product"),
+    sourceReference,
+    sourceType,
+    quantity: parseMoney(product.quantity || 1, 1),
+    ...vatFieldsForProduct(sourceReference, invoiceSettings),
+    pricePerUnit: roundMoney(product.unitPrice ?? product.price),
+    totalPrice: roundMoney(product.price),
+    ...(party.assigneeKey ? { assigneeKey: party.assigneeKey } : {}),
+    ...(party.partyRole ? { partyRole: party.partyRole } : {}),
+    ...(party.partyName ? { partyName: party.partyName } : {}),
+  };
+}
+
 function buildFallbackLineItems(booking, meta, invoiceSettings) {
   const snapshotServices = Array.isArray(meta?.clientSnapshot?.services)
     ? meta.clientSnapshot.services
     : [];
-  if (snapshotServices.length) {
-    return withKilometerAllowanceLine(
-      snapshotServices
-        .filter((service) => service?.id || service?.serviceId)
-        .map((service) => {
-          const sourceReference = String(service.id || service.serviceId);
-          return {
-            description: service.name || "Service",
-            sourceReference,
-            sourceType: "serviceId",
-            quantity: 1,
-            ...vatFieldsForService(sourceReference, invoiceSettings),
-            pricePerUnit: serviceLineNet(service),
-            totalPrice: serviceLineNet(service),
-          };
-        }),
-      meta,
-    );
-  }
-
   const guests = Array.isArray(meta?.guests) ? meta.guests : [];
-  const fromGuests = [];
-  for (const guest of guests) {
-    for (const service of guest.services ?? []) {
+  const flatProducts = Array.isArray(meta?.products) ? meta.products : [];
+  const lines = [];
+
+  if (snapshotServices.length) {
+    for (const service of snapshotServices) {
       if (!service?.id && !service?.serviceId) continue;
       const sourceReference = String(service.id || service.serviceId);
-      fromGuests.push({
+      const assigneeKey =
+        service.guestId != null && String(service.guestId).trim() !== ""
+          ? String(service.guestId).trim()
+          : "";
+      lines.push({
         description: service.name || "Service",
         sourceReference,
         sourceType: "serviceId",
@@ -460,23 +471,56 @@ function buildFallbackLineItems(booking, meta, invoiceSettings) {
         ...vatFieldsForService(sourceReference, invoiceSettings),
         pricePerUnit: serviceLineNet(service),
         totalPrice: serviceLineNet(service),
+        ...(assigneeKey ? { assigneeKey } : {}),
       });
     }
+  } else {
+    for (const guest of guests) {
+      for (const service of guest.services ?? []) {
+        if (!service?.id && !service?.serviceId) continue;
+        const sourceReference = String(service.id || service.serviceId);
+        lines.push({
+          description: service.name || "Service",
+          sourceReference,
+          sourceType: "serviceId",
+          quantity: 1,
+          ...vatFieldsForService(sourceReference, invoiceSettings),
+          pricePerUnit: serviceLineNet(service),
+          totalPrice: serviceLineNet(service),
+          assigneeKey: String(guest.id),
+        });
+      }
+    }
+  }
+
+  // Products/unique always — snapshot-only path used to drop these.
+  const seenProductKeys = new Set();
+  const pushProduct = (product, party = {}) => {
+    const mapped = mapProductDocLine(product, invoiceSettings, party);
+    if (!mapped) return;
+    const key = `${mapped.sourceReference}::${party.assigneeKey || ""}`;
+    if (seenProductKeys.has(key)) return;
+    seenProductKeys.add(key);
+    lines.push(mapped);
+  };
+  for (const guest of guests) {
     for (const product of guest.products ?? []) {
-      if (!product?.id && !product?.productId) continue;
-      const sourceReference = String(product.id || product.productId);
-      fromGuests.push({
-        description: product.name || "Product",
-        sourceReference,
-        sourceType: "productId",
-        quantity: parseMoney(product.quantity || 1, 1),
-        ...vatFieldsForProduct(sourceReference, invoiceSettings),
-        pricePerUnit: roundMoney(product.unitPrice ?? product.price),
-        totalPrice: roundMoney(product.price),
+      pushProduct(product, {
+        assigneeKey: String(guest.id),
+        partyRole: guest.participantType === "model" ? "model" : "guest",
+        partyName: guest.name || "Guest",
       });
     }
   }
-  if (fromGuests.length) return withKilometerAllowanceLine(fromGuests, meta);
+  for (const product of flatProducts) {
+    const gid =
+      product.guestId != null && String(product.guestId).trim() !== ""
+        ? String(product.guestId).trim()
+        : "";
+    pushProduct(product, gid ? { assigneeKey: gid } : {});
+  }
+
+  if (lines.length) return withKilometerAllowanceLine(lines, meta);
 
   if (booking.service_id) {
     const sourceReference = String(booking.service_id);
@@ -983,8 +1027,56 @@ function resolveSplitPayers(booking, meta, invoiceSettings) {
         pricePerUnit: serviceLineNet(service),
         totalPrice: serviceLineNet(service),
         amount: serviceLineNet(service),
+        assigneeKey: assigneeId === String(requester.id) ? undefined : assigneeId,
       });
       groups.set(assigneeId, prev);
+    }
+
+    // Attach products/unique to the correct person (not only main).
+    const guestsById = new Map(
+      (Array.isArray(meta.guests) ? meta.guests : []).map((guest) => [
+        String(guest.id),
+        guest,
+      ]),
+    );
+    const pushGroupedProduct = (product, assigneeId, partyRole, partyName) => {
+      const mapped = mapProductDocLine(product, invoiceSettings, {
+        assigneeKey: assigneeId === String(requester.id) ? undefined : assigneeId,
+        partyRole,
+        partyName,
+      });
+      if (!mapped) return;
+      const prev = groups.get(assigneeId) ?? [];
+      prev.push({ ...mapped, amount: mapped.totalPrice });
+      groups.set(assigneeId, prev);
+    };
+    for (const guest of guestsById.values()) {
+      const guestId = String(guest.id);
+      const role = guest.participantType === "model" ? "model" : "guest";
+      for (const product of guest.products ?? []) {
+        pushGroupedProduct(product, guestId, role, guest.name || "Guest");
+      }
+    }
+    for (const product of Array.isArray(meta.products) ? meta.products : []) {
+      const gid =
+        product.guestId != null && String(product.guestId).trim() !== ""
+          ? String(product.guestId).trim()
+          : String(requester.id);
+      const guest = guestsById.get(gid);
+      const role =
+        gid === String(requester.id)
+          ? "main_client"
+          : guest?.participantType === "model"
+            ? "model"
+            : "guest";
+      pushGroupedProduct(
+        product,
+        gid,
+        role,
+        role === "main_client"
+          ? booking.customer_name || "Client"
+          : guest?.name || "Guest",
+      );
     }
 
     const payers = [];
@@ -1017,7 +1109,11 @@ function resolveSplitPayers(booking, meta, invoiceSettings) {
         displayName = trimmed && trimmed.toLowerCase() !== "guest" ? trimmed : `Guest ${guestOrdinal}`;
       }
 
-      let docLines = lines.map(({ amount: _a, ...docLine }) => docLine);
+      let docLines = lines.map(({ amount: _a, ...docLine }) => ({
+        ...docLine,
+        partyRole: role,
+        partyName: displayName,
+      }));
       if (role === "main_client") {
         docLines = withKilometerAllowanceLine(docLines, meta);
       }
@@ -1194,6 +1290,61 @@ async function healEmptyDocumentLineItems(financeTransactionId, lineItems) {
   );
 }
 
+/** Append product/unique catalog lines dropped by the old services-only snapshot path. */
+async function healMissingProductUniqueLines(financeTransactionId, lineItems) {
+  const extras = (Array.isArray(lineItems) ? lineItems : []).filter(
+    (line) =>
+      isCatalogLinkedLine(line) &&
+      (line.sourceType === "productId" || line.sourceType === "uniqueItemCode"),
+  );
+  if (!financeTransactionId || !extras.length) return;
+
+  const existing = await query(
+    `SELECT document, issued_document FROM finance_transactions WHERE id = $1 LIMIT 1`,
+    [financeTransactionId],
+  );
+  const row = existing.rows[0];
+  if (!row) return;
+
+  const lineKey = (line) =>
+    `${line?.sourceType || ""}:${String(line?.sourceReference || "")}:${String(line?.assigneeKey || "")}:${String(line?.description || "").trim().toLowerCase()}`;
+
+  const patchDoc = (doc) => {
+    if (!doc || typeof doc !== "object") return null;
+    const lines = Array.isArray(doc.lineItems) ? doc.lineItems : [];
+    const have = new Set(lines.map(lineKey));
+    const missing = extras.filter((line) => !have.has(lineKey(line)));
+    if (!missing.length) return null;
+    const nextLines = [...lines, ...missing];
+    const linesTotal = roundMoney(
+      nextLines.reduce((sum, line) => sum + (Number(line?.totalPrice) || 0), 0),
+    );
+    return {
+      ...doc,
+      lineItems: nextLines,
+      // Keep stamped total when it already covers extras; otherwise raise to lines sum.
+      totalPrice: roundMoney(Math.max(Number(doc.totalPrice) || 0, linesTotal)),
+    };
+  };
+
+  const nextDocument = patchDoc(row.document);
+  const nextIssued = patchDoc(row.issued_document);
+  if (!nextDocument && !nextIssued) return;
+
+  await query(
+    `UPDATE finance_transactions
+     SET document = COALESCE($2::jsonb, document),
+         issued_document = COALESCE($3::jsonb, issued_document),
+         updated_at = NOW()
+     WHERE id = $1`,
+    [
+      financeTransactionId,
+      nextDocument ? JSON.stringify(normalizeMoneyJson(nextDocument)) : null,
+      nextIssued ? JSON.stringify(normalizeMoneyJson(nextIssued)) : null,
+    ],
+  );
+}
+
 /**
  * Append missing Kilometer Allowance to an existing doc and bump totalPrice.
  * Settled PRE rows reuse exact matches — without this, km stays absent forever.
@@ -1349,6 +1500,7 @@ async function linkSalesCardForInsertedTx(
   if (!financeTransactionId || !booking?.id) return financeTransactionId;
   try {
     await healEmptyDocumentLineItems(financeTransactionId, lineItems);
+    await healMissingProductUniqueLines(financeTransactionId, lineItems);
     await healMissingKilometerAllowanceLine(financeTransactionId, lineItems);
     await ensureSalesCardMetadataForFinanceRow({
       professionalProfileId: booking.professional_profile_id,

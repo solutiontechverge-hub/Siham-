@@ -155,6 +155,7 @@ export function useBookingPaymentDueMeta(event: {
   id: string;
   bookingCode?: string;
   status?: string;
+  details?: { invoiceDueDate?: string | null } | null;
 } | null): BookingPaymentDueMeta | null {
   const [revision, setRevision] = React.useState(0);
   const preloadedRows = React.useContext(FinancePaymentDueRowsContext);
@@ -205,16 +206,27 @@ export function useBookingPaymentDueMeta(event: {
         financeResponse.data?.rows ?? [],
       );
     }
+    const dueFromNotes = String(event.details?.invoiceDueDate ?? "").trim();
+    const fromNotes: BookingPaymentDueMeta | null = dueFromNotes
+      ? {
+          dueDateIso: dueFromNotes,
+          dateLabel: formatFinanceDueDate(dueFromNotes),
+          reissued: false,
+          paymentDue: true,
+          pastDue: isDueDatePast(dueFromNotes),
+        }
+      : null;
     // Sales meta holds reissue due dates; finance list can lag until Sales mounts.
     if (fromFinance?.reissued) return fromFinance;
     if (fromMeta?.reissued) return fromMeta;
-    return fromFinance ?? fromMeta;
+    return fromFinance ?? fromMeta ?? fromNotes;
     // revision intentionally included so in-memory sales meta updates re-resolve
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     event?.id,
     event?.bookingCode,
     event?.status,
+    event?.details?.invoiceDueDate,
     financeResponse,
     preloadedRows,
     revision,

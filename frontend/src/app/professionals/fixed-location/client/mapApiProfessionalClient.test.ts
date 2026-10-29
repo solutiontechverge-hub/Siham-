@@ -11,6 +11,7 @@ const base = {
   email: "ada@example.com",
   phone: "+31 6 12345678",
   client_kind: "individual",
+  mollure_user_id: null,
   is_mollure: false,
   total_sales: 0,
   total_sales_label: "€0",

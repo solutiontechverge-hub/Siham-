@@ -28,6 +28,8 @@ type BookingSelectProductsScreenProps = {
   heading?: string;
   searchPlaceholder?: string;
   addButtonLabel?: string;
+  emptyLabel?: string;
+  emptySearchLabel?: string;
 };
 
 function ProductRow({
@@ -132,6 +134,8 @@ export default function BookingSelectProductsScreen({
   heading = "Select Product",
   searchPlaceholder = "Search products...",
   addButtonLabel = "Add Product",
+  emptyLabel = "No products yet. Add a product to get started.",
+  emptySearchLabel = "No products match your search.",
 }: BookingSelectProductsScreenProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -170,16 +174,30 @@ export default function BookingSelectProductsScreen({
       />
 
       <Stack spacing={0.75}>
-        {filteredProducts.map((product) => (
-          <ProductRow
-            key={product.id}
-            product={product}
-            draft={draft}
-            disabled={disabled}
-            onToggle={onToggle}
-            onQuantityChange={onQuantityChange}
-          />
-        ))}
+        {filteredProducts.length === 0 ? (
+          <BodyText
+            sx={{
+              ...mollureLabelSx(m.navy, {
+                color: alpha(m.navy, 0.48),
+                fontWeight: 700,
+              }),
+              py: 1.5,
+            }}
+          >
+            {query.trim() ? emptySearchLabel : emptyLabel}
+          </BodyText>
+        ) : (
+          filteredProducts.map((product) => (
+            <ProductRow
+              key={product.id}
+              product={product}
+              draft={draft}
+              disabled={disabled}
+              onToggle={onToggle}
+              onQuantityChange={onQuantityChange}
+            />
+          ))
+        )}
       </Stack>
 
       {onAddProduct ? (

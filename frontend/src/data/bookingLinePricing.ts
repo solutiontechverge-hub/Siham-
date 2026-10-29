@@ -154,7 +154,12 @@ export function coerceLineDiscount(
  */
 export function normalizeServiceLinePricing<T extends BookingLinePriceFields>(
   service: T,
-): T {
+): T & {
+  price: number;
+  originalPrice?: number;
+  discount: BookingLineDiscount | null;
+  pricingMode: BookingLinePricingMode;
+} {
   const discount = coerceLineDiscount(service);
   if (!discount?.amount) {
     const price = roundBookingMoney(Number(service.price) || 0);

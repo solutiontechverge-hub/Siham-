@@ -53,6 +53,25 @@ export type PreviewLineItem = {
   vatRate?: number | null;
   pricePerUnit: number | string;
   totalPrice: number | string;
+  sourceType?: "serviceId" | "productId" | "uniqueItemCode" | string;
+  assigneeKey?: string;
+  partyRole?: "main_client" | "guest" | "model" | string;
+  partyName?: string;
+};
+
+export type InvoicePartyLineGroup = {
+  kind: "service" | "product" | "unique" | "other";
+  label: string;
+  items: InvoiceDisplayLineItem[];
+};
+
+export type InvoicePartySection = {
+  key: string;
+  role: "main_client" | "guest" | "model" | "other";
+  /** Section eyebrow: Client / Guest / Model */
+  title: string;
+  name: string;
+  groups: InvoicePartyLineGroup[];
 };
 
 /** A transaction document is frozen once its identifying metadata is persisted. */
@@ -475,7 +494,125 @@ export function normalizePreviewLineItems(items: TransactionDocumentLineItem[]):
     vatRate: item.vatRate,
     pricePerUnit: item.pricePerUnit,
     totalPrice: item.totalPrice,
+    ...(item.sourceType ? { sourceType: item.sourceType } : {}),
+    ...(item.assigneeKey ? { assigneeKey: item.assigneeKey } : {}),
+    ...(item.partyRole ? { partyRole: item.partyRole } : {}),
+    ...(item.partyName ? { partyName: item.partyName } : {}),
   }));
+}
+
+function invoiceLineKind(
+  item: Pick<PreviewLineItem, "sourceType" | "description">,
+): InvoicePartyLineGroup["kind"] {
+  const type = String(item.sourceType || "");
+  if (type === "serviceId") return "service";
+  if (type === "productId") return "product";
+  if (type === "uniqueItemCode") return "unique";
+  const ref = String(item.description || "").toLowerCase();
+  if (ref.includes("unique")) return "unique";
+  return "other";
+}
+
+function invoiceKindLabel(kind: InvoicePartyLineGroup["kind"]): string {
+  if (kind === "service") return "Service";
+  if (kind === "product") return "Product";
+  if (kind === "unique") return "Unique item";
+  return "Other";
+}
+
+/**
+ * Client + Guest sections for invoice body when lines carry party metadata.
+ * Returns null when there is nothing to section (solo / legacy flat docs).
+ */
+export function groupInvoiceDisplayLineItemsByParty(
+  items: InvoiceDisplayLineItem[],
+): InvoicePartySection[] | null {
+  if (!items.length) return null;
+  const hasParty = items.some(
+    (item) => item.partyRole || item.partyName || item.assigneeKey,
+  );
+  if (!hasParty) return null;
+
+  const order: string[] = [];
+  const buckets = new Map<
+    string,
+    {
+      role: InvoicePartySection["role"];
+      title: string;
+      name: string;
+      items: InvoiceDisplayLineItem[];
+    }
+  >();
+
+  for (const item of items) {
+    const roleRaw = String(item.partyRole || "");
+    const role: InvoicePartySection["role"] =
+      roleRaw === "main_client" || roleRaw === "guest" || roleRaw === "model"
+        ? roleRaw
+        : item.assigneeKey
+          ? "guest"
+          : "main_client";
+    const key =
+      item.assigneeKey ||
+      (role === "main_client" ? "main-client" : `${role}:${item.partyName || item.description}`);
+    if (!buckets.has(key)) {
+      order.push(key);
+      buckets.set(key, {
+        role,
+        title:
+          role === "main_client" ? "Client" : role === "model" ? "Model" : "Guest",
+        name: item.partyName || (role === "main_client" ? "Client" : "Guest"),
+        items: [],
+      });
+    }
+    buckets.get(key)!.items.push(item);
+  }
+
+  const sections = order.map((key) => {
+    const bucket = buckets.get(key)!;
+    const kindOrder: InvoicePartyLineGroup["kind"][] = [
+      "service",
+      "product",
+      "unique",
+      "other",
+    ];
+    const byKind = new Map<InvoicePartyLineGroup["kind"], InvoiceDisplayLineItem[]>();
+    for (const item of bucket.items) {
+      const kind = invoiceLineKind(item);
+      const list = byKind.get(kind) ?? [];
+      list.push(item);
+      byKind.set(kind, list);
+    }
+    return {
+      key,
+      role: bucket.role,
+      title: bucket.title,
+      name: bucket.name,
+      groups: kindOrder
+        .filter((kind) => (byKind.get(kind) ?? []).length > 0)
+        .map((kind) => ({
+          kind,
+          label: invoiceKindLabel(kind),
+          items: byKind.get(kind)!,
+        })),
+    } satisfies InvoicePartySection;
+  });
+
+  // Solo main-client invoice stays flat (booking mock only needs Client+Guest).
+  if (
+    sections.length === 1 &&
+    sections[0]?.role === "main_client"
+  ) {
+    return null;
+  }
+
+  // Client first, then guests/models.
+  sections.sort((a, b) => {
+    const rank = (role: InvoicePartySection["role"]) =>
+      role === "main_client" ? 0 : role === "guest" ? 1 : role === "model" ? 2 : 3;
+    return rank(a.role) - rank(b.role);
+  });
+  return sections;
 }
 
 export function buildPreviewLineItems(_settings: FinanceInvoiceSettings, row?: TransactionRow | null): PreviewLineItem[] {

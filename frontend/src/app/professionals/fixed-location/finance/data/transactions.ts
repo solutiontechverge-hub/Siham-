@@ -280,6 +280,10 @@ export type TransactionDocumentLineItem = {
   description: string;
   sourceReference?: string;
   sourceType?: "serviceId" | "productId" | "uniqueItemCode";
+  /** Guest/person id from checkout composite line id — groups Client vs Guest sections. */
+  assigneeKey?: string;
+  partyRole?: "main_client" | "guest" | "model" | string;
+  partyName?: string;
   quantity: number;
   vat: string;
   /** Numeric VAT rate for integrations; VAT text remains display/reference-only. */
@@ -303,6 +307,8 @@ export type TransactionDocument = {
   serviceDate: string;
   /** Appointment clock time, e.g. "14:00" or "2:00 PM". */
   serviceTime?: string;
+  /** full | prepay | addon — stamped on issued finance docs. */
+  paymentPhase?: "full" | "prepay" | "addon" | string;
   invoiceDate: string;
   dueDate: string;
   lateFeeNotice?: string;

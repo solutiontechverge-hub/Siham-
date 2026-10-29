@@ -183,6 +183,14 @@ export function useProfessionalFixedLocationCalendarServiceProductScreensUniqueI
     setSlotBookingScreen("add-unique-item");
   }, []);
 
+  const openAddProduct = React.useCallback(() => {
+    setEditingBookingLine(null);
+    setEditingCatalogProductId(null);
+    setUniqueItemOrigin("products");
+    setUniqueItemDraft(emptyBookingUniqueItemDraft());
+    setSlotBookingScreen("add-unique-item");
+  }, []);
+
   const draftFromBookingLine = React.useCallback(
     (line: {
       id: string;
@@ -311,7 +319,7 @@ export function useProfessionalFixedLocationCalendarServiceProductScreensUniqueI
               guest.id === ownerId
                 ? {
                     ...guest,
-                    products: guest.products.map((product) =>
+                    products: (guest.products ?? []).map((product) =>
                       product.id === editingBookingLine.id ? stamped : product,
                     ),
                   }
@@ -332,9 +340,9 @@ export function useProfessionalFixedLocationCalendarServiceProductScreensUniqueI
             guest.id === ownerId
               ? {
                   ...guest,
-                  products: guest.products.map((product) =>
-                    product.id === editingBookingLine.id ? stamped : product,
-                  ),
+                    products: (guest.products ?? []).map((product) =>
+                      product.id === editingBookingLine.id ? stamped : product,
+                    ),
                 }
               : guest,
           ),
@@ -393,18 +401,29 @@ export function useProfessionalFixedLocationCalendarServiceProductScreensUniqueI
       return;
     }
 
+    const creatingProduct = uniqueItemOrigin === "products";
     const next = buildCatalogProductFromUniqueItemDraft(
       uniqueItemDraft,
-      `unique-${Date.now()}`,
+      creatingProduct ? `p-${Date.now()}` : `unique-${Date.now()}`,
     );
     if (!next) return;
-    persistBookingUniqueCatalogItem(next);
-    setUniqueItemSelectionDraft((prev) => ({
-      ...prev,
-      [next.id]: { selected: true, quantity: Math.max(1, next.unit ?? 1) },
-    }));
-    resetUniqueItemForm();
-    setSlotBookingScreen("select-unique-items");
+    if (creatingProduct) {
+      persistBookingCatalogProduct(next);
+      setProductSelectionDraft((prev) => ({
+        ...prev,
+        [next.id]: { selected: true, quantity: Math.max(1, next.unit ?? 1) },
+      }));
+      resetUniqueItemForm();
+      setSlotBookingScreen("select-products");
+    } else {
+      persistBookingUniqueCatalogItem(next);
+      setUniqueItemSelectionDraft((prev) => ({
+        ...prev,
+        [next.id]: { selected: true, quantity: Math.max(1, next.unit ?? 1) },
+      }));
+      resetUniqueItemForm();
+      setSlotBookingScreen("select-unique-items");
+    }
     setSlotSaveAttempted(false);
   }, [
     bookingGuests,
@@ -416,6 +435,7 @@ export function useProfessionalFixedLocationCalendarServiceProductScreensUniqueI
     persistBookingUniqueCatalogItem,
     resetUniqueItemForm,
     selectedServices,
+    setProductSelectionDraft,
     uniqueItemDraft,
     uniqueItemOrigin,
   ]);
@@ -426,6 +446,7 @@ export function useProfessionalFixedLocationCalendarServiceProductScreensUniqueI
     applyUniqueItemSelection,
     draftFromBookingLine,
     leaveUniqueItemScreen,
+    openAddProduct,
     openAddUniqueItem,
     openEditBookingProductLine,
     openEditBookingUniqueLine,

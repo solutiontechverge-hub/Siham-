@@ -107,29 +107,54 @@ function normalizeProducts(products: readonly FinanceInvoiceProduct[] | undefine
   }));
 }
 
+/** Merge partial/raw invoice settings onto defaults (shared by read + write paths). */
+export function coerceFinanceInvoiceSettings(
+  raw: Partial<FinanceInvoiceSettings> | null | undefined,
+): FinanceInvoiceSettings {
+  const base = raw ?? defaultFinanceInvoiceSettings;
+  return {
+    ...defaultFinanceInvoiceSettings,
+    ...base,
+    products: normalizeProducts(base.products),
+    uniqueItems: normalizeProducts(base.uniqueItems),
+    services: base.services ?? [],
+    paymentTerms: {
+      ...defaultFinanceInvoiceSettings.paymentTerms,
+      ...base.paymentTerms,
+    },
+    reminders: {
+      ...defaultFinanceInvoiceSettings.reminders,
+      ...base.reminders,
+    },
+    logoDataUrl: base.logoDataUrl ?? null,
+  };
+}
+
+/** Compute next invoice settings for PUT — never rely on a setState updater side effect. */
+export function buildNextFinanceInvoiceSettings(
+  current: Partial<FinanceInvoiceSettings> | null | undefined,
+  updater:
+    | FinanceInvoiceSettings
+    | ((prev: FinanceInvoiceSettings) => FinanceInvoiceSettings),
+): FinanceInvoiceSettings {
+  const base = coerceFinanceInvoiceSettings(current);
+  const next = typeof updater === "function" ? updater(base) : updater;
+  return coerceFinanceInvoiceSettings(next);
+}
+
 export function useFinanceInvoiceSettings() {
   const { data: settingsResponse, isLoading } = useGetFinanceSettingsQuery();
   const [updateInvoiceSettings] = useUpdateFinanceInvoiceSettingsMutation();
   const [localDraft, setLocalDraft] = React.useState<FinanceInvoiceSettings | null>(null);
+  const localDraftRef = React.useRef(localDraft);
+  localDraftRef.current = localDraft;
+  const serverSettingsRef = React.useRef(settingsResponse?.data?.invoiceSettings);
+  serverSettingsRef.current = settingsResponse?.data?.invoiceSettings;
 
   const rawSettings =
     localDraft ?? settingsResponse?.data?.invoiceSettings ?? defaultFinanceInvoiceSettings;
   const settings = React.useMemo<FinanceInvoiceSettings>(
-    () => ({
-      ...defaultFinanceInvoiceSettings,
-      ...rawSettings,
-      products: normalizeProducts(rawSettings.products),
-      uniqueItems: normalizeProducts(rawSettings.uniqueItems),
-      services: rawSettings.services ?? [],
-      paymentTerms: {
-        ...defaultFinanceInvoiceSettings.paymentTerms,
-        ...rawSettings.paymentTerms,
-      },
-      reminders: {
-        ...defaultFinanceInvoiceSettings.reminders,
-        ...rawSettings.reminders,
-      },
-    }),
+    () => coerceFinanceInvoiceSettings(rawSettings),
     [rawSettings],
   );
 
@@ -139,43 +164,19 @@ export function useFinanceInvoiceSettings() {
         | FinanceInvoiceSettings
         | ((prev: FinanceInvoiceSettings) => FinanceInvoiceSettings),
     ): Promise<void> => {
-      let normalized: FinanceInvoiceSettings = defaultFinanceInvoiceSettings;
-      setLocalDraft((prev) => {
-        const raw =
-          prev ??
-          settingsResponse?.data?.invoiceSettings ??
-          defaultFinanceInvoiceSettings;
-        const base: FinanceInvoiceSettings = {
-          ...defaultFinanceInvoiceSettings,
-          ...raw,
-          products: normalizeProducts(raw.products),
-          uniqueItems: normalizeProducts(raw.uniqueItems),
-          services: raw.services ?? [],
-          paymentTerms: {
-            ...defaultFinanceInvoiceSettings.paymentTerms,
-            ...raw.paymentTerms,
-          },
-          reminders: {
-            ...defaultFinanceInvoiceSettings.reminders,
-            ...raw.reminders,
-          },
-        };
-        const next = typeof updater === "function" ? updater(base) : updater;
-        normalized = {
-          ...defaultFinanceInvoiceSettings,
-          ...next,
-          products: normalizeProducts(next.products),
-          uniqueItems: normalizeProducts(next.uniqueItems),
-          services: next.services ?? [],
-          logoDataUrl: next.logoDataUrl ?? null,
-        };
-        return normalized;
-      });
+      // Compute outside setState — mutating `normalized` inside an updater can PUT
+      // defaultFinanceInvoiceSettings (products: []) and wipe the catalog.
+      const normalized = buildNextFinanceInvoiceSettings(
+        localDraftRef.current ?? serverSettingsRef.current,
+        updater,
+      );
+      localDraftRef.current = normalized;
+      setLocalDraft(normalized);
       return updateInvoiceSettings({ invoiceSettings: normalized })
         .unwrap()
         .then(() => undefined);
     },
-    [settingsResponse?.data?.invoiceSettings, updateInvoiceSettings],
+    [updateInvoiceSettings],
   );
 
   // Keep draft until server catches up (logo uploads race with refetch).

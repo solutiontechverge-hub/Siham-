@@ -23,6 +23,8 @@ import {
   BodyText,
 } from "../../../ui/typography";
 
+import BookingGuidelineIcon from "../BookingGuidelineIcon";
+
 import BookingIndicatorIcon, {
   BOOKING_INDICATOR_LABELS,
 } from "../BookingIndicatorIcon";
@@ -82,6 +84,8 @@ import BookingResponseExpiryBanner from "../BookingResponseExpiryBanner";
 
 import { useProfessionalFixedLocationCalendar } from "./useProfessionalFixedLocationCalendar";
 
+import ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderNoticesPayment from "./ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderNoticesPayment";
+
 type Vm = ReturnType<typeof useProfessionalFixedLocationCalendar>;
 
 export type ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderNoticesStatusBag = Pick<
@@ -91,8 +95,13 @@ export type ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderNot
   | "handleDiscardBr"
   | "m"
   | "openActivityComparison"
+  | "postBookingPendingPayment"
   | "responseTimeConfigured"
   | "selectedSlot"
+  | "setDrawerDocOpen"
+  | "setDrawerDocType"
+  | "setFocusSalesCardId"
+  | "setSlotDrawerTab"
   | "showExpiredResponseBanner"
   | "viewingBookingEvent"
   | "viewingBookingPaymentDue"
@@ -175,6 +184,11 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
           }
         />
       ) : null}
+
+      {/* Mock: Invoice Issued strip sits between Booking ID and Status. */}
+      <ProfessionalFixedLocationCalendarBookingDrawerDetailsStatusHeaderNoticesPayment
+        bag={bag}
+      />
 
       <Box>
         <BodyText
@@ -470,7 +484,14 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
             );
           })()}
           {viewingBookingPaymentDue ? (
-            <Tooltip title="Payment due" placement="top">
+            <Tooltip
+              title={
+                viewingBookingPaymentDue.pastDue
+                  ? "Payment overdue"
+                  : "Payment due"
+              }
+              placement="top"
+            >
               <Box
                 sx={{
                   display: "grid",
@@ -481,7 +502,11 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
                   flexShrink: 0,
                 }}
               >
-                <PaymentDueIcon size={24} />
+                {viewingBookingPaymentDue.pastDue ? (
+                  <BookingGuidelineIcon variant="overdue_payment" size={24} />
+                ) : (
+                  <PaymentDueIcon size={24} />
+                )}
               </Box>
             </Tooltip>
           ) : null}

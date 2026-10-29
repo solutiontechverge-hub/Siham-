@@ -6,6 +6,7 @@ import {
   shouldShowExpiredResponseBanner,
   type ResponseWindowInput,
 } from "./bookingResponseDeadline";
+import { resolveTimeBasedCalendarStatus } from "./bookingStatus";
 import { resolveCalendarPrepaymentStatus } from "./prepaymentStatus";
 
 export type CalendarResponseStatus = "suggestion_for_change" | "overdue_response";
@@ -25,11 +26,11 @@ export function resolveBookingResponseIndicators(
   const prepayment = resolveCalendarPrepaymentStatus(event);
   const prepayRequired = Boolean(details?.showPrepayment);
   const prepayPaid = prepayment === "confirmed";
+  // Waiting/overdue response clock only while accept is still pending.
+  // Do not key off leftover bookingScenario "BR"/"EBR" after Confirmed/Completed.
   const pendingNegotiation =
     event.status === "Requested" ||
-    event.bookingScenario === "BR" ||
-    event.bookingScenario === "EBR" ||
-    event.bookingScenario === "ER";
+    (event.status === "Confirmed" && event.bookingScenario === "ER");
 
   if (
     details?.responseStatus === "suggestion_for_change" ||
@@ -51,18 +52,18 @@ export function resolveBookingResponseIndicators(
     indicators.push("prepaid");
   }
 
-  // In Progress past end may stay out of sync — still signal close-out when unpaid.
-  if (event.status === "In Progress" && !details?.refunded) {
-    if (resolvePostBookingPendingPayment(event as CalendarEvent)) {
-      indicators.push("waiting_for_payment");
-    }
-  } else if (
-    event.status === "Completed" &&
-    details?.waitingForPayment &&
-    !details?.refunded
+  // Time-based In Progress / Completed — signal unpaid close-out (incl. Confirmed past end).
+  const displayStatus = resolveTimeBasedCalendarStatus(
+    event as CalendarEvent,
+  );
+  if (
+    (displayStatus === "In Progress" || displayStatus === "Completed") &&
+    !details?.refunded &&
+    resolvePostBookingPendingPayment(event as CalendarEvent)
   ) {
-    const due = details.invoiceDueDate?.trim();
+    const due = details?.invoiceDueDate?.trim();
     const overdue =
+      displayStatus === "Completed" &&
       Boolean(due) &&
       !Number.isNaN(new Date(`${due}T00:00:00`).getTime()) &&
       new Date(`${due}T00:00:00`).getTime() <

@@ -125,7 +125,7 @@ assert.deepEqual(
   ["eyelash"],
 );
 assert.deepEqual(
-  hydration.guests[0]?.products.map((product) => product.name),
+  (hydration.guests[0]?.products ?? []).map((product) => product.name),
   ["Guest product"],
 );
 

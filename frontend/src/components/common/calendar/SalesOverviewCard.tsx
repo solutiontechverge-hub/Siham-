@@ -743,9 +743,8 @@ export default function SalesOverviewCard({
 
   const isGuestOrModel =
     card.payerRole === "guest" || card.payerRole === "model";
-  // Guest/model split cards: one teal Total Amount (no Payment row duplicate).
-  const guestTotalOnly =
-    isGuestOrModel && !(card.secondaryRows?.length) && !card.subCards?.length;
+  // Split After Treatment: Total + Payment rows (mock); prepaid stays main-only via secondaryRows.
+  const guestTotalOnly = false;
   const isFeeSummary =
     card.title === "Fee Summary" || card.title === "No-Show Fee Invoice";
   const badge = statusBadgeSx(card.statusBadge, m, card.paymentState);
@@ -754,9 +753,14 @@ export default function SalesOverviewCard({
     card.paymentState,
     card.statusBadge,
   );
-  // Individuals: no type badge. Business: BC only.
-  const clientBadge =
-    !isGuestOrModel && card.clientKind === "company" ? "BC Client" : null;
+  // After Treatment: IC/BC next to main client (mock). Guests: no type badge.
+  const clientBadge = isGuestOrModel
+    ? null
+    : card.clientKind === "company"
+      ? "BC Client"
+      : card.kind === "after_treatment"
+        ? "IC Client"
+        : null;
   // Follow-on split section (title already hidden): skip "Guest"/"Model" role label.
   const realGuestName =
     isGuestOrModel &&
@@ -856,7 +860,8 @@ export default function SalesOverviewCard({
         ) : (
           <Box sx={{ flex: 1 }} />
         )}
-        {card.statusBadge && !isFeeSummary ? (
+        {/* Guests may show own Paid; hideTitle still suppresses follow-on duplicate pills. */}
+        {card.statusBadge && !isFeeSummary && !hideTitle ? (
           <Box sx={{ px: 1, py: 0.3, borderRadius: "999px", ...badge }}>
             <Typography sx={{ fontSize: 11, fontWeight: 800, color: "inherit" }}>
               {card.statusBadge}

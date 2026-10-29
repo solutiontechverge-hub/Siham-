@@ -24,6 +24,7 @@ export {
   resolveInvoiceTemplateType,
   resolveInvoiceLineItemLayout,
   toInvoiceDisplayLineItems,
+  groupInvoiceDisplayLineItemsByParty,
   getInvoiceLineItemColumns,
   getIssuedDocument,
   hasStoredDocumentSnapshot,

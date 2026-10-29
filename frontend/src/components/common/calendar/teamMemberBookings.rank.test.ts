@@ -5,11 +5,11 @@ import assert from "node:assert/strict";
 import { rankResourcesForCalendarDay } from "./teamMemberBookings";
 
 const resources = [
-  { id: "umer", name: "Umer" },
-  { id: "ali", name: "ali" },
-  { id: "aliza", name: "aliza" },
-  { id: "hama", name: "hama" },
-] as const;
+  { id: "umer", name: "Umer", avatarText: "U" },
+  { id: "ali", name: "ali", avatarText: "A" },
+  { id: "aliza", name: "aliza", avatarText: "AZ" },
+  { id: "hama", name: "hama", avatarText: "H" },
+];
 
 const occupancy: Record<string, number> = {
   umer: 0,

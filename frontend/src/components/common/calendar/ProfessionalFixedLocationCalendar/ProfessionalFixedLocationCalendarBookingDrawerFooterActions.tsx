@@ -6,6 +6,7 @@ import { Box, Stack } from "@mui/material";
 
 import { alpha } from "@mui/material/styles";
 
+import { resolvePostBookingPendingPayment } from "../bookingCheckout";
 import { showPersistentCheckoutButton } from "../bookingStatusActions";
 
 import { useProfessionalFixedLocationCalendar } from "./useProfessionalFixedLocationCalendar";
@@ -115,6 +116,9 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerFooterActi
     viewingBookingEvent,
   } = bag;
 
+  const checkoutEnabled =
+    resolvePostBookingPendingPayment(viewingBookingEvent) != null;
+
   if (standaloneCheckout) {
     if (!showPersistentCheckoutButton(viewingBookingEvent)) return null;
     return (
@@ -130,6 +134,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerFooterActi
         <Stack direction="row" justifyContent="flex-end">
           <AppButton
             tone="primary"
+            disabled={!checkoutEnabled}
             onClick={() => void handleBookingActionSelect("checkout")}
             sx={{ height: 38, minWidth: 110 }}
           >
@@ -356,6 +361,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerFooterActi
       slotBookingScreen === "new-booking" ? (
         <AppButton
           tone="primary"
+          disabled={!checkoutEnabled}
           onClick={() => void handleBookingActionSelect("checkout")}
           sx={{
             height: 38,

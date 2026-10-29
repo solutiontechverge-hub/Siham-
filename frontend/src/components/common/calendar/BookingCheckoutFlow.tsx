@@ -1,21 +1,18 @@
 "use client";
 
-import {
-  mollureBodyMutedSx,
-  mollurePageSubtitleSx,
-  mollurePageTitleSx,
-  mollureSectionTitleSx,
-} from "../../../theme/mollureHierarchy";
+import { mollureSectionTitleSx } from "../../../theme/mollureHierarchy";
 
 import AppButton from "../AppButton";
 import AppTextField from "../AppTextField";
 import * as React from "react";
-import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
-import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import StorefrontOutlinedIcon from "@mui/icons-material/StorefrontOutlined";
 import {
+  Avatar,
   Box,
+  Checkbox,
   IconButton,
   Popover,
   Radio,
@@ -25,9 +22,24 @@ import {
 import { alpha, useTheme } from "@mui/material/styles";
 import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import { AppCalendarPanel } from "../AppDatePicker";
+import { clientPlatformTagToneColors } from "../ClientPlatformTag";
 import { formatCompactEuro } from "../booking-finance/formatBookingFinance";
 import { tomorrowIso } from "./calendar.utils";
-import type { SalesCheckoutPaymentMethod, SalesLineItem } from "./salesOverview.types";
+import {
+  resolveCheckoutLateRescheduleFee,
+  resolveSalesCheckoutPaymentOptions,
+} from "./bookingCheckout";
+import BookingCheckoutItemsStep from "./BookingCheckoutItemsStep";
+import {
+  buildCheckoutItemParties,
+  manualLinesFromBookingEvent,
+  salesLinesFromPartyCheckout,
+} from "./bookingCheckoutItems";
+import type {
+  SalesCheckoutPaymentMethod,
+  SalesClientKind,
+  SalesLineItem,
+} from "./salesOverview.types";
 import {
   buildSplitPaymentAmounts,
   collapseSharesOntoPayer,
@@ -37,8 +49,9 @@ import {
   type BookingSplitBillMode,
   type SalesPayerShare,
 } from "./salesSplitBill";
+import type { ManualEntryDiscount, ManualEntryLine } from "../../sections/finance/manualEntry.data";
 
-type Step = "split" | "payer" | "payment" | "summary" | "completed";
+type Step = "items" | "split" | "payer" | "payment" | "summary" | "completed";
 
 export type BookingCheckoutResult = {
   mode: BookingSplitBillMode;
@@ -59,23 +72,22 @@ type BookingCheckoutFlowProps = {
   clientName: string;
   clientEmail?: string;
   clientPhone?: string;
+  /** company → 4 payment methods; otherwise Online/Offline Direct only. */
+  clientKind?: SalesClientKind | null;
+  clientPhotoSrc?: string | null;
   prepaidAmount?: number;
   onCancel: () => void;
-  onSave: (result: BookingCheckoutResult) => void | Promise<void>;
+  /** Return `false` on failure so the UI stays on summary (no throw → no Next overlay). */
+  onSave: (result: BookingCheckoutResult) => boolean | void | Promise<boolean | void>;
 };
-
-const PAYMENT_OPTIONS: Array<{ id: SalesCheckoutPaymentMethod; label: string }> = [
-  { id: "onlineDirect", label: "Online Direct" },
-  { id: "offlineDirect", label: "Offline Direct" },
-  { id: "onlineNonDirect", label: "Online Non-Direct" },
-  { id: "offlineNonDirect", label: "Offline Non-Direct" },
-];
 
 export default function BookingCheckoutFlow({
   event,
   clientName,
   clientEmail,
   clientPhone,
+  clientKind,
+  clientPhotoSrc,
   prepaidAmount = 0,
   onCancel,
   onSave,
@@ -86,53 +98,71 @@ export default function BookingCheckoutFlow({
     [event.details?.splitBill],
   );
 
-  const allShares = React.useMemo(() => {
-    const snapshotServices = event.details?.clientSnapshot?.services ?? [];
-    const allLines: SalesLineItem[] = snapshotServices.length
-      ? snapshotServices.map((service, index) => ({
-          id: `${service.id}::${String(service.guestId ?? "")}::${index}`,
-          label: service.name,
-          amount: Math.round((service.price + Number.EPSILON) * 100) / 100,
-        }))
-      : [
-          ...(event.details?.services ?? []).map((service) => ({
-            id: service.id,
-            label: service.name,
-            amount: Math.round((service.price + Number.EPSILON) * 100) / 100,
-          })),
-          ...(event.details?.guests ?? []).flatMap((guest) => [
-            ...(guest.services ?? []).map((service, index) => ({
-              id: `${service.id}::${String(guest.id)}::${index}`,
-              label: service.name,
-              amount: Math.round((service.price + Number.EPSILON) * 100) / 100,
-            })),
-            ...(guest.products ?? []).map((product, index) => ({
-              id: `${product.id}::${String(guest.id)}::${index}`,
-              label:
-                product.quantity > 1
-                  ? `${product.name} ×${product.quantity}`
-                  : product.name,
-              amount: Math.round((product.price + Number.EPSILON) * 100) / 100,
-            })),
-          ]),
-          ...(event.details?.products ?? []).map((product) => ({
-            id: product.id,
-            label:
-              product.quantity > 1
-                ? `${product.name} ×${product.quantity}`
-                : product.name,
-            amount: Math.round((product.price + Number.EPSILON) * 100) / 100,
-          })),
-        ];
-    const shares = resolveSalesPayerShares({
+  const [checkoutLines, setCheckoutLines] = React.useState<ManualEntryLine[]>(
+    () => manualLinesFromBookingEvent(event),
+  );
+  const [discountByParty, setDiscountByParty] = React.useState<
+    Record<string, ManualEntryDiscount | null>
+  >({});
+  const [partyIndex, setPartyIndex] = React.useState(0);
+
+  const seedShares = React.useMemo(() => {
+    const allLines: SalesLineItem[] = manualLinesFromBookingEvent(event).map(
+      (line) => ({
+        id: line.id,
+        label:
+          line.quantity > 1 ? `${line.name} ×${line.quantity}` : line.name,
+        amount:
+          Math.round(
+            (line.quantity * line.unitPrice + Number.EPSILON) * 100,
+          ) / 100,
+      }),
+    );
+    return resolveSalesPayerShares({
       event,
       allLines: allLines.filter((line) => line.amount >= 0),
       mainClientName: clientName,
       mainClientEmail: clientEmail,
       mainClientPhone: clientPhone,
     });
+  }, [clientEmail, clientName, clientPhone, event]);
+
+  const itemParties = React.useMemo(
+    () =>
+      buildCheckoutItemParties({
+        event,
+        shares: seedShares,
+        clientName,
+        clientEmail,
+        clientKind,
+      }),
+    [clientEmail, clientKind, clientName, event, seedShares],
+  );
+
+  const activeParty = itemParties[Math.min(partyIndex, itemParties.length - 1)];
+
+  const editedSalesLines = React.useMemo(
+    () => salesLinesFromPartyCheckout(checkoutLines, itemParties, discountByParty),
+    [checkoutLines, discountByParty, itemParties],
+  );
+
+  const allShares = React.useMemo(() => {
+    const shares = resolveSalesPayerShares({
+      event,
+      allLines: editedSalesLines.filter((line) => line.amount !== 0),
+      mainClientName: clientName,
+      mainClientEmail: clientEmail,
+      mainClientPhone: clientPhone,
+    });
     return buildSplitPaymentAmounts({ shares, prepaidAmount });
-  }, [clientEmail, clientName, clientPhone, event, prepaidAmount]);
+  }, [
+    clientEmail,
+    clientName,
+    clientPhone,
+    editedSalesLines,
+    event,
+    prepaidAmount,
+  ]);
 
   const unpaidShares = React.useMemo(() => {
     if (!existingSplit) return allShares.filter((share) => share.paymentAmount > 0);
@@ -145,45 +175,149 @@ export default function BookingCheckoutFlow({
   const initialMode: BookingSplitBillMode =
     existingSplit?.mode ?? (canSplit ? "split" : "single");
 
-  const [step, setStep] = React.useState<Step>(() => {
-    if (existingSplit?.mode === "split" && unpaidShares.length) return "payer";
-    if (canSplit) return "split";
-    return "payment";
-  });
+  const [step, setStep] = React.useState<Step>("items");
   const [mode, setMode] = React.useState<BookingSplitBillMode>(initialMode);
   const [payerKey, setPayerKey] = React.useState(
     () => unpaidShares[0]?.key ?? allShares[0]?.key ?? "main-client",
   );
+  const [forWhoKeys, setForWhoKeys] = React.useState<string[]>(() =>
+    (unpaidShares.length ? unpaidShares : allShares).map((share) => share.key),
+  );
+  const mainParty = itemParties.find((party) => party.variant === "main") ?? itemParties[0];
+  const selectedPayerRole =
+    unpaidShares.find((share) => share.key === payerKey)?.role ??
+    allShares.find((share) => share.key === payerKey)?.role;
+  const paymentOptions = React.useMemo(
+    () =>
+      resolveSalesCheckoutPaymentOptions(
+        selectedPayerRole === "guest" || selectedPayerRole === "model"
+          ? "individual"
+          : clientKind,
+      ),
+    [clientKind, selectedPayerRole],
+  );
   const [paymentMethod, setPaymentMethod] =
-    React.useState<SalesCheckoutPaymentMethod>("offlineDirect");
+    React.useState<SalesCheckoutPaymentMethod>(
+      () => paymentOptions[0]?.id ?? "offlineDirect",
+    );
+  React.useEffect(() => {
+    if (!paymentOptions.some((option) => option.id === paymentMethod)) {
+      setPaymentMethod(paymentOptions[0]?.id ?? "offlineDirect");
+    }
+  }, [paymentMethod, paymentOptions]);
   const [checkoutEmail, setCheckoutEmail] = React.useState(clientEmail?.trim() ?? "");
   const [dueDate, setDueDate] = React.useState(tomorrowIso());
   const [dueDateAnchor, setDueDateAnchor] = React.useState<null | HTMLElement>(null);
   const [saving, setSaving] = React.useState(false);
   const [completed, setCompleted] = React.useState<BookingCheckoutResult | null>(null);
 
+  // Brief success beat, then back to booking details (footer Checkout disables when settled).
+  const onCancelRef = React.useRef(onCancel);
+  onCancelRef.current = onCancel;
+  React.useEffect(() => {
+    if (step !== "completed") return;
+    const timer = window.setTimeout(() => onCancelRef.current(), 1400);
+    return () => window.clearTimeout(timer);
+  }, [step]);
+
+  const sharePool = unpaidShares.length ? unpaidShares : allShares;
+
   const activeShares = React.useMemo(() => {
     if (mode === "single") {
-      return collapseSharesOntoPayer(unpaidShares.length ? unpaidShares : allShares, payerKey);
+      return collapseSharesOntoPayer(sharePool, payerKey);
     }
-    const chosen = unpaidShares.find((share) => share.key === payerKey);
-    return chosen ? [chosen] : unpaidShares.slice(0, 1);
-  }, [allShares, mode, payerKey, unpaidShares]);
+    const coveredKeys = forWhoKeys.length ? forWhoKeys : [payerKey];
+    const covered = sharePool.filter((share) => coveredKeys.includes(share.key));
+    return collapseSharesOntoPayer(
+      covered.length ? covered : sharePool.slice(0, 1),
+      payerKey,
+      sharePool,
+    );
+  }, [forWhoKeys, mode, payerKey, sharePool]);
 
   const activeShare = activeShares[0];
-  const amount = activeShare?.paymentAmount ?? 0;
   const lines = activeShare?.lines ?? [];
+  const summarySubtotal = activeShare?.subtotal ?? 0;
+  // Late fee uses drawer SSOT (`computeBookingPrice`); only on main / single bill.
+  const lateRescheduleFee =
+    activeShare &&
+    (activeShare.role === "main_client" || mode === "single")
+      ? resolveCheckoutLateRescheduleFee({
+          event,
+          baseAmount: summarySubtotal,
+        })
+      : null;
+  const lateFeeAmount = lateRescheduleFee?.amount ?? 0;
+  // Charge amount = collapsed share due (prepaid already deducted) + late fee when applicable.
+  const amount = Math.round(
+    (((activeShare?.paymentAmount ?? 0) + lateFeeAmount + Number.EPSILON) *
+      100) /
+      100,
+  );
   const needsDueDate =
     paymentMethod === "onlineNonDirect" || paymentMethod === "offlineNonDirect";
+  // Guest/model only — IC/BC already have email on file (Case B/C).
+  const isGuestPayer =
+    activeShare?.role === "guest" || activeShare?.role === "model";
   const needsOnlineEmail =
-    paymentMethod === "onlineDirect" || paymentMethod === "onlineNonDirect";
+    isGuestPayer &&
+    (paymentMethod === "onlineDirect" || paymentMethod === "onlineNonDirect");
   const paymentLabel =
-    PAYMENT_OPTIONS.find((option) => option.id === paymentMethod)?.label ?? "Offline Direct";
+    paymentOptions.find((option) => option.id === paymentMethod)?.label ??
+    "Offline Direct";
 
   const remainingAfterThis = React.useMemo(() => {
     if (mode === "single") return 0;
-    return Math.max(0, unpaidShares.length - 1);
-  }, [mode, unpaidShares.length]);
+    const covered = new Set(forWhoKeys);
+    return Math.max(0, unpaidShares.filter((share) => !covered.has(share.key)).length);
+  }, [forWhoKeys, mode, unpaidShares]);
+
+  const fullBillTotal = React.useMemo(
+    () => sharePool.reduce((sum, share) => sum + share.paymentAmount, 0),
+    [sharePool],
+  );
+
+  const personRoleLabel = (share: SalesPayerShare) => {
+    if (share.role === "main_client") {
+      return mainParty?.clientBadge ?? "IC Client";
+    }
+    if (share.role === "model") return "Model";
+    return "Guest User";
+  };
+
+  const personPrimaryName = (share: SalesPayerShare) =>
+    share.displayName?.trim() || share.label;
+
+  // Split summary: one panel per covered share (before collapse). Charge still uses activeShare.
+  const summaryShares = React.useMemo(() => {
+    if (mode === "single") return activeShare ? [activeShare] : [];
+    const keys = forWhoKeys.length ? forWhoKeys : payerKey ? [payerKey] : [];
+    const covered = sharePool.filter((share) => keys.includes(share.key));
+    return covered.length ? covered : activeShare ? [activeShare] : [];
+  }, [activeShare, forWhoKeys, mode, payerKey, sharePool]);
+
+  const goAfterItems = () => {
+    if (canSplit && !existingSplit) {
+      setForWhoKeys(sharePool.map((share) => share.key));
+      setStep("split");
+      return;
+    }
+    if (existingSplit?.mode === "split" && unpaidShares.length > 1) {
+      const nextKey = unpaidShares[0]?.key ?? payerKey;
+      setPayerKey(nextKey);
+      setForWhoKeys([nextKey]);
+      setStep("payer");
+      return;
+    }
+    if (canSplit) {
+      const nextKey = unpaidShares[0]?.key ?? payerKey;
+      setPayerKey(nextKey);
+      setForWhoKeys([nextKey]);
+      setStep("payer");
+      return;
+    }
+    setStep("payment");
+  };
 
   const handleBack = () => {
     if (step === "completed") {
@@ -195,20 +329,35 @@ export default function BookingCheckoutFlow({
       return;
     }
     if (step === "payment") {
-      if (mode === "split" && unpaidShares.length > 1) {
-        setStep("payer");
-        return;
-      }
       if (canSplit && !existingSplit) {
         setStep("split");
         return;
       }
-      onCancel();
+      if (mode === "split" && unpaidShares.length > 1) {
+        setStep("payer");
+        return;
+      }
+      setPartyIndex(itemParties.length - 1);
+      setStep("items");
       return;
     }
     if (step === "payer") {
       if (canSplit && !existingSplit) {
         setStep("split");
+        return;
+      }
+      setPartyIndex(itemParties.length - 1);
+      setStep("items");
+      return;
+    }
+    if (step === "split") {
+      setPartyIndex(itemParties.length - 1);
+      setStep("items");
+      return;
+    }
+    if (step === "items") {
+      if (partyIndex > 0) {
+        setPartyIndex((index) => index - 1);
         return;
       }
       onCancel();
@@ -218,9 +367,17 @@ export default function BookingCheckoutFlow({
   };
 
   const handleNext = async () => {
+    if (step === "items") {
+      if (partyIndex < itemParties.length - 1) {
+        setPartyIndex((index) => index + 1);
+        return;
+      }
+      goAfterItems();
+      return;
+    }
     if (step === "split") {
-      if (mode === "split") setStep("payer");
-      else setStep(unpaidShares.length > 1 ? "payer" : "payment");
+      // Who pays? (+ For Who? when split) live on this step — skip separate payer step.
+      setStep("payment");
       return;
     }
     if (step === "payer") {
@@ -234,27 +391,43 @@ export default function BookingCheckoutFlow({
       return;
     }
     if (!activeShare || saving) return;
+    const saveLines =
+      lateFeeAmount > 0 && lateRescheduleFee
+        ? [
+            ...lines,
+            {
+              id: `late-reschedule-${activeShare.key}`,
+              label: lateRescheduleFee.label,
+              amount: lateFeeAmount,
+            },
+          ]
+        : lines;
     const result: BookingCheckoutResult = {
       mode,
       payerKey: activeShare.key,
       payerKeys:
         mode === "single"
-          ? (unpaidShares.length ? unpaidShares : allShares).map((share) => share.key)
-          : [activeShare.key],
+          ? sharePool.map((share) => share.key)
+          : forWhoKeys.length
+            ? forWhoKeys
+            : [activeShare.key],
       paymentMethod,
       dueDate: needsDueDate ? dueDate : null,
       clientEmail: checkoutEmail.trim() || null,
       amount,
-      lines,
+      lines: saveLines,
       remainingUnpaidCount: remainingAfterThis,
       payerLabel: activeShare.label,
       payerName: activeShare.displayName,
     };
     setSaving(true);
     try {
-      await onSave(result);
+      const ok = await onSave(result);
+      if (ok === false) return;
       setCompleted(result);
       setStep("completed");
+    } catch {
+      // Legacy throw path — toast already shown; stay on summary.
     } finally {
       setSaving(false);
     }
@@ -264,17 +437,31 @@ export default function BookingCheckoutFlow({
     (step === "payment" && needsDueDate && !dueDate) ||
     (step === "payment" && needsOnlineEmail && !checkoutEmail.trim()) ||
     (step === "payer" && !payerKey) ||
+    (step === "split" && !payerKey) ||
+    (step === "split" && mode === "split" && forWhoKeys.length === 0) ||
     saving;
 
   const nextLabel =
-    step === "summary" ? (saving ? "Saving…" : "Confirm") : "Next";
+    step === "summary" && saving ? "Saving…" : "Next";
 
-  const renderPersonRow = (share: SalesPayerShare & { paymentAmount: number }) => {
+  const footerSecondaryIsCancel =
+    (step === "items" && partyIndex === 0) || step === "summary";
+
+  const renderPayerRadioRow = (
+    share: SalesPayerShare & { paymentAmount: number },
+    opts?: { showAmount?: boolean },
+  ) => {
     const selected = payerKey === share.key;
     return (
       <Box
-        key={share.key}
-        onClick={() => setPayerKey(share.key)}
+        key={`payer-${share.key}`}
+        onClick={() => {
+          setPayerKey(share.key);
+          // Resume path: one share at a time (For Who? only on first split step).
+          if (mode === "split" && step === "payer") {
+            setForWhoKeys([share.key]);
+          }
+        }}
         sx={{
           borderRadius: "12px",
           border: `1px solid ${selected ? m.teal : alpha(m.navy, 0.1)}`,
@@ -289,20 +476,61 @@ export default function BookingCheckoutFlow({
             <Typography
               sx={{ fontSize: 13.5, fontWeight: 800, color: alpha(m.navy, 0.82) }}
             >
-              {share.label}
+              {personPrimaryName(share)} ({personRoleLabel(share)})
             </Typography>
-            {share.displayName && share.displayName !== share.label ? (
-              <Typography
-                sx={{ fontSize: 12, fontWeight: 650, color: alpha(m.navy, 0.5) }}
-              >
-                {share.displayName}
-              </Typography>
-            ) : null}
           </Box>
-          <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
-            {formatCompactEuro(share.paymentAmount)}
-          </Typography>
+          {opts?.showAmount ? (
+            <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
+              {formatCompactEuro(share.paymentAmount)}
+            </Typography>
+          ) : null}
           <Radio
+            checked={selected}
+            sx={{
+              p: 0.5,
+              color: alpha(m.navy, 0.3),
+              "&.Mui-checked": { color: m.teal },
+            }}
+          />
+        </Stack>
+      </Box>
+    );
+  };
+
+  const renderForWhoCheckboxRow = (
+    share: SalesPayerShare & { paymentAmount: number },
+  ) => {
+    const selected = forWhoKeys.includes(share.key);
+    return (
+      <Box
+        key={`for-who-${share.key}`}
+        onClick={() => {
+          setForWhoKeys((prev) => {
+            if (prev.includes(share.key)) {
+              if (prev.length <= 1) return prev;
+              return prev.filter((key) => key !== share.key);
+            }
+            return [...prev, share.key];
+          });
+        }}
+        sx={{
+          borderRadius: "12px",
+          border: `1px solid ${selected ? m.teal : alpha(m.navy, 0.1)}`,
+          bgcolor: selected ? alpha(m.navy, 0.03) : "#fff",
+          px: 1.5,
+          py: 1.2,
+          cursor: "pointer",
+        }}
+      >
+        <Stack direction="row" alignItems="center" spacing={1.25}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography
+              sx={{ fontSize: 13.5, fontWeight: 800, color: alpha(m.navy, 0.82) }}
+            >
+              {personPrimaryName(share)} ({personRoleLabel(share)})
+            </Typography>
+          </Box>
+          <Checkbox
             checked={selected}
             sx={{
               p: 0.5,
@@ -317,145 +545,251 @@ export default function BookingCheckoutFlow({
 
   if (step === "completed" && completed) {
     return (
-      <Box sx={{ pt: 2, px: 0.25, textAlign: "center" }}>
+      <Stack
+        alignItems="center"
+        justifyContent="center"
+        spacing={2.5}
+        sx={{ minHeight: 360, px: 0.25, textAlign: "center" }}
+      >
         <Box
           sx={{
             width: 72,
             height: 72,
             borderRadius: "999px",
-            bgcolor: alpha(m.teal, 0.12),
+            border: `1.5px solid ${m.teal}`,
+            bgcolor: alpha(m.teal, 0.06),
             display: "grid",
             placeItems: "center",
-            mx: "auto",
-            mb: 2,
           }}
         >
-          <CheckCircleRoundedIcon sx={{ fontSize: 42, color: m.teal }} />
+          <CheckRoundedIcon sx={{ fontSize: 36, color: m.teal, fontWeight: 900 }} />
         </Box>
-        <Typography sx={mollurePageTitleSx(m.navy, { mb: 0.75 })}>
+        <Typography sx={{ fontSize: 20, fontWeight: 800, color: m.navy }}>
           Payment Completed
         </Typography>
-        <Typography sx={mollurePageSubtitleSx(m.navy, { mb: 2 })}>
-          {completed.payerLabel}
-          {completed.payerName && completed.payerName !== completed.payerLabel
-            ? ` · ${completed.payerName}`
-            : ""}
-        </Typography>
-        <Typography sx={{ fontSize: 28, fontWeight: 900, color: m.teal, mb: 1.5 }}>
-          {formatCompactEuro(completed.amount)}
-        </Typography>
-        {completed.remainingUnpaidCount > 0 ? (
-          <Typography
-            sx={mollureBodyMutedSx(m.navy, { mb: 2  })}
-          >
-            {completed.remainingUnpaidCount === 1
-              ? "One guest payment remaining. Checkout stays available on this booking."
-              : `${completed.remainingUnpaidCount} guest payments remaining. Checkout stays available on this booking.`}
-          </Typography>
-        ) : (
-          <Typography
-            sx={mollureBodyMutedSx(m.navy, { mb: 2  })}
-          >
-            This booking checkout is complete.
-          </Typography>
-        )}
-        <AppButton tone="primary" onClick={onCancel} sx={{ minWidth: 140, height: 40 }}>
-          Done
-        </AppButton>
-      </Box>
+      </Stack>
     );
   }
 
   return (
     <Box sx={{ pt: 0.5 }}>
-      <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 2 }}>
-        <IconButton
-          size="small"
-          onClick={handleBack}
-          aria-label="Back"
-          sx={{ color: alpha(m.navy, 0.7), width: 32, height: 32 }}
-        >
-          <ArrowBackRoundedIcon sx={{ fontSize: 20 }} />
-        </IconButton>
-        <Typography sx={{ fontSize: 16, fontWeight: 900, color: alpha(m.navy, 0.88) }}>
-          Checkout
-        </Typography>
-      </Stack>
+      {step === "items" && activeParty ? (
+        <BookingCheckoutItemsStep
+          party={activeParty}
+          clientPhotoSrc={clientPhotoSrc}
+          lines={checkoutLines}
+          onChangeLines={setCheckoutLines}
+          discount={discountByParty[activeParty.key] ?? null}
+          onChangeDiscount={(next) =>
+            setDiscountByParty((prev) => ({
+              ...prev,
+              [activeParty.key]: next,
+            }))
+          }
+        />
+      ) : null}
 
       {step === "split" ? (
-        <Stack spacing={1.25}>
-          <Typography sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.86) }}>
-            How should this bill be paid?
-          </Typography>
-          {(
-            [
-              {
-                id: "single" as const,
-                title: "One person pays the full bill",
-                detail: `Charge ${formatCompactEuro(
-                  unpaidShares.reduce((sum, share) => sum + share.paymentAmount, 0),
-                )} to a single guest.`,
-              },
-              {
-                id: "split" as const,
-                title: "Split between guests",
-                detail: `${unpaidShares.length} people on this booking. Checkout each share separately.`,
-              },
-            ] as const
-          ).map((option) => {
-            const selected = mode === option.id;
-            return (
-              <Box
-                key={option.id}
-                onClick={() => {
-                  setMode(option.id);
-                  if (option.id === "split") {
-                    setPayerKey(unpaidShares[0]?.key ?? payerKey);
-                  }
-                }}
+        <Stack spacing={1.5}>
+          {mainParty ? (
+            <Box>
+              <Typography
                 sx={{
-                  borderRadius: "12px",
-                  border: `1px solid ${selected ? m.teal : alpha(m.navy, 0.1)}`,
-                  bgcolor: selected ? alpha(m.navy, 0.03) : "#fff",
-                  px: 1.5,
-                  py: 1.35,
-                  cursor: "pointer",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.55),
+                  mb: 0.75,
                 }}
               >
-                <Stack direction="row" alignItems="center" spacing={1.25}>
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                Client
+              </Typography>
+              <Box
+                sx={{
+                  borderRadius: "12px",
+                  border: `1px solid ${alpha(m.navy, 0.1)}`,
+                  bgcolor: alpha(m.navy, 0.03),
+                  px: 1.5,
+                  py: 1.25,
+                }}
+              >
+                <Stack direction="row" alignItems="center" spacing={1.15}>
+                  <Avatar
+                    src={clientPhotoSrc || undefined}
+                    sx={{ width: 40, height: 40, fontSize: 14, fontWeight: 800 }}
+                  >
+                    {(mainParty.name
+                      .split(/\s+/)
+                      .filter(Boolean)
+                      .slice(0, 2)
+                      .map((part) => part[0]?.toUpperCase() ?? "")
+                      .join("") || "C")}
+                  </Avatar>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      spacing={0.75}
+                      sx={{ mb: 0.15, flexWrap: "wrap" }}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: 13.5,
+                          fontWeight: 800,
+                          color: alpha(m.navy, 0.82),
+                        }}
+                      >
+                        {mainParty.name}
+                      </Typography>
+                      {mainParty.clientBadge ? (
+                        <Box
+                          sx={{
+                            px: 0.7,
+                            py: 0.15,
+                            borderRadius: "999px",
+                            ...clientPlatformTagToneColors(m, "teal"),
+                          }}
+                        >
+                          <Typography sx={{ fontSize: 10.5, fontWeight: 800 }}>
+                            {mainParty.clientBadge}
+                          </Typography>
+                        </Box>
+                      ) : null}
+                    </Stack>
+                    {mainParty.email ? (
+                      <Typography
+                        sx={{
+                          fontSize: 12,
+                          fontWeight: 650,
+                          color: alpha(m.navy, 0.5),
+                        }}
+                      >
+                        {mainParty.email}
+                      </Typography>
+                    ) : null}
+                  </Box>
+                </Stack>
+              </Box>
+            </Box>
+          ) : null}
+
+          <Stack spacing={1}>
+            {(
+              [
+                {
+                  id: "single" as const,
+                  title: "Pay Full Bill",
+                  trailing: (
                     <Typography
-                      sx={{ fontSize: 13.5, fontWeight: 800, color: alpha(m.navy, 0.82) }}
+                      sx={{ fontSize: 13.5, fontWeight: 900, color: alpha(m.navy, 0.82) }}
+                    >
+                      {formatCompactEuro(fullBillTotal)}
+                    </Typography>
+                  ),
+                },
+                {
+                  id: "split" as const,
+                  title: "Split Bill",
+                  trailing: (
+                    <GroupsOutlinedIcon
+                      sx={{ fontSize: 20, color: alpha(m.navy, 0.45) }}
+                    />
+                  ),
+                },
+              ] as const
+            ).map((option) => {
+              const selected = mode === option.id;
+              return (
+                <Box
+                  key={option.id}
+                  onClick={() => {
+                    setMode(option.id);
+                    if (option.id === "split") {
+                      setPayerKey(sharePool[0]?.key ?? payerKey);
+                      setForWhoKeys(sharePool.map((share) => share.key));
+                    } else {
+                      setForWhoKeys(sharePool.map((share) => share.key));
+                    }
+                  }}
+                  sx={{
+                    borderRadius: "12px",
+                    border: `1px solid ${selected ? m.teal : alpha(m.navy, 0.1)}`,
+                    bgcolor: selected ? alpha(m.navy, 0.03) : "#fff",
+                    px: 1.5,
+                    py: 1.2,
+                    cursor: "pointer",
+                  }}
+                >
+                  <Stack direction="row" alignItems="center" spacing={1.25}>
+                    <Checkbox
+                      checked={selected}
+                      sx={{
+                        p: 0.5,
+                        color: alpha(m.navy, 0.3),
+                        "&.Mui-checked": { color: m.teal },
+                      }}
+                    />
+                    <Typography
+                      sx={{
+                        flex: 1,
+                        minWidth: 0,
+                        fontSize: 13.5,
+                        fontWeight: 800,
+                        color: alpha(m.navy, 0.82),
+                      }}
                     >
                       {option.title}
                     </Typography>
-                    <Typography
-                      sx={{ fontSize: 12, fontWeight: 650, color: alpha(m.navy, 0.5), mt: 0.25 }}
-                    >
-                      {option.detail}
-                    </Typography>
-                  </Box>
-                  <Radio
-                    checked={selected}
-                    sx={{
-                      p: 0.5,
-                      color: alpha(m.navy, 0.3),
-                      "&.Mui-checked": { color: m.teal },
-                    }}
-                  />
-                </Stack>
-              </Box>
-            );
-          })}
+                    {option.trailing}
+                  </Stack>
+                </Box>
+              );
+            })}
+          </Stack>
+
+          <Stack spacing={1}>
+            <Typography sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.86) }}>
+              Who pays?
+            </Typography>
+            {sharePool.map((share) => renderPayerRadioRow(share))}
+          </Stack>
+
+          {mode === "split" ? (
+            <Stack spacing={1}>
+              <Typography sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.86) }}>
+                For Who?
+              </Typography>
+              {sharePool.map((share) => renderForWhoCheckboxRow(share))}
+            </Stack>
+          ) : null}
+
+          {mainParty ? (
+            <BookingCheckoutItemsStep
+              party={mainParty}
+              hideClient
+              showAllLines
+              clientPhotoSrc={clientPhotoSrc}
+              lines={checkoutLines}
+              onChangeLines={setCheckoutLines}
+              discount={discountByParty[mainParty.key] ?? null}
+              onChangeDiscount={(next) =>
+                setDiscountByParty((prev) => ({
+                  ...prev,
+                  [mainParty.key]: next,
+                }))
+              }
+            />
+          ) : null}
         </Stack>
       ) : null}
 
       {step === "payer" ? (
         <Stack spacing={1.25}>
           <Typography sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.86) }}>
-            {mode === "single" ? "Who is paying the full bill?" : "Whose share are you checking out?"}
+            Who pays?
           </Typography>
-          {(mode === "single" ? unpaidShares : unpaidShares).map(renderPersonRow)}
+          {unpaidShares.map((share) =>
+            renderPayerRadioRow(share, { showAmount: true }),
+          )}
         </Stack>
       ) : null}
 
@@ -491,10 +825,14 @@ export default function BookingCheckoutFlow({
             Payment method
           </Typography>
           <Stack spacing={1}>
-            {PAYMENT_OPTIONS.map((option) => {
+            {paymentOptions.map((option) => {
               const selected = paymentMethod === option.id;
               const showCalendar =
                 option.id === "onlineNonDirect" || option.id === "offlineNonDirect";
+              const showGuestEmail =
+                selected &&
+                isGuestPayer &&
+                (option.id === "onlineDirect" || option.id === "onlineNonDirect");
               const dueLabel =
                 dueDate && selected ? dueDate.split("-").reverse().join("/") : null;
               return (
@@ -509,8 +847,6 @@ export default function BookingCheckoutFlow({
                     py: 1.25,
                     minHeight: 52,
                     cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
                   }}
                 >
                   <Stack
@@ -540,6 +876,27 @@ export default function BookingCheckoutFlow({
                           Due {dueLabel}
                         </Typography>
                       ) : null}
+                      {showGuestEmail ? (
+                        <Box
+                          sx={{ mt: 1 }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <AppTextField
+                            label="Email for Guest"
+                            placeholder="Guest email for online payment"
+                            value={checkoutEmail}
+                            onChange={(e) => setCheckoutEmail(e.target.value)}
+                            fullWidth
+                            size="small"
+                            helperText={
+                              !checkoutEmail.trim()
+                                ? "Required for online payment"
+                                : undefined
+                            }
+                            error={!checkoutEmail.trim()}
+                          />
+                        </Box>
+                      ) : null}
                     </Box>
                     {showCalendar ? (
                       <IconButton
@@ -560,6 +917,8 @@ export default function BookingCheckoutFlow({
                           }`,
                           borderRadius: "8px",
                           bgcolor: "#fff",
+                          alignSelf: "flex-start",
+                          mt: 0.25,
                         }}
                       >
                         <CalendarMonthRoundedIcon sx={{ fontSize: 18 }} />
@@ -572,6 +931,8 @@ export default function BookingCheckoutFlow({
                         p: 0.5,
                         color: alpha(m.navy, 0.3),
                         "&.Mui-checked": { color: m.teal },
+                        alignSelf: showGuestEmail ? "flex-start" : "center",
+                        mt: showGuestEmail ? 0.25 : 0,
                       }}
                     />
                   </Stack>
@@ -579,19 +940,6 @@ export default function BookingCheckoutFlow({
               );
             })}
           </Stack>
-          {needsOnlineEmail ? (
-            <Box sx={{ mt: 1.5 }}>
-              <AppTextField
-                label="Email"
-                placeholder="Email for online payment"
-                value={checkoutEmail}
-                onChange={(e) => setCheckoutEmail(e.target.value)}
-                fullWidth
-                helperText={!checkoutEmail.trim() ? "Required for online payment" : undefined}
-                error={!checkoutEmail.trim()}
-              />
-            </Box>
-          ) : null}
           <Popover
             open={Boolean(dueDateAnchor)}
             anchorEl={dueDateAnchor}
@@ -620,74 +968,301 @@ export default function BookingCheckoutFlow({
         </Box>
       ) : null}
 
-      {step === "summary" ? (
-        <Box
-          sx={{
-            borderRadius: "12px",
-            border: `1px solid ${alpha(m.navy, 0.1)}`,
-            bgcolor: "#fff",
-            px: 1.75,
-            py: 1.5,
-          }}
-        >
-          <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
-            <Typography sx={mollureSectionTitleSx(m.navy)}>
-              {mode === "split" ? "Guest payment" : "After treatment Summary"}
-            </Typography>
-            <Box
-              sx={{
-                px: 1,
-                py: 0.3,
-                borderRadius: "999px",
-                bgcolor: alpha("#F79009", 0.16),
-              }}
-            >
-              <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#B54708" }}>
-                {needsDueDate ? "Payment Due" : "Pending"}
-              </Typography>
-            </Box>
-          </Stack>
-          <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: alpha(m.navy, 0.82) }}>
-            {activeShare?.label}
-          </Typography>
-          {checkoutEmail.trim() ? (
-            <Typography
-              sx={{ fontSize: 12, fontWeight: 650, color: alpha(m.navy, 0.5), mb: 1.25 }}
-            >
-              {checkoutEmail.trim()}
-            </Typography>
-          ) : (
-            <Box sx={{ mb: 1.25 }} />
-          )}
-          <Stack spacing={0.75} sx={{ mb: 1.25 }}>
-            {lines.map((line) => (
-              <Stack key={line.id} direction="row" justifyContent="space-between">
-                <Typography sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.72) }}>
-                  {line.label}
+      {step === "summary" && summaryShares.length ? (
+        <Stack spacing={1.5}>
+          {summaryShares.map((share) => {
+            const isMainOrSingle =
+              share.role === "main_client" || mode === "single";
+            const panelPrepaid =
+              prepaidAmount > 0 && isMainOrSingle ? prepaidAmount : 0;
+            const panelLate =
+              isMainOrSingle && lateRescheduleFee ? lateRescheduleFee : null;
+            const panelLateAmt = panelLate?.amount ?? 0;
+            const panelPay = Math.round(
+              ((share.paymentAmount + panelLateAmt + Number.EPSILON) * 100) / 100,
+            );
+            const panelBreakdown = panelPrepaid > 0 || panelLateAmt > 0;
+            const panelName =
+              share.role === "main_client"
+                ? personPrimaryName(share)
+                : share.label || personPrimaryName(share);
+            const panelBadge =
+              share.role === "main_client" ? personRoleLabel(share) : null;
+            const panelEmail =
+              share.role === "main_client"
+                ? checkoutEmail.trim() ||
+                  share.email?.trim() ||
+                  mainParty?.email?.trim() ||
+                  ""
+                : "";
+            const panelInitials =
+              panelName
+                .split(/\s+/)
+                .filter(Boolean)
+                .slice(0, 2)
+                .map((part) => part[0]?.toUpperCase() ?? "")
+                .join("") || "C";
+            return (
+              <Box
+                key={share.key}
+                sx={{
+                  borderRadius: "12px",
+                  border: `1px solid ${alpha(m.navy, 0.1)}`,
+                  bgcolor: "#fff",
+                  px: 1.75,
+                  py: 1.5,
+                }}
+              >
+                <Typography sx={mollureSectionTitleSx(m.navy, { mb: 1.25 })}>
+                  Summary
                 </Typography>
-                <Typography sx={{ fontSize: 13, fontWeight: 800 }}>
-                  {formatCompactEuro(line.amount)}
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  spacing={1.15}
+                  sx={{ mb: 1.5 }}
+                >
+                  <Avatar
+                    src={
+                      share.role === "main_client"
+                        ? clientPhotoSrc || undefined
+                        : undefined
+                    }
+                    sx={{ width: 40, height: 40, fontSize: 14, fontWeight: 800 }}
+                  >
+                    {panelInitials}
+                  </Avatar>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      spacing={0.75}
+                      sx={{ mb: 0.15, flexWrap: "wrap" }}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: 13.5,
+                          fontWeight: 800,
+                          color: alpha(m.navy, 0.82),
+                        }}
+                      >
+                        {panelName}
+                      </Typography>
+                      {panelBadge ? (
+                        <Box
+                          sx={{
+                            px: 0.7,
+                            py: 0.15,
+                            borderRadius: "999px",
+                            ...clientPlatformTagToneColors(m, "teal"),
+                          }}
+                        >
+                          <Typography sx={{ fontSize: 10.5, fontWeight: 800 }}>
+                            {panelBadge}
+                          </Typography>
+                        </Box>
+                      ) : null}
+                    </Stack>
+                    {panelEmail ? (
+                      <Typography
+                        sx={{
+                          fontSize: 12,
+                          fontWeight: 650,
+                          color: alpha(m.navy, 0.5),
+                        }}
+                      >
+                        {panelEmail}
+                      </Typography>
+                    ) : null}
+                  </Box>
+                </Stack>
+                <Stack spacing={0.75} sx={{ mb: 1.5 }}>
+                  {share.lines.map((line) => {
+                    const muted =
+                      line.amount < 0 ||
+                      String(line.id).startsWith("kilometer-allowance") ||
+                      /kilometer|allowance/i.test(line.label);
+                    return (
+                      <Stack
+                        key={line.id}
+                        direction="row"
+                        justifyContent="space-between"
+                      >
+                        <Typography
+                          sx={{
+                            fontSize: 13,
+                            fontWeight: muted ? 650 : 700,
+                            color: alpha(m.navy, muted ? 0.45 : 0.72),
+                          }}
+                        >
+                          {line.label}
+                        </Typography>
+                        <Typography
+                          sx={{
+                            fontSize: 13,
+                            fontWeight: muted ? 700 : 800,
+                            color: alpha(m.navy, muted ? 0.45 : 0.88),
+                          }}
+                        >
+                          {formatCompactEuro(line.amount)}
+                        </Typography>
+                      </Stack>
+                    );
+                  })}
+                </Stack>
+                {panelBreakdown ? (
+                  <Stack spacing={0.55} sx={{ mb: 0.85 }}>
+                    <Stack
+                      direction="row"
+                      justifyContent="space-between"
+                      alignItems="baseline"
+                    >
+                      <Typography sx={{ fontSize: 13, fontWeight: 900 }}>
+                        Total
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontSize: 13,
+                          fontWeight: 900,
+                          color: alpha(m.navy, 0.88),
+                        }}
+                      >
+                        {formatCompactEuro(share.subtotal)}
+                      </Typography>
+                    </Stack>
+                    {panelPrepaid > 0 ? (
+                      <Stack
+                        direction="row"
+                        justifyContent="space-between"
+                        alignItems="baseline"
+                      >
+                        <Typography
+                          sx={{
+                            fontSize: 12.5,
+                            fontWeight: 600,
+                            color: alpha(m.navy, 0.45),
+                          }}
+                        >
+                          Prepaid
+                        </Typography>
+                        <Typography
+                          sx={{
+                            fontSize: 12.5,
+                            fontWeight: 700,
+                            color: alpha(m.navy, 0.45),
+                          }}
+                        >
+                          {formatCompactEuro(panelPrepaid)}
+                        </Typography>
+                      </Stack>
+                    ) : null}
+                    {panelLate ? (
+                      <Stack
+                        direction="row"
+                        justifyContent="space-between"
+                        alignItems="baseline"
+                      >
+                        <Typography
+                          sx={{
+                            fontSize: 12.5,
+                            fontWeight: 600,
+                            color: alpha(m.navy, 0.45),
+                          }}
+                        >
+                          {panelLate.label}
+                        </Typography>
+                        <Typography
+                          sx={{
+                            fontSize: 12.5,
+                            fontWeight: 700,
+                            color: alpha(m.navy, 0.45),
+                          }}
+                        >
+                          {formatCompactEuro(panelLate.amount)}
+                        </Typography>
+                      </Stack>
+                    ) : null}
+                    <Box sx={{ mt: 0.15 }}>
+                      <Typography
+                        sx={{
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: alpha(m.navy, 0.55),
+                          mb: 0.2,
+                        }}
+                      >
+                        Payment
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontSize: 22,
+                          fontWeight: 900,
+                          color: m.teal,
+                          lineHeight: 1.1,
+                        }}
+                      >
+                        {formatCompactEuro(panelPay)}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                ) : (
+                  <Stack spacing={0.55} sx={{ mb: 0.75 }}>
+                    <Stack
+                      direction="row"
+                      justifyContent="space-between"
+                      alignItems="baseline"
+                    >
+                      <Typography sx={{ fontSize: 13, fontWeight: 900 }}>
+                        Total
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontSize: 13,
+                          fontWeight: 900,
+                          color: alpha(m.navy, 0.88),
+                        }}
+                      >
+                        {formatCompactEuro(share.subtotal)}
+                      </Typography>
+                    </Stack>
+                    <Box>
+                      <Typography
+                        sx={{
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: alpha(m.navy, 0.55),
+                          mb: 0.2,
+                        }}
+                      >
+                        Payment
+                      </Typography>
+                      <Typography
+                        sx={{ fontSize: 22, fontWeight: 900, color: m.teal }}
+                      >
+                        {formatCompactEuro(panelPay)}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                )}
+                <Typography
+                  sx={{ fontSize: 12, fontWeight: 650, color: alpha(m.navy, 0.5) }}
+                >
+                  {needsDueDate
+                    ? `${paymentLabel} (Due date ${dueDate.split("-").reverse().join("/")})`
+                    : paymentLabel}
                 </Typography>
-              </Stack>
-            ))}
-          </Stack>
-          <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.75 }}>
-            <Typography sx={{ fontSize: 13, fontWeight: 900 }}>Payment</Typography>
-            <Typography sx={{ fontSize: 22, fontWeight: 900, color: m.teal }}>
-              {formatCompactEuro(amount)}
-            </Typography>
-          </Stack>
-          <Typography sx={{ fontSize: 12, fontWeight: 650, color: alpha(m.navy, 0.5) }}>
-            {needsDueDate
-              ? `${paymentLabel} (Due date ${dueDate.split("-").reverse().join("/")})`
-              : paymentLabel}
-          </Typography>
-        </Box>
+              </Box>
+            );
+          })}
+        </Stack>
       ) : null}
 
       <Stack direction="row" justifyContent="flex-end" spacing={1} sx={{ mt: 2.5 }}>
-        <AppButton tone="secondary" onClick={step === "split" ? onCancel : handleBack}>
-          {step === "split" ? "Cancel" : "Back"}
+        <AppButton
+          tone="secondary"
+          onClick={footerSecondaryIsCancel ? onCancel : handleBack}
+        >
+          {footerSecondaryIsCancel ? "Cancel" : "Back"}
         </AppButton>
         <AppButton
           tone="primary"

@@ -11,12 +11,12 @@ const erNotes = serializeCalendarEntryNotes(
   "",
   {
     originalGuests: [
-      { id: "g1", name: "Ali", participantType: "guest", services: [] },
-      { id: "p1", name: "Planning", participantType: "planning", services: [] },
+      { id: "g1", name: "Ali", participantType: "guest", services: [], products: [] },
+      { id: "p1", name: "Planning", participantType: "planning", services: [], products: [] },
     ],
     guests: [
-      { id: "g1", name: "umerarshad", participantType: "guest", services: [] },
-      { id: "p1", name: "Planning", participantType: "planning", services: [] },
+      { id: "g1", name: "umerarshad", participantType: "guest", services: [], products: [] },
+      { id: "p1", name: "Planning", participantType: "planning", services: [], products: [] },
     ],
   },
   null,
@@ -73,11 +73,11 @@ const snapshotFallback = buildBookingActivityTimeline({
         "",
         {
           guests: [
-            { id: "g1", name: "umerarshad", participantType: "guest", services: [] },
+            { id: "g1", name: "umerarshad", participantType: "guest", services: [], products: [] },
           ],
           silentUpdated: true,
           silentUpdateSnapshot: {
-            guests: [{ id: "g1", name: "Ali", participantType: "guest", services: [] }],
+            guests: [{ id: "g1", name: "Ali", participantType: "guest", services: [], products: [] }],
           },
         },
       ),
