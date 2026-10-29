@@ -210,7 +210,10 @@ export function resolveSalesPayerShares(input: {
         role,
         label,
         displayName,
-        email: role === "main_client" ? mainClientEmail : undefined,
+        email:
+          role === "main_client"
+            ? mainClientEmail
+            : guestRow?.email?.trim() || person.email?.trim() || undefined,
         phone: role === "main_client" ? mainClientPhone : undefined,
         lines,
         subtotal: sumLines(lines),
@@ -254,6 +257,7 @@ export function resolveSalesPayerShares(input: {
           names: [person?.name, guestRow?.name],
           ordinal: isModel ? modelOrdinal : guestOrdinal,
         }),
+        email: guestRow?.email?.trim() || person?.email?.trim() || undefined,
         lines,
         subtotal: sumLines(lines),
       });
@@ -297,6 +301,10 @@ export function resolveSalesPayerShares(input: {
           names: [guest.name, peopleById.get(guestId)?.name],
           ordinal: isModel ? modelOrdinal : guestOrdinal,
         }),
+        email:
+          guest.email?.trim() ||
+          peopleById.get(guestId)?.email?.trim() ||
+          undefined,
         lines,
         subtotal: sumLines(lines),
       });
@@ -365,6 +373,7 @@ export function resolveSalesPayerShares(input: {
           names: [guest.name],
           ordinal: isModel ? modelOrdinal : guestOrdinal,
         }),
+        email: guest.email?.trim() || undefined,
         lines,
         subtotal: sumLines(lines),
       });
@@ -425,6 +434,8 @@ export function resolveSalesPayerShares(input: {
           names: [person.name, guestRow?.name],
           ordinal: isModel ? modelOrdinal : guestOrdinal,
         }),
+        email:
+          guestRow?.email?.trim() || person.email?.trim() || undefined,
         lines,
         subtotal: sumLines(lines),
       });

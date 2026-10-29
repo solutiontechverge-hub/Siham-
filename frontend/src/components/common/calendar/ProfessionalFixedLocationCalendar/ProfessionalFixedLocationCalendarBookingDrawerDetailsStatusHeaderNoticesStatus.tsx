@@ -1,5 +1,7 @@
 "use client";
 
+import * as React from "react";
+
 import {
   mollureBodyMutedSx,
 } from "../../../../theme/mollureHierarchy";
@@ -267,16 +269,8 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
               const comparisonSignpost =
                 indicator === "EBR" || indicator === "ER";
 
-              return (
-                <Tooltip
-                  key={indicator}
-                  title={
-                    comparisonSignpost
-                      ? ACTIVITY_COMPARISON_SIGNPOST
-                      : BOOKING_SCENARIO_LABELS[indicator]
-                  }
-                  placement="top"
-                >
+              // BR badge already owns its tooltip — wrapping again stacks two hovers.
+              const chip = (
                   <Chip
                     size="small"
                     onClick={
@@ -362,6 +356,21 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
                       cursor: comparisonSignpost ? "pointer" : "default",
                     }}
                   />
+              );
+              if (indicator === "BR") {
+                return <React.Fragment key={indicator}>{chip}</React.Fragment>;
+              }
+              return (
+                <Tooltip
+                  key={indicator}
+                  title={
+                    comparisonSignpost
+                      ? ACTIVITY_COMPARISON_SIGNPOST
+                      : BOOKING_SCENARIO_LABELS[indicator]
+                  }
+                  placement="top"
+                >
+                  {chip}
                 </Tooltip>
               );
             },

@@ -29,9 +29,12 @@ import {
   resolveCheckoutLateRescheduleFee,
   resolveSalesCheckoutPaymentOptions,
 } from "./bookingCheckout";
-import BookingCheckoutItemsStep from "./BookingCheckoutItemsStep";
+import BookingCheckoutItemsStep, {
+  BookingCheckoutTotalsBar,
+} from "./BookingCheckoutItemsStep";
 import {
   buildCheckoutItemParties,
+  filterLinesForParty,
   manualLinesFromBookingEvent,
   salesLinesFromPartyCheckout,
 } from "./bookingCheckoutItems";
@@ -49,9 +52,17 @@ import {
   type BookingSplitBillMode,
   type SalesPayerShare,
 } from "./salesSplitBill";
-import type { ManualEntryDiscount, ManualEntryLine } from "../../sections/finance/manualEntry.data";
+import ManualEntryDiscountModal from "../../sections/finance/ManualEntryDiscountModal";
+import {
+  calculateManualEntryDiscountAmount,
+  lineTotal,
+  type ManualEntryDiscount,
+  type ManualEntryLine,
+} from "../../sections/finance/manualEntry.data";
 
 type Step = "items" | "split" | "payer" | "payment" | "summary" | "completed";
+
+type CheckoutNavFrame = { step: Step; partyIndex: number };
 
 export type BookingCheckoutResult = {
   mode: BookingSplitBillMode;
@@ -81,6 +92,11 @@ type BookingCheckoutFlowProps = {
   onSave: (result: BookingCheckoutResult) => boolean | void | Promise<boolean | void>;
 };
 
+type BookingCheckoutFlowPropsWithBack = BookingCheckoutFlowProps & {
+  /** Header back arrow — same as footer Back (stack pop / booking). */
+  onBackHandlerChange?: (goBack: (() => void) | null) => void;
+};
+
 export default function BookingCheckoutFlow({
   event,
   clientName,
@@ -91,7 +107,8 @@ export default function BookingCheckoutFlow({
   prepaidAmount = 0,
   onCancel,
   onSave,
-}: BookingCheckoutFlowProps) {
+  onBackHandlerChange,
+}: BookingCheckoutFlowPropsWithBack) {
   const m = useTheme().palette.mollure;
   const existingSplit = React.useMemo(
     () => parseSplitBillState(event.details?.splitBill),
@@ -104,7 +121,15 @@ export default function BookingCheckoutFlow({
   const [discountByParty, setDiscountByParty] = React.useState<
     Record<string, ManualEntryDiscount | null>
   >({});
-  const [partyIndex, setPartyIndex] = React.useState(0);
+  // Explicit stack so header/footer Back always pops one screen (no jump-to-booking).
+  const [navStack, setNavStack] = React.useState<CheckoutNavFrame[]>([
+    { step: "items", partyIndex: 0 },
+  ]);
+  const step = navStack[navStack.length - 1]?.step ?? "items";
+  const partyIndex = navStack[navStack.length - 1]?.partyIndex ?? 0;
+  const pushNav = React.useCallback((frame: CheckoutNavFrame) => {
+    setNavStack((prev) => [...prev, frame]);
+  }, []);
 
   const seedShares = React.useMemo(() => {
     const allLines: SalesLineItem[] = manualLinesFromBookingEvent(event).map(
@@ -175,7 +200,6 @@ export default function BookingCheckoutFlow({
   const initialMode: BookingSplitBillMode =
     existingSplit?.mode ?? (canSplit ? "split" : "single");
 
-  const [step, setStep] = React.useState<Step>("items");
   const [mode, setMode] = React.useState<BookingSplitBillMode>(initialMode);
   const [payerKey, setPayerKey] = React.useState(
     () => unpaidShares[0]?.key ?? allShares[0]?.key ?? "main-client",
@@ -205,7 +229,8 @@ export default function BookingCheckoutFlow({
       setPaymentMethod(paymentOptions[0]?.id ?? "offlineDirect");
     }
   }, [paymentMethod, paymentOptions]);
-  const [checkoutEmail, setCheckoutEmail] = React.useState(clientEmail?.trim() ?? "");
+  // Guest/model online pay: guest email only (never seed IC/BC client email).
+  const [checkoutEmail, setCheckoutEmail] = React.useState("");
   const [dueDate, setDueDate] = React.useState(tomorrowIso());
   const [dueDateAnchor, setDueDateAnchor] = React.useState<null | HTMLElement>(null);
   const [saving, setSaving] = React.useState(false);
@@ -266,16 +291,146 @@ export default function BookingCheckoutFlow({
     paymentOptions.find((option) => option.id === paymentMethod)?.label ??
     "Offline Direct";
 
+  React.useEffect(() => {
+    if (!isGuestPayer) return;
+    setCheckoutEmail(activeShare?.email?.trim() ?? "");
+  }, [activeShare?.email, activeShare?.key, isGuestPayer]);
+
   const remainingAfterThis = React.useMemo(() => {
     if (mode === "single") return 0;
     const covered = new Set(forWhoKeys);
     return Math.max(0, unpaidShares.filter((share) => !covered.has(share.key)).length);
   }, [forWhoKeys, mode, unpaidShares]);
 
+  const fullBillGross = React.useMemo(
+    () => sharePool.reduce((sum, share) => sum + share.subtotal, 0),
+    [sharePool],
+  );
   const fullBillTotal = React.useMemo(
     () => sharePool.reduce((sum, share) => sum + share.paymentAmount, 0),
     [sharePool],
   );
+
+  // Split step: items + totals follow "For Who?" (rest stay payment due).
+  const splitCoveredShares = React.useMemo(() => {
+    if (mode !== "split") return sharePool;
+    const keys = forWhoKeys.length ? forWhoKeys : [payerKey];
+    const covered = sharePool.filter((share) => keys.includes(share.key));
+    return covered.length ? covered : sharePool.slice(0, 1);
+  }, [forWhoKeys, mode, payerKey, sharePool]);
+  const splitCoveredGross = React.useMemo(
+    () => splitCoveredShares.reduce((sum, share) => sum + share.subtotal, 0),
+    [splitCoveredShares],
+  );
+  const splitCoveredDue = React.useMemo(
+    () =>
+      splitCoveredShares.reduce((sum, share) => sum + share.paymentAmount, 0),
+    [splitCoveredShares],
+  );
+  const splitVisibleParties = React.useMemo(() => {
+    if (mode !== "split") return itemParties;
+    const keys = new Set(splitCoveredShares.map((share) => share.key));
+    const matched = itemParties.filter((party) => keys.has(party.key));
+    if (matched.length) return matched;
+    return splitCoveredShares.map((share) => ({
+      key: share.key,
+      role: share.role,
+      name: share.displayName || share.label,
+      email: share.email,
+      variant:
+        share.role === "main_client"
+          ? ("main" as const)
+          : ("guest" as const),
+      clientBadge: null as "IC Client" | "BC Client" | null,
+    }));
+  }, [itemParties, mode, splitCoveredShares]);
+  const splitItemsParty =
+    splitVisibleParties.find((party) => party.variant === "main") ??
+    splitVisibleParties[0] ??
+    mainParty;
+  const splitVisibleLineIds = React.useMemo(() => {
+    if (mode !== "split") return undefined;
+    return new Set(
+      splitCoveredShares.flatMap((share) =>
+        share.lines
+          .map((line) => line.id)
+          .filter((id) => !String(id).startsWith("discount")),
+      ),
+    );
+  }, [mode, splitCoveredShares]);
+
+  const [stickyDiscountOpen, setStickyDiscountOpen] = React.useState(false);
+  const stickyTotals = React.useMemo(() => {
+    if (step === "split") {
+      const total =
+        mode === "single" ? fullBillGross : splitCoveredGross;
+      const due = mode === "single" ? fullBillTotal : splitCoveredDue;
+      const partyKey = splitItemsParty?.key;
+      const disc = partyKey ? discountByParty[partyKey] ?? null : null;
+      return {
+        show: true,
+        displayedTotal: total,
+        amountDue: due,
+        prepaidApplied: Math.max(0, total - due),
+        // Share totals already net discount — only drive Edit/+ Discount label.
+        discount: disc,
+        discountAmount: 0,
+        partyKey,
+      };
+    }
+    if (step === "items" && activeParty) {
+      const partyLines = filterLinesForParty(checkoutLines, activeParty);
+      if (!partyLines.length) {
+        return {
+          show: false,
+          displayedTotal: 0,
+          amountDue: 0,
+          prepaidApplied: 0,
+          discount: null as ManualEntryDiscount | null,
+          discountAmount: 0,
+          partyKey: activeParty.key,
+        };
+      }
+      const sub = partyLines.reduce((sum, line) => sum + lineTotal(line), 0);
+      const disc = discountByParty[activeParty.key] ?? null;
+      const discAmt = calculateManualEntryDiscountAmount(sub, disc);
+      const total = Math.max(0, sub - discAmt);
+      const prepaid =
+        activeParty.variant === "main"
+          ? Math.min(Math.max(0, prepaidAmount), total)
+          : 0;
+      return {
+        show: true,
+        displayedTotal: total,
+        amountDue: Math.max(0, total - prepaid),
+        prepaidApplied: prepaid,
+        discount: disc,
+        discountAmount: discAmt,
+        partyKey: activeParty.key,
+      };
+    }
+    return {
+      show: false,
+      displayedTotal: 0,
+      amountDue: 0,
+      prepaidApplied: 0,
+      discount: null as ManualEntryDiscount | null,
+      discountAmount: 0,
+      partyKey: undefined as string | undefined,
+    };
+  }, [
+    activeParty,
+    checkoutLines,
+    discountByParty,
+    fullBillGross,
+    fullBillTotal,
+    mode,
+    prepaidAmount,
+    splitCoveredDue,
+    splitCoveredGross,
+    splitItemsParty?.key,
+    step,
+  ]);
 
   const personRoleLabel = (share: SalesPayerShare) => {
     if (share.role === "main_client") {
@@ -299,77 +454,48 @@ export default function BookingCheckoutFlow({
   const goAfterItems = () => {
     if (canSplit && !existingSplit) {
       setForWhoKeys(sharePool.map((share) => share.key));
-      setStep("split");
+      pushNav({ step: "split", partyIndex });
       return;
     }
     if (existingSplit?.mode === "split" && unpaidShares.length > 1) {
       const nextKey = unpaidShares[0]?.key ?? payerKey;
       setPayerKey(nextKey);
       setForWhoKeys([nextKey]);
-      setStep("payer");
+      pushNav({ step: "payer", partyIndex });
       return;
     }
     if (canSplit) {
       const nextKey = unpaidShares[0]?.key ?? payerKey;
       setPayerKey(nextKey);
       setForWhoKeys([nextKey]);
-      setStep("payer");
+      pushNav({ step: "payer", partyIndex });
       return;
     }
-    setStep("payment");
+    pushNav({ step: "payment", partyIndex });
   };
 
-  const handleBack = () => {
+  const handleBack = React.useCallback(() => {
     if (step === "completed") {
       onCancel();
       return;
     }
-    if (step === "summary") {
-      setStep("payment");
-      return;
-    }
-    if (step === "payment") {
-      if (canSplit && !existingSplit) {
-        setStep("split");
-        return;
-      }
-      if (mode === "split" && unpaidShares.length > 1) {
-        setStep("payer");
-        return;
-      }
-      setPartyIndex(itemParties.length - 1);
-      setStep("items");
-      return;
-    }
-    if (step === "payer") {
-      if (canSplit && !existingSplit) {
-        setStep("split");
-        return;
-      }
-      setPartyIndex(itemParties.length - 1);
-      setStep("items");
-      return;
-    }
-    if (step === "split") {
-      setPartyIndex(itemParties.length - 1);
-      setStep("items");
-      return;
-    }
-    if (step === "items") {
-      if (partyIndex > 0) {
-        setPartyIndex((index) => index - 1);
-        return;
-      }
+    if (navStack.length <= 1) {
       onCancel();
       return;
     }
-    onCancel();
-  };
+    setNavStack((prev) => prev.slice(0, -1));
+  }, [navStack.length, onCancel, step]);
+
+  React.useEffect(() => {
+    if (!onBackHandlerChange) return;
+    onBackHandlerChange(handleBack);
+    return () => onBackHandlerChange(null);
+  }, [handleBack, onBackHandlerChange]);
 
   const handleNext = async () => {
     if (step === "items") {
       if (partyIndex < itemParties.length - 1) {
-        setPartyIndex((index) => index + 1);
+        pushNav({ step: "items", partyIndex: partyIndex + 1 });
         return;
       }
       goAfterItems();
@@ -377,17 +503,17 @@ export default function BookingCheckoutFlow({
     }
     if (step === "split") {
       // Who pays? (+ For Who? when split) live on this step — skip separate payer step.
-      setStep("payment");
+      pushNav({ step: "payment", partyIndex });
       return;
     }
     if (step === "payer") {
-      setStep("payment");
+      pushNav({ step: "payment", partyIndex });
       return;
     }
     if (step === "payment") {
       if (needsDueDate && !dueDate) return;
       if (needsOnlineEmail && !checkoutEmail.trim()) return;
-      setStep("summary");
+      pushNav({ step: "summary", partyIndex });
       return;
     }
     if (!activeShare || saving) return;
@@ -425,7 +551,7 @@ export default function BookingCheckoutFlow({
       const ok = await onSave(result);
       if (ok === false) return;
       setCompleted(result);
-      setStep("completed");
+      pushNav({ step: "completed", partyIndex });
     } catch {
       // Legacy throw path — toast already shown; stay on summary.
     } finally {
@@ -530,6 +656,9 @@ export default function BookingCheckoutFlow({
               {personPrimaryName(share)} ({personRoleLabel(share)})
             </Typography>
           </Box>
+          <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
+            {formatCompactEuro(share.paymentAmount)}
+          </Typography>
           <Checkbox
             checked={selected}
             sx={{
@@ -572,7 +701,16 @@ export default function BookingCheckoutFlow({
   }
 
   return (
-    <Box sx={{ pt: 0.5 }}>
+    <Box
+      sx={{
+        pt: 0.5,
+        minHeight: "100%",
+        display: "flex",
+        flexDirection: "column",
+        boxSizing: "border-box",
+      }}
+    >
+      <Box sx={{ flex: "1 0 auto" }}>
       {step === "items" && activeParty ? (
         <BookingCheckoutItemsStep
           party={activeParty}
@@ -586,6 +724,10 @@ export default function BookingCheckoutFlow({
               [activeParty.key]: next,
             }))
           }
+          prepaidAmount={
+            activeParty.variant === "main" ? prepaidAmount : 0
+          }
+          hideTotals
         />
       ) : null}
 
@@ -762,21 +904,39 @@ export default function BookingCheckoutFlow({
             </Stack>
           ) : null}
 
-          {mainParty ? (
+          {splitItemsParty ? (
             <BookingCheckoutItemsStep
-              party={mainParty}
+              party={splitItemsParty}
               hideClient
-              showAllLines
+              showAllLines={mode === "single"}
+              filterParties={
+                mode === "split" ? splitVisibleParties : undefined
+              }
+              visibleLineIds={splitVisibleLineIds}
               clientPhotoSrc={clientPhotoSrc}
               lines={checkoutLines}
               onChangeLines={setCheckoutLines}
-              discount={discountByParty[mainParty.key] ?? null}
+              discount={discountByParty[splitItemsParty.key] ?? null}
               onChangeDiscount={(next) =>
                 setDiscountByParty((prev) => ({
                   ...prev,
-                  [mainParty.key]: next,
+                  [splitItemsParty.key]: next,
                 }))
               }
+              prepaidAmount={
+                splitCoveredShares.some(
+                  (share) => share.role === "main_client",
+                )
+                  ? prepaidAmount
+                  : 0
+              }
+              totalPriceOverride={
+                mode === "single" ? fullBillGross : splitCoveredGross
+              }
+              amountDueOverride={
+                mode === "single" ? fullBillTotal : splitCoveredDue
+              }
+              hideTotals
             />
           ) : null}
         </Stack>
@@ -883,7 +1043,7 @@ export default function BookingCheckoutFlow({
                         >
                           <AppTextField
                             label="Email for Guest"
-                            placeholder="Guest email for online payment"
+                            placeholder="guest@email.com"
                             value={checkoutEmail}
                             onChange={(e) => setCheckoutEmail(e.target.value)}
                             fullWidth
@@ -1257,22 +1417,63 @@ export default function BookingCheckoutFlow({
         </Stack>
       ) : null}
 
-      <Stack direction="row" justifyContent="flex-end" spacing={1} sx={{ mt: 2.5 }}>
-        <AppButton
-          tone="secondary"
-          onClick={footerSecondaryIsCancel ? onCancel : handleBack}
-        >
-          {footerSecondaryIsCancel ? "Cancel" : "Back"}
-        </AppButton>
-        <AppButton
-          tone="primary"
-          disabled={nextDisabled}
-          onClick={() => void handleNext()}
-          sx={{ px: 2.5 }}
-        >
-          {nextLabel}
-        </AppButton>
-      </Stack>
+      </Box>
+
+      <Box
+        sx={{
+          position: "sticky",
+          bottom: 0,
+          zIndex: 2,
+          flexShrink: 0,
+          mt: 2,
+          pt: 1.5,
+          pb: 0.5,
+          bgcolor: "#fff",
+          borderTop: `1px solid ${alpha(m.navy, 0.08)}`,
+          boxShadow: "0 -8px 20px rgba(16, 35, 63, 0.06)",
+        }}
+      >
+        {stickyTotals.show ? (
+          <Box sx={{ mb: 1.5 }}>
+            <BookingCheckoutTotalsBar
+              displayedTotal={stickyTotals.displayedTotal}
+              amountDue={stickyTotals.amountDue}
+              prepaidApplied={stickyTotals.prepaidApplied}
+              discount={stickyTotals.discount}
+              discountAmount={stickyTotals.discountAmount}
+              onDiscountClick={() => setStickyDiscountOpen(true)}
+            />
+            <ManualEntryDiscountModal
+              open={stickyDiscountOpen}
+              initialValue={stickyTotals.discount}
+              onClose={() => setStickyDiscountOpen(false)}
+              onApply={(next) => {
+                if (!stickyTotals.partyKey) return;
+                setDiscountByParty((prev) => ({
+                  ...prev,
+                  [stickyTotals.partyKey!]: next,
+                }));
+              }}
+            />
+          </Box>
+        ) : null}
+        <Stack direction="row" justifyContent="flex-end" spacing={1}>
+          <AppButton
+            tone="secondary"
+            onClick={footerSecondaryIsCancel ? onCancel : handleBack}
+          >
+            {footerSecondaryIsCancel ? "Cancel" : "Back"}
+          </AppButton>
+          <AppButton
+            tone="primary"
+            disabled={nextDisabled}
+            onClick={() => void handleNext()}
+            sx={{ px: 2.5 }}
+          >
+            {nextLabel}
+          </AppButton>
+        </Stack>
+      </Box>
     </Box>
   );
 }

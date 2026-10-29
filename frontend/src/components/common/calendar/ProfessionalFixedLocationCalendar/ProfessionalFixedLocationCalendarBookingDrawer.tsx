@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { mollureBodyMutedSx } from "../../../../theme/mollureHierarchy";
 import { Box } from "@mui/material";
 import { alpha } from "@mui/material/styles";
@@ -50,6 +51,14 @@ export default function ProfessionalFixedLocationCalendarBookingDrawer({
     uniqueItemFlowTitle,
     viewingBookingEvent,
   } = bag;
+
+  const checkoutGoBackRef = React.useRef<(() => void) | null>(null);
+  const onCheckoutBackHandlerChange = React.useCallback(
+    (goBack: (() => void) | null) => {
+      checkoutGoBackRef.current = goBack;
+    },
+    [],
+  );
 
   return (
     <>
@@ -102,7 +111,13 @@ export default function ProfessionalFixedLocationCalendarBookingDrawer({
         }
         onBack={
           bookingCheckoutOpen
-            ? () => setBookingCheckoutOpen(false)
+            ? () => {
+                if (checkoutGoBackRef.current) {
+                  checkoutGoBackRef.current();
+                  return;
+                }
+                setBookingCheckoutOpen(false);
+              }
             : activityDetailItem
             ? () => setActivityDetailItem(null)
             : isBookingDetailsSubScreen
@@ -126,7 +141,20 @@ export default function ProfessionalFixedLocationCalendarBookingDrawer({
         }
         footer={<ProfessionalFixedLocationCalendarBookingDrawerFooter bag={bag} />}
       >
-        <Box sx={{ px: 2.5, pt: 0.5, pb: 2.5 }}>
+        <Box
+          sx={{
+            px: 2.5,
+            pt: 0.5,
+            pb: bookingCheckoutOpen ? 1 : 2.5,
+            ...(bookingCheckoutOpen
+              ? {
+                  height: "100%",
+                  minHeight: 0,
+                  boxSizing: "border-box",
+                }
+              : null),
+          }}
+        >
           {selectedSlot && bookingCheckoutOpen && viewingBookingEvent ? (
             <BookingCheckoutFlow
               event={viewingBookingEvent}
@@ -162,6 +190,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawer({
               prepaidAmount={prepaymentAmount}
               onCancel={() => setBookingCheckoutOpen(false)}
               onSave={handleBookingCheckoutSave}
+              onBackHandlerChange={onCheckoutBackHandlerChange}
             />
           ) : selectedSlot ? (
             <>

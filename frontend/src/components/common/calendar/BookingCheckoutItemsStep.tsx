@@ -65,7 +65,95 @@ type BookingCheckoutItemsStepProps = {
   hideClient?: boolean;
   /** Combined bill: show every line; new adds still stamp to `party.key`. */
   showAllLines?: boolean;
+  /** Split "For Who?": only these parties' services/products/unique (no mix). */
+  filterParties?: CheckoutItemParty[];
+  /** Prefer share line ids (For Who?) — strongest no-mix filter. */
+  visibleLineIds?: ReadonlySet<string>;
+  /** Confirmed booking prepayment — shown under Total so due matches Pay Full Bill. */
+  prepaidAmount?: number;
+  /** SSOT bill total (share pool) — keeps footer aligned with Pay Full Bill. */
+  totalPriceOverride?: number;
+  /** SSOT amount due after prepaid (same as Pay Full Bill). */
+  amountDueOverride?: number;
+  /** When true, totals render in parent sticky footer instead. */
+  hideTotals?: boolean;
 };
+
+export function BookingCheckoutTotalsBar(props: {
+  displayedTotal: number;
+  amountDue: number;
+  prepaidApplied: number;
+  discount: ManualEntryDiscount | null;
+  discountAmount: number;
+  onDiscountClick: () => void;
+}) {
+  const m = useTheme().palette.mollure;
+  const {
+    displayedTotal,
+    amountDue,
+    prepaidApplied,
+    discount,
+    discountAmount,
+    onDiscountClick,
+  } = props;
+  return (
+    <Stack spacing={1}>
+      <Stack direction="row" justifyContent="space-between">
+        <Typography
+          sx={mollureSectionTitleSx(m.navy, { color: m.headingText })}
+        >
+          Total Price:
+        </Typography>
+        <Typography
+          sx={mollurePageTitleSx(m.navy, { color: m.headingText })}
+        >
+          {formatEurAmount(displayedTotal)}
+        </Typography>
+      </Stack>
+      {discount && discount.amount > 0 ? (
+        <Typography sx={mollureBodyMutedSx(m.navy)}>
+          Discount ({formatManualEntryDiscountLabel(discount)}): -
+          {formatEurAmount(discountAmount)}
+        </Typography>
+      ) : null}
+      {prepaidApplied > 0 ? (
+        <Stack spacing={0.35}>
+          <Stack direction="row" justifyContent="space-between">
+            <Typography sx={mollureBodyMutedSx(m.navy)}>Prepaid:</Typography>
+            <Typography sx={mollureBodyMutedSx(m.navy)}>
+              -{formatEurAmount(prepaidApplied)}
+            </Typography>
+          </Stack>
+          <Stack direction="row" justifyContent="space-between">
+            <Typography
+              sx={mollureSectionTitleSx(m.navy, { color: m.headingText })}
+            >
+              Amount due:
+            </Typography>
+            <Typography
+              sx={mollurePageTitleSx(m.navy, { color: m.headingText })}
+            >
+              {formatEurAmount(amountDue)}
+            </Typography>
+          </Stack>
+        </Stack>
+      ) : null}
+      <AppButton
+        variant="text"
+        onClick={onDiscountClick}
+        sx={mollureLabelSx(m.navy, {
+          alignSelf: "flex-start",
+          p: 0,
+          minWidth: 0,
+          textTransform: "none",
+          color: m.teal,
+        })}
+      >
+        {discount && discount.amount > 0 ? "Edit Discount" : "+ Discount"}
+      </AppButton>
+    </Stack>
+  );
+}
 
 export default function BookingCheckoutItemsStep({
   party,
@@ -76,6 +164,12 @@ export default function BookingCheckoutItemsStep({
   onChangeDiscount,
   hideClient = false,
   showAllLines = false,
+  filterParties,
+  visibleLineIds,
+  prepaidAmount = 0,
+  totalPriceOverride,
+  amountDueOverride,
+  hideTotals = false,
 }: BookingCheckoutItemsStepProps) {
   const m = useTheme().palette.mollure;
   const { settings, setSettings } = useFinanceInvoiceSettings();
@@ -94,10 +188,21 @@ export default function BookingCheckoutItemsStep({
   const [addMenuAnchor, setAddMenuAnchor] =
     React.useState<null | HTMLElement>(null);
 
-  const partyLines = React.useMemo(
-    () => (showAllLines ? lines : filterLinesForParty(lines, party)),
-    [lines, party, showAllLines],
-  );
+  const partyLines = React.useMemo(() => {
+    if (visibleLineIds) {
+      return lines.filter((line) => visibleLineIds.has(line.id));
+    }
+    if (filterParties && filterParties.length > 0) {
+      const allowed = new Set(
+        filterParties.flatMap((p) =>
+          filterLinesForParty(lines, p).map((line) => line.id),
+        ),
+      );
+      return lines.filter((line) => allowed.has(line.id));
+    }
+    if (showAllLines) return lines;
+    return filterLinesForParty(lines, party);
+  }, [filterParties, lines, party, showAllLines, visibleLineIds]);
   const serviceLines = React.useMemo(
     () =>
       partyLines.filter(
@@ -131,6 +236,19 @@ export default function BookingCheckoutItemsStep({
     [discount, subtotal],
   );
   const totalPrice = Math.max(0, subtotal - discountAmount);
+  const displayedTotal =
+    typeof totalPriceOverride === "number"
+      ? Math.max(0, totalPriceOverride)
+      : totalPrice;
+  const amountDue =
+    typeof amountDueOverride === "number"
+      ? Math.max(0, amountDueOverride)
+      : Math.max(
+          0,
+          displayedTotal - Math.min(Math.max(0, prepaidAmount), displayedTotal),
+        );
+  // Actual credit on this bill (may be capped to main share when guests exist).
+  const prepaidApplied = Math.max(0, displayedTotal - amountDue);
 
   const { productOptions, itemOptions, uniqueItemOptions } = React.useMemo(
     () =>
@@ -391,40 +509,15 @@ export default function BookingCheckoutItemsStep({
         </Stack>
       </Box>
 
-      {partyLines.length ? (
-        <Stack spacing={1}>
-          <Stack direction="row" justifyContent="space-between">
-            <Typography
-              sx={mollureSectionTitleSx(m.navy, { color: m.headingText })}
-            >
-              Total Price:
-            </Typography>
-            <Typography
-              sx={mollurePageTitleSx(m.navy, { color: m.headingText })}
-            >
-              {formatEurAmount(totalPrice)}
-            </Typography>
-          </Stack>
-          {discount && discount.amount > 0 ? (
-            <Typography sx={mollureBodyMutedSx(m.navy)}>
-              Discount ({formatManualEntryDiscountLabel(discount)}): -
-              {formatEurAmount(discountAmount)}
-            </Typography>
-          ) : null}
-          <AppButton
-            variant="text"
-            onClick={() => setDiscountModalOpen(true)}
-            sx={mollureLabelSx(m.navy, {
-              alignSelf: "flex-start",
-              p: 0,
-              minWidth: 0,
-              textTransform: "none",
-              color: m.teal,
-            })}
-          >
-            {discount && discount.amount > 0 ? "Edit Discount" : "+ Discount"}
-          </AppButton>
-        </Stack>
+      {!hideTotals && partyLines.length ? (
+        <BookingCheckoutTotalsBar
+          displayedTotal={displayedTotal}
+          amountDue={amountDue}
+          prepaidApplied={prepaidApplied}
+          discount={discount}
+          discountAmount={discountAmount}
+          onDiscountClick={() => setDiscountModalOpen(true)}
+        />
       ) : null}
 
       <ManualEntryDiscountModal

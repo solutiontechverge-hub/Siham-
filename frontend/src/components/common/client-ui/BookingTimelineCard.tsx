@@ -322,7 +322,11 @@ function renderScenarioBadge(
     </Stack>
     );
 
-  if (!badge.tooltip) {
+  // BookingRequestBadge already has its own tooltip — don't stack a second hover.
+  if (
+    !badge.tooltip ||
+    (badge.showRequestSentIcon && badge.label === "BR")
+  ) {
     return <React.Fragment key={key}>{node}</React.Fragment>;
   }
 
