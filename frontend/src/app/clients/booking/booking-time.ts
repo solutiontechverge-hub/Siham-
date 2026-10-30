@@ -8,8 +8,8 @@ export const CLIENT_BOOKING_MIN_LEAD_ERROR =
 
 /** Minutes from midnight for client AM/PM labels or professional/API `HH:mm`. */
 export function parseTimeLabelToMinutes(label: string) {
-  // Shared clock parser: AM/PM-only used to return 0 for "09:30" → "12:00 AM" on client.
-  return parseClockToMinutes(label) ?? 0;
+  // Case-insensitive AM/PM (am/AM/a.m.) via parseClockToMinutes.
+  return parseClockToMinutes(String(label ?? "").trim()) ?? 0;
 }
 
 export function getNowMinutesFromMidnight(date = new Date()) {

@@ -23,11 +23,14 @@ import {
 import {
   isClientBookingPaymentDue,
   isWaitingForPrepayment,
+  listTabForClientBooking,
+  resolveClientBookingDisplayStatus,
   statusChipLabel,
   type BookingListTab,
   type ClientBookingRecord,
   type ClientBookingStatus,
 } from "./clientBookingRecords";
+import { useScheduleClock } from "../../../components/common/client-booking/useScheduleClock";
 import {
   bookingSecondaryStatusBadgeSx,
   bookingSecondaryStatusChipSx,
@@ -74,6 +77,7 @@ type Props = {
 export default function ClientBookingListView({ listTab }: Props) {
   const m = useTheme().palette.mollure;
   const router = useRouter();
+  const scheduleNow = useScheduleClock();
   const [page, setPage] = React.useState(1);
   const [searchInput, setSearchInput] = React.useState("");
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -100,10 +104,13 @@ export default function ClientBookingListView({ listTab }: Props) {
 
   const bookings = React.useMemo(() => {
     const rows = data?.data ?? [];
-    return rows.map((row) =>
-      enrichClientBookingRecord(mapApiBookingToClientRecord(row)),
-    );
-  }, [data]);
+    return rows
+      .map((row) =>
+        enrichClientBookingRecord(mapApiBookingToClientRecord(row)),
+      )
+      // Force wall-clock tab membership even if API bucket lags.
+      .filter((b) => listTabForClientBooking(b, scheduleNow) === listTab);
+  }, [data, listTab, scheduleNow]);
 
   React.useEffect(() => {
     for (const b of bookings) {
@@ -112,6 +119,14 @@ export default function ClientBookingListView({ listTab }: Props) {
       }
     }
   }, [bookings]);
+
+  React.useEffect(() => {
+    const onFocus = () => {
+      void refetch();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [refetch]);
 
   const pagination = data?.pagination;
   const totalPages = Math.max(1, pagination?.totalPages ?? 1);
@@ -240,7 +255,8 @@ export default function ClientBookingListView({ listTab }: Props) {
                 const bookingIdLabel = formatBookingIdLabel(b.bookingRef);
                 const status = (b.status ?? "confirmed") as ClientBookingStatus;
                 const paymentDue = isClientBookingPaymentDue(b);
-                const displayStatus: ClientBookingStatus = status;
+                const displayStatus: ClientBookingStatus =
+                  resolveClientBookingDisplayStatus(b, scheduleNow);
                 // BR only while pending — hide once accepted (confirmed) or rejected.
                 const isEbrIncoming = isClientIncomingProfessionalEbr(
                   b.incomingEditRequest,
@@ -277,11 +293,15 @@ export default function ClientBookingListView({ listTab }: Props) {
                 const erNote =
                   (incomingEr?.note || outgoingEr?.note || "").trim() || "";
                 const waitingForPrepayment = isWaitingForPrepayment(b);
-                const showPrepaidIcon =
-                  Boolean(b.requiresPrepayment) &&
-                  Boolean(b.prepaid) &&
-                  !waitingForPrepayment;
-                const waitingForPayment = paymentDue;
+                // €✓ only when full amount settled (not while AT/prepay still due).
+                const showPaidIcon =
+                  !waitingForPrepayment &&
+                  !paymentDue &&
+                  (displayStatus === "completed" ||
+                    b.status === "completed" ||
+                    b.status === "in_progress") &&
+                  (!b.requiresPrepayment || Boolean(b.prepaid));
+                const waitingForPayment = paymentDue && !waitingForPrepayment;
                 const isSilentUpdated = Boolean(b.silentUpdated);
                 const isConfirmedEdited =
                   displayStatus === "confirmed" &&
@@ -489,7 +509,7 @@ export default function ClientBookingListView({ listTab }: Props) {
                                   size={24}
                                 />
                               </Box>
-                            ) : showPrepaidIcon ? (
+                            ) : showPaidIcon ? (
                               <Box
                                 sx={{
                                   display: "grid",
@@ -499,11 +519,11 @@ export default function ClientBookingListView({ listTab }: Props) {
                                   lineHeight: 0,
                                   flexShrink: 0,
                                 }}
-                                title="Prepayment received"
-                                aria-label="Prepayment received"
+                                title="Paid"
+                                aria-label="Paid"
                               >
-                                <PrepaymentStatusIcon
-                                  variant="confirmed"
+                                <BookingIndicatorIcon
+                                  variant="prepaid"
                                   size={24}
                                 />
                               </Box>

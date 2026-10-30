@@ -597,7 +597,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
   const paymentPending =
     Boolean(notesDetails?.waitingForPayment) ||
     unpaidSplitPayers(parseSplitBillState(notesDetails?.splitBill)).length > 0;
-  // Explicit false only while post-booking settlement is open (drives payment-due UI).
+  // Explicit false while settlement open (notes). Details also ORs finance Pending.
   const paid =
     status === "no_show"
       ? false

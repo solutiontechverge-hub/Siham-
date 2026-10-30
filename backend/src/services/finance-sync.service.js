@@ -985,13 +985,22 @@ function resolveSplitPayers(booking, meta, invoiceSettings) {
             .map((id) => byRef.get(catalogRefFromLineId(id)))
             .filter(Boolean);
         }
+        // Split bill: never dump the full catalog onto main — that merges guest lines
+        // into the main-client invoice. Solo/full-bill may still use the catalog.
+        const splitPayerCount = meta.splitBill.payers.length;
         if (
           !lineItems.length &&
+          splitPayerCount <= 1 &&
           (role === "main_client" || String(p.key) === "main-client")
         ) {
           lineItems = catalogLines.filter(isCatalogLinkedLine);
         }
-        lineItems = lineItems.map((line) => applyCatalogVat(line, invoiceSettings));
+        lineItems = lineItems.map((line) => ({
+          ...applyCatalogVat(line, invoiceSettings),
+          partyRole: role,
+          partyName: p.displayName || p.label || booking.customer_name,
+          ...(role !== "main_client" ? { assigneeKey: String(p.key) } : {}),
+        }));
         return {
           key: String(p.key),
           role,
@@ -999,6 +1008,7 @@ function resolveSplitPayers(booking, meta, invoiceSettings) {
           displayName: p.displayName || p.label || "Guest",
           subtotal: roundMoney(p.subtotal),
           paymentAmount: roundMoney(p.paymentAmount),
+          paid: Boolean(p.paid),
           lineItems,
         };
       }),
@@ -1551,15 +1561,16 @@ async function insertFinanceTransaction({
   const openExisting = await query(
     `SELECT id, gross_amount, status, entry_label FROM finance_transactions
      WHERE professional_profile_id = $1
-       AND booking_id = $2
-       AND COALESCE(document->>'payerKey', '') = $3
-       AND COALESCE(document->>'paymentPhase', '') = $4
+       AND booking_id::text IN ($2, $3)
+       AND COALESCE(document->>'payerKey', '') = $4
+       AND COALESCE(document->>'paymentPhase', '') = $5
        AND status NOT IN ('Paid', 'Prepaid', 'Refunded', 'Voided')
      ORDER BY updated_at DESC NULLS LAST
      LIMIT 1`,
     [
       booking.professional_profile_id,
       booking.unique_code,
+      String(booking.id),
       payerKey || "",
       paymentPhase || "",
     ],
@@ -1570,6 +1581,74 @@ async function insertFinanceTransaction({
   if (openRow) {
     const prevGross = roundMoney(openRow.gross_amount);
     const sameLabel = String(openRow.entry_label || "") === labelKey;
+    const openStatus = String(openRow.status || "");
+    // Client Pay Now: flip Pending → Paid in place (keep invoice/receipt on same row).
+    if (
+      sameLabel &&
+      prevGross === gross &&
+      status === "Paid" &&
+      ["Pending", "Payment due", "Overdue", "Overdue response"].includes(openStatus)
+    ) {
+      await query(
+        `UPDATE finance_transactions
+         SET status = 'Paid',
+             paid_amount = COALESCE(NULLIF(paid_amount, 0), gross_amount, $2),
+             transaction_date = COALESCE(transaction_date, CURRENT_DATE),
+             document = CASE
+               WHEN NULLIF(TRIM(COALESCE(document->>'receiptNumber', '')), '') IS NULL
+               THEN jsonb_set(
+                 COALESCE(document, '{}'::jsonb),
+                 '{receiptNumber}',
+                 to_jsonb('RCP-G' || COALESCE(entry_id, '')),
+                 true
+               )
+               ELSE document
+             END,
+             issued_document = CASE
+               WHEN NULLIF(TRIM(COALESCE(
+                 COALESCE(issued_document, document)->>'receiptNumber', ''
+               )), '') IS NULL
+               THEN jsonb_set(
+                 COALESCE(issued_document, document, '{}'::jsonb),
+                 '{receiptNumber}',
+                 to_jsonb('RCP-G' || COALESCE(entry_id, '')),
+                 true
+               )
+               ELSE issued_document
+             END,
+             updated_at = NOW()
+         WHERE id = $1`,
+        [openRow.id, gross],
+      );
+      // Mirror PAYMENT into ledger so outstanding → 0 and badge becomes Paid.
+      try {
+        const {
+          mirrorSettledFinanceToLedger,
+          recalculateBookingFinancials,
+        } = await import("./bookingTransactionLedger.service.js");
+        await mirrorSettledFinanceToLedger({
+          bookingId: booking.id,
+          bookingRef: booking.unique_code,
+          clientId: booking.customer_id ?? booking.professional_client_id ?? null,
+          professionalProfileId: booking.professional_profile_id,
+          financeTransactionId: openRow.id,
+          paymentPhase,
+          entryLabel: entryLabel || null,
+          status: "Paid",
+          amount: gross,
+          metadata: { payerKey, payerRole, source: "client_pay_now_inplace" },
+        });
+        await recalculateBookingFinancials(booking.id);
+      } catch {
+        /* ledger dual-write is best-effort */
+      }
+      return linkSalesCardForInsertedTx(
+        booking,
+        salesCardFields,
+        openRow.id,
+        lineItems,
+      );
+    }
     if (
       shouldReuseOpenFinanceRow({
         forceReplace,
@@ -1626,6 +1705,31 @@ async function insertFinanceTransaction({
           [exact.rows[0].id],
         );
       } else {
+        // Heal: Paid row may predate ledger mirror (client Pay Now in-place gap).
+        if (isSettledFinanceStatus(status)) {
+          try {
+            const {
+              mirrorSettledFinanceToLedger,
+              recalculateBookingFinancials,
+            } = await import("./bookingTransactionLedger.service.js");
+            await mirrorSettledFinanceToLedger({
+              bookingId: booking.id,
+              bookingRef: booking.unique_code,
+              clientId:
+                booking.customer_id ?? booking.professional_client_id ?? null,
+              professionalProfileId: booking.professional_profile_id,
+              financeTransactionId: exact.rows[0].id,
+              paymentPhase,
+              entryLabel: entryLabel || null,
+              status,
+              amount: gross,
+              metadata: { payerKey, payerRole, source: "settle_heal_existing" },
+            });
+            await recalculateBookingFinancials(booking.id);
+          } catch {
+            /* ledger dual-write is best-effort */
+          }
+        }
         return linkSalesCardForInsertedTx(
           booking,
           salesCardFields,
@@ -2319,8 +2423,13 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
     if (id) createdIds.push(id);
   }
 
-  // After-treatment split: main client + each guest/model
-  if (isCompleted || requestedPhase === "full") {
+  // After-treatment only after pro checkout (splitBill / waitingForPayment) or
+  // an explicit full-phase sync — not on bare auto-complete without checkout.
+  const afterTreatmentCheckoutDone =
+    Boolean(meta.splitBill?.payers?.length) ||
+    Boolean(meta.waitingForPayment) ||
+    requestedPhase === "full";
+  if (afterTreatmentCheckoutDone && (isCompleted || requestedPhase === "full")) {
     for (const payer of payers) {
       const amount =
         amountOverride != null && payer.role === "main_client"
@@ -2342,17 +2451,18 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
             ? `-M-${String(payer.key).slice(0, 8)}`
             : `-G-${String(payer.key).slice(0, 8)}`;
 
-      // Online Direct/invoice stays unpaid until collected; only Offline Direct is cash-on-hand.
-      const afterTreatmentStatus =
-        statusOverride ??
-        (payerMethod === "offlineDirect" || booking.booking_type === "offline"
+      // Online Direct stays Pending until client Pay Now stamps splitBill.payers[].paid.
+      // Do not apply a blanket statusOverride to every split payer.
+      const afterTreatmentStatus = payer.paid
+        ? "Paid"
+        : payerMethod === "offlineDirect" || booking.booking_type === "offline"
           ? "Paid"
           : payerMethod === "onlineInvoice" ||
               payerMethod === "onlineNonDirect" ||
               payerMethod === "offlineInvoice" ||
               payerMethod === "offlineNonDirect"
             ? "Payment due"
-            : "Pending");
+            : "Pending";
       const id = await insertFinanceTransaction({
         booking,
         paymentPhase: "full",

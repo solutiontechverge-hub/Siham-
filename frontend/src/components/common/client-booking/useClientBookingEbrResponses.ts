@@ -283,11 +283,15 @@ export function useClientBookingEbrResponses(input: {
               parseStoredEbrFromNotes(activeBooking?.notes),
               parseStoredErFromNotes(activeBooking?.notes),
             );
+            // Prepaid (or offline) Accept → Confirmed; otherwise BR Accepted until pay.
             await persistBookingPatch({
               id: apiBookingId,
-              status: "br_accepted",
+              status:
+                alreadyPaid || isOfflinePay || !shouldRequirePrepay
+                  ? "confirmed"
+                  : "br_accepted",
               notes: nextNotes,
-              ...(shouldRequirePrepay
+              ...(shouldRequirePrepay && !alreadyPaid && !isOfflinePay
                 ? { prepayment_status: "required" as const }
                 : {}),
             });

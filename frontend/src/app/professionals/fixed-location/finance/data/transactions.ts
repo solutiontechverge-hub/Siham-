@@ -309,6 +309,8 @@ export type TransactionDocument = {
   serviceTime?: string;
   /** full | prepay | addon — stamped on issued finance docs. */
   paymentPhase?: "full" | "prepay" | "addon" | string;
+  /** Split-bill payer key from checkout. */
+  payerKey?: string;
   invoiceDate: string;
   dueDate: string;
   lateFeeNotice?: string;

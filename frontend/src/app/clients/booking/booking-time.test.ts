@@ -12,6 +12,14 @@ import {
 } from "./booking-time";
 
 assert.equal(parseTimeLabelToMinutes("9:30 AM"), 9 * 60 + 30);
+assert.equal(parseTimeLabelToMinutes("9:30 am"), 9 * 60 + 30, "am case");
+assert.equal(parseTimeLabelToMinutes("9:30 Am"), 9 * 60 + 30, "Am case");
+assert.equal(parseTimeLabelToMinutes("9:30 a.m."), 9 * 60 + 30, "a.m. dots");
+assert.equal(parseTimeLabelToMinutes("2:15 PM"), 14 * 60 + 15);
+assert.equal(parseTimeLabelToMinutes("2:15 pm"), 14 * 60 + 15, "pm case");
+assert.equal(parseTimeLabelToMinutes("2:15 p.m."), 14 * 60 + 15, "p.m. dots");
+assert.equal(parseTimeLabelToMinutes("12:00 AM"), 0, "midnight");
+assert.equal(parseTimeLabelToMinutes("12:00 pm"), 12 * 60, "noon");
 assert.equal(parseTimeLabelToMinutes("09:30"), 9 * 60 + 30, "HH:mm must not collapse to midnight");
 assert.equal(parseTimeLabelToMinutes("09:45"), 9 * 60 + 45);
 

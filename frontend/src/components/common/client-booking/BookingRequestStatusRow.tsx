@@ -15,7 +15,6 @@ import type { ReactNode } from "react";
 import BookingRequestBadge from "../calendar/BookingRequestBadge";
 import BookingRequestReceivedIcon from "../calendar/BookingRequestReceivedIcon";
 import BookingIndicatorIcon from "../calendar/BookingIndicatorIcon";
-import PrepaymentStatusIcon from "../calendar/PrepaymentStatusIcon";
 import EditRequestIndicatorIcon from "./EditRequestIndicatorIcon";
 
 const STATUS_ICON_BOX = {
@@ -123,7 +122,9 @@ export default function BookingRequestStatusRow({
     rowMode === "professional_rejected" &&
     (bookingStatus === "cancelled" || bookingStatus === "invalid");
   const isDraft = bookingStatus === "draft";
-  const isCompleted = bookingStatus === "completed";
+  // Parent passes schedule-resolved status (confirmed ↔ in_progress ↔ completed).
+  const displayStatus: ClientBookingStatus = bookingStatus;
+  const isCompleted = displayStatus === "completed";
   const isTerminal =
     bookingStatus === "cancelled" ||
     bookingStatus === "invalid" ||
@@ -135,18 +136,20 @@ export default function BookingRequestStatusRow({
       !isTerminal &&
       !isCompleted);
 
+  // Icon 1 while any prepayment is still owed (BR / confirmed / draft sent).
   const waitingForPrepayment =
     requiresPrepayment &&
     !prepaymentPaid &&
+    !isCompleted &&
+    !isTerminal &&
     (bookingStatus === "br_accepted" ||
       bookingStatus === "requested" ||
-      (isDraft && bookingRequestSent)) &&
-    !isCompleted &&
-    !isTerminal;
+      bookingStatus === "confirmed" ||
+      (isDraft && bookingRequestSent));
 
   const chipStatus: ClientBookingStatus = isEbrRejected
     ? "invalid"
-    : bookingStatus;
+    : displayStatus;
 
   const chipColors = bookingStatusChipColors(chipStatus);
   const chipLabel = isEbrRejected
@@ -270,12 +273,16 @@ export default function BookingRequestStatusRow({
         </Box>
       ) : null}
 
+      {/*
+        Icon 1 (€ clock: prepayment due OR after-treatment payment due.
+        Icon 2 (€✓): only when prepaid (if required) AND remaining AT is settled.
+      */}
       {waitingForPrepayment ? (
         <Box
           component={onWaitingForPrepaymentClick ? "button" : "span"}
           type={onWaitingForPrepaymentClick ? "button" : undefined}
-          title="Waiting for prepayment — pay now"
-          aria-label="Waiting for prepayment — pay now"
+          title="Waiting for payment — prepayment due"
+          aria-label="Waiting for payment — prepayment due"
           onClick={onWaitingForPrepaymentClick}
           sx={{
             ...STATUS_ICON_BOX,
@@ -289,19 +296,9 @@ export default function BookingRequestStatusRow({
               : undefined,
           }}
         >
-          <PrepaymentStatusIcon variant="pending" size={24} />
+          <BookingIndicatorIcon variant="waiting_for_payment" size={24} />
         </Box>
-      ) : requiresPrepayment && prepaymentPaid && !isTerminal ? (
-        <Box
-          title="Prepayment received"
-          aria-label="Prepayment received"
-          sx={STATUS_ICON_BOX}
-        >
-          <PrepaymentStatusIcon variant="confirmed" size={24} />
-        </Box>
-      ) : null}
-
-      {paymentDue && !paymentOverdue ? (
+      ) : paymentDue && !paymentOverdue ? (
         <Box
           title="Waiting for payment"
           aria-label="Waiting for payment"
@@ -309,15 +306,25 @@ export default function BookingRequestStatusRow({
         >
           <BookingIndicatorIcon variant="waiting_for_payment" size={24} />
         </Box>
-      ) : null}
-
-      {paymentOverdue ? (
+      ) : paymentOverdue ? (
         <Box
           title="Overdue payment"
           aria-label="Overdue payment"
           sx={STATUS_ICON_BOX}
         >
           <BookingIndicatorIcon variant="overdue_payment" size={24} />
+        </Box>
+      ) : (!requiresPrepayment || prepaymentPaid) &&
+        !paymentDue &&
+        !paymentOverdue &&
+        isCompleted &&
+        !isTerminal ? (
+        <Box
+          title="Paid"
+          aria-label="Paid"
+          sx={STATUS_ICON_BOX}
+        >
+          <BookingIndicatorIcon variant="prepaid" size={24} />
         </Box>
       ) : null}
     </Stack>

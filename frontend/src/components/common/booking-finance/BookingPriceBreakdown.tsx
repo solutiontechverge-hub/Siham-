@@ -30,6 +30,8 @@ type BookingPriceBreakdownProps = {
   /** Override Remaining label (e.g. ledger "Amount Due"). */
   remainingLabel?: string;
   prepaymentPaid?: boolean;
+  /** After-treatment settled → label "Paid (x%)" instead of "Remaining (x%)". */
+  remainingPaid?: boolean;
   prepaidAction?: ReactNode;
   extraRows?: readonly BookingPriceBreakdownRow[];
   /** Rows only — no nested card. Use inside a parent booking card. */
@@ -115,6 +117,7 @@ export default function BookingPriceBreakdown({
   remainingAmount,
   remainingLabel,
   prepaymentPaid = false,
+  remainingPaid = false,
   prepaidAction,
   extraRows = [],
   variant = "card",
@@ -260,6 +263,7 @@ export default function BookingPriceBreakdown({
                   prepaidPercent,
                   remaining,
                   totalPrice,
+                  remainingPaid,
                 )
               }
               value={formatFinanceEuro(remaining)}

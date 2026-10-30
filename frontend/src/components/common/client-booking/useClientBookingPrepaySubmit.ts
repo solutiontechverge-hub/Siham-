@@ -128,12 +128,14 @@ export function useClientBookingPrepaySubmit(input: {
     }
 
     try {
-      // Fixed settles on prepay. Desired BR stays requested so the professional can Accept.
+      // BR stays requested after prepay until Accept. Confirm only when:
+      // - Accept was clicked first (pendingAcceptBrAfterPrepay), or
+      // - already BR Accepted (pro accepted; client finishing prepay), or
+      // - draft create settle (no open BR).
       const statusBeforePay =
         sessionRecord?.status ?? activeBooking?.status ?? null;
       const confirmAfterPay =
         pendingAcceptBrAfterPrepay.current ||
-        locationMode === "fixed" ||
         statusBeforePay === "br_accepted" ||
         statusBeforePay === "draft";
       pendingAcceptBrAfterPrepay.current = false;
@@ -204,15 +206,13 @@ export function useClientBookingPrepaySubmit(input: {
     updateMyBooking,
   ]);
 
-  // Heal: Fixed / BR Accepted left on unpaid path after prepaid was recorded.
-  // Desired requested stays requested so the professional can Accept.
+  // Heal only BR Accepted + prepaid → Confirmed (never auto-confirm open BR).
   const prepaidConfirmHealKeyRef = React.useRef<string | null>(null);
   React.useEffect(() => {
     if (!apiBookingId || String(apiBookingId).startsWith("bk_draft_")) return;
     if (!isPrepaymentPaid) return;
-    if (locationMode === "desired" && bookingStatus === "requested") return;
-    if (bookingStatus !== "requested" && bookingStatus !== "br_accepted") return;
-    const healKey = `${apiBookingId}:prepaid→confirmed`;
+    if (bookingStatus !== "br_accepted") return;
+    const healKey = `${apiBookingId}:br_accepted+prepaid→confirmed`;
     if (prepaidConfirmHealKeyRef.current === healKey) return;
     prepaidConfirmHealKeyRef.current = healKey;
     let cancelled = false;
@@ -243,7 +243,6 @@ export function useClientBookingPrepaySubmit(input: {
     apiBookingId,
     bookingStatus,
     isPrepaymentPaid,
-    locationMode,
     persistBookingPatch,
     refreshActiveBooking,
   ]);

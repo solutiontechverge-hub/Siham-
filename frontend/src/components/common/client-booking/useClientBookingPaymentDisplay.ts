@@ -3,8 +3,15 @@
 import * as React from "react";
 import type { ClientBookingStatus } from "../../../app/clients/booking/clientBookingRecords";
 import type { CalendarBookingDetails } from "../../../app/professionals/fixed-location/calendar/calendar.data";
+import type { TransactionRow } from "../../../app/professionals/fixed-location/finance/data/transactions";
 import { resolveKilometerAllowanceAmount } from "../calendar/bookingEventDetails";
 import { summarizeClientBookingPrice } from "../calendar/bookingTotal";
+import {
+  hasAfterTreatmentCheckoutSignal,
+  resolveAfterTreatmentPayerRows,
+} from "../calendar/resolveAfterTreatmentPayerRows";
+import { parseSplitBillState } from "../calendar/salesSplitBill";
+import { isProtectiveFeeEntryLabel } from "../finance-documents/protectiveFeeInvoice";
 import { buildClientBookingPaymentSummary } from "./buildClientBookingPaymentSummary";
 import {
   checkoutPaymentMethodApiValue,
@@ -52,6 +59,9 @@ export function useClientBookingPaymentDisplay(input: {
     transactionId?: string;
     settled?: boolean;
   }>;
+  financeRows?: readonly TransactionRow[];
+  bookingId?: string | null;
+  bookingRef?: string | null;
 }) {
   const kilometerAllowanceAmount = React.useMemo(
     () =>
@@ -148,6 +158,73 @@ export function useClientBookingPaymentDisplay(input: {
   const displayTotal = detailsPrice.breakdown.bookingTotal;
   const displayPrepaidAmount = detailsPrice.breakdown.prepaymentAmount;
 
+  const splitBill = React.useMemo(
+    () => parseSplitBillState(input.bookingNotesMeta?.splitBill),
+    [input.bookingNotesMeta?.splitBill],
+  );
+
+  const financeHasAfterTreatmentTx = React.useMemo(() => {
+    const rows = input.financeRows ?? [];
+    return rows.some((row) => {
+      if (isProtectiveFeeEntryLabel(row.entryLabel)) return false;
+      const label = String(row.entryLabel ?? "").toLowerCase();
+      // Require pro-checkout AT label — bare phase=full is also created by autocomplete.
+      return (
+        label.includes("after treatment") || label.includes("after-treatment")
+      );
+    });
+  }, [input.financeRows]);
+
+  const hasAfterTreatmentCheckout = React.useMemo(
+    () =>
+      hasAfterTreatmentCheckoutSignal({
+        splitBill,
+        waitingForPayment: Boolean(input.bookingNotesMeta?.waitingForPayment),
+        financeHasAfterTreatmentTx,
+      }),
+    [
+      financeHasAfterTreatmentTx,
+      input.bookingNotesMeta?.waitingForPayment,
+      splitBill,
+    ],
+  );
+
+  const afterTreatmentPayers = React.useMemo(() => {
+    const remaining = Math.max(
+      0,
+      round2(displayTotal - (displayPrepaidAmount || 0)),
+    );
+    return resolveAfterTreatmentPayerRows({
+      splitBill,
+      bookingPaymentMethod:
+        input.bookingNotesMeta?.paymentMethod ??
+        checkoutPaymentMethodApiValue(input.selectedPaymentMethod),
+      bookingPaid: input.activeBooking?.paid === true,
+      paymentDue: input.isPaymentDue,
+      paymentOverdue: Boolean(input.paymentOverdue),
+      invoiceDueDateLabel: input.invoiceDueDateLabel ?? null,
+      financeRows: input.financeRows,
+      bookingId: input.bookingId,
+      bookingCode: input.bookingRef,
+      fallbackMainAmount: remaining,
+      enabled: hasAfterTreatmentCheckout,
+    });
+  }, [
+    displayPrepaidAmount,
+    displayTotal,
+    hasAfterTreatmentCheckout,
+    input.activeBooking?.paid,
+    input.bookingId,
+    input.bookingNotesMeta?.paymentMethod,
+    input.bookingRef,
+    input.financeRows,
+    input.invoiceDueDateLabel,
+    input.isPaymentDue,
+    input.paymentOverdue,
+    input.selectedPaymentMethod,
+    splitBill,
+  ]);
+
   const paymentSummarySections = React.useMemo(
     () =>
       buildClientBookingPaymentSummary({
@@ -173,8 +250,10 @@ export function useClientBookingPaymentDisplay(input: {
         showUnpaidPrepayment: input.isOfflinePay,
         shopName: input.shopDisplayName,
         paidProtectiveFees: input.paidProtectiveFees,
+        afterTreatmentPayers,
       }),
     [
+      afterTreatmentPayers,
       input.activeBooking?.paid,
       input.activeBooking?.prepaymentPercent,
       input.activeBooking?.requiresPrepayment,
@@ -208,8 +287,10 @@ export function useClientBookingPaymentDisplay(input: {
         // Cancelled + No Show: keep Prepayment + Fee Summary only.
         isCancelled:
           input.isCancelled || input.bookingStatus === "no_show",
+        hasAfterTreatmentCheckout,
       }),
     [
+      hasAfterTreatmentCheckout,
       input.bookingStatus,
       input.isCancelled,
       input.isCompleted,
@@ -231,6 +312,11 @@ export function useClientBookingPaymentDisplay(input: {
         input.requiresPrepayment &&
         input.bookingStatus !== "draft"));
 
+  // Source of truth for header icon/Delete — finance Pending overrides stale notes.paid.
+  const hasUnpaidAfterTreatment = afterTreatmentPayers.some(
+    (row) => row.amount > 0 && row.statusLabel !== "Paid",
+  );
+
   return {
     kilometerAllowanceAmount,
     showKilometerAllowance,
@@ -243,5 +329,12 @@ export function useClientBookingPaymentDisplay(input: {
     paymentSummarySections,
     visiblePaymentSummarySections,
     showPaymentSummary,
+    afterTreatmentPayers,
+    hasAfterTreatmentCheckout,
+    hasUnpaidAfterTreatment,
   };
+}
+
+function round2(n: number) {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
 }

@@ -319,18 +319,23 @@ export function extractBookingId(rawId: string) {
   return rawId;
 }
 
-const CLOCK_TIME_RE = /^(\d{1,2}):(\d{2})(?::\d{2})?\s*(am|pm)?$/i;
+// am/AM/Am/a.m./A.M. and pm variants — case-insensitive.
+const CLOCK_TIME_RE =
+  /^(\d{1,2}):(\d{2})(?::\d{2})?\s*(a\.?m\.?|p\.?m\.?)?$/i;
 
-/** Minutes from midnight for `HH:MM`, `H:MM`, or `HH:MM AM/PM`. */
+/** Minutes from midnight for `HH:MM`, `H:MM`, or `HH:MM AM/PM` (any case). */
 export function parseClockToMinutes(hhmm: string): number | null {
-  const match = hhmm.trim().match(CLOCK_TIME_RE);
+  const match = String(hhmm ?? "").trim().match(CLOCK_TIME_RE);
   if (!match) return null;
   let hours = Number.parseInt(match[1], 10);
   const minutes = Number.parseInt(match[2], 10);
   if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
-  const mer = match[3]?.toLowerCase();
-  if (mer === "pm" && hours < 12) hours += 12;
-  if (mer === "am" && hours === 12) hours = 0;
+  const mer = match[3];
+  if (mer) {
+    const isPm = /^p/i.test(mer);
+    if (isPm && hours < 12) hours += 12;
+    if (!isPm && hours === 12) hours = 0;
+  }
   if (hours > 23 || minutes > 59) return null;
   return hours * 60 + minutes;
 }

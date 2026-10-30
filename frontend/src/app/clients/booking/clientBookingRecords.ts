@@ -1,6 +1,12 @@
 import type { ClientBookingDraft } from "../../../components/common/client-booking/types";
 import type { BookingEditRequestRecord } from "../../../components/common/client-booking/bookingEditRequest";
+import { parseCalendarEntryNotes } from "../../../components/common/calendar/bookingEventDetails";
+import {
+  parseSplitBillState,
+  unpaidSplitPayers,
+} from "../../../components/common/calendar/salesSplitBill";
 import type { BookingEditRequestPayload } from "../../../store/services/businessApi";
+import { parseTimeLabelToMinutes } from "./booking-time";
 
 export type ClientBookingStatus =
   | "draft"
@@ -66,20 +72,122 @@ export type ClientBookingRecord = {
 
 export type BookingListTab = "past" | "ongoing" | "upcoming";
 
+/** Local wall-clock Date from YYYY-MM-DD + minutes (AM/PM-safe via parseTimeLabelToMinutes). */
+function wallClockLocal(dateIso: string, minutesFromMidnight: number): Date | null {
+  const m = String(dateIso).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const mins =
+    ((Math.floor(minutesFromMidnight) % (24 * 60)) + 24 * 60) % (24 * 60);
+  const dt = new Date(
+    Number(m[1]),
+    Number(m[2]) - 1,
+    Number(m[3]),
+    Math.floor(mins / 60),
+    mins % 60,
+    0,
+    0,
+  );
+  return Number.isNaN(dt.getTime()) ? null : dt;
+}
+
+/** Start/end ms from draft date + time (+ service duration / endTime). */
+export function clientBookingScheduleRangeMs(record: ClientBookingRecord): {
+  startMs: number | null;
+  endMs: number | null;
+} {
+  const dateIso = String(record.draft?.selectedDateISO ?? "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateIso)) {
+    return { startMs: null, endMs: null };
+  }
+  const services = record.draft?.services ?? [];
+  const startLabel =
+    String(record.draft?.selectedTime ?? "").trim() ||
+    String(services[0]?.startTime ?? "").trim();
+  const startMins = parseTimeLabelToMinutes(startLabel);
+  const durationSum = services.reduce(
+    (sum, s) => sum + (Number(s.durationMins) || 0),
+    0,
+  );
+  let endMins = startMins + Math.max(15, durationSum || 60);
+  for (const s of services) {
+    const endLabel = String(s.endTime ?? "").trim();
+    if (!endLabel) continue;
+    const em = parseTimeLabelToMinutes(endLabel);
+    if (em > endMins) endMins = em;
+  }
+  const start = wallClockLocal(dateIso, startMins);
+  let end = wallClockLocal(dateIso, endMins);
+  if (start && end && end.getTime() <= start.getTime()) {
+    end = new Date(end.getTime() + 24 * 60 * 60 * 1000);
+  }
+  return {
+    startMs: start?.getTime() ?? null,
+    endMs: end?.getTime() ?? null,
+  };
+}
+
 function bookingDate(record: ClientBookingRecord): Date | null {
   const iso = record.draft?.selectedDateISO;
   if (!iso) return null;
-  const d = new Date(`${iso}T00:00:00`);
-  return Number.isNaN(d.getTime()) ? null : d;
+  return wallClockLocal(iso, 0);
 }
 
-/** True when booking date is before today (list tab helper; API uses end_time). */
-function isSchedulePast(record: ClientBookingRecord): boolean {
+/** True when scheduled end is at/before now (time-accurate; falls back to date). */
+export function isClientBookingSchedulePast(
+  record: ClientBookingRecord,
+  now = new Date(),
+): boolean {
+  const { endMs } = clientBookingScheduleRangeMs(record);
+  if (endMs != null) return endMs <= now.getTime();
   const d = bookingDate(record);
   if (!d) return false;
-  const today = new Date();
+  const today = new Date(now);
   today.setHours(0, 0, 0, 0);
   return d.getTime() < today.getTime();
+}
+
+export function isClientBookingScheduleStarted(
+  record: ClientBookingRecord,
+  now = new Date(),
+): boolean {
+  const { startMs } = clientBookingScheduleRangeMs(record);
+  if (startMs == null) return false;
+  return startMs <= now.getTime();
+}
+
+/**
+ * Chip/header status from API + wall clock.
+ * Confirmed→In Progress when window starts; In Progress→Completed when window ends.
+ * BR states stay until Accept; never show Completed for a future start.
+ */
+export function resolveClientBookingDisplayStatus(
+  record: ClientBookingRecord,
+  now = new Date(),
+): ClientBookingStatus {
+  const status = normalizeStatus(record);
+  if (
+    status === "cancelled" ||
+    status === "invalid" ||
+    status === "no_show" ||
+    status === "draft" ||
+    status === "requested" ||
+    status === "br_accepted" ||
+    status === "completed"
+  ) {
+    return status;
+  }
+
+  const { startMs, endMs } = clientBookingScheduleRangeMs(record);
+  if (startMs == null || endMs == null) return status;
+
+  const t = now.getTime();
+  if (t < startMs) {
+    return status === "in_progress" ? "confirmed" : status;
+  }
+  if (t < endMs) {
+    return "in_progress";
+  }
+  return status === "in_progress" ? "completed" : status;
 }
 
 /** Draft bookings are checkout-only until the client sends a booking request. */
@@ -90,8 +198,12 @@ export function isClientListVisibleBooking(record: ClientBookingRecord): boolean
 function isWaitingForPrepayment(record: ClientBookingRecord): boolean {
   if (!record.requiresPrepayment || record.prepaid) return false;
   const status = normalizeStatus(record);
-  // Icon while BR is out (requested) or after accept awaiting pay (br_accepted).
-  return status === "requested" || status === "br_accepted";
+  // €+clock while prepayment still owed (BR, accepted, or confirmed).
+  return (
+    status === "requested" ||
+    status === "br_accepted" ||
+    status === "confirmed"
+  );
 }
 
 function normalizeStatus(record: ClientBookingRecord): ClientBookingStatus {
@@ -113,17 +225,36 @@ export function isClientBookingPaymentDue(record: ClientBookingRecord): boolean 
   if (status === "cancelled" || status === "invalid") return false;
   if (status === "no_show") return record.paid === false;
   if (status !== "completed" && status !== "in_progress") return false;
-  return record.paid === false;
+  if (record.paid === false) return true;
+  // In Progress after checkout may leave `paid` undefined — use notes.
+  const notes = parseCalendarEntryNotes(record.notes);
+  if (notes?.waitingForPayment) return true;
+  if (unpaidSplitPayers(parseSplitBillState(notes?.splitBill)).length > 0) {
+    return true;
+  }
+  return false;
 }
 
-export function listTabForClientBooking(record: ClientBookingRecord): BookingListTab {
+export function listTabForClientBooking(
+  record: ClientBookingRecord,
+  now = new Date(),
+): BookingListTab {
   const status = normalizeStatus(record);
-  const schedulePast = isSchedulePast(record);
-  if (status === "in_progress" && !schedulePast) return "ongoing";
+  const display = resolveClientBookingDisplayStatus(record, now);
+  const schedulePast = isClientBookingSchedulePast(record, now);
+  const started = isClientBookingScheduleStarted(record, now);
+  if (
+    (display === "in_progress" ||
+      (status === "confirmed" && started && !schedulePast)) &&
+    !schedulePast
+  ) {
+    return "ongoing";
+  }
   if (
     status === "cancelled" ||
     status === "no_show" ||
     status === "completed" ||
+    display === "completed" ||
     schedulePast
   ) {
     return "past";
@@ -136,10 +267,14 @@ export function listTabForClientBooking(record: ClientBookingRecord): BookingLis
  * Ongoing  = in progress while schedule still active.
  * Upcoming = not started, schedule still ahead.
  */
-export function filterBookingsByTab(bookings: ClientBookingRecord[], tab: BookingListTab): ClientBookingRecord[] {
+export function filterBookingsByTab(
+  bookings: ClientBookingRecord[],
+  tab: BookingListTab,
+  now = new Date(),
+): ClientBookingRecord[] {
   const filtered = bookings.filter((b) => {
     if (b.hiddenForCustomer) return false;
-    return listTabForClientBooking(b) === tab;
+    return listTabForClientBooking(b, now) === tab;
   });
   return filtered.sort((a, b) => {
     const dateA = bookingDate(a)?.getTime() ?? 0;

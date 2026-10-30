@@ -25,10 +25,7 @@ import ClientEbrResponseActions from "./ClientEbrResponseActions";
 import EditRequestIncomingNote from "./EditRequestIncomingNote";
 import WithdrawErButton from "./WithdrawErButton";
 import InlineTimedSnackbar from "../InlineTimedSnackbar";
-import {
-  isResponseWindowOverdue,
-  shouldShowExpiredResponseBanner,
-} from "../calendar/bookingResponseDeadline";
+import { shouldShowExpiredResponseBanner } from "../calendar/bookingResponseDeadline";
 import ClientBookingPaymentMethodSelector from "./ClientBookingPaymentMethodSelector";
 import ClientBookingDetailsOverlays from "./ClientBookingDetailsOverlays";
 import { CLIENT_BOOKING_DETAILS_COPY } from "./clientBookingDetails.data";
@@ -103,8 +100,11 @@ export default function ClientBookingDetailsView({
     handleKeepBookingFromFeeDialog,
     handlePayCancellationFee,
     handlePayNow,
+    handlePaymentSummaryPayNow,
     handleSendBookingRequest,
     handleWithdrawEr,
+    afterTreatmentPayers,
+    hasUnpaidAfterTreatment,
     hasProfessionalSuggestedEdits,
     headerName,
     incomingProfessionalNote,
@@ -179,11 +179,16 @@ export default function ClientBookingDetailsView({
     bookingPillTabs,
   } = useClientBookingDetails({ variant });
 
+  // AT checkout done + settled → "Paid (x%)" instead of "Remaining (x%)".
+  const remainingPaid =
+    afterTreatmentPayers.length > 0 && !hasUnpaidAfterTreatment;
+
   const paymentCardShared = {
     draft: displayDraft,
     requesterName,
     requesterEmail: user?.email,
     requesterAvatarUrl,
+    remainingPaid,
     showKilometerAllowance,
     kilometerAllowanceAmount,
     discount: bookingNotesMeta?.totalDiscount ?? null,
@@ -321,6 +326,8 @@ export default function ClientBookingDetailsView({
             erSignpostTitle={ACTIVITY_COMPARISON_SIGNPOST}
             onErClick={() => openActivityComparison("er")}
             responseOverdue={
+              // BR/EBR response clock only — never on Confirmed / In Progress / Completed
+              // (leftover respondBy was showing a false "overdue" triangle).
               bookingStatus === "requested" || bookingStatus === "br_accepted"
                 ? shouldShowExpiredResponseBanner(
                     {
@@ -352,17 +359,7 @@ export default function ClientBookingDetailsView({
                     },
                     bookingSetup?.responseTime ?? null,
                   )
-                : isResponseWindowOverdue(
-                    {
-                      responseStatus: bookingNotesMeta?.responseStatus,
-                      responseStartedAt: bookingNotesMeta?.responseStartedAt,
-                      respondBy: bookingNotesMeta?.respondBy,
-                      responseWindowMinutes:
-                        bookingNotesMeta?.responseWindowMinutes,
-                    },
-                    new Date(),
-                    bookingSetup?.responseTime ?? null,
-                  )
+                : false
             }
             onWaitingForPrepaymentClick={() => {
               if (isPrepaid) {
@@ -431,8 +428,9 @@ export default function ClientBookingDetailsView({
                           hasAnyDocument ? openReceipt : undefined
                         }
                         onPayNow={
-                          canActOnPayment && isPaymentDue && !paymentOverdue
-                            ? () => setStripeDialogOpen(true)
+                          afterTreatmentPayers.some((p) => p.showPayNow) ||
+                          (canActOnPayment && isPaymentDue && !paymentOverdue)
+                            ? handlePaymentSummaryPayNow
                             : undefined
                         }
                       />

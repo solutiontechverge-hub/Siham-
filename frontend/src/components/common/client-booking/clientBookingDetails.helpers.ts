@@ -149,16 +149,26 @@ export function filterVisiblePaymentSummarySections<
     isPaymentDue: boolean;
     /** Cancelled: keep Prepayment + Fee Summary as payment history. */
     isCancelled?: boolean;
+    /**
+     * Pro checkout done — otherwise strip After Treatment / Add Ons so the only
+     * Pay Now stays prepayment.
+     */
+    hasAfterTreatmentCheckout?: boolean;
   },
 ): T[] {
   if (!paymentSummarySections.length) return [];
+  // Pro checkout done (splitBill / AT finance) → keep After Treatment even if
+  // booking is still In Progress (unpaid onlineDirect).
+  if (flags.hasAfterTreatmentCheckout) {
+    return [...paymentSummarySections];
+  }
   const keepPaymentHistoryOnly =
     flags.isCancelled ||
     ((flags.isPrepaymentPaid || flags.isOfflinePay) &&
       !flags.isCompleted &&
       !flags.isPaymentDue);
-  if (keepPaymentHistoryOnly) {
-    // Keep Prepayment + paid Fee Summary; hide after-treatment until due/completed.
+  if (keepPaymentHistoryOnly || flags.hasAfterTreatmentCheckout === false) {
+    // Keep Prepayment + Fee Summary; hide after-treatment until pro checkout.
     return paymentSummarySections.filter(
       (section) =>
         section.id === "prepayment" ||

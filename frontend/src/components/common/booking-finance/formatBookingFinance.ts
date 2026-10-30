@@ -99,7 +99,10 @@ export function remainingBreakdownLabel(
   prepaidPercent: number,
   remainingAmount?: number,
   totalPrice?: number,
+  paid = false,
 ): string {
+  // Full settle → "100% Paid" (not "Paid (80%)" for the former remaining share).
+  if (paid) return "100% Paid";
   let remainingPercent = 0;
   if (prepaidPercent > 0) {
     remainingPercent = Math.max(0, 100 - prepaidPercent);

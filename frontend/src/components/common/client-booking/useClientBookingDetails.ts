@@ -9,20 +9,32 @@ import type { BookingListTab } from "../../../app/clients/booking/clientBookingR
 import {
   isClientBookingPaymentDue,
   isWaitingForPrepayment,
+  resolveClientBookingDisplayStatus,
   type ClientBookingStatus,
 } from "../../../app/clients/booking/clientBookingRecords";
 import { useClientBookingDraft } from "./useClientBookingDraft";
 import { useClientRequesterProfile } from "./useClientRequesterProfile";
 import { useActiveClientBooking } from "./useActiveClientBooking";
 import { useCheckoutBookingRef } from "./useCheckoutBookingRef";
+import { useScheduleClock } from "./useScheduleClock";
+import {
+  notifyActiveBookingChanged,
+  setActiveBookingSession,
+} from "../../../app/clients/booking/clientBookingSession";
 import type { ClientEbrActionKind } from "./ClientEbrActionDialog";
 import { useBookingEditRequest } from "./useBookingEditRequest";
 import {
   isClientIncomingProfessionalEbr,
   parseCalendarEntryNotes,
   resolveKilometerAllowanceAmount,
+  rewriteCalendarNotesPreservingNegotiation,
 } from "../calendar/bookingEventDetails";
 import { clientShouldAck } from "../calendar/bookingAcknowledgment";
+import {
+  markSplitPayersPaid,
+  parseSplitBillState,
+  unpaidSplitPayers,
+} from "../calendar/salesSplitBill";
 import { usePublicFinanceSettings } from "../finance-documents/usePublicFinanceSettings";
 import { isProtectiveFeeEntryLabel } from "../finance-documents/protectiveFeeInvoice";
 import {
@@ -35,6 +47,9 @@ import {
   type UpdateMyBookingRequest,
 } from "../../../store/services/businessApi";
 import { useSyncFinanceTransactionFromBookingMutation } from "../../../store/services/financeApi";
+import { useSnackbar } from "../AppSnackbar";
+import { getApiErrorMessage } from "../../../lib/api-error";
+import { parseAfterTreatmentPayerKey } from "./buildClientBookingPaymentSummary";
 import { useOpenMessagingForBookingMutation } from "../../../store/services/messagingApi";
 import { useBookingRealtimeSync } from "../../../hooks/useBookingRealtimeSync";
 import {
@@ -107,23 +122,29 @@ export function useClientBookingDetails({
     setActionFeedback(null);
   }, [bookingRef]);
   const editRequest = useBookingEditRequest(bookingRef);
-  const bookingStatus: ClientBookingStatus = activeBooking?.status ?? "draft";
-  const isDraft = bookingStatus === "draft";
-  const isCompleted = bookingStatus === "completed";
+  const scheduleNow = useScheduleClock();
+  const apiBookingStatus: ClientBookingStatus = activeBooking?.status ?? "draft";
+  // Wall-clock date+time drives Confirmed → In Progress → Completed on the chip.
+  const bookingStatus: ClientBookingStatus = activeBooking
+    ? resolveClientBookingDisplayStatus(activeBooking, scheduleNow)
+    : "draft";
+  const isDraft = apiBookingStatus === "draft";
+  const isCompleted =
+    bookingStatus === "completed" || apiBookingStatus === "completed";
   const isBookingRequestSent = Boolean(activeBooking?.bookingRequestSent);
-  const isPaymentDue = Boolean(
+  const notesPaymentDue = Boolean(
     activeBooking && isClientBookingPaymentDue(activeBooking),
   );
   const earlyNotesMeta = parseCalendarEntryNotes(activeBooking?.notes);
   const invoiceDueDateIsoEarly = String(
     earlyNotesMeta?.invoiceDueDate ?? "",
   ).trim();
-  const paymentOverdueEarly =
-    isPaymentDue &&
+  const invoiceDueDatePassed =
     Boolean(invoiceDueDateIsoEarly) &&
     !Number.isNaN(new Date(`${invoiceDueDateIsoEarly}T00:00:00`).getTime()) &&
     new Date(`${invoiceDueDateIsoEarly}T00:00:00`).getTime() <
       new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00`).getTime();
+  const paymentOverdueEarly = notesPaymentDue && invoiceDueDatePassed;
   const storedPaymentMethod = earlyNotesMeta?.paymentMethod;
   const isPrepaymentPaid =
     Boolean(activeBooking?.prepaid) &&
@@ -227,16 +248,19 @@ export function useClientBookingDetails({
     );
   }, [checkoutPaymentOptions]);
   const isOfflinePay = isOfflinePaymentMethod(selectedPaymentMethod);
+  // Prepayment / method selector only before complete. After-treatment Pay Now
+  // uses handlePaymentSummaryPayNow (works while completed + onlineDirect pending).
   const canActOnPayment =
     !isCompleted &&
     !isCancelled &&
     !isOfflinePay &&
     (prepaymentState === "required" ||
-      (isPaymentDue && !paymentOverdueEarly));
+      (notesPaymentDue && !paymentOverdueEarly));
   const [syncFinanceFromBooking] =
     useSyncFinanceTransactionFromBookingMutation();
   const [updateMyBooking] = useUpdateMyBookingMutation();
   const [updateBookingStatus] = useUpdateBookingStatusMutation();
+  const { showSnackbar } = useSnackbar();
   const persistBookingPatch = React.useCallback(
     async (payload: UpdateMyBookingRequest) => {
       if (user?.user_type === "professional") {
@@ -310,7 +334,7 @@ export function useClientBookingDetails({
     prepaymentPercent,
     user: user as never,
     isCompleted,
-    isPaymentDue,
+    isPaymentDue: notesPaymentDue,
     activeBookingPaid: activeBooking?.paid,
     pageBg: m.pageBg,
   });
@@ -556,7 +580,6 @@ export function useClientBookingDetails({
     () => parseCalendarEntryNotes(activeBooking?.notes),
     [activeBooking?.notes],
   );
-  const paymentOverdue = paymentOverdueEarly;
   const invoiceDueDateLabel = invoiceDueDateIsoEarly
     ? invoiceDueDateIsoEarly.split("-").reverse().join("/")
     : null;
@@ -623,6 +646,8 @@ export function useClientBookingDetails({
     displayPrepaidAmount,
     visiblePaymentSummarySections,
     showPaymentSummary,
+    afterTreatmentPayers,
+    hasUnpaidAfterTreatment,
   } = useClientBookingPaymentDisplay({
     locationMode,
     bookingNotesMeta,
@@ -639,8 +664,8 @@ export function useClientBookingDetails({
     isOfflinePay,
     isPrepaymentPaid,
     isCompleted,
-    isPaymentDue,
-    paymentOverdue,
+    isPaymentDue: notesPaymentDue,
+    paymentOverdue: paymentOverdueEarly,
     invoiceDueDateLabel,
     requiresPrepayment,
     bookingStatus,
@@ -648,7 +673,139 @@ export function useClientBookingDetails({
     selectedPaymentMethod,
     shopDisplayName,
     paidProtectiveFees,
+    financeRows,
+    bookingId: apiBookingId,
+    bookingRef,
   });
+  // Prefer AT payer/finance Pending over stale notes that marked Online Direct paid at checkout.
+  const isPaymentDue = notesPaymentDue || hasUnpaidAfterTreatment;
+  const paymentOverdue = isPaymentDue && invoiceDueDatePassed;
+
+  // Heal ledger when AT already paid in notes but finance outstanding lagged (Paid flip gap).
+  const healedAtFinanceRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!apiBookingId) return;
+    if (!afterTreatmentPayers.length || hasUnpaidAfterTreatment) return;
+    if (healedAtFinanceRef.current === apiBookingId) return;
+    healedAtFinanceRef.current = apiBookingId;
+    void syncFinanceFromBooking({
+      bookingId: apiBookingId,
+      bookingRef,
+      paymentPhase: "full",
+      paymentMethod: selectedPaymentMethod || "onlineDirect",
+    });
+  }, [
+    afterTreatmentPayers.length,
+    apiBookingId,
+    bookingRef,
+    hasUnpaidAfterTreatment,
+    selectedPaymentMethod,
+    syncFinanceFromBooking,
+  ]);
+
+  const settleAfterTreatmentPayNow = React.useCallback(
+    async (lineId?: string) => {
+      const payerKey = parseAfterTreatmentPayerKey(lineId);
+      if (!payerKey || !apiBookingId) return;
+      const payer = afterTreatmentPayers.find((row) => row.payerKey === payerKey);
+      if (!payer?.showPayNow) return;
+      try {
+        const prior = parseCalendarEntryNotes(activeBooking?.notes);
+        const split = parseSplitBillState(prior?.splitBill);
+        const nextSplit = split
+          ? markSplitPayersPaid(
+              split,
+              [payerKey],
+              payer.methodRaw ?? "onlineDirect",
+            )
+          : null;
+        const nextDetails = {
+          ...prior,
+          ...(nextSplit
+            ? {
+                splitBill: nextSplit as never,
+                waitingForPayment: unpaidSplitPayers(nextSplit).length > 0,
+              }
+            : {
+                waitingForPayment: false,
+                paymentMethod:
+                  (payer.methodRaw as "online" | "offline" | undefined) ??
+                  prior?.paymentMethod,
+              }),
+        };
+        const nextNotes = rewriteCalendarNotesPreservingNegotiation(
+          activeBooking?.notes,
+          prior?.internalNote ?? "",
+          nextDetails,
+        );
+        if (!nextSplit) {
+          throw new Error("Unable to update payment for this payer.");
+        }
+        const marked = nextSplit.payers.find((row) => row.key === payerKey);
+        if (!marked?.paid) {
+          throw new Error("Unable to match this payer on the split bill.");
+        }
+        // Client can update own booking notes; finance bulk markPaid is pro-only.
+        await updateMyBooking({
+          id: apiBookingId,
+          notes: nextNotes ?? undefined,
+        }).unwrap();
+        // Optimistic UI: Payment Summary reads notes.paid before API refetch catches up.
+        if (activeBooking && nextNotes) {
+          setActiveBookingSession({
+            ...activeBooking,
+            notes: nextNotes,
+            paid: unpaidSplitPayers(nextSplit).length === 0 ? true : activeBooking.paid,
+          });
+          notifyActiveBookingChanged();
+        }
+        // Sync flips this payer's Pending → Paid from splitBill.payers[].paid.
+        try {
+          await syncFinanceFromBooking({
+            bookingId: apiBookingId,
+            bookingRef,
+            paymentPhase: "full",
+            paymentMethod: payer.methodRaw ?? "onlineDirect",
+          }).unwrap();
+        } catch {
+          // Notes already settled — finance sync is best-effort for client.
+        }
+        await refreshActiveBooking();
+        showSnackbar({
+          severity: "success",
+          message: "Payment completed.",
+        });
+      } catch (error) {
+        showSnackbar({
+          severity: "error",
+          message: getApiErrorMessage(error, "Unable to complete payment."),
+        });
+      }
+    },
+    [
+      activeBooking,
+      afterTreatmentPayers,
+      apiBookingId,
+      bookingRef,
+      refreshActiveBooking,
+      showSnackbar,
+      syncFinanceFromBooking,
+      updateMyBooking,
+    ],
+  );
+
+  const handlePaymentSummaryPayNow = React.useCallback(
+    (lineId?: string) => {
+      if (parseAfterTreatmentPayerKey(lineId)) {
+        void settleAfterTreatmentPayNow(lineId);
+        return;
+      }
+      if (isPaymentDue && !paymentOverdue) {
+        setStripeDialogOpen(true);
+      }
+    },
+    [isPaymentDue, paymentOverdue, settleAfterTreatmentPayNow],
+  );
 
   return {
     acceptedChangesNote,
@@ -713,8 +870,11 @@ export function useClientBookingDetails({
     handlePayCancellationFee,
     handlePayNow,
     handleSendBookingRequest,
+    handlePaymentSummaryPayNow,
     handleWithdrawEr,
     hasProfessionalSuggestedEdits,
+    afterTreatmentPayers,
+    hasUnpaidAfterTreatment,
     headerName,
     incomingProfessionalNote,
     isBookingRequestSent,

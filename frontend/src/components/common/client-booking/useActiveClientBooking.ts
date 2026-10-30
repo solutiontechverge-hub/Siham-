@@ -73,6 +73,13 @@ function notesMarkPrepaymentPaid(notes: string | null | undefined) {
   return parseCalendarEntryNotes(notes)?.prepaymentStatus === "confirmed";
 }
 
+function countSplitPaid(notes: string | null | undefined) {
+  const split = parseCalendarEntryNotes(notes)?.splitBill as
+    | { payers?: Array<{ paid?: boolean }> }
+    | undefined;
+  return (split?.payers ?? []).filter((p) => p.paid).length;
+}
+
 function resolveActivePrepaid(
   fromApi: ClientBookingRecord,
   sessionRecord: ClientBookingRecord | null,
@@ -83,10 +90,16 @@ function resolveActivePrepaid(
     sessionRecord != null &&
     sameBooking(fromApi, sessionRecord) &&
     notesMarkPrepaymentPaid(sessionRecord.notes);
+  // After-treatment Pay Now stamps notes first; keep session notes until API catches up.
+  const sessionNotesFresher =
+    sessionRecord != null &&
+    sameBooking(fromApi, sessionRecord) &&
+    countSplitPaid(sessionRecord.notes) > countSplitPaid(fromApi.notes);
   return {
     prepaid: apiPaid || sessionPaid,
-    notes:
-      sessionPaid && !apiPaid
+    notes: sessionNotesFresher
+      ? (sessionRecord.notes ?? fromApi.notes)
+      : sessionPaid && !apiPaid
         ? (sessionRecord.notes ?? fromApi.notes)
         : fromApi.notes,
   };

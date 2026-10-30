@@ -176,6 +176,7 @@ export default function ClientBookingDetailsHeader({
     px: 1.5,
   });
 
+  // bookingStatus is already schedule-resolved by the details hook.
   const displayStatus: ClientBookingStatus = isCancelled
     ? "cancelled"
     : bookingStatus;
@@ -197,31 +198,40 @@ export default function ClientBookingDetailsHeader({
     !editRequest.isEditGrantActive;
   const canDiscardOutgoingRequest =
     isOutgoingBookingRequest || isOutgoingPendingEbr;
-  const isCompleted = bookingStatus === "completed";
-  const isConfirmed = bookingStatus === "confirmed";
+  const isCompleted = displayStatus === "completed";
+  const isConfirmed = displayStatus === "confirmed";
+  const isInProgress = displayStatus === "in_progress";
   const isInvalid = bookingStatus === "invalid";
   const isNoShow = bookingStatus === "no_show";
+  // Delete only when full amount settled (prepay + AT), same rule as paid icon.
+  const paymentFullySettled =
+    (!requiresPrepayment || Boolean(prepaymentPaid)) &&
+    !paymentDue &&
+    !paymentOverdue;
   const canDelete =
-    isCancelled || isCompleted || isInvalid || isNoShow;
+    isCancelled ||
+    isInvalid ||
+    isNoShow ||
+    (isCompleted && paymentFullySettled);
   const waitingForPayment =
     requiresPrepayment && !prepaymentPaid && !isCompleted && !isCancelled && !isInvalid;
   /** Edit enabled only on Confirmed (guideline). Prepay wait may still allow edits. */
   const canEdit =
     !isCancelled &&
     !isCompleted &&
+    !isInProgress &&
     !isInvalid &&
     !isNoShow &&
     !isOutgoingBookingRequest &&
-    bookingStatus !== "in_progress" &&
     !bookingRequestSent &&
     (isConfirmed || waitingForPayment);
   /** Show Edit (disabled when !canEdit) on non-terminal details, e.g. Requested/BR. */
   const showEdit =
     !isCancelled &&
     !isCompleted &&
+    !isInProgress &&
     !isInvalid &&
-    !isNoShow &&
-    bookingStatus !== "in_progress";
+    !isNoShow;
   const editActionsDisabled = !canEdit;
   /** Confirmed bookings can be edited directly (no ER grant). */
   const showConfirmedEditMenu =

@@ -6,12 +6,24 @@ import {
   formatOfflinePrepaymentVisitNote,
 } from "../booking-finance/formatBookingFinance";
 import type { BookingPaymentSummarySection } from "../booking-finance/bookingFinance.types";
+import type { AfterTreatmentPayerRow } from "../calendar/resolveAfterTreatmentPayerRows";
 import { isOfflinePaymentMethod } from "./checkoutPaymentOptions";
 import {
   isProtectiveFeeEntryLabel,
   LATE_CANCELLATION_BOOKING_FEE,
   LATE_RESCHEDULING_FEE,
 } from "../finance-documents/protectiveFeeInvoice";
+
+export const afterTreatmentLineId = (payerKey: string) =>
+  `after-treatment-${payerKey}`;
+
+export function parseAfterTreatmentPayerKey(
+  lineId?: string | null,
+): string | null {
+  const raw = String(lineId ?? "");
+  if (!raw.startsWith("after-treatment-")) return null;
+  return raw.slice("after-treatment-".length) || null;
+}
 
 export type PaymentSummaryLine = {
   id: string;
@@ -55,6 +67,11 @@ type BuildInput = {
     transactionId?: string;
     settled?: boolean;
   }>;
+  /**
+   * From pro checkout splitBill + finance. When empty / omitted, After Treatment
+   * section is skipped (prepayment-only phase).
+   */
+  afterTreatmentPayers?: readonly AfterTreatmentPayerRow[];
 };
 
 function protectiveFeeLineId(fee: {
@@ -107,19 +124,8 @@ export function buildClientBookingPaymentSummary(input: BuildInput): PaymentSumm
     showUnpaidPrepayment = false,
     shopName,
     paidProtectiveFees = [],
+    afterTreatmentPayers = [],
   } = input;
-  const dueStatus = paymentOverdue
-    ? "Overdue"
-    : paymentDue
-      ? "Payment Due"
-      : paid
-        ? "Paid"
-        : "Pending";
-  const dueNote = paymentOverdue
-    ? "Due date passed — please wait while the professional reissues your invoice."
-    : paymentDue && invoiceDueDateLabel
-      ? `Due date ${invoiceDueDateLabel}`
-      : undefined;
 
   if (!draft?.services?.length && !paidProtectiveFees.length) return [];
 
@@ -129,7 +135,6 @@ export function buildClientBookingPaymentSummary(input: BuildInput): PaymentSumm
   );
   const methodLabel = formatFinanceMethodLabel(paymentMethod);
   const offline = isOfflinePaymentMethod(paymentMethod);
-  const canPayNow = paymentDue && !paymentOverdue && !offline;
   const visitNote = formatOfflinePrepaymentVisitNote(shopName, bookingDate);
   const total =
     draft?.total ??
@@ -220,89 +225,57 @@ export function buildClientBookingPaymentSummary(input: BuildInput): PaymentSumm
 
   if (!draft?.services?.length) return sections;
 
-  const summarySections = buildBookingSummarySections(draft);
-  const afterTreatmentLines: PaymentSummaryLine[] = [];
-
-  for (const section of summarySections) {
-    const { standard } = splitServices(section.items);
-    if (!standard.length) continue;
-
-    const amount = sumServices(standard);
-    const isRequester = section.isRequester ?? section.title === requesterName;
-    const labelName = isRequester ? "Main Client" : personLabel(section.title, false);
-    const method = isRequester ? methodLabel : "Offline Direct";
-
-    afterTreatmentLines.push({
-      id: `after-treatment-${section.key}`,
-      label: `${labelName} - ${dueStatus} - ${bookingDate} - ${method}`,
-      amount,
-      showInvoice: isRequester && paid && !paymentDue,
-      showReceipt: isRequester && paid && !paymentDue,
-      showPayNow: isRequester && canPayNow,
-      note: isRequester ? dueNote : undefined,
-    });
-  }
-
-  if (!afterTreatmentLines.length) {
-    const { standard } = splitServices(draft.services);
-    if (standard.length) {
-      const amount = sumServices(standard);
-      afterTreatmentLines.push({
-        id: "after-treatment-main",
-        label: `Main Client - ${dueStatus} - ${bookingDate} - ${methodLabel}`,
-        amount,
-        showInvoice: paid && !paymentDue,
-        showReceipt: paid && !paymentDue,
-        showPayNow: canPayNow,
-        note: dueNote,
-      });
-    }
-  }
-
-  if (afterTreatmentLines.length) {
+  // After Treatment only from pro checkout payer rows (not draft people guesswork).
+  if (afterTreatmentPayers.length) {
+    const afterTreatmentLines: PaymentSummaryLine[] = afterTreatmentPayers.map(
+      (payer) => ({
+        id: afterTreatmentLineId(payer.payerKey),
+        label: `${payer.labelName} - ${payer.statusLabel} - ${bookingDate} - ${payer.methodLabel}`,
+        amount: payer.amount,
+        showInvoice: payer.showInvoice,
+        showReceipt: payer.showReceipt,
+        showPayNow: payer.showPayNow,
+        note: payer.note,
+      }),
+    );
     sections.push({
       id: "after-treatment",
       title: "After Treatment Payment",
       amount: afterTreatmentLines.reduce((sum, line) => sum + line.amount, 0),
       lines: afterTreatmentLines,
     });
-  }
 
-  const addOnLines: PaymentSummaryLine[] = [];
-  for (const section of summarySections) {
-    const { addOns } = splitServices(section.items);
-    if (!addOns.length) continue;
-
-    const amount = sumServices(addOns);
-    const isRequester = section.isRequester ?? section.title === requesterName;
-    const labelName = isRequester ? "Main Client" : personLabel(section.title, false);
-
-    addOnLines.push({
-      id: `addon-${section.key}`,
-      label: `${labelName} - ${dueStatus} - ${bookingDate} - Offline Direct`,
-      amount,
-    });
-  }
-
-  if (!addOnLines.length) {
-    const { addOns } = splitServices(draft.services);
-    if (addOns.length) {
+    const summarySections = buildBookingSummarySections(draft);
+    const addOnLines: PaymentSummaryLine[] = [];
+    for (const section of summarySections) {
+      const { addOns } = splitServices(section.items);
+      if (!addOns.length) continue;
       const amount = sumServices(addOns);
+      const isRequester = section.isRequester ?? section.title === requesterName;
+      const labelName = isRequester
+        ? "Main Client"
+        : personLabel(section.title, false);
+      const payerMatch = afterTreatmentPayers.find((p) =>
+        isRequester
+          ? p.role === "main_client"
+          : p.labelName.toLowerCase().includes(section.title.trim().toLowerCase()),
+      );
+      const method = payerMatch?.methodLabel ?? "Offline Direct";
+      const status = payerMatch?.statusLabel ?? "Paid";
       addOnLines.push({
-        id: "addon-main",
-        label: `Main Client - ${dueStatus} - ${bookingDate} - Offline Direct`,
+        id: `addon-${section.key}`,
+        label: `${labelName} - ${status} - ${bookingDate} - ${method}`,
         amount,
       });
     }
-  }
-
-  if (addOnLines.length) {
-    sections.push({
-      id: "addons",
-      title: "Add Ons - After Checkout",
-      amount: addOnLines.reduce((sum, line) => sum + line.amount, 0),
-      lines: addOnLines,
-    });
+    if (addOnLines.length) {
+      sections.push({
+        id: "addons",
+        title: "Add Ons - After Checkout",
+        amount: addOnLines.reduce((sum, line) => sum + line.amount, 0),
+        lines: addOnLines,
+      });
+    }
   }
 
   return sections;

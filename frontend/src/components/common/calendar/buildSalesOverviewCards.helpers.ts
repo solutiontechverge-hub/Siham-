@@ -406,18 +406,63 @@ export function applyLedgerFinancialsToCards(
     if (card.kind !== "after_treatment" && card.title !== "Summary") return card;
 
     const next: SalesOverviewCardData = { ...card };
+    // splitBill Pay Now can settle before ledger outstanding catches up.
+    const splitFullySettled =
+      next.paymentState === "paid" ||
+      Boolean(next.paidAt) ||
+      (Boolean(next.subCards?.length) &&
+        (next.subCards ?? []).every(
+          (sub) =>
+            sub.paymentState === "paid" ||
+            sub.paymentState === "voided" ||
+            sub.paymentState === "refunded" ||
+            Boolean(sub.paidAt),
+        ));
+    const effectiveOutstanding =
+      splitFullySettled && (outstanding ?? 0) > 0 ? 0 : outstanding;
+    const effectivePaid =
+      splitFullySettled &&
+      typeof net === "number" &&
+      Number.isFinite(net) &&
+      paid < net
+        ? net
+        : paid;
+    const effectiveBadge = splitFullySettled
+      ? deriveBookingFinanceBadge({
+          paymentStatus: "paid",
+          cancellationPaymentStatus: financials.cancellation_payment_status,
+          bookingStatus: opts?.bookingStatus,
+          totalPaid: effectivePaid,
+          totalRefunded: refunded,
+          amountDue: 0,
+          netTotal: net ?? 0,
+        })
+      : badge;
+    const effectiveBadgeLabel = bookingFinanceBadgeLabel(effectiveBadge);
+    const effectivePaymentState = splitFullySettled
+      ? ("paid" as const)
+      : paymentState;
+
     if (typeof net === "number" && Number.isFinite(net)) {
       next.total = roundMoney(net);
       if (typeof next.documentAmount === "number") {
         next.documentAmount = roundMoney(net);
       }
     }
-    if (typeof outstanding === "number" && Number.isFinite(outstanding)) {
-      next.highlightAmount = roundMoney(Math.max(0, outstanding));
-      next.highlightLabel = outstanding > 0 ? "Amount Due" : next.highlightLabel;
+    if (typeof effectiveOutstanding === "number" && Number.isFinite(effectiveOutstanding)) {
+      if (effectiveOutstanding > 0) {
+        next.highlightAmount = roundMoney(effectiveOutstanding);
+        next.highlightLabel = "Amount Due";
+      } else if (splitFullySettled) {
+        // Keep payable amount; only flip label (stale ledger outstanding cleared).
+        next.highlightLabel = "Paid";
+        if (!(next.highlightAmount > 0) && typeof net === "number") {
+          next.highlightAmount = roundMoney(Math.max(0, net - (prepay ?? 0)));
+        }
+      }
     }
-    if (paymentState) next.paymentState = paymentState;
-    next.statusBadge = badgeLabel;
+    if (effectivePaymentState) next.paymentState = effectivePaymentState;
+    next.statusBadge = effectiveBadgeLabel;
 
     // Subcards keep their own share totals (guest/model ≠ booking outstanding).
     // Booking Partially Paid / due stays on main only; guests may show own Paid.
@@ -434,9 +479,9 @@ export function applyLedgerFinancialsToCards(
                 : undefined;
         return {
           ...sub,
-          statusBadge: isMain ? badgeLabel : ownGuestBadge,
+          statusBadge: isMain ? effectiveBadgeLabel : ownGuestBadge,
           paymentState: isMain
-            ? (paymentState ?? sub.paymentState)
+            ? (effectivePaymentState ?? sub.paymentState)
             : sub.paymentState,
         };
       });
@@ -455,10 +500,14 @@ export function applyLedgerFinancialsToCards(
     }
     if (addOns > 0) upsert("ledger-addons", "Add-ons", addOns);
     if (cancelFee > 0) upsert("ledger-cancel-fee", "Cancellation Fee", cancelFee);
-    if (paid > 0) upsert("ledger-paid", "Total Paid", paid);
+    if (effectivePaid > 0) upsert("ledger-paid", "Total Paid", effectivePaid);
     if (refunded > 0) upsert("ledger-refunded", "Refunded", -roundMoney(refunded));
-    if (typeof outstanding === "number" && outstanding > 0) {
-      upsert("ledger-due", "Amount Due", outstanding);
+    if (typeof effectiveOutstanding === "number" && effectiveOutstanding > 0) {
+      upsert("ledger-due", "Amount Due", effectiveOutstanding);
+    } else {
+      // Drop stale Amount Due when splitBill says fully settled.
+      const dueIdx = rows.findIndex((row) => row.id === "ledger-due");
+      if (dueIdx >= 0) rows.splice(dueIdx, 1);
     }
     next.secondaryRows = rows;
     return next;
@@ -870,7 +919,18 @@ function applyFinanceAndMetaState(
   const financeState = finance
     ? financeStatusToSalesPaymentState(finance.status, kind)
     : null;
-  if (finance && financeState) {
+  const paidHintEarly =
+    Boolean(extras.paidHint) ||
+    Boolean(meta?.paidAt) ||
+    Boolean(meta?.paid);
+  // Client Pay Now stamps splitBill.paid before finance Pending→Paid lands.
+  const trustSplitPaidOverStaleFinance =
+    paidHintEarly &&
+    Boolean(extras.isAfterTreatment) &&
+    (financeState === "unpaid" ||
+      financeState === "pending" ||
+      financeState === "payment_due");
+  if (finance && financeState && !trustSplitPaidOverStaleFinance) {
     if (financeState === "refunded" && "refunded" in next) next.refunded = true;
     if (financeState === "voided") {
       if ("voided" in next) next.voided = true;

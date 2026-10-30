@@ -70,6 +70,8 @@ type Props = {
   rejectedChangesNote?: OutcomeChangesNote | null;
   /** Offline prepayment is due at the visit — keep the total undeducted. */
   prepaymentOffline?: boolean;
+  /** After-treatment settled — Remaining row becomes Paid. */
+  remainingPaid?: boolean;
   /** Notes meta — who was marked no-show (pro modal). */
   noShowParticipantIds?: readonly string[] | null;
 };
@@ -110,6 +112,7 @@ export default function ClientBookingPaymentDetailsCard({
   acceptedChangesNote = null,
   rejectedChangesNote = null,
   prepaymentOffline = false,
+  remainingPaid = false,
   noShowParticipantIds,
 }: Props) {
   const m = useTheme().palette.mollure;
@@ -366,6 +369,7 @@ export default function ClientBookingPaymentDetailsCard({
               prepaymentState === "none" ? undefined : remaining
             }
             prepaymentPaid={prepaymentPaid}
+            remainingPaid={remainingPaid}
             extraRows={
               extrasAmount > 0
                 ? [

@@ -47,6 +47,114 @@ function isPrepaymentLineId(lineId?: string | null) {
   return Boolean(lineId && String(lineId).startsWith("prepaid-"));
 }
 
+function mainPersonFromDraft(draft: ClientBookingDraft | null | undefined) {
+  const people = draft?.people ?? [];
+  return people.find((p) => p.isRequester) ?? people[0] ?? null;
+}
+
+/** Split bill keys may be `main-client` or the requester's person UUID. */
+function isMainPayerKey(
+  payerKey: string,
+  draft: ClientBookingDraft | null | undefined,
+): boolean {
+  const key = String(payerKey ?? "").trim();
+  if (!key) return false;
+  if (key === "main-client" || key === "main_client") return true;
+  const main = mainPersonFromDraft(draft);
+  return Boolean(main && String(main.id) === key);
+}
+
+/** Keep services/products/unique for one payer (main or guest/model id). */
+function filterDraftForPayer(
+  draft: ClientBookingDraft,
+  payerKey: string,
+): ClientBookingDraft | null {
+  const key = String(payerKey ?? "").trim();
+  if (!key) return draft;
+  const people = draft.people ?? [];
+  const mainPerson = mainPersonFromDraft(draft);
+  const isMain = isMainPayerKey(key, draft);
+  const guestPerson = people.find((p) => String(p.id) === key);
+  const personId = isMain ? mainPerson?.id : guestPerson?.id ?? key;
+
+  const services = (draft.services ?? []).filter((s) => {
+    const sid = String(s.guestId ?? "");
+    if (isMain) return !sid || sid === String(mainPerson?.id ?? "");
+    return sid === key || sid === String(personId);
+  });
+  const products = (draft.products ?? []).filter((p) => {
+    const gid = String(p.guestId ?? "");
+    if (isMain) return !gid || gid === String(mainPerson?.id ?? "");
+    return gid === key || gid === String(personId);
+  });
+  if (!services.length && !products.length) return null;
+  const partyTotal =
+    services.reduce((sum, s) => sum + (Number(s.price) || 0), 0) +
+    products.reduce((sum, p) => sum + (Number(p.price) || 0), 0);
+  return {
+    ...draft,
+    // Party subtotal only — never the full booking total.
+    total: partyTotal,
+    services,
+    products,
+    people: isMain
+      ? people.filter((p) => p.isRequester || p.id === mainPerson?.id)
+      : people.filter((p) => p.id === personId || String(p.id) === key),
+  };
+}
+
+/** Overlay issued INV/RCP + fees onto party-filtered line items. */
+function mergePartyDocOntoFinanceRow(
+  financeRow: TransactionRow | null,
+  partyRow: TransactionRow,
+): TransactionRow {
+  if (!financeRow) return partyRow;
+  const issued = financeRow.issuedDocument ?? financeRow.document;
+  const partyDoc = partyRow.issuedDocument ?? partyRow.document;
+  if (!partyDoc?.lineItems?.length) {
+    return financeRow;
+  }
+  const mergedDoc = {
+    ...(issued ?? {}),
+    ...partyDoc,
+    documentNumber: issued?.documentNumber ?? partyDoc.documentNumber,
+    receiptNumber: issued?.receiptNumber ?? partyDoc.receiptNumber,
+    invoiceDate: issued?.invoiceDate ?? partyDoc.invoiceDate,
+    serviceDate: issued?.serviceDate ?? partyDoc.serviceDate,
+    dueDate: issued?.dueDate ?? partyDoc.dueDate,
+    paymentPhase: issued?.paymentPhase ?? "full",
+    payerKey: issued?.payerKey ?? partyDoc.payerKey,
+    lineItems: partyDoc.lineItems,
+    bookingItems: partyDoc.bookingItems ?? partyDoc.lineItems.map((line) => ({
+      label: String(line.description ?? ""),
+      value: Number(line.totalPrice) || 0,
+    })),
+    // Party draft lines win; keep issued INV/RCP numbers from finance.
+    totalPrice: partyDoc.totalPrice ?? financeRow.grossAmount,
+    prepaymentAmount: undefined,
+    issuedSnapshot: issued?.issuedSnapshot,
+  };
+  const amount =
+    Number(partyDoc.totalPrice) ||
+    Number(financeRow.grossAmount) ||
+    Number(partyRow.grossAmount) ||
+    0;
+  return {
+    ...financeRow,
+    ...partyRow,
+    id: financeRow.id,
+    entryId: financeRow.entryId,
+    entryLabel: financeRow.entryLabel,
+    status: financeRow.status,
+    grossAmount: amount,
+    netAmount: amount,
+    stripeFee: financeRow.stripeFee,
+    mollureFee: financeRow.mollureFee,
+    document: mergedDoc as TransactionRow["document"],
+    issuedDocument: mergedDoc as TransactionRow["issuedDocument"],
+  };
+}
+
 /** Invoice / receipt rows + document drawer openers for client booking details. */
 export function useClientBookingInvoiceDocs(input: {
   bookingSetup: unknown;
@@ -367,18 +475,111 @@ export function useClientBookingInvoiceDocs(input: {
           ? (prepaymentReceiptRow ?? prepaymentInvoiceRow)
           : (prepaymentInvoiceRow ?? prepaymentReceiptRow);
       }
+      // After-treatment-{payerKey}: build lines from that party's draft (split = separate docs).
+      const payerKey = String(lineId ?? "").startsWith("after-treatment-")
+        ? String(lineId).slice("after-treatment-".length)
+        : "";
+      if (payerKey && input.draft) {
+        const isMain = isMainPayerKey(payerKey, input.draft);
+        const payerKeysToTry = isMain
+          ? Array.from(
+              new Set(
+                [payerKey, "main-client", "main_client", String(mainPersonFromDraft(input.draft)?.id ?? "")].filter(
+                  Boolean,
+                ),
+              ),
+            )
+          : [payerKey];
+        let byPayer: TransactionRow | null = null;
+        for (const key of payerKeysToTry) {
+          byPayer = findIssuedFinanceTransaction(financeRows, {
+            bookingId: input.bookingId,
+            bookingCode: input.bookingRef,
+            phase: "full",
+            protectiveFee: false,
+            payerKey: key,
+          });
+          if (byPayer) break;
+        }
+        const partyDraft = filterDraftForPayer(input.draft, payerKey);
+        if (
+          partyDraft &&
+          ((partyDraft.services?.length ?? 0) > 0 ||
+            (partyDraft.products?.length ?? 0) > 0)
+        ) {
+          const partyPerson =
+            (isMain
+              ? mainPersonFromDraft(partyDraft)
+              : partyDraft.people?.find((p) => String(p.id) === payerKey)) ??
+            partyDraft.people?.[0];
+          const linesSum =
+            partyDraft.services.reduce((sum, s) => sum + (Number(s.price) || 0), 0) +
+            (partyDraft.products ?? []).reduce(
+              (sum, p) => sum + (Number(p.price) || 0),
+              0,
+            );
+          const paidShare =
+            Number(byPayer?.grossAmount) ||
+            Number(byPayer?.netAmount) ||
+            linesSum;
+          // Invoice = this party's catalog lines; receipt total = their paid share.
+          const documentAmount =
+            type === "receipt" && paidShare > 0 ? paidShare : linesSum;
+          const partyRow = withKm(
+            buildClientBookingTransactionRow({
+              bookingRef: `${input.bookingRef}-${payerKey}`,
+              draft: partyDraft,
+              requesterName:
+                partyPerson?.name?.trim() ||
+                (isMain ? input.requesterName : "Guest"),
+              requesterEmail: isMain
+                ? (input.requesterEmail ?? undefined)
+                : undefined,
+              financeSettings: input.financeSettings as never,
+              methodTitle,
+              methodDetail,
+              documentAmount: documentAmount > 0 ? documentAmount : undefined,
+              clientParty: isMain
+                ? clientParty
+                : {
+                    legalName: partyPerson?.name?.trim() || "Guest",
+                  },
+            }),
+          );
+          if (!partyRow) {
+            return byPayer && hasStoredDocumentSnapshot(byPayer)
+              ? withDiscountedIssued(byPayer)
+              : null;
+          }
+          return withDiscountedIssued(
+            mergePartyDocOntoFinanceRow(byPayer, partyRow),
+          );
+        }
+        if (byPayer && hasStoredDocumentSnapshot(byPayer)) {
+          return withDiscountedIssued(byPayer);
+        }
+      }
       return type === "receipt"
-        ? (prepaymentReceiptRow ?? bookingTransactionRow)
+        ? (bookingTransactionRow ?? prepaymentReceiptRow)
         : bookingTransactionRow;
     },
     [
       bookingTransactionRow,
+      clientParty,
       feeInvoiceRow,
       financeRows,
       input.bookingId,
       input.bookingRef,
+      input.draft,
+      input.financeSettings,
+      input.requesterEmail,
+      input.requesterName,
+      methodDetail,
+      methodTitle,
       prepaymentInvoiceRow,
       prepaymentReceiptRow,
+      withDiscountedIssued,
+      withKm,
     ],
   );
 

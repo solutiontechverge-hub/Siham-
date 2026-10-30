@@ -333,7 +333,8 @@ const VARIANT_SVG: Record<
   (p: SvgProps) => ReactNode
 > = {
   waiting_for_prepayment: WaitingForPrepaymentSvg,
-  waiting_for_payment: AlarmClockSvg,
+  // Same €+clock glyph as prepayment wait — used for AT payment due too.
+  waiting_for_payment: WaitingForPrepaymentSvg,
   prepaid: PrepaidSvg,
   refund_pending: RefundPendingSvg,
   refund_completed: RefundCompletedSvg,

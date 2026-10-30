@@ -67,6 +67,8 @@ export function findIssuedFinanceTransaction(
     protectiveFee?: boolean;
     /** Pin a specific protective fee row (LCF / LRF / No-show fee). */
     entryLabel?: string | null;
+    /** Split-bill payer key stamped on finance document. */
+    payerKey?: string | null;
   },
 ): TransactionRow | null {
   if (opts.transactionId) {
@@ -78,12 +80,16 @@ export function findIssuedFinanceTransaction(
   const phase = opts.phase ?? null;
   const addonId = opts.addonId ? String(opts.addonId) : "";
   const wantLabel = String(opts.entryLabel ?? "").trim();
+  const wantPayer = String(opts.payerKey ?? "").trim();
   const candidates = rows.filter((row) => {
     if (!matchesFinanceBooking(row, opts.bookingId, opts.bookingCode)) return false;
     if (wantLabel && String(row.entryLabel ?? "").trim() !== wantLabel) {
       return false;
     }
     const doc = docPhaseFields(row);
+    if (wantPayer && String(doc.payerKey ?? "") !== wantPayer) {
+      return false;
+    }
     const rowPhase = doc.paymentPhase;
     if (addonId) {
       return (

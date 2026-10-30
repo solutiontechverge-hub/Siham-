@@ -2508,6 +2508,14 @@ const parseBookingsTabFilter = (tab, alias = "b") => {
       AND COALESCE(${alias}.booking_date, ${alias}.start_time::date) < CURRENT_DATE
     )
   )`;
+  // Start reached (wall clock) — drives Confirmed → Ongoing without waiting on DB status.
+  const scheduleStartedSql = `(
+    (${alias}.start_time IS NOT NULL AND ${alias}.start_time <= NOW())
+    OR (
+      ${alias}.start_time IS NULL
+      AND COALESCE(${alias}.booking_date, ${alias}.end_time::date) <= CURRENT_DATE
+    )
+  )`;
 
   if (normalized === "past") {
     return `AND (
@@ -2516,15 +2524,21 @@ const parseBookingsTabFilter = (tab, alias = "b") => {
     )`;
   }
   if (normalized === "ongoing") {
-    return `AND ${alias}.status = 'in_progress' AND NOT ${schedulePastSql}`;
+    return `AND ${alias}.status IN ('confirmed', 'in_progress')
+      AND ${scheduleStartedSql}
+      AND NOT ${schedulePastSql}`;
   }
   if (normalized === "upcoming") {
     return `AND (
       ${alias}.status IN ('requested', 'br_accepted', 'confirmed', 'invalid')
       OR ${waitingPrepaymentSql}
     )
-      AND ${alias}.status NOT IN ('completed', 'cancelled', 'no_show')
-      AND NOT ${schedulePastSql}`;
+      AND ${alias}.status NOT IN ('completed', 'cancelled', 'no_show', 'in_progress')
+      AND NOT ${schedulePastSql}
+      AND NOT (
+        ${alias}.status = 'confirmed'
+        AND ${scheduleStartedSql}
+      )`;
   }
   return "";
 };
@@ -3424,13 +3438,8 @@ export const updateMyBooking = async (req, res) => {
       }
       nextPrepayment = normalizedPrepayment;
       if (normalizedPrepayment === "paid") {
-        const isDesired =
-          String(existing.location_type || "").toLowerCase() === "desired";
-        // Desired BR stays requested after prepay so the professional can Accept.
-        // Fixed / BR Accepted still settle to confirmed on successful prepay.
+        // Open BR stays requested after prepay until Accept. Only BR Accepted settles.
         if (nextStatus === "br_accepted") {
-          nextStatus = "confirmed";
-        } else if (nextStatus === "requested" && !isDesired) {
           nextStatus = "confirmed";
         }
       }

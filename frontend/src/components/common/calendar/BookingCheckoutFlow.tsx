@@ -196,9 +196,23 @@ export default function BookingCheckoutFlow({
     return allShares.filter((share) => unpaidKeys.has(share.key));
   }, [allShares, existingSplit]);
 
-  const canSplit = unpaidShares.length > 1;
+  // Split Bill only when a guest/model is on the booking (not shares>1 alone).
+  const hasGuestOrModelParty = React.useMemo(
+    () =>
+      allShares.some(
+        (share) => share.role === "guest" || share.role === "model",
+      ),
+    [allShares],
+  );
+  const canSplit = hasGuestOrModelParty && unpaidShares.length > 1;
   const initialMode: BookingSplitBillMode =
-    existingSplit?.mode ?? (canSplit ? "split" : "single");
+    existingSplit?.mode === "split" && hasGuestOrModelParty
+      ? "split"
+      : existingSplit?.mode === "single"
+        ? "single"
+        : canSplit
+          ? "split"
+          : "single";
 
   const [mode, setMode] = React.useState<BookingSplitBillMode>(initialMode);
   const [payerKey, setPayerKey] = React.useState(

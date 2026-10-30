@@ -135,17 +135,18 @@ export function useProfessionalFixedLocationCalendarBookingPersistCheckout(
           prepaidAmount: prepaidApplied,
           payers: [],
         };
-      const isDirect =
-        result.paymentMethod === "onlineDirect" ||
-        result.paymentMethod === "offlineDirect";
-      // Non-direct: payers stay unpaid (invoice); booking still Completes with due date.
-      const nextSplit = isDirect
+      const isOfflineDirect = result.paymentMethod === "offlineDirect";
+      const isOnlineDirect = result.paymentMethod === "onlineDirect";
+      const isDirect = isOfflineDirect || isOnlineDirect;
+      // Offline Direct settles at checkout; Online Direct stays unpaid until client Pay Now.
+      // Non-direct: invoice unpaid + due date.
+      const nextSplit = isOfflineDirect
         ? markSplitPayersPaid(splitBase, result.payerKeys, result.paymentMethod)
         : splitBase;
       const stillUnpaid = nextSplit.payers.filter(
         (payer) => !payer.paid && payer.paymentAmount > 0,
       ).length;
-      const allSettled = stillUnpaid === 0 && isDirect;
+      const allSettled = stillUnpaid === 0 && isOfflineDirect;
       const invoiceIssued = !isDirect && Boolean(result.dueDate);
       // Protective-fee checkout on Cancelled / No Show must keep that status.
       const statusLower = String(current.status ?? "").toLowerCase();
@@ -154,11 +155,12 @@ export function useProfessionalFixedLocationCalendarBookingPersistCheckout(
         statusLower === "canceled" ||
         statusLower === "no show" ||
         statusLower === "no_show";
+      // After-treatment checkout Completes the service side; unpaid Online Direct
+      // stays on waitingForPayment / splitBill.paid — not In Progress (that hid
+      // client After Treatment Summary while prepaid was already paid).
       const nextStatus: CalendarEvent["status"] = isProtectiveFeeCheckout
         ? current.status
-        : allSettled || invoiceIssued
-          ? "Completed"
-          : "In Progress";
+        : "Completed";
       const nextDetails = {
         ...(current.details ?? {}),
         ...basePatch,
@@ -204,50 +206,52 @@ export function useProfessionalFixedLocationCalendarBookingPersistCheckout(
         current.id;
       const paidAt = new Date().toISOString();
       const metaMethod = result.paymentMethod as SalesCheckoutPaymentMethod;
-      const cardIds =
-        result.mode === "single"
-          ? [`${bookingId}-after-treatment`]
-          : result.payerKeys.map((key) =>
-              key === shares.find((share) => share.role === "main_client")?.key
-                ? `${bookingId}-after-treatment`
-                : `${bookingId}-after-treatment-sub-${key}`,
-            );
       const mainShare = shares.find((share) => share.role === "main_client");
-      const financePayerKey =
-        result.mode === "single"
-          ? mainShare?.key || result.payerKey || "main-client"
-          : result.payerKey || "main-client";
-      const financePayerRole =
-        shares.find((share) => share.key === financePayerKey)?.role ||
-        (financePayerKey === mainShare?.key ? "main_client" : "guest");
       const discountAmount = result.lines
         .filter((line) => line.amount < 0)
         .reduce((sum, line) => sum + Math.abs(line.amount), 0);
-      const chargeLines = result.lines.filter((line) => line.amount >= 0);
 
-      const persistCardMeta = (financeTransactionId?: string) =>
-        Promise.all(
-          cardIds.map((cardId) =>
-            Promise.resolve(
-              upsertSalesCardMeta({
-                bookingId,
-                cardKind: "after_treatment",
-                cardId,
-                ...(financeTransactionId ? { financeTransactionId } : {}),
-                paymentMethod: metaMethod,
-                dueDate: result.dueDate,
-                paid: isDirect,
-                paidAt: isDirect ? paidAt : null,
-                totalPrice: result.amount,
-                ...(discountAmount > 0 ? { discountAmount } : {}),
-              }),
-            ),
-          ),
+      const cardIdForPayer = (payerKey: string) =>
+        payerKey === mainShare?.key || result.mode === "single"
+          ? `${bookingId}-after-treatment`
+          : `${bookingId}-after-treatment-sub-${payerKey}`;
+
+      const persistCardMeta = (
+        payerKey: string,
+        totalPrice: number,
+        financeTransactionId?: string,
+      ) =>
+        Promise.resolve(
+          upsertSalesCardMeta({
+            bookingId,
+            cardKind: "after_treatment",
+            cardId: cardIdForPayer(payerKey),
+            ...(financeTransactionId ? { financeTransactionId } : {}),
+            paymentMethod: metaMethod,
+            dueDate: result.dueDate,
+            paid: isOfflineDirect,
+            paidAt: isOfflineDirect ? paidAt : null,
+            totalPrice,
+            ...(discountAmount > 0 &&
+            (payerKey === mainShare?.key || result.mode === "single")
+              ? { discountAmount }
+              : {}),
+          }),
         );
 
       // Await PUT so Sales meta survives refresh even if finance create fails.
       try {
-        await persistCardMeta();
+        await Promise.all(
+          (result.mode === "split" ? result.payerKeys : [result.payerKey]).map(
+            (key) => {
+              const share = shares.find((s) => s.key === key);
+              return persistCardMeta(
+                key,
+                share?.paymentAmount ?? result.amount,
+              );
+            },
+          ),
+        );
       } catch {
         // Booking notes already saved; finance create may still write sales_card_metadata.
       }
@@ -269,79 +273,143 @@ export function useProfessionalFixedLocationCalendarBookingPersistCheckout(
             (guest.services ?? []).map((service) => String(service.id)),
           ),
         ]);
-        const created = await createFinanceTransaction({
-          clientName: result.payerName || selectedClient?.name || "Client",
-          clientEmail: result.clientEmail || selectedClient?.email || "",
-          clientType: resolveCheckoutFinanceClientType(selectedClient),
-          paymentMethod: result.paymentMethod,
-          totalPrice: result.amount,
-          dueDate: result.dueDate ?? undefined,
-          ...(prepaidApplied > 0 ? { prepaymentAmount: prepaidApplied } : {}),
-          ...(discountAmount > 0 ? { discountAmount } : {}),
-          lines: chargeLines.map((line) => {
-            const parts = String(line.id).split("::");
-            const sourceReference = parts[0];
-            const assigneeKey = parts.length >= 2 ? parts[1] : "";
-            const ownerShare =
-              shares.find((share) => share.key === assigneeKey) ||
-              (!assigneeKey
-                ? shares.find((share) => share.role === "main_client")
-                : undefined);
-            const sourceType =
-              productIds.has(sourceReference)
-                ? "productId"
+
+        const mapChargeLines = (
+          lines: typeof result.lines,
+          fallbackRole: string,
+          fallbackName: string,
+        ) =>
+          lines
+            .filter((line) => line.amount >= 0)
+            .map((line) => {
+              const parts = String(line.id).split("::");
+              const sourceReference = parts[0];
+              const assigneeKey = parts.length >= 2 ? parts[1] : "";
+              const ownerShare =
+                shares.find((share) => share.key === assigneeKey) ||
+                (!assigneeKey
+                  ? shares.find((share) => share.role === "main_client")
+                  : undefined);
+              const sourceType = productIds.has(sourceReference)
+                ? ("productId" as const)
                 : serviceIds.has(sourceReference)
-                  ? "serviceId"
+                  ? ("serviceId" as const)
                   : sourceReference.startsWith("unique-") ||
                       sourceReference === "kilometer-allowance" ||
                       sourceReference.startsWith("late-reschedule") ||
                       sourceReference.startsWith("late-cancellation") ||
                       sourceReference.startsWith("no-show")
-                    ? "uniqueItemCode"
-                    : "serviceId";
-            // Unique catalog ids are product-shaped in booking bags — prefer uniqueItemCode.
-            const resolvedType =
-              sourceReference.startsWith("unique-") ||
-              sourceReference === "kilometer-allowance"
-                ? "uniqueItemCode"
-                : sourceType;
-            return {
-              name: line.label,
-              quantity: 1,
-              unitPrice: line.amount,
-              sourceReference,
-              sourceType: resolvedType,
-              ...(assigneeKey ? { assigneeKey } : {}),
-              partyRole: ownerShare?.role ?? financePayerRole,
-              partyName:
-                ownerShare?.displayName ||
-                ownerShare?.label ||
-                result.payerName ||
-                selectedClient?.name ||
-                "Client",
-            };
-          }),
-          bookingId,
-          bookingRef: current.bookingCode,
-          paymentPhase: "full",
-          payerKey: financePayerKey,
-          payerRole: financePayerRole,
-          entryType: String(result.paymentMethod).startsWith("offline")
-            ? "offlineBooking"
-            : "onlineBooking",
-          entryLabel: resolveCheckoutEntryLabel({
-            mode: result.mode,
-            payerLabel: result.payerLabel,
-            status: current.status,
-            lines: result.lines,
-          }),
-        }).unwrap();
-        const financeTransactionId = created?.data?.id;
-        if (financeTransactionId) {
-          try {
-            await persistCardMeta(financeTransactionId);
-          } catch {
-            // Backend createFinanceTransaction already ensureSalesCardMetadataForFinanceRow.
+                    ? ("uniqueItemCode" as const)
+                    : ("serviceId" as const);
+              const resolvedType =
+                sourceReference.startsWith("unique-") ||
+                sourceReference === "kilometer-allowance"
+                  ? ("uniqueItemCode" as const)
+                  : sourceType;
+              return {
+                name: line.label,
+                quantity: 1,
+                unitPrice: line.amount,
+                sourceReference,
+                sourceType: resolvedType,
+                ...(assigneeKey ? { assigneeKey } : {}),
+                partyRole: ownerShare?.role ?? fallbackRole,
+                partyName:
+                  ownerShare?.displayName ||
+                  ownerShare?.label ||
+                  fallbackName,
+              };
+            });
+
+        // Split: one finance invoice/receipt per covered payer (not one merged doc).
+        const financeJobs =
+          result.mode === "split"
+            ? result.payerKeys.map((key) => {
+                const share = shares.find((s) => s.key === key);
+                // Split: only this payer's lines — never the full bill (that merges guest onto main).
+                const shareLines = share?.lines?.length ? share.lines : [];
+                return {
+                  payerKey: key,
+                  payerRole: share?.role ?? "guest",
+                  clientName:
+                    share?.displayName ||
+                    share?.label ||
+                    result.payerName ||
+                    selectedClient?.name ||
+                    "Client",
+                  clientEmail:
+                    share?.email ||
+                    result.clientEmail ||
+                    selectedClient?.email ||
+                    "",
+                  amount: share?.paymentAmount ?? result.amount,
+                  lines: shareLines,
+                  prepaid:
+                    share?.role === "main_client" && prepaidApplied > 0
+                      ? prepaidApplied
+                      : 0,
+                };
+              })
+            : [
+                {
+                  payerKey:
+                    mainShare?.key || result.payerKey || "main-client",
+                  payerRole: mainShare?.role || "main_client",
+                  clientName:
+                    result.payerName || selectedClient?.name || "Client",
+                  clientEmail:
+                    result.clientEmail || selectedClient?.email || "",
+                  amount: result.amount,
+                  lines: result.lines,
+                  prepaid: prepaidApplied > 0 ? prepaidApplied : 0,
+                },
+              ];
+
+        for (const job of financeJobs) {
+          const created = await createFinanceTransaction({
+            clientName: job.clientName,
+            clientEmail: job.clientEmail,
+            clientType: resolveCheckoutFinanceClientType(selectedClient),
+            paymentMethod: result.paymentMethod,
+            totalPrice: job.amount,
+            dueDate: result.dueDate ?? undefined,
+            ...(job.prepaid > 0 ? { prepaymentAmount: job.prepaid } : {}),
+            ...(discountAmount > 0 && job.payerRole === "main_client"
+              ? { discountAmount }
+              : {}),
+            lines: mapChargeLines(
+              job.lines,
+              job.payerRole,
+              job.clientName,
+            ),
+            bookingId,
+            bookingRef: current.bookingCode,
+            paymentPhase: "full",
+            payerKey: job.payerKey,
+            payerRole: job.payerRole,
+            entryType: String(result.paymentMethod).startsWith("offline")
+              ? "offlineBooking"
+              : "onlineBooking",
+            entryLabel: resolveCheckoutEntryLabel({
+              mode: result.mode,
+              payerLabel:
+                shares.find((s) => s.key === job.payerKey)?.label ||
+                result.payerLabel,
+              status: current.status,
+              lines: job.lines,
+            }),
+          }).unwrap();
+          const financeTransactionId = created?.data?.id;
+          if (financeTransactionId) {
+            try {
+              await persistCardMeta(
+                job.payerKey,
+                job.amount,
+                financeTransactionId,
+              );
+            } catch {
+              // Backend createFinanceTransaction already ensureSalesCardMetadataForFinanceRow.
+            }
           }
         }
       } catch {
@@ -351,12 +419,14 @@ export function useProfessionalFixedLocationCalendarBookingPersistCheckout(
         });
       }
 
-      if (allSettled || invoiceIssued) {
-        showSnackbar({
-          severity: "success",
-          message: invoiceIssued ? "Invoice issued." : "Checkout complete.",
-        });
-      }
+      showSnackbar({
+        severity: "success",
+        message: invoiceIssued
+          ? "Invoice issued."
+          : allSettled
+            ? "Checkout complete."
+            : "Checkout saved — awaiting online payment.",
+      });
       return true;
     },
     [
