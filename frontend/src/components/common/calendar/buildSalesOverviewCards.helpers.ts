@@ -469,19 +469,30 @@ export function applyLedgerFinancialsToCards(
     if (next.subCards?.length) {
       next.subCards = next.subCards.map((sub) => {
         const isMain = sub.payerRole === "main_client";
+        const subPaid = sub.paymentState === "paid" || sub.paymentState === "prepaid";
         const ownGuestBadge =
-          sub.paymentState === "paid"
+          subPaid
             ? "Paid"
-            : sub.paymentState === "voided"
-              ? "Voided"
-              : sub.paymentState === "refunded"
-                ? "Refunded"
-                : undefined;
+            : sub.paymentState === "pending" ||
+                sub.paymentState === "payment_due" ||
+                sub.paymentState === "unpaid"
+              ? "Pending"
+              : sub.paymentState === "voided"
+                ? "Voided"
+                : sub.paymentState === "refunded"
+                  ? "Refunded"
+                  : undefined;
         return {
           ...sub,
-          statusBadge: isMain ? effectiveBadgeLabel : ownGuestBadge,
+          statusBadge: isMain
+            ? subPaid
+              ? "Paid"
+              : effectiveBadgeLabel
+            : ownGuestBadge,
           paymentState: isMain
-            ? (effectivePaymentState ?? sub.paymentState)
+            ? subPaid
+              ? sub.paymentState
+              : (effectivePaymentState ?? sub.paymentState)
             : sub.paymentState,
         };
       });
@@ -922,7 +933,9 @@ function applyFinanceAndMetaState(
   const paidHintEarly =
     Boolean(extras.paidHint) ||
     Boolean(meta?.paidAt) ||
-    Boolean(meta?.paid);
+    Boolean(meta?.paid) ||
+    next.paymentState === "paid" ||
+    next.paymentState === "prepaid";
   // Client Pay Now stamps splitBill.paid before finance Pending→Paid lands.
   const trustSplitPaidOverStaleFinance =
     paidHintEarly &&
@@ -1120,10 +1133,17 @@ function applySubMeta(
     ctx.paymentTerms,
     meta?.reissuedAt ? 1 : 0,
   );
-  // Guest/model: own Paid/Voided/Refunded only — never booking Partially Paid / due.
+  // Guest/model: own Paid/Pending/Voided/Refunded — never booking Partially Paid / due.
   if (next.payerRole === "guest" || next.payerRole === "model") {
-    if (next.paymentState === "paid") next.statusBadge = "Paid";
-    else if (next.paymentState === "voided") next.statusBadge = "Voided";
+    if (next.paymentState === "paid" || next.paymentState === "prepaid") {
+      next.statusBadge = "Paid";
+    } else if (
+      next.paymentState === "pending" ||
+      next.paymentState === "payment_due" ||
+      next.paymentState === "unpaid"
+    ) {
+      next.statusBadge = "Pending";
+    } else if (next.paymentState === "voided") next.statusBadge = "Voided";
     else if (next.paymentState === "refunded") next.statusBadge = "Refunded";
     else next.statusBadge = undefined;
   }
@@ -1785,6 +1805,19 @@ function isSplitPayerPaid(
   return Boolean(split.payers.find((payer) => payer.key === payerKey)?.paid);
 }
 
+function splitSharePaymentVisual(
+  paid: boolean,
+  salesCardId: string,
+): Pick<SalesSubCardData, "paymentState" | "statusBadge"> {
+  if (paid) {
+    return { paymentState: "paid", statusBadge: "Paid" };
+  }
+  if (getSalesCardMeta(salesCardId)) {
+    return { paymentState: "pending", statusBadge: "Pending" };
+  }
+  return {};
+}
+
 export function buildCardsForEvent(input: {
   event: CalendarEvent;
   booking?: CalendarBooking;
@@ -2387,8 +2420,10 @@ export function buildCardsForEvent(input: {
         const subPaid = isSplitPayerPaid(splitState, share.key);
         const payer = splitState?.payers.find((row) => row.key === share.key);
         const guestRole = share.role === "model" ? ("model" as const) : ("guest" as const);
+        const subCardId = `${afterId}-sub-${share.key}`;
+        const shareVisual = splitSharePaymentVisual(subPaid, subCardId);
         return {
-          id: `${afterId}-sub-${share.key}`,
+          id: subCardId,
           bookingId,
           bookingCode,
           payerRole: share.role,
@@ -2404,8 +2439,7 @@ export function buildCardsForEvent(input: {
           highlightLabel: "Payment",
           highlightAmount: share.paymentAmount,
           paidAt: payer?.paidAt ?? (subPaid ? occurredAt : null),
-          paymentState: subPaid ? ("paid" as const) : undefined,
-          statusBadge: subPaid ? "Paid" : undefined,
+          ...shareVisual,
           dueDate: invoiceDueFromNotes,
           methodDateLine: method,
           showAddOns: true,
@@ -2416,10 +2450,12 @@ export function buildCardsForEvent(input: {
       // Split: parent shell + main + guest/model subCards (Add-Ons on subCards only).
       // Solo main: flat parent card (no subCards) keeps Add-Ons.
       const mainPayer = splitState?.payers.find((row) => row.key === mainShare.key);
+      const mainSubCardId = `${afterId}-sub-${mainShare.key}`;
+      const mainShareVisual = splitSharePaymentVisual(mainPaid, mainSubCardId);
       const subCards: SalesSubCardData[] | undefined = hasGuestSubs
         ? [
             {
-              id: `${afterId}-sub-${mainShare.key}`,
+              id: mainSubCardId,
               bookingId,
               bookingCode,
               payerRole: "main_client",
@@ -2434,7 +2470,7 @@ export function buildCardsForEvent(input: {
               highlightLabel: "Payment",
               highlightAmount: mainPayable,
               paidAt: mainPayer?.paidAt ?? (mainPaid ? occurredAt : null),
-              paymentState: mainPaid ? ("paid" as const) : undefined,
+              ...mainShareVisual,
               dueDate: invoiceDueFromNotes,
               methodDateLine: method,
               showAddOns: true,

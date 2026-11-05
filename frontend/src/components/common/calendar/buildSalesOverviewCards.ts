@@ -24,6 +24,43 @@ import {
   protectiveFeeFlagsFromBooking,
 } from "./buildSalesOverviewCards.helpers";
 
+/** Sales drawer event can lag calendar state; booking notes (client Pay Now) are SSOT for splitBill. */
+function mergeSalesEventFromBooking(
+  event: CalendarEvent,
+  booking?: CalendarBooking,
+): CalendarEvent {
+  if (!booking?.notes) return event;
+  const fromNotes = parseCalendarEntryNotes(booking.notes);
+  if (!fromNotes) return event;
+  const statusKey = String(booking.status ?? "").toLowerCase();
+  const statusFromBooking =
+    statusKey === "completed"
+      ? ("Completed" as const)
+      : statusKey === "in_progress" || statusKey === "in progress"
+        ? ("In Progress" as const)
+        : statusKey === "confirmed"
+          ? ("Confirmed" as const)
+          : statusKey === "cancelled" || statusKey === "canceled"
+            ? ("Cancelled" as const)
+            : null;
+  return {
+    ...event,
+    ...(statusFromBooking ? { status: statusFromBooking } : {}),
+    details: {
+      ...(event.details ?? {}),
+      ...(fromNotes.splitBill !== undefined
+        ? { splitBill: fromNotes.splitBill }
+        : {}),
+      ...(typeof fromNotes.waitingForPayment === "boolean"
+        ? { waitingForPayment: fromNotes.waitingForPayment }
+        : {}),
+      ...(fromNotes.prepaymentStatus
+        ? { prepaymentStatus: fromNotes.prepaymentStatus }
+        : {}),
+    },
+  };
+}
+
 export type BuildSalesOverviewInput = {
   bookings: CalendarBooking[];
   currentEvent?: CalendarEvent | null;
@@ -75,7 +112,7 @@ export function buildSalesOverviewCards(input: BuildSalesOverviewInput): SalesOv
 
     cards.push(
       ...buildCardsForEvent({
-        event: currentEvent,
+        event: mergeSalesEventFromBooking(currentEvent, matchingBooking),
         booking: matchingBooking,
         clientName,
         clientEmail,

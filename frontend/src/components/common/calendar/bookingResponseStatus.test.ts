@@ -94,4 +94,52 @@ assert.ok(
   "Confirmed + ER still awaiting accept → waiting-for-response",
 );
 
+const splitAfterTreatmentPending = resolveBookingResponseIndicators({
+  id: "booking-1",
+  bookingScenario: "E" as const,
+  status: "Completed" as const,
+  date: "2099-06-01",
+  start: "10:00",
+  details: {
+    showPrepayment: true,
+    prepaymentStatus: "confirmed",
+    prepaymentPercent: "50",
+    services: [{ id: "s1", name: "Cut", price: 100, durationMins: 30 }],
+    splitBill: {
+      mode: "split",
+      prepaidAmount: 0,
+      payers: [
+        {
+          key: "main",
+          role: "main_client",
+          label: "Ada",
+          displayName: "Ada",
+          subtotal: 60,
+          paymentAmount: 60,
+          lineIds: ["s1"],
+          paid: true,
+        },
+        {
+          key: "g1",
+          role: "guest",
+          label: "Guest",
+          displayName: "Bea",
+          subtotal: 40,
+          paymentAmount: 40,
+          lineIds: ["s2"],
+          paid: false,
+        },
+      ],
+    },
+  },
+});
+assert.ok(
+  splitAfterTreatmentPending.includes("waiting_for_payment"),
+  "split guest unpaid → pending payment icon",
+);
+assert.ok(
+  !splitAfterTreatmentPending.includes("prepaid"),
+  "prepay confirmed must not show paid tick while after-treatment balance pending",
+);
+
 console.log("bookingResponseStatus.test.ts: ok");

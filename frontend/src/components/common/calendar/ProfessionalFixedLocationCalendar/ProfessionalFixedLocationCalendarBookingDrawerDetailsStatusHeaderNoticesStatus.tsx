@@ -54,6 +54,8 @@ import {
   scenarioIndicatorDisplayLabel,
 } from "../bookingStatus";
 
+import { resolvePostBookingPendingPayment } from "../bookingCheckout";
+
 import PrepaymentStatusIcon from "../PrepaymentStatusIcon";
 
 import {
@@ -390,8 +392,13 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
             const waitingClientPrepay = professionalWaitingForClientPrepay(
               viewingBookingEvent,
             );
+            const postBookingPending = resolvePostBookingPendingPayment(
+              viewingBookingEvent,
+            );
             const confirmedPrepaidStandalone =
-              prepayment === "confirmed" && !waitingClientPrepay;
+              prepayment === "confirmed" &&
+              !waitingClientPrepay &&
+              !postBookingPending;
 
             const timingStandalone = responseIndicators.filter(
               (item) =>
@@ -415,12 +422,14 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
             const ebrOwnsPrepaymentIcon = scenarioIndicators.includes("EBR");
             const standalonePrepayment = waitingClientPrepay
               ? ("pending" as const)
-              : prepayment &&
-                  (prepayment === "confirmed"
-                    ? !ebrOwnsPrepaymentIcon
-                    : scenarioIndicators.length === 0 || hasBr)
-                ? prepayment
-                : undefined;
+              : postBookingPending
+                ? undefined
+                : prepayment &&
+                    (prepayment === "confirmed"
+                      ? !ebrOwnsPrepaymentIcon
+                      : scenarioIndicators.length === 0 || hasBr)
+                  ? prepayment
+                  : undefined;
 
             const prepaymentAsIndicator =
               standalonePrepayment === "pending"

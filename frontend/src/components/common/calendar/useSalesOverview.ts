@@ -345,13 +345,17 @@ export function useSalesOverview({
       // Guest/model keep own Paid; never inherit booking Partially Paid from parent.
       const guestBadge =
         sub.statusBadge ||
-        (sub.paymentState === "paid"
+        (sub.paymentState === "paid" || sub.paymentState === "prepaid"
           ? "Paid"
-          : sub.paymentState === "voided"
-            ? "Voided"
-            : sub.paymentState === "refunded"
-              ? "Refunded"
-              : undefined);
+          : sub.paymentState === "pending" ||
+              sub.paymentState === "payment_due" ||
+              sub.paymentState === "unpaid"
+            ? "Pending"
+            : sub.paymentState === "voided"
+              ? "Voided"
+              : sub.paymentState === "refunded"
+                ? "Refunded"
+                : undefined);
       return {
         id: sub.id,
         bookingId: sub.bookingId || parent.bookingId,
