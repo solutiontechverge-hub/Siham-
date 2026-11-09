@@ -72,6 +72,15 @@ type VerifyOtpRequest = {
   otp: string;
 };
 
+type VerifyEmailOtpRequest = {
+  email: string;
+  otp: string;
+};
+
+type ResendVerificationRequest = {
+  email: string;
+};
+
 type VerifyOtpData = {
   user_id: string;
 };
@@ -254,6 +263,53 @@ export const authApi = baseApi.injectEndpoints({
         return { data };
       },
     }),
+    verifyEmailOtp: builder.mutation<ApiEnvelope<unknown>, VerifyEmailOtpRequest>({
+      async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: "/api/auth/verify-email-otp",
+          method: "POST",
+          body: {
+            email: payload.email.trim().toLowerCase(),
+            otp: payload.otp,
+          },
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<unknown>;
+
+        if (!data.success) {
+          return { error: customError(data.message || "Email verification failed.") };
+        }
+
+        return { data };
+      },
+    }),
+    resendVerification: builder.mutation<ApiEnvelope<null>, ResendVerificationRequest>({
+      async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: "/api/auth/resend-verification",
+          method: "POST",
+          body: {
+            email: payload.email.trim().toLowerCase(),
+          },
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<null>;
+
+        if (!data.success) {
+          return { error: customError(data.message || "Unable to resend verification code.") };
+        }
+
+        return { data };
+      },
+    }),
     resetPassword: builder.mutation<ApiEnvelope<unknown>, ResetPasswordRequest>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
         const response = await fetchWithBQ({
@@ -308,6 +364,8 @@ export const {
   useLoginWithAppleMutation,
   useLoginWithGoogleMutation,
   useRegisterMutation,
+  useResendVerificationMutation,
   useResetPasswordMutation,
+  useVerifyEmailOtpMutation,
   useVerifyOtpMutation,
 } = authApi;
