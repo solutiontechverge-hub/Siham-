@@ -91,7 +91,6 @@ function SummaryRow({
 
 export default function BookingTotalPriceCard({
   totalPrice,
-  originalPrice,
   discountAmount = 0,
   lines = [],
   prepaidPercent,
@@ -107,16 +106,12 @@ export default function BookingTotalPriceCard({
   const remaining =
     remainingAmount ??
     Math.round((totalPrice - prepaidAmount + Number.EPSILON) * 100) / 100;
-  const remainingDiffersFromTotal =
-    Math.round((remaining + Number.EPSILON) * 100) / 100 !==
-    Math.round((totalPrice + Number.EPSILON) * 100) / 100;
-  const renderRemaining = showRemaining && remainingDiffersFromTotal;
+  const renderRemaining = showRemaining && showPrepay;
   const remainingLabel = remainingBreakdownLabel(
     prepaidPercent ?? 0,
     remaining,
     totalPrice,
   );
-  const showStrike = originalPrice != null && originalPrice > totalPrice;
   const visibleLines = lines.filter((line) => line.amount > 0);
   const hasBreakdown = visibleLines.length > 0 || showPrepay;
 
@@ -184,19 +179,6 @@ export default function BookingTotalPriceCard({
           Total Price
         </Typography>
         <Stack alignItems="flex-end" spacing={0.15} sx={{ minWidth: 0 }}>
-          {showStrike ? (
-            <Typography
-              sx={{
-                fontSize: 13,
-                fontWeight: 700,
-                color: alpha(m.navy, 0.42),
-                textDecoration: "line-through",
-                lineHeight: 1.2,
-              }}
-            >
-              {formatCompactEuro(originalPrice)}
-            </Typography>
-          ) : null}
           <Typography
             sx={mollureSectionTitleSx(m.navy, {
               color: m.headingText,

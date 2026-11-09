@@ -3080,7 +3080,7 @@ export const updateCalendarEntryStatus = async (req, res) => {
     }
 
     const entry = result.rows[0];
-    void logBookingStatusActivity(
+    await logBookingStatusActivity(
       {
         id: null,
         unique_code: entry.unique_code,
@@ -3242,7 +3242,7 @@ export const updateCalendarEntry = async (req, res) => {
 
     // Offline / calendar-only status changes often go through PUT, not /status.
     if (entry && String(existing.status) !== String(entry.status)) {
-      void logBookingStatusActivity(
+      await logBookingStatusActivity(
         {
           id: null,
           unique_code: entry.unique_code,
@@ -3609,7 +3609,7 @@ export const updateMyBooking = async (req, res) => {
           req.body.notify_incoming_er === true || req.body.email_scenario === "incoming_er",
       });
     }
-    void logBookingStatusActivity(booking, {
+    await logBookingStatusActivity(booking, {
       previousStatus,
       previousPrepayment: existing.prepayment_status,
       actor: "client",
@@ -3970,7 +3970,7 @@ export const updateBookingStatus = async (req, res) => {
       initiatedBy: req.body.initiated_by === "client" ? "client" : "professional",
     });
 
-    void logBookingStatusActivity(booking, {
+    await logBookingStatusActivity(booking, {
       previousStatus,
       previousPrepayment: existingBooking.prepayment_status,
       actor: "professional",

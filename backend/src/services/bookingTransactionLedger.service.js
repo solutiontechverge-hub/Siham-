@@ -4,6 +4,7 @@
  * opt in to dual-write and to apply deriveStatusesFromFinancials().
  */
 import { query } from "../db/index.js";
+import { logSettledBookingPaymentActivity } from "./bookingActivity.service.js";
 import { parseMoney, roundMoney, serviceLineList, serviceLineNet } from "../utils/money.js";
 import {
   LEDGER_TYPES,
@@ -18,6 +19,11 @@ import {
 } from "../utils/bookingFinancialGuards.js";
 
 const VALID_TYPES = new Set(LEDGER_TYPES);
+
+async function withPaymentActivity(row) {
+  await logSettledBookingPaymentActivity(row);
+  return row;
+}
 
 function mapRow(row) {
   if (!row) return null;
@@ -83,7 +89,7 @@ export async function appendLedgerTransaction(input) {
         LIMIT 1`,
       [financeTransactionId, type],
     );
-    if (existing.rows[0]) return mapRow(existing.rows[0]);
+    if (existing.rows[0]) return withPaymentActivity(mapRow(existing.rows[0]));
   }
   if (metadata.idempotency_key) {
     const byKey = await query(
@@ -92,7 +98,7 @@ export async function appendLedgerTransaction(input) {
         LIMIT 1`,
       [String(metadata.idempotency_key)],
     );
-    if (byKey.rows[0]) return mapRow(byKey.rows[0]);
+    if (byKey.rows[0]) return withPaymentActivity(mapRow(byKey.rows[0]));
   }
 
   // Balance clamps (skip for fee/discount/add-on charge lines and explicit bypass).
@@ -164,7 +170,7 @@ export async function appendLedgerTransaction(input) {
         JSON.stringify(metadata),
       ],
     );
-    return mapRow(result.rows[0]);
+    return withPaymentActivity(mapRow(result.rows[0]));
   } catch (err) {
     // Unique index race: return the winner row instead of 500.
     const code = err?.code;
@@ -175,7 +181,7 @@ export async function appendLedgerTransaction(input) {
           LIMIT 1`,
         [financeTransactionId, type],
       );
-      if (raced.rows[0]) return mapRow(raced.rows[0]);
+      if (raced.rows[0]) return withPaymentActivity(mapRow(raced.rows[0]));
     }
     if (code === "23505" && metadata.idempotency_key) {
       const raced = await query(
@@ -184,7 +190,7 @@ export async function appendLedgerTransaction(input) {
           LIMIT 1`,
         [String(metadata.idempotency_key)],
       );
-      if (raced.rows[0]) return mapRow(raced.rows[0]);
+      if (raced.rows[0]) return withPaymentActivity(mapRow(raced.rows[0]));
     }
     throw err;
   }
@@ -256,12 +262,12 @@ export async function mirrorSettledFinanceToLedger({
   if (money <= 0) return null;
 
   const existing = await query(
-    `SELECT id FROM transactions
+    `SELECT * FROM transactions
       WHERE finance_transaction_id = $1 AND type = $2 AND status <> 'voided'
       LIMIT 1`,
     [financeTransactionId, type],
   );
-  if (existing.rows[0]) return mapRow(existing.rows[0]);
+  if (existing.rows[0]) return withPaymentActivity(mapRow(existing.rows[0]));
 
   const meta = {
     ...metadata,

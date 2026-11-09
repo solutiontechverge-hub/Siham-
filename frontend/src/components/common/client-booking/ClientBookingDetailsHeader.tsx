@@ -61,6 +61,7 @@ type Props = {
   prepaymentPaid?: boolean;
   /** Past booking still awaiting settlement. */
   paymentDue?: boolean;
+  paymentConfirmed?: boolean;
   /** Invoice due date has passed — waiting for professional reissue. */
   paymentOverdue?: boolean;
   onEditDateTime?: () => void;
@@ -108,6 +109,7 @@ export default function ClientBookingDetailsHeader({
   requiresPrepayment = false,
   prepaymentPaid = false,
   paymentDue = false,
+  paymentConfirmed = false,
   paymentOverdue = false,
   onEditDateTime,
   onEditBookingDetails,
@@ -470,6 +472,7 @@ export default function ClientBookingDetailsHeader({
                 requiresPrepayment && requestRowMode === "default"
               }
               prepaymentPaid={prepaymentPaid}
+              paymentConfirmed={paymentConfirmed}
               paymentDue={paymentDue}
               paymentOverdue={paymentOverdue}
               bookingRequestDirection={

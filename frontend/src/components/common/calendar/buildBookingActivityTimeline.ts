@@ -105,6 +105,8 @@ function mapApiKind(kind: string): BookingActivityKind {
     "booking_request_sent",
     "booking_accepted",
     "booking_confirmed",
+    "booking_in_progress",
+    "booking_completed",
     "booking_prepaid",
     "edit_request_sent",
     "edit_request_suggest",

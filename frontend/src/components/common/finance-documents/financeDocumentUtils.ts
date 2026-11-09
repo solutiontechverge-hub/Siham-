@@ -103,6 +103,33 @@ export function getIssuedDocument(row?: TransactionRow | null) {
   return healed > 0 ? { ...doc, prepaymentAmount: healed } : doc;
 }
 
+/** Refresh settlement fields without replacing the receipt's party-specific lines. */
+export function withLiveTransactionPaymentState(
+  row: TransactionRow | null,
+  liveRows: readonly TransactionRow[],
+): TransactionRow | null {
+  if (!row) return null;
+  const live = liveRows.find((item) => item.id === row.id);
+  if (!live) return row;
+  const document = getIssuedDocument(row);
+  const liveDocument = getIssuedDocument(live);
+  const updatedDocument = document && liveDocument
+    ? {
+        ...document,
+        receiptNumber: liveDocument.receiptNumber,
+        creditNoteNumber: liveDocument.creditNoteNumber,
+        paidAmount: liveDocument.paidAmount,
+        refundedAt: liveDocument.refundedAt,
+      }
+    : liveDocument ?? document;
+  return {
+    ...row,
+    status: live.status,
+    document: updatedDocument ?? undefined,
+    issuedDocument: updatedDocument ?? undefined,
+  };
+}
+
 /**
  * Issued rows read paymentTerms from issuedSnapshot; live settings only for
  * drafts / legacy rows that never snapshotted terms.
@@ -666,6 +693,14 @@ export function formatPaymentMethod(row?: TransactionRow | null) {
 
 export function receiptTitleForStatus(status?: TransactionRow["status"]) {
   return status === "Refunded" ? "Refund Receipt" : "Receipt";
+}
+
+/** A settled prepayment is Paid on its receipt, even while the booking has a balance. */
+export function receiptPaymentStatus(status?: string | null): string {
+  const normalized = String(status ?? "").trim().toLowerCase();
+  return ["paid", "prepaid", "completed"].includes(normalized)
+    ? "Paid"
+    : status || "Pending";
 }
 
 export function receiptItemsTitleForStatus(status?: TransactionRow["status"]) {

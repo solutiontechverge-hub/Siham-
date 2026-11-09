@@ -42,6 +42,7 @@ type Props = {
   prepaymentPaid?: boolean;
   /** Past booking still awaiting settlement. */
   paymentDue?: boolean;
+  paymentConfirmed?: boolean;
   /** Invoice due date has passed. */
   paymentOverdue?: boolean;
   /** BR/EBR/ER response window has elapsed. */
@@ -105,6 +106,7 @@ export default function BookingRequestStatusRow({
   requiresPrepayment = false,
   prepaymentPaid = false,
   paymentDue = false,
+  paymentConfirmed = false,
   paymentOverdue = false,
   responseOverdue = false,
   bookingRequestDirection = "outgoing",
@@ -298,7 +300,7 @@ export default function BookingRequestStatusRow({
         >
           <BookingIndicatorIcon variant="waiting_for_payment" size={24} />
         </Box>
-      ) : paymentDue && !paymentOverdue ? (
+      ) : (paymentDue || (isCompleted && !paymentConfirmed)) && !paymentOverdue ? (
         <Box
           title="Waiting for payment"
           aria-label="Waiting for payment"
@@ -314,7 +316,7 @@ export default function BookingRequestStatusRow({
         >
           <BookingIndicatorIcon variant="overdue_payment" size={24} />
         </Box>
-      ) : (!requiresPrepayment || prepaymentPaid) &&
+      ) : paymentConfirmed && (!requiresPrepayment || prepaymentPaid) &&
         !paymentDue &&
         !paymentOverdue &&
         isCompleted &&

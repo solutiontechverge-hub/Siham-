@@ -105,7 +105,6 @@ function FinanceRow({
 
 export default function BookingPriceBreakdown({
   totalPrice,
-  originalPrice = null,
   lineDiscountAmount = 0,
   bookingDiscountAmount = 0,
   bookingTotalDiscount = null,
@@ -134,10 +133,7 @@ export default function BookingPriceBreakdown({
     remainingAmount != null
       ? round2(remainingAmount)
       : round2(grandTotal - prepaidAmount);
-  const remainingDiffersFromTotal = round2(remaining) !== round2(grandTotal);
-  const renderRemaining = showRemaining && remainingDiffersFromTotal;
-  const showStrike =
-    originalPrice != null && round2(originalPrice) !== round2(grandTotal);
+  const renderRemaining = showRemaining && showPrepay;
   const discountHints =
     lineDiscountAmount > 0 ||
     (bookingDiscountAmount > 0 && Boolean(bookingTotalDiscount));
@@ -148,23 +144,8 @@ export default function BookingPriceBreakdown({
       emphasize
       label="Total Price:"
       value={
-        showStrike || discountHints ? (
+        discountHints ? (
           <Stack alignItems="flex-end" spacing={0.35} sx={{ minWidth: 0 }}>
-            {showStrike && originalPrice != null ? (
-              <BodyText
-                component="span"
-                sx={{
-                  ...financePriceTextSx,
-                  m: 0,
-                  fontSize: 13,
-                  fontWeight: 800,
-                  color: alpha(m.navy, 0.42),
-                  textDecoration: "line-through",
-                }}
-              >
-                {formatFinanceEuro(originalPrice)}
-              </BodyText>
-            ) : null}
             <BodyText
               component="span"
               sx={{

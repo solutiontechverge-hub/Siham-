@@ -26,6 +26,7 @@ import { useBookingEditRequest } from "./useBookingEditRequest";
 import {
   isClientIncomingProfessionalEbr,
   parseCalendarEntryNotes,
+  parseBookingFinancialsFromNotes,
   resolveKilometerAllowanceAmount,
   rewriteCalendarNotesPreservingNegotiation,
 } from "../calendar/bookingEventDetails";
@@ -168,6 +169,8 @@ export function useClientBookingDetails({
     },
     {
       skip: !apiBookingId && !bookingRef,
+      refetchOnMountOrArgChange: true,
+      pollingInterval: 12_000,
     },
   );
 
@@ -677,8 +680,16 @@ export function useClientBookingDetails({
     bookingId: apiBookingId,
     bookingRef,
   });
-  // Prefer AT payer/finance Pending over stale notes that marked Online Direct paid at checkout.
-  const isPaymentDue = notesPaymentDue || hasUnpaidAfterTreatment;
+  // A completed appointment alone does not prove that its payment was settled.
+  const financials = parseBookingFinancialsFromNotes(activeBooking?.notes);
+  const paymentConfirmed = afterTreatmentPayers.length > 0
+    ? afterTreatmentPayers.every((payer) => {
+        const row = financeRows.find((item) => item.id === payer.financeTransactionId);
+        return Boolean(row && ["paid", "completed"].includes(String(row.status).trim().toLowerCase()));
+      })
+    : ["paid", "completed"].includes(String(financials?.payment_status ?? "").trim().toLowerCase()) &&
+      !(Number(financials?.outstanding_balance) > 0);
+  const isPaymentDue = !paymentConfirmed && (notesPaymentDue || hasUnpaidAfterTreatment);
   const paymentOverdue = isPaymentDue && invoiceDueDatePassed;
 
   // Heal ledger when AT already paid in notes but finance outstanding lagged (Paid flip gap).
@@ -875,6 +886,7 @@ export function useClientBookingDetails({
     hasProfessionalSuggestedEdits,
     afterTreatmentPayers,
     hasUnpaidAfterTreatment,
+    paymentConfirmed,
     headerName,
     incomingProfessionalNote,
     isBookingRequestSent,

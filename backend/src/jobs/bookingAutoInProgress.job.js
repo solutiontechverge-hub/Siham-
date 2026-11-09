@@ -1,6 +1,7 @@
 import { query } from "../db/index.js";
 import { emitBookingChanged } from "../messaging/messagingSocket.js";
 import { dispatchBookingUpdatedNotifications } from "../services/bookingNotification.service.js";
+import { logScheduledBookingStatusActivity } from "../services/bookingActivity.service.js";
 
 const DEFAULT_INTERVAL_MS = Number(process.env.BOOKING_AUTO_IN_PROGRESS_POLL_MS || 60 * 1000);
 
@@ -39,6 +40,7 @@ const runAutoInProgressCycle = async () => {
     );
 
     for (const booking of result.rows) {
+      await logScheduledBookingStatusActivity(booking);
       void dispatchBookingUpdatedNotifications(
         booking,
         booking.prev_status,

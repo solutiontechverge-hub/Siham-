@@ -104,7 +104,7 @@ export default function ClientBookingDetailsView({
     handleSendBookingRequest,
     handleWithdrawEr,
     afterTreatmentPayers,
-    hasUnpaidAfterTreatment,
+    paymentConfirmed,
     hasProfessionalSuggestedEdits,
     headerName,
     incomingProfessionalNote,
@@ -180,8 +180,7 @@ export default function ClientBookingDetailsView({
   } = useClientBookingDetails({ variant });
 
   // AT checkout done + settled → "Paid (x%)" instead of "Remaining (x%)".
-  const remainingPaid =
-    afterTreatmentPayers.length > 0 && !hasUnpaidAfterTreatment;
+  const remainingPaid = paymentConfirmed;
 
   const paymentCardShared = {
     draft: displayDraft,
@@ -280,6 +279,7 @@ export default function ClientBookingDetailsView({
             prepaymentPaid={
               paymentCardPrepaymentState === "paid" || isPrepaymentPaid
             }
+            paymentConfirmed={paymentConfirmed}
             paymentDue={isPaymentDue}
             paymentOverdue={paymentOverdue}
             scheduleChangeTags={clientScheduleChangeTags}

@@ -1,10 +1,13 @@
 import { query } from "../db/index.js";
+import { emitBookingChanged } from "../messaging/messagingSocket.js";
 
 const KIND = {
   BOOKING_CREATED: "booking_created",
   BOOKING_REQUEST_SENT: "booking_request_sent",
   BOOKING_ACCEPTED: "booking_accepted",
   BOOKING_CONFIRMED: "booking_confirmed",
+  BOOKING_IN_PROGRESS: "booking_in_progress",
+  BOOKING_COMPLETED: "booking_completed",
   BOOKING_PREPAID: "booking_prepaid",
   BOOKING_CANCELLED: "booking_cancelled",
   BOOKING_UPDATED: "booking_updated",
@@ -84,11 +87,13 @@ export async function appendBookingActivityEvent(input, { throwOnError = false }
     const result = await query(
       `INSERT INTO booking_activity_events (
          booking_id, booking_code, kind, action_type, title, action,
-         actor, actor_role, user_id, actor_label, subtitle, payload, occurred_at
+         actor, actor_role, user_id, actor_label, subtitle, payload, occurred_at, id
        ) VALUES (
          $1::uuid, $2, $3, $4, $5, $5,
-         $6, $6, $7::uuid, $8, $9, $10::jsonb, COALESCE($11::timestamptz, NOW())
+         $6, $6, $7::uuid, $8, $9, $10::jsonb, COALESCE($11::timestamptz, NOW()),
+         COALESCE(md5($12::text)::uuid, gen_random_uuid())
        )
+       ON CONFLICT (id) DO NOTHING
        RETURNING *`,
       [
         bookingId,
@@ -102,9 +107,10 @@ export async function appendBookingActivityEvent(input, { throwOnError = false }
         input.subtitle ?? null,
         JSON.stringify(input.payload ?? {}),
         input.occurredAt ?? null,
+        input.idempotencyKey ?? null,
       ],
     );
-    return mapEventRow(result.rows[0]);
+    return result.rows[0] ? mapEventRow(result.rows[0]) : null;
   } catch (error) {
     console.error("[booking-activity] Failed to append event:", error.message);
     if (throwOnError) throw error;
@@ -114,6 +120,22 @@ export async function appendBookingActivityEvent(input, { throwOnError = false }
 
 export async function listBookingActivityEvents({ bookingId, bookingCode } = {}) {
   if (!bookingId && !bookingCode) return [];
+
+  if (bookingId) {
+    const booking = await query(`SELECT * FROM bookings WHERE id = $1 LIMIT 1`, [bookingId]);
+    if (booking.rows[0]) await logScheduledBookingStatusActivity(booking.rows[0]);
+    // Repair older missing payment logs from settled ledger events, never notes.paid.
+    const payments = await query(
+      `SELECT t.* FROM transactions t
+       WHERE t.booking_id = $1 AND t.type = 'PAYMENT' AND t.status = 'completed'
+         AND NOT EXISTS (
+           SELECT 1 FROM booking_activity_events a
+           WHERE a.id = md5('booking-payment:' || t.id::text)::uuid
+         )`,
+      [bookingId],
+    );
+    for (const payment of payments.rows) await logSettledBookingPaymentActivity(payment);
+  }
 
   const conditions = [];
   const values = [];
@@ -239,6 +261,7 @@ export async function logBookingStatusActivity(
     actor,
     userId,
     cancellationReason,
+    occurredAt,
   } = {},
 ) {
   if (!booking?.id && !booking?.unique_code) return;
@@ -260,11 +283,26 @@ export async function logBookingStatusActivity(
   const actorRole = actor || "client";
   const clientLabel = actorLabel || (actorRole === "professional" ? "Professional" : "Client");
   const priceSub = moneySubtitle(booking.total_price);
-  const now = new Date().toISOString();
+  const now = occurredAt || new Date().toISOString();
   const cancelReason =
     cancellationReason || parseNotesCancellationReason(booking.notes) || null;
+  let lifecycleEvent = null;
 
   if (status !== prev) {
+    if (status === "in_progress" || status === "completed") {
+      lifecycleEvent = await appendBookingActivityEvent({
+        bookingId,
+        bookingCode,
+        kind: status === "in_progress" ? KIND.BOOKING_IN_PROGRESS : KIND.BOOKING_COMPLETED,
+        title: status === "in_progress" ? "In Progress" : "Completed",
+        actor: actorRole,
+        actorLabel: actorLabel || (actorRole === "system" ? "System" : clientLabel),
+        userId: userId || null,
+        occurredAt: now,
+        payload: { previousStatus: prev, status },
+        idempotencyKey: `booking-status:${bookingId || bookingCode}:${status}:${booking.start_time || booking.booking_date || ""}:${booking.end_time || ""}`,
+      });
+    }
     if (status === "br_accepted" && prev === "requested") {
       if (canLogRequestAccepted) {
         await appendBookingActivityEvent({
@@ -362,6 +400,77 @@ export async function logBookingStatusActivity(
       subtitle: priceSub,
       occurredAt: now,
     });
+  }
+  return lifecycleEvent;
+}
+
+/** Persist the same scheduled lifecycle displayed by the client and calendar clocks. */
+export async function logScheduledBookingStatusActivity(booking, { now = new Date() } = {}) {
+  if (!["confirmed", "in_progress", "completed"].includes(String(booking?.status).toLowerCase())) return;
+  if (booking.edit_request?.status === "pending") return;
+  let changed = false;
+  for (const [time, status, previousStatus] of [
+    [booking.start_time, "in_progress", "confirmed"],
+    [booking.end_time, "completed", "in_progress"],
+  ]) {
+    if (!time || !Number.isFinite(new Date(time).getTime()) || new Date(time) > now) continue;
+    const event = await logBookingStatusActivity({ ...booking, status }, {
+      previousStatus,
+      previousPrepayment: booking.prepayment_status,
+      actor: "system",
+      actorLabel: "System",
+      occurredAt: new Date(time).toISOString(),
+    });
+    changed = changed || Boolean(event);
+  }
+  return changed;
+}
+
+/** One event per actual settled portion, shared by checkout, Pay Now and mark-paid. */
+export async function logSettledBookingPaymentActivity(payment) {
+  if (payment?.type !== "PAYMENT" || payment.status !== "completed" ||
+      !(Number(payment.amount) > 0) || !payment.booking_id || payment.metadata?.settlesAddon) return;
+  try {
+    const result = await query(
+      `SELECT b.*, ft.method_title, ft.method_detail, ft.status AS finance_status, ft.client_name AS payer_name,
+              ft.document AS payment_document
+       FROM bookings b LEFT JOIN finance_transactions ft ON ft.id = $2::uuid
+       WHERE b.id = $1 LIMIT 1`,
+      [payment.booking_id, payment.finance_transaction_id ?? null],
+    );
+    const booking = result.rows[0];
+    if (!booking) return;
+    if (payment.finance_transaction_id &&
+        !["paid", "prepaid", "completed", "refunded"].includes(String(booking.finance_status ?? "").toLowerCase())) return;
+    const meta = payment.metadata ?? {};
+    const payerRole = meta.payerRole || booking.payment_document?.payerRole || "main_client";
+    const payerLabel = payerRole === "guest" ? "Guest" : payerRole === "model" ? "Model" : "Client";
+    const actor = meta.actor || (payerRole === "main_client" ? "client" : "guest");
+    const method = [booking.method_title, booking.method_detail].filter(Boolean).join(" ");
+    const event = await appendBookingActivityEvent({
+      bookingId: booking.id,
+      bookingCode: booking.unique_code,
+      kind: KIND.POST_BOOKING_PAID,
+      title: `${payerLabel} paid ${payerRole === "main_client" ? "remaining portion" : "their portion"}`,
+      actor,
+      actorLabel: actor === "professional" ? "Professional" : booking.payer_name || payerLabel,
+      userId: meta.performed_by_user_id || (actor === "client" ? booking.customer_id : null),
+      subtitle: `${method ? `${method} · ` : ""}${Number(payment.amount).toFixed(2)} EUR`,
+      occurredAt: payment.created_at || meta.performed_at,
+      payload: {
+        transactionId: payment.id,
+        financeTransactionId: payment.finance_transaction_id,
+        payerKey: meta.payerKey || booking.payment_document?.payerKey || "main-client",
+        payerRole,
+        amount: Number(payment.amount),
+      },
+      idempotencyKey: `booking-payment:${payment.id}`,
+    });
+    if (event) emitBookingChanged(booking, "updated");
+    return event;
+  } catch (error) {
+    console.error("[booking-activity] Failed to log portion payment:", error.message);
+    return null;
   }
 }
 

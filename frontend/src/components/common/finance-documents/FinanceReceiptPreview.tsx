@@ -21,6 +21,7 @@ import {
   parseCurrencyValue,
   receiptNumberLabelForStatus,
   receiptTitleForStatus,
+  receiptPaymentStatus,
   receiptItemsTitleForStatus,
   displayReceiptNumber,
   financePreviewCardSx,
@@ -81,7 +82,7 @@ export default function FinanceReceiptPreview({
   const paymentMethod = frozenDocument
     ? [row?.methodTitle, row?.methodDetail].filter(Boolean).join(" ")
     : formatPaymentMethod(row);
-  const paymentStatus = row?.status ?? "Paid";
+  const paymentStatus = receiptPaymentStatus(row?.status);
 
   const downloadReceiptPdf = React.useCallback(async () => {
     if (onDownload) {

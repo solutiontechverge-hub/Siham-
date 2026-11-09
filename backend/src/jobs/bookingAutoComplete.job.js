@@ -3,6 +3,7 @@ import { syncBookingToFinanceTransaction } from "../services/finance-sync.servic
 import { safeEnsureProfessionalClientFromBooking } from "../services/professional-clients.service.js";
 import { emitBookingChanged } from "../messaging/messagingSocket.js";
 import { dispatchBookingUpdatedNotifications } from "../services/bookingNotification.service.js";
+import { logBookingStatusActivity, logScheduledBookingStatusActivity } from "../services/bookingActivity.service.js";
 import {
   BOOKING_WALKOUT_GRACE_MINUTES,
   isCheckoutCloseOutComplete,
@@ -58,6 +59,13 @@ const completeBookingsByIds = async (eligibleIds, allowedStatuses) => {
   );
 
   for (const booking of result.rows) {
+    await logBookingStatusActivity(booking, {
+      previousStatus: booking.prev_status,
+      previousPrepayment: booking.prepayment_status,
+      actor: "system",
+      actorLabel: "System",
+      occurredAt: booking.end_time || undefined,
+    });
     try {
       await syncBookingToFinanceTransaction(booking.id, {
         paymentMethod: booking.booking_type === "offline" ? "offlineDirect" : "onlineDirect",
@@ -83,7 +91,7 @@ const runAutoCompleteCycle = async () => {
   try {
     // ponytail: confirmed → completed on clock; No Show window = before end only
     const confirmedPast = await query(
-      `SELECT id
+      `SELECT *
          FROM bookings
         WHERE status = 'confirmed'
           AND ${PAST_END_SQL}
@@ -91,11 +99,18 @@ const runAutoCompleteCycle = async () => {
     );
 
     const inProgressPast = await query(
-      `SELECT id, notes, end_time, booking_date
+      `SELECT *
          FROM bookings
         WHERE status = 'in_progress'
           AND ${PAST_END_SQL}`,
     );
+
+    // The calendar's clock reaches Completed independently of payment close-out.
+    for (const booking of [...confirmedPast.rows, ...inProgressPast.rows]) {
+      if (await logScheduledBookingStatusActivity(booking)) {
+        emitBookingChanged(booking, "updated");
+      }
+    }
 
     const inProgressIds = inProgressPast.rows
       .filter((row) => {

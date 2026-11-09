@@ -15,7 +15,8 @@ import FinanceInvoicePreview from "./FinanceInvoicePreview";
 import FinanceReceiptPreview, {
   resolveReceiptTotalLabel,
 } from "./FinanceReceiptPreview";
-import { buildPreviewLineItems, getIssuedDocument, getIssuedDocumentSnapshot, hasStoredDocumentSnapshot, resolveInvoiceTemplateType } from "./financeDocumentUtils";
+import { buildPreviewLineItems, getIssuedDocument, getIssuedDocumentSnapshot, hasStoredDocumentSnapshot, resolveInvoiceTemplateType, withLiveTransactionPaymentState } from "./financeDocumentUtils";
+import { useGetFinanceTransactionsQuery } from "../../../store/services/financeApi";
 import { isMollureFinanceClient } from "./financeClientAccess";
 import type { FinanceProfessionalBusinessOverride } from "./financeDocumentTypes";
 import type {
@@ -47,10 +48,22 @@ export default function FinanceDocumentPreviewDrawer({
   professionalBusinessOverride = null,
 }: FinanceDocumentPreviewDrawerProps) {
   const m = useTheme().palette.mollure;
-  const frozenDocument = hasStoredDocumentSnapshot(row);
-  const renderRow = row && row.issuedDocument
-    ? { ...row, document: getIssuedDocument(row) ?? row.document }
+  const bookingId = row?.bookingId;
+  const { currentData: liveTransactions } = useGetFinanceTransactionsQuery(
+    { bookingId, limit: 200 },
+    {
+      skip: !open || documentType !== "receipt" || !bookingId,
+      refetchOnMountOrArgChange: true,
+      pollingInterval: 12_000,
+    },
+  );
+  const liveRow = documentType === "receipt"
+    ? withLiveTransactionPaymentState(row, liveTransactions?.data?.rows ?? [])
     : row;
+  const frozenDocument = hasStoredDocumentSnapshot(row);
+  const renderRow = liveRow && liveRow.issuedDocument
+    ? { ...liveRow, document: getIssuedDocument(liveRow) ?? liveRow.document }
+    : liveRow;
   const issuedSnapshot = getIssuedDocumentSnapshot(row);
   const issuedBusinessOverride = issuedSnapshot?.professionalBusiness
     ? {
@@ -82,8 +95,8 @@ export default function FinanceDocumentPreviewDrawer({
     [renderRow, settings],
   );
   const totalPriceLabel = React.useMemo(
-    () => resolveReceiptTotalLabel(row, lineItems),
-    [lineItems, row],
+    () => resolveReceiptTotalLabel(renderRow, lineItems),
+    [lineItems, renderRow],
   );
   const titleLabel = documentType === "receipt" ? "Receipt" : "Invoice";
   const isMollureClient =

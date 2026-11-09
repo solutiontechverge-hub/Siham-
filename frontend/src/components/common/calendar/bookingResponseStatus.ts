@@ -1,21 +1,39 @@
 import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { BookingIndicatorVariant } from "./BookingIndicatorIcon";
 import { prepayBlocksConfirmation } from "./bookingAcknowledgment";
-import { resolvePostBookingPendingPayment } from "./bookingCheckout";
 import {
   shouldShowExpiredResponseBanner,
   type ResponseWindowInput,
 } from "./bookingResponseDeadline";
 import { resolveTimeBasedCalendarStatus } from "./bookingStatus";
 import { resolveCalendarPrepaymentStatus } from "./prepaymentStatus";
+import { parseBookingFinancialsFromNotes } from "./bookingEventDetails";
 
 export type CalendarResponseStatus = "suggestion_for_change" | "overdue_response";
+
+/** Appointment completion and a deposit do not confirm the remaining payment. */
+export function resolveBookingPaymentIconStatus(
+  event: Pick<CalendarEvent, "status" | "details"> &
+    Partial<Pick<CalendarEvent, "notes" | "date" | "start" | "end">>,
+) {
+  const status = resolveTimeBasedCalendarStatus(event);
+  if (status !== "In Progress" && status !== "Completed") {
+    return resolveCalendarPrepaymentStatus(event);
+  }
+  if (event.details?.refunded) return undefined;
+  const financials = parseBookingFinancialsFromNotes(event.notes);
+  const paymentStatus = String(financials?.payment_status ?? "").trim().toLowerCase();
+  return (paymentStatus === "paid" || paymentStatus === "completed") &&
+    !(Number(financials?.outstanding_balance) > 0)
+    ? "confirmed" as const
+    : "pending" as const;
+}
 
 export function resolveBookingResponseIndicators(
   event: Pick<
     CalendarEvent,
     "id" | "bookingScenario" | "details" | "status" | "date" | "start"
-  >,
+  > & Partial<Pick<CalendarEvent, "notes" | "end">>,
   opts?: {
     responseTimeConfigured?: boolean;
     responseTime?: ResponseWindowInput | null;
@@ -23,7 +41,7 @@ export function resolveBookingResponseIndicators(
 ): BookingIndicatorVariant[] {
   const indicators: BookingIndicatorVariant[] = [];
   const details = event.details;
-  const prepayment = resolveCalendarPrepaymentStatus(event);
+  const prepayment = resolveBookingPaymentIconStatus(event);
   const prepayRequired = Boolean(details?.showPrepayment);
   const prepayPaid = prepayment === "confirmed";
   // Waiting/overdue response clock only while accept is still pending.
@@ -48,7 +66,7 @@ export function resolveBookingResponseIndicators(
   if (waitingPrepay) {
     // Shared €-in-circle pending seal — BR outstanding or post-accept client pay wait.
     indicators.push("waiting_for_prepayment");
-  } else if (prepayRequired && prepayPaid) {
+  } else if (prepayPaid) {
     indicators.push("prepaid");
   }
 
@@ -59,7 +77,7 @@ export function resolveBookingResponseIndicators(
   if (
     (displayStatus === "In Progress" || displayStatus === "Completed") &&
     !details?.refunded &&
-    resolvePostBookingPendingPayment(event as CalendarEvent)
+    prepayment === "pending"
   ) {
     const due = details?.invoiceDueDate?.trim();
     const overdue =
@@ -68,6 +86,8 @@ export function resolveBookingResponseIndicators(
       !Number.isNaN(new Date(`${due}T00:00:00`).getTime()) &&
       new Date(`${due}T00:00:00`).getTime() <
         new Date(new Date().toISOString().slice(0, 10) + "T00:00:00").getTime();
+    const prepayIndex = indicators.indexOf("waiting_for_prepayment");
+    if (prepayIndex !== -1) indicators.splice(prepayIndex, 1);
     indicators.push(overdue ? "overdue_payment" : "waiting_for_payment");
   }
 

@@ -2,7 +2,7 @@
  * Run with: npx --yes tsx src/components/common/calendar/bookingResponseStatus.test.ts
  */
 import assert from "node:assert/strict";
-import { resolveBookingResponseIndicators } from "./bookingResponseStatus";
+import { resolveBookingPaymentIconStatus, resolveBookingResponseIndicators } from "./bookingResponseStatus";
 
 const base = {
   id: "b1",
@@ -93,5 +93,30 @@ assert.ok(
   pendingEr.includes("response_time_active"),
   "Confirmed + ER still awaiting accept → waiting-for-response",
 );
+
+const completedPayment = {
+  ...base,
+  status: "Completed" as const,
+  details: { showPrepayment: true, prepaymentStatus: "confirmed" as const },
+};
+for (const payment_status of [undefined, "Pending", "Unpaid", "Prepaid"]) {
+  const event = {
+    ...completedPayment,
+    notes: `---mollure-meta---\n${JSON.stringify({ financials: { payment_status, outstanding_balance: 70.4 } })}`,
+  };
+  assert.equal(resolveBookingPaymentIconStatus(event), "pending", "a deposit or completed appointment cannot confirm full payment");
+  const indicators = resolveBookingResponseIndicators(event);
+  assert.ok(indicators.includes("waiting_for_payment"));
+  assert.ok(!indicators.includes("prepaid"), "no green currency tick while remaining payment is pending");
+}
+for (const payment_status of ["Paid", "Completed"]) {
+  const event = {
+    ...completedPayment,
+    notes: `---mollure-meta---\n${JSON.stringify({ financials: { payment_status, outstanding_balance: 0 } })}`,
+  };
+  assert.equal(resolveBookingPaymentIconStatus(event), "confirmed");
+  assert.ok(resolveBookingResponseIndicators(event).includes("prepaid"));
+  assert.ok(!resolveBookingResponseIndicators(event).includes("waiting_for_payment"));
+}
 
 console.log("bookingResponseStatus.test.ts: ok");

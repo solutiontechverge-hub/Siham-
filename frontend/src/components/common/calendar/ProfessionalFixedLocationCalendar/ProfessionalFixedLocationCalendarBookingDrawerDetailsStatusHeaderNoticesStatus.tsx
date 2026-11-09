@@ -73,10 +73,10 @@ import PaymentDueIcon from "../../client-booking/PaymentDueIcon";
 import {
   actionRequiredBookingIndicators,
   resolveBookingResponseIndicators,
+  resolveBookingPaymentIconStatus,
 } from "../bookingResponseStatus";
 
 import {
-  resolveCalendarPrepaymentStatus,
   toPrepaymentIconVariant,
 } from "../prepaymentStatus";
 
@@ -249,7 +249,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
                 }),
               );
               const prepayment =
-                resolveCalendarPrepaymentStatus(viewingBookingEvent);
+                resolveBookingPaymentIconStatus(viewingBookingEvent);
               const prepaymentVariant = prepayment
                 ? toPrepaymentIconVariant(prepayment)
                 : undefined;
@@ -385,7 +385,7 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
               }),
             );
             const prepayment =
-              resolveCalendarPrepaymentStatus(viewingBookingEvent);
+              resolveBookingPaymentIconStatus(viewingBookingEvent);
             const hasBr = scenarioIndicators.includes("BR");
             const waitingClientPrepay = professionalWaitingForClientPrepay(
               viewingBookingEvent,
@@ -395,7 +395,8 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
 
             const timingStandalone = responseIndicators.filter(
               (item) =>
-                item === "overdue_response" || item === "response_time_active",
+                item === "overdue_response" || item === "response_time_active" ||
+                item === "waiting_for_payment" || item === "overdue_payment",
             );
             if (scenarioIndicators.length && !hasBr) {
               // Scenario chips own most indicators; waiting/overdue + prepaid stay standalone.
@@ -413,7 +414,10 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerDetailsSta
             // Confirmed prepaid always surfaces unless the EBR chip already renders it.
             // Pending (incl. BR Accepted waiting for client pay) shows the € seal.
             const ebrOwnsPrepaymentIcon = scenarioIndicators.includes("EBR");
-            const standalonePrepayment = waitingClientPrepay
+            const standalonePrepayment = responseIndicators.includes("waiting_for_payment") ||
+              responseIndicators.includes("overdue_payment")
+              ? undefined
+              : waitingClientPrepay
               ? ("pending" as const)
               : prepayment &&
                   (prepayment === "confirmed"

@@ -95,6 +95,8 @@ export function useProfessionalFixedLocationCalendarSalesActivity({
     },
     {
       skip: !activityBookingId && !activityBookingCode,
+      refetchOnMountOrArgChange: true,
+      pollingInterval: slotDrawerOpen && slotDrawerTab === "activity" ? 12_000 : 0,
     },
   );
 

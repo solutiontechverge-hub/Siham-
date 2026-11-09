@@ -4,6 +4,9 @@ import * as React from "react";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
+import PlayCircleOutlineRoundedIcon from "@mui/icons-material/PlayCircleOutlineRounded";
+import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
+import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
 import { Box, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { mollureSectionTitleSx, mollureBodySx, mollureBodyMutedSx } from "../../../theme/mollureHierarchy";
@@ -33,6 +36,13 @@ function ActivityCard({
   onOpen?: () => void;
 }) {
   const m = useTheme().palette.mollure;
+  const ActivityIcon = item.kind === "booking_in_progress"
+    ? PlayCircleOutlineRoundedIcon
+    : item.kind === "booking_completed"
+      ? CheckCircleOutlineRoundedIcon
+      : item.kind === "post_booking_paid"
+        ? PaymentsOutlinedIcon
+        : null;
 
   return (
     <Box sx={{ position: "relative", pl: 2 }}>
@@ -85,16 +95,19 @@ function ActivityCard({
             >
               {item.actorLabel}
             </Typography>
-            <Typography
-              sx={{
-                fontSize: 13,
-                fontWeight: 900,
-                color: alpha(m.navy, 0.88),
-                lineHeight: 1.3,
-              }}
-            >
-              {item.title}
-            </Typography>
+            <Stack direction="row" alignItems="center" spacing={0.75}>
+              {ActivityIcon ? <ActivityIcon sx={{ fontSize: 18, color: m.teal }} /> : null}
+              <Typography
+                sx={{
+                  fontSize: 13,
+                  fontWeight: 900,
+                  color: alpha(m.navy, 0.88),
+                  lineHeight: 1.3,
+                }}
+              >
+                {item.title}
+              </Typography>
+            </Stack>
             {item.subtitle ? (
               <Typography
                 sx={{

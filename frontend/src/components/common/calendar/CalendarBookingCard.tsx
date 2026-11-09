@@ -37,12 +37,12 @@ import {
 import {
   actionRequiredBookingIndicators,
   resolveBookingResponseIndicators,
+  resolveBookingPaymentIconStatus,
 } from "./bookingResponseStatus";
 import type { ResponseWindowInput } from "./bookingResponseDeadline";
 import { resolveProfessionalBookingRequestDirection } from "./BookingRequestBadge";
 import {
   actionRequiredPrepaymentIconVariant,
-  resolveCalendarPrepaymentStatus,
   toPrepaymentIconVariant,
 } from "./prepaymentStatus";
 import { useBookingPaymentDueMeta } from "./resolveBookingPaymentDueMeta";
@@ -293,9 +293,11 @@ export default function CalendarBookingCard({
       responseTime,
     }),
   );
-  const prepaymentStatus = resolveCalendarPrepaymentStatus(event);
+  const prepaymentStatus = resolveBookingPaymentIconStatus(event);
   const prepaymentIconVariant = actionRequiredPrepaymentIconVariant(
-    waitingForClientPrepay
+    responseIndicators.includes("waiting_for_payment") || responseIndicators.includes("overdue_payment")
+      ? undefined
+      : waitingForClientPrepay
       ? "pending"
       : prepaymentStatus
         ? toPrepaymentIconVariant(prepaymentStatus)
@@ -449,7 +451,8 @@ export default function CalendarBookingCard({
         : scenarioIndicators.length
           ? responseIndicators.filter(
               (item) =>
-                item === "overdue_response" || item === "response_time_active",
+                item === "overdue_response" || item === "response_time_active" ||
+                item === "waiting_for_payment" || item === "overdue_payment",
             )
           : responseIndicators;
       if (!raw?.length) return raw;

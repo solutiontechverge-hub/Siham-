@@ -624,4 +624,22 @@ assert.equal(
   "empty server activity must not invent timeline rows",
 );
 
+const lifecycleEvents = [
+  { id: "started", bookingId: "activity-booking", kind: "booking_in_progress", title: "In Progress", actor: "system", occurredAt: "2026-11-03T09:15:00Z" },
+  { id: "portion", bookingId: "activity-booking", kind: "post_booking_paid", title: "Client paid remaining portion", actor: "client", actorLabel: "Client Ali", subtitle: "Online - Direct Card · 70.40 EUR", occurredAt: "2026-11-03T10:30:00Z" },
+  { id: "finished", bookingId: "activity-booking", kind: "booking_completed", title: "Completed", actor: "system", occurredAt: "2026-11-03T10:15:00Z" },
+];
+const lifecycleInput = {
+  bookings: [],
+  currentBookingId: "activity-booking",
+  apiEvents: lifecycleEvents,
+};
+const lifecycleItems = buildBookingActivityTimeline({ ...lifecycleInput, mode: "activity" });
+assert.deepEqual(lifecycleItems.map((item) => item.id), ["portion", "finished", "started"], "service transitions and portion payments sort by actual occurrence, newest first");
+assert.deepEqual(lifecycleItems.map((item) => item.kind), ["post_booking_paid", "booking_completed", "booking_in_progress"], "new server lifecycle kinds must not map to booking_created");
+assert.equal(lifecycleItems[0].subtitle, "Online - Direct Card · 70.40 EUR");
+assert.equal(lifecycleItems[0].actorLabel, "Client Ali");
+assert.ok(lifecycleItems.every((item) => item.dateLabel && item.timeLabel));
+assert.deepEqual(buildBookingActivityTimeline({ ...lifecycleInput, mode: "sales" }).map((item) => item.id), ["portion"], "portion payments also appear in sales activity without lifecycle rows");
+
 console.log("buildBookingActivityTimeline.test.ts passed");
