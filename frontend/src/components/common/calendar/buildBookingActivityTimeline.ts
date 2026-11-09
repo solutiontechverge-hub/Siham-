@@ -76,6 +76,14 @@ function pushItem(items: BookingActivityItem[], item: Omit<BookingActivityItem, 
   });
 }
 
+/** Newest first; stable when occurredAt matches (DB insert order). */
+function compareTimelineItems(a: BookingActivityItem, b: BookingActivityItem): number {
+  const at = parseDate(a.occurredAt)?.getTime() ?? 0;
+  const bt = parseDate(b.occurredAt)?.getTime() ?? 0;
+  if (bt !== at) return bt - at;
+  return String(b.id).localeCompare(String(a.id));
+}
+
 function isOfflineBooking(booking: {
   booking_type?: string | null;
   unique_code?: string | null;
@@ -939,7 +947,7 @@ function synthesizeBookingActivity(
         actor: "professional",
         actorLabel: "Professional",
         title: "Confirmed",
-        occurredAt: created.toISOString(),
+        occurredAt: (requestFlow && !offline ? updated : created).toISOString(),
         hasDetailArrow: false,
       });
     }
@@ -1081,11 +1089,7 @@ function synthesizeBookingActivity(
 
   const filtered = mode === "sales" ? items.filter((item) => isSalesKind(item.kind)) : items;
 
-  return filtered.sort((a, b) => {
-    const at = parseDate(a.occurredAt)?.getTime() ?? 0;
-    const bt = parseDate(b.occurredAt)?.getTime() ?? 0;
-    return bt - at;
-  });
+  return filtered.sort(compareTimelineItems);
 }
 
 export function buildBookingActivityTimeline(input: BookingActivityBuildInput): BookingActivityItem[] {
@@ -1096,11 +1100,7 @@ export function buildBookingActivityTimeline(input: BookingActivityBuildInput): 
     const mapped = dedupeActivityItems(mapApiEventsToItems(apiEvents, fallbackId));
     const filtered =
       input.mode === "sales" ? mapped.filter((item) => isSalesKind(item.kind)) : mapped;
-    const sorted = filtered.sort((a, b) => {
-      const at = parseDate(a.occurredAt)?.getTime() ?? 0;
-      const bt = parseDate(b.occurredAt)?.getTime() ?? 0;
-      return bt - at;
-    });
+    const sorted = filtered.sort(compareTimelineItems);
     return enrichItemsWithComparison(sorted, input);
   }
 

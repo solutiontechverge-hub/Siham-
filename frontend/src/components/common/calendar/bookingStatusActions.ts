@@ -316,8 +316,8 @@ export function showProfessionalActionMenu(
 }
 
 /**
- * Pin Checkout for In Progress / Completed.
- * Enable only while `resolvePostBookingPendingPayment` is non-null (footer disables otherwise).
+ * Pin Checkout for In Progress / Completed (visibility shell).
+ * Footer enables via `canEnablePersistentBookingCheckout` (not raw pending payment).
  */
 export function showPersistentCheckoutButton(
   event:

@@ -10,8 +10,11 @@ import type {
   SalesCheckoutPaymentMethod,
   SalesClientKind,
 } from "./salesOverview.types";
+import { getSalesCardMeta } from "./salesOverview.storage";
 import {
   parseSplitBillState,
+  type BookingSplitBillState,
+  type BookingSplitPayerRecord,
   unpaidSplitPayers,
 } from "./salesSplitBill";
 
@@ -67,6 +70,29 @@ export function afterTreatmentCardId(bookingId: string) {
 
 export function afterTreatmentSubCardId(bookingId: string, payerKey: string) {
   return `${bookingId}-after-treatment-sub-${payerKey}`;
+}
+
+function afterTreatmentCardIdForSplitPayer(
+  bookingId: string,
+  split: BookingSplitBillState,
+  payer: BookingSplitPayerRecord,
+) {
+  return split.mode === "single" || payer.role === "main_client"
+    ? afterTreatmentCardId(bookingId)
+    : afterTreatmentSubCardId(bookingId, payer.key);
+}
+
+/** Unpaid split share still needs pro checkout (no sales meta = client Pay Now not issued yet). */
+function unpaidSplitPayerStillNeedsProCheckout(
+  bookingId: string,
+  split: BookingSplitBillState,
+): boolean {
+  const unpaid = unpaidSplitPayers(split);
+  if (!unpaid.length) return false;
+  return unpaid.some(
+    (payer) =>
+      !getSalesCardMeta(afterTreatmentCardIdForSplitPayer(bookingId, split, payer)),
+  );
 }
 
 export type PostBookingPendingPayment = {
@@ -176,6 +202,28 @@ export function resolvePostBookingPendingPayment(
   return null;
 }
 
+/**
+ * Booking drawer Checkout — enable only before pro after-treatment checkout runs.
+ * Client-owed balances (online direct / split) keep pending indicators but must not reopen checkout.
+ */
+export function canEnablePersistentBookingCheckout(
+  event: CalendarEvent | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  if (!event || resolvePostBookingPendingPayment(event, now) == null) {
+    return false;
+  }
+  const bookingId = parseApiCalendarEventId(event.id)?.id ?? event.id;
+  const split = parseSplitBillState(event.details?.splitBill);
+  if (split?.payers?.length) {
+    return unpaidSplitPayerStillNeedsProCheckout(bookingId, split);
+  }
+  if (event.details?.waitingForPayment) {
+    return !getSalesCardMeta(afterTreatmentCardId(bookingId));
+  }
+  return true;
+}
+
 /** Auto-open booking checkout when display status hits Completed with unpaid balance. */
 export function shouldAutoOpenBookingCheckout(
   event: CalendarEvent | null | undefined,
@@ -183,7 +231,7 @@ export function shouldAutoOpenBookingCheckout(
 ): boolean {
   if (!event || event.details?.refunded) return false;
   if (resolveTimeBasedCalendarStatus(event, now) !== "Completed") return false;
-  return resolvePostBookingPendingPayment(event, now) != null;
+  return canEnablePersistentBookingCheckout(event, now);
 }
 
 const SALES_CHECKOUT_PAYMENT_OPTIONS: Array<{

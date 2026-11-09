@@ -27,6 +27,7 @@ import {
   logBookingCreatedActivity,
   logEditRequestActivity,
   logBookingStatusActivity,
+  logSplitBillPaymentActivities,
 } from "../services/bookingActivity.service.js";
 import { getTeamMemberReviewAggregates } from "../services/review.service.js";
 import { safeEnsureProfessionalClientFromBooking } from "../services/professional-clients.service.js";
@@ -3616,6 +3617,14 @@ export const updateMyBooking = async (req, res) => {
       actorLabel: "Client",
       userId: req.user?.id ?? null,
     });
+    if (hasNotes && String(booking.notes ?? "") !== String(existing.notes ?? "")) {
+      void logSplitBillPaymentActivities(booking, {
+        previousNotes: existing.notes,
+        actor: "client",
+        userId: req.user?.id ?? null,
+        defaultClientLabel: existing.customer_name || "Client",
+      });
+    }
     emitBookingChanged(booking, "updated");
 
     return res.status(200).json({
@@ -3977,6 +3986,14 @@ export const updateBookingStatus = async (req, res) => {
       actorLabel: "Professional",
       userId: req.user?.id ?? null,
     });
+    if (String(booking.notes ?? "") !== String(existingBooking.notes ?? "")) {
+      void logSplitBillPaymentActivities(booking, {
+        previousNotes: existingBooking.notes,
+        actor: "professional",
+        userId: req.user?.id ?? null,
+        defaultClientLabel: existingBooking.customer_name || "Client",
+      });
+    }
 
     emitBookingChanged(booking, "updated");
 

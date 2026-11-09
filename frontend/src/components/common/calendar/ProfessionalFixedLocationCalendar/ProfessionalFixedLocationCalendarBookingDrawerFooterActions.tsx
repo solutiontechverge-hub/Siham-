@@ -1,13 +1,18 @@
 "use client";
 
+import * as React from "react";
+
 import AppButton from "../../AppButton";
 
 import { Box, Stack } from "@mui/material";
 
 import { alpha } from "@mui/material/styles";
 
-import { resolvePostBookingPendingPayment } from "../bookingCheckout";
+import {
+  canEnablePersistentBookingCheckout,
+} from "../bookingCheckout";
 import { showPersistentCheckoutButton } from "../bookingStatusActions";
+import { SALES_META_CHANGED_EVENT } from "../salesOverview.storage";
 
 import { useProfessionalFixedLocationCalendar } from "./useProfessionalFixedLocationCalendar";
 
@@ -116,11 +121,21 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerFooterActi
     viewingBookingEvent,
   } = bag;
 
-  const checkoutEnabled =
-    resolvePostBookingPendingPayment(viewingBookingEvent) != null;
+  const [salesMetaTick, setSalesMetaTick] = React.useState(0);
+  React.useEffect(() => {
+    const onMeta = () => setSalesMetaTick((n) => n + 1);
+    window.addEventListener(SALES_META_CHANGED_EVENT, onMeta);
+    return () => window.removeEventListener(SALES_META_CHANGED_EVENT, onMeta);
+  }, []);
+
+  void salesMetaTick;
+
+  const showCheckout =
+    showPersistentCheckoutButton(viewingBookingEvent) &&
+    canEnablePersistentBookingCheckout(viewingBookingEvent);
 
   if (standaloneCheckout) {
-    if (!showPersistentCheckoutButton(viewingBookingEvent)) return null;
+    if (!showCheckout) return null;
     return (
       <Box
         sx={{
@@ -134,7 +149,6 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerFooterActi
         <Stack direction="row" justifyContent="flex-end">
           <AppButton
             tone="primary"
-            disabled={!checkoutEnabled}
             onClick={() => void handleBookingActionSelect("checkout")}
             sx={{ height: 38, minWidth: 110 }}
           >
@@ -357,11 +371,9 @@ export default function ProfessionalFixedLocationCalendarBookingDrawerFooterActi
             {drawerPrimaryActionLabel}
           </AppButton>
         ))}
-      {showPersistentCheckoutButton(viewingBookingEvent) &&
-      slotBookingScreen === "new-booking" ? (
+      {showCheckout && slotBookingScreen === "new-booking" ? (
         <AppButton
           tone="primary"
-          disabled={!checkoutEnabled}
           onClick={() => void handleBookingActionSelect("checkout")}
           sx={{
             height: 38,

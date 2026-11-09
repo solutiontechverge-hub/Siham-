@@ -642,4 +642,54 @@ assert.equal(lifecycleItems[0].actorLabel, "Client Ali");
 assert.ok(lifecycleItems.every((item) => item.dateLabel && item.timeLabel));
 assert.deepEqual(buildBookingActivityTimeline({ ...lifecycleInput, mode: "sales" }).map((item) => item.id), ["portion"], "portion payments also appear in sales activity without lifecycle rows");
 
+const splitPayments = buildBookingActivityTimeline({
+  bookings: [
+    {
+      id: "split-1",
+      unique_code: "BK-SPLIT",
+      status: "completed",
+      customer_name: "Liza",
+      created_at: "2026-09-21T09:00:00.000Z",
+    },
+  ],
+  clientName: "Liza",
+  currentBookingId: "split-1",
+  currentBookingCode: "BK-SPLIT",
+  apiEvents: [
+    {
+      id: "e-conf",
+      bookingId: "split-1",
+      kind: "booking_confirmed",
+      actor: "professional",
+      actorLabel: "Professional",
+      title: "Confirmed",
+      occurredAt: "2026-09-21T10:00:00.000Z",
+    },
+    {
+      id: "e-main-pay",
+      bookingId: "split-1",
+      kind: "post_booking_paid",
+      actor: "client",
+      actorLabel: "Liza",
+      title: "After-treatment payment completed",
+      subtitle: "Online Direct (60.00 EUR)",
+      occurredAt: "2026-09-21T12:05:00.000Z",
+    },
+    {
+      id: "e-guest-pay",
+      bookingId: "split-1",
+      kind: "post_booking_paid",
+      actor: "guest",
+      actorLabel: "Bea",
+      title: "Guest payment completed",
+      subtitle: "Online Direct (40.00 EUR)",
+      occurredAt: "2026-09-21T14:00:00.000Z",
+    },
+  ],
+  mode: "activity",
+});
+assert.equal(splitPayments[0]?.kind, "post_booking_paid");
+assert.equal(splitPayments[0]?.actorLabel, "Bea");
+assert.equal(splitPayments[2]?.kind, "booking_confirmed");
+
 console.log("buildBookingActivityTimeline.test.ts passed");

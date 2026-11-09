@@ -8,6 +8,7 @@ import {
 import { resolveTimeBasedCalendarStatus } from "./bookingStatus";
 import { resolveCalendarPrepaymentStatus } from "./prepaymentStatus";
 import { parseBookingFinancialsFromNotes } from "./bookingEventDetails";
+import { resolvePostBookingPendingPayment } from "./bookingCheckout";
 
 export type CalendarResponseStatus = "suggestion_for_change" | "overdue_response";
 
@@ -58,6 +59,14 @@ export function resolveBookingResponseIndicators(
     indicators.push("suggestion_for_change");
   }
 
+  const displayStatus = resolveTimeBasedCalendarStatus(
+    event as CalendarEvent,
+  );
+  const postBookingPending =
+    (displayStatus === "In Progress" || displayStatus === "Completed") &&
+    !details?.refunded &&
+    resolvePostBookingPendingPayment(event as CalendarEvent);
+
   const waitingPrepay =
     prepayment === "pending" ||
     ((event.status === "BR Accepted" || event.status === "Requested") &&
@@ -66,19 +75,12 @@ export function resolveBookingResponseIndicators(
   if (waitingPrepay) {
     // Shared €-in-circle pending seal — BR outstanding or post-accept client pay wait.
     indicators.push("waiting_for_prepayment");
-  } else if (prepayPaid) {
+  } else if (prepayRequired && prepayPaid && !postBookingPending) {
+    // Prepay tick hides while after-treatment / split balance is still outstanding.
     indicators.push("prepaid");
   }
 
-  // Time-based In Progress / Completed — signal unpaid close-out (incl. Confirmed past end).
-  const displayStatus = resolveTimeBasedCalendarStatus(
-    event as CalendarEvent,
-  );
-  if (
-    (displayStatus === "In Progress" || displayStatus === "Completed") &&
-    !details?.refunded &&
-    prepayment === "pending"
-  ) {
+  if (postBookingPending) {
     const due = details?.invoiceDueDate?.trim();
     const overdue =
       displayStatus === "Completed" &&

@@ -34,6 +34,7 @@ import {
   hideConnectedChainStatusBadge,
   resolveConnectedChainBlockStatus,
 } from "./connectedChainBadge";
+import { resolvePostBookingPendingPayment } from "./bookingCheckout";
 import {
   actionRequiredBookingIndicators,
   resolveBookingResponseIndicators,
@@ -294,14 +295,17 @@ export default function CalendarBookingCard({
     }),
   );
   const prepaymentStatus = resolveBookingPaymentIconStatus(event);
+  const postBookingPending = resolvePostBookingPendingPayment(event);
   const prepaymentIconVariant = actionRequiredPrepaymentIconVariant(
     responseIndicators.includes("waiting_for_payment") || responseIndicators.includes("overdue_payment")
       ? undefined
       : waitingForClientPrepay
       ? "pending"
-      : prepaymentStatus
-        ? toPrepaymentIconVariant(prepaymentStatus)
-        : undefined,
+      : postBookingPending
+        ? undefined
+        : prepaymentStatus
+          ? toPrepaymentIconVariant(prepaymentStatus)
+          : undefined,
   );
   const paymentDueMeta = useBookingPaymentDueMeta(event);
   const isDesiredLocation = event.location === "DL";

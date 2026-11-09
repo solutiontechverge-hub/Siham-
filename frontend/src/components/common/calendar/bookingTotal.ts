@@ -40,7 +40,7 @@ export type BookingPriceBreakdown = {
   prepaymentAmount: number;
   /** Amount deducted from payable because prepayment is paid / applied. */
   prepaidApplied: number;
-  /** Amount still owed — shown as Total Price in the drawer. */
+  /** Amount still owed after prepaid applied (Remaining row — not Total Price). */
   payableTotal: number;
   remainingAfterPrepayment: number;
 };
@@ -248,17 +248,12 @@ export function buildBookingPriceSummaryLines(input: {
 
 export function resolveBookingPriceDisplay(input: {
   breakdown: BookingPriceBreakdown;
+  /** Kept for callers; prepaid remainder is a breakdown row, never remapped onto Total. */
   prepaymentPaid?: boolean;
 }): { displayTotal: number; originalPrice: number | null } {
-  const { breakdown, prepaymentPaid } = input;
+  const { breakdown } = input;
   const preDiscount = roundMoney(breakdown.lineSubtotal + breakdown.extrasAmount);
-  if (prepaymentPaid && breakdown.prepaymentAmount > 0) {
-    return {
-      displayTotal: breakdown.payableTotal,
-      originalPrice:
-        breakdown.discountAmount > 0 ? preDiscount : breakdown.bookingTotal,
-    };
-  }
+  // Strike only for real discounts. Prepaid → Remaining row (not Total = payable + strike).
   if (breakdown.discountAmount > 0) {
     return {
       displayTotal: breakdown.bookingTotal,

@@ -97,7 +97,20 @@ assert.ok(
 const completedPayment = {
   ...base,
   status: "Completed" as const,
-  details: { showPrepayment: true, prepaymentStatus: "confirmed" as const },
+  details: {
+    showPrepayment: true,
+    prepaymentStatus: "confirmed" as const,
+    prepaymentPercent: "50",
+    services: [{ id: "s1", name: "Cut", price: 140.8, durationMins: 30 }],
+  },
+};
+const completedPaidInFull = {
+  ...completedPayment,
+  details: {
+    ...completedPayment.details,
+    prepaymentPercent: "100",
+    services: [{ id: "s1", name: "Cut", price: 100, durationMins: 30 }],
+  },
 };
 for (const payment_status of [undefined, "Pending", "Unpaid", "Prepaid"]) {
   const event = {
@@ -111,12 +124,60 @@ for (const payment_status of [undefined, "Pending", "Unpaid", "Prepaid"]) {
 }
 for (const payment_status of ["Paid", "Completed"]) {
   const event = {
-    ...completedPayment,
+    ...completedPaidInFull,
     notes: `---mollure-meta---\n${JSON.stringify({ financials: { payment_status, outstanding_balance: 0 } })}`,
   };
   assert.equal(resolveBookingPaymentIconStatus(event), "confirmed");
   assert.ok(resolveBookingResponseIndicators(event).includes("prepaid"));
   assert.ok(!resolveBookingResponseIndicators(event).includes("waiting_for_payment"));
 }
+
+const splitAfterTreatmentPending = resolveBookingResponseIndicators({
+  id: "booking-1",
+  bookingScenario: "E" as const,
+  status: "Completed" as const,
+  date: "2099-06-01",
+  start: "10:00",
+  details: {
+    showPrepayment: true,
+    prepaymentStatus: "confirmed",
+    prepaymentPercent: "50",
+    services: [{ id: "s1", name: "Cut", price: 100, durationMins: 30 }],
+    splitBill: {
+      mode: "split",
+      prepaidAmount: 0,
+      payers: [
+        {
+          key: "main",
+          role: "main_client",
+          label: "Ada",
+          displayName: "Ada",
+          subtotal: 60,
+          paymentAmount: 60,
+          lineIds: ["s1"],
+          paid: true,
+        },
+        {
+          key: "g1",
+          role: "guest",
+          label: "Guest",
+          displayName: "Bea",
+          subtotal: 40,
+          paymentAmount: 40,
+          lineIds: ["s2"],
+          paid: false,
+        },
+      ],
+    },
+  },
+});
+assert.ok(
+  splitAfterTreatmentPending.includes("waiting_for_payment"),
+  "split guest unpaid → pending payment icon",
+);
+assert.ok(
+  !splitAfterTreatmentPending.includes("prepaid"),
+  "prepay confirmed must not show paid tick while after-treatment balance pending",
+);
 
 console.log("bookingResponseStatus.test.ts: ok");

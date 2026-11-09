@@ -4,6 +4,8 @@
 import assert from "node:assert/strict";
 import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import {
+  afterTreatmentSubCardId,
+  canEnablePersistentBookingCheckout,
   resolveCheckoutLateRescheduleFee,
   resolveOfflineBookingPrepayAction,
   resolvePostBookingPendingPayment,
@@ -11,6 +13,7 @@ import {
   shouldAutoOpenBookingCheckout,
   isPreBookingPrepaymentWait,
 } from "./bookingCheckout";
+import { upsertSalesCardMeta } from "./salesOverview.storage";
 
 const onlineSave = resolveOfflineBookingPrepayAction({
   isNewBooking: true,
@@ -113,6 +116,31 @@ const splitEvent = {
 const splitPending = resolvePostBookingPendingPayment(splitEvent);
 assert.equal(splitPending?.count, 1);
 assert.equal(splitPending?.focusCardId, "booking-1-after-treatment-sub-g1");
+
+assert.equal(
+  canEnablePersistentBookingCheckout(splitEvent),
+  true,
+  "Unpaid guest without sales meta → pro may still checkout",
+);
+
+upsertSalesCardMeta({
+  bookingId: "booking-1",
+  cardKind: "after_treatment",
+  cardId: afterTreatmentSubCardId("booking-1", "g1"),
+  paymentMethod: "onlineDirect",
+  paid: false,
+  totalPrice: 30,
+});
+assert.equal(
+  canEnablePersistentBookingCheckout(splitEvent),
+  false,
+  "After checkout issued guest Pay Now → hide/disable drawer Checkout",
+);
+assert.equal(
+  resolvePostBookingPendingPayment(splitEvent)?.count,
+  1,
+  "Pending payment indicator unchanged for Sales/client",
+);
 
 const settledSplit = {
   ...inProgress,

@@ -135,7 +135,7 @@ export default function BookingCheckoutFlow({
     const allLines: SalesLineItem[] = manualLinesFromBookingEvent(event).map(
       (line) => ({
         id: line.id,
-        label:
+              label:
           line.quantity > 1 ? `${line.name} ×${line.quantity}` : line.name,
         amount:
           Math.round(
@@ -466,11 +466,11 @@ export default function BookingCheckoutFlow({
   }, [activeShare, forWhoKeys, mode, payerKey, sharePool]);
 
   const goAfterItems = () => {
-    if (canSplit && !existingSplit) {
+      if (canSplit && !existingSplit) {
       setForWhoKeys(sharePool.map((share) => share.key));
       pushNav({ step: "split", partyIndex });
-      return;
-    }
+        return;
+      }
     if (existingSplit?.mode === "split" && unpaidShares.length > 1) {
       const nextKey = unpaidShares[0]?.key ?? payerKey;
       setPayerKey(nextKey);
@@ -483,8 +483,8 @@ export default function BookingCheckoutFlow({
       setPayerKey(nextKey);
       setForWhoKeys([nextKey]);
       pushNav({ step: "payer", partyIndex });
-      return;
-    }
+        return;
+      }
     pushNav({ step: "payment", partyIndex });
   };
 
@@ -494,7 +494,7 @@ export default function BookingCheckoutFlow({
       return;
     }
     if (navStack.length <= 1) {
-      onCancel();
+    onCancel();
       return;
     }
     setNavStack((prev) => prev.slice(0, -1));
@@ -550,7 +550,7 @@ export default function BookingCheckoutFlow({
           ? sharePool.map((share) => share.key)
           : forWhoKeys.length
             ? forWhoKeys
-            : [activeShare.key],
+          : [activeShare.key],
       paymentMethod,
       dueDate: needsDueDate ? dueDate : null,
       clientEmail: checkoutEmail.trim() || null,
@@ -664,11 +664,11 @@ export default function BookingCheckoutFlow({
       >
         <Stack direction="row" alignItems="center" spacing={1.25}>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography
+              <Typography
               sx={{ fontSize: 13.5, fontWeight: 800, color: alpha(m.navy, 0.82) }}
-            >
+              >
               {personPrimaryName(share)} ({personRoleLabel(share)})
-            </Typography>
+              </Typography>
           </Box>
           <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
             {formatCompactEuro(share.paymentAmount)}
@@ -749,7 +749,7 @@ export default function BookingCheckoutFlow({
         <Stack spacing={1.5}>
           {mainParty ? (
             <Box>
-              <Typography
+          <Typography
                 sx={{
                   fontSize: 12,
                   fontWeight: 700,
@@ -758,7 +758,7 @@ export default function BookingCheckoutFlow({
                 }}
               >
                 Client
-              </Typography>
+          </Typography>
               <Box
                 sx={{
                   borderRadius: "12px",
@@ -787,7 +787,7 @@ export default function BookingCheckoutFlow({
                       spacing={0.75}
                       sx={{ mb: 0.15, flexWrap: "wrap" }}
                     >
-                      <Typography
+          <Typography
                         sx={{
                           fontSize: 13.5,
                           fontWeight: 800,
@@ -795,7 +795,7 @@ export default function BookingCheckoutFlow({
                         }}
                       >
                         {mainParty.name}
-                      </Typography>
+          </Typography>
                       {mainParty.clientBadge ? (
                         <Box
                           sx={{
@@ -808,7 +808,7 @@ export default function BookingCheckoutFlow({
                           <Typography sx={{ fontSize: 10.5, fontWeight: 800 }}>
                             {mainParty.clientBadge}
                           </Typography>
-                        </Box>
+      </Box>
                       ) : null}
                     </Stack>
                     {mainParty.email ? (
@@ -820,19 +820,19 @@ export default function BookingCheckoutFlow({
                         }}
                       >
                         {mainParty.email}
-                      </Typography>
+        </Typography>
                     ) : null}
                   </Box>
-                </Stack>
+      </Stack>
               </Box>
             </Box>
           ) : null}
 
           <Stack spacing={1}>
-            {(
-              [
-                {
-                  id: "single" as const,
+          {(
+            [
+              {
+                id: "single" as const,
                   title: "Pay Full Bill",
                   trailing: (
                     <Typography
@@ -841,49 +841,49 @@ export default function BookingCheckoutFlow({
                       {formatCompactEuro(fullBillTotal)}
                     </Typography>
                   ),
-                },
-                {
-                  id: "split" as const,
+              },
+              {
+                id: "split" as const,
                   title: "Split Bill",
                   trailing: (
                     <GroupsOutlinedIcon
                       sx={{ fontSize: 20, color: alpha(m.navy, 0.45) }}
                     />
                   ),
-                },
-              ] as const
-            ).map((option) => {
-              const selected = mode === option.id;
-              return (
-                <Box
-                  key={option.id}
-                  onClick={() => {
-                    setMode(option.id);
-                    if (option.id === "split") {
+              },
+            ] as const
+          ).map((option) => {
+            const selected = mode === option.id;
+            return (
+              <Box
+                key={option.id}
+                onClick={() => {
+                  setMode(option.id);
+                  if (option.id === "split") {
                       setPayerKey(sharePool[0]?.key ?? payerKey);
                       setForWhoKeys(sharePool.map((share) => share.key));
                     } else {
                       setForWhoKeys(sharePool.map((share) => share.key));
-                    }
-                  }}
-                  sx={{
-                    borderRadius: "12px",
-                    border: `1px solid ${selected ? m.teal : alpha(m.navy, 0.1)}`,
-                    bgcolor: selected ? alpha(m.navy, 0.03) : "#fff",
-                    px: 1.5,
+                  }
+                }}
+                sx={{
+                  borderRadius: "12px",
+                  border: `1px solid ${selected ? m.teal : alpha(m.navy, 0.1)}`,
+                  bgcolor: selected ? alpha(m.navy, 0.03) : "#fff",
+                  px: 1.5,
                     py: 1.2,
-                    cursor: "pointer",
-                  }}
-                >
-                  <Stack direction="row" alignItems="center" spacing={1.25}>
+                  cursor: "pointer",
+                }}
+              >
+                <Stack direction="row" alignItems="center" spacing={1.25}>
                     <Checkbox
-                      checked={selected}
-                      sx={{
-                        p: 0.5,
-                        color: alpha(m.navy, 0.3),
-                        "&.Mui-checked": { color: m.teal },
-                      }}
-                    />
+                    checked={selected}
+                    sx={{
+                      p: 0.5,
+                      color: alpha(m.navy, 0.3),
+                      "&.Mui-checked": { color: m.teal },
+                    }}
+                  />
                     <Typography
                       sx={{
                         flex: 1,
@@ -896,10 +896,10 @@ export default function BookingCheckoutFlow({
                       {option.title}
                     </Typography>
                     {option.trailing}
-                  </Stack>
-                </Box>
-              );
-            })}
+                </Stack>
+              </Box>
+            );
+          })}
           </Stack>
 
           <Stack spacing={1}>
@@ -1179,17 +1179,17 @@ export default function BookingCheckoutFlow({
             return (
               <Box
                 key={share.key}
-                sx={{
-                  borderRadius: "12px",
-                  border: `1px solid ${alpha(m.navy, 0.1)}`,
-                  bgcolor: "#fff",
-                  px: 1.75,
-                  py: 1.5,
-                }}
-              >
+          sx={{
+            borderRadius: "12px",
+            border: `1px solid ${alpha(m.navy, 0.1)}`,
+            bgcolor: "#fff",
+            px: 1.75,
+            py: 1.5,
+          }}
+        >
                 <Typography sx={mollureSectionTitleSx(m.navy, { mb: 1.25 })}>
                   Summary
-                </Typography>
+            </Typography>
                 <Stack
                   direction="row"
                   alignItems="center"
@@ -1223,22 +1223,22 @@ export default function BookingCheckoutFlow({
                         {panelName}
                       </Typography>
                       {panelBadge ? (
-                        <Box
-                          sx={{
+            <Box
+              sx={{
                             px: 0.7,
                             py: 0.15,
-                            borderRadius: "999px",
+                borderRadius: "999px",
                             ...clientPlatformTagToneColors(m, "teal"),
-                          }}
-                        >
+              }}
+            >
                           <Typography sx={{ fontSize: 10.5, fontWeight: 800 }}>
                             {panelBadge}
-                          </Typography>
-                        </Box>
+              </Typography>
+            </Box>
                       ) : null}
-                    </Stack>
+          </Stack>
                     {panelEmail ? (
-                      <Typography
+            <Typography
                         sx={{
                           fontSize: 12,
                           fontWeight: 650,
@@ -1246,7 +1246,7 @@ export default function BookingCheckoutFlow({
                         }}
                       >
                         {panelEmail}
-                      </Typography>
+            </Typography>
                     ) : null}
                   </Box>
                 </Stack>
@@ -1269,8 +1269,8 @@ export default function BookingCheckoutFlow({
                             color: alpha(m.navy, muted ? 0.45 : 0.72),
                           }}
                         >
-                          {line.label}
-                        </Typography>
+                  {line.label}
+                </Typography>
                         <Typography
                           sx={{
                             fontSize: 13,
@@ -1278,12 +1278,12 @@ export default function BookingCheckoutFlow({
                             color: alpha(m.navy, muted ? 0.45 : 0.88),
                           }}
                         >
-                          {formatCompactEuro(line.amount)}
-                        </Typography>
-                      </Stack>
+                  {formatCompactEuro(line.amount)}
+                </Typography>
+              </Stack>
                     );
                   })}
-                </Stack>
+          </Stack>
                 {panelBreakdown ? (
                   <Stack spacing={0.55} sx={{ mb: 0.85 }}>
                     <Stack
@@ -1302,8 +1302,8 @@ export default function BookingCheckoutFlow({
                         }}
                       >
                         {formatCompactEuro(share.subtotal)}
-                      </Typography>
-                    </Stack>
+            </Typography>
+          </Stack>
                     {panelPrepaid > 0 ? (
                       <Stack
                         direction="row"
@@ -1421,11 +1421,11 @@ export default function BookingCheckoutFlow({
                 <Typography
                   sx={{ fontSize: 12, fontWeight: 650, color: alpha(m.navy, 0.5) }}
                 >
-                  {needsDueDate
-                    ? `${paymentLabel} (Due date ${dueDate.split("-").reverse().join("/")})`
-                    : paymentLabel}
-                </Typography>
-              </Box>
+            {needsDueDate
+              ? `${paymentLabel} (Due date ${dueDate.split("-").reverse().join("/")})`
+              : paymentLabel}
+          </Typography>
+        </Box>
             );
           })}
         </Stack>
@@ -1477,16 +1477,16 @@ export default function BookingCheckoutFlow({
             onClick={footerSecondaryIsCancel ? onCancel : handleBack}
           >
             {footerSecondaryIsCancel ? "Cancel" : "Back"}
-          </AppButton>
-          <AppButton
-            tone="primary"
-            disabled={nextDisabled}
-            onClick={() => void handleNext()}
-            sx={{ px: 2.5 }}
-          >
-            {nextLabel}
-          </AppButton>
-        </Stack>
+        </AppButton>
+        <AppButton
+          tone="primary"
+          disabled={nextDisabled}
+          onClick={() => void handleNext()}
+          sx={{ px: 2.5 }}
+        >
+          {nextLabel}
+        </AppButton>
+      </Stack>
       </Box>
     </Box>
   );

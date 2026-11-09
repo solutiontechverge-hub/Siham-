@@ -1,5 +1,6 @@
 import { query } from "../db/index.js";
 import { emitBookingChanged } from "../messaging/messagingSocket.js";
+import { parseBookingNotesMeta } from "../jobs/bookingAutoCompleteCloseOut.js";
 
 const KIND = {
   BOOKING_CREATED: "booking_created",
@@ -20,10 +21,87 @@ const KIND = {
   REFUND_COMPLETED: "refund_completed",
 };
 
-function moneySubtitle(amount) {
+function moneySubtitle(amount, paymentMethod) {
   const n = Number(amount);
   if (!Number.isFinite(n) || n <= 0) return null;
-  return `Online Direct (${n.toFixed(2)} EUR)`;
+  const method = String(paymentMethod ?? "onlineDirect").toLowerCase();
+  const label = method.includes("offline") ? "Offline Direct" : "Online Direct";
+  return `${label} (${n.toFixed(2)} EUR)`;
+}
+
+function splitPayersFromNotes(notes) {
+  const meta = parseBookingNotesMeta(notes);
+  const payers = meta?.splitBill?.payers;
+  return Array.isArray(payers) ? payers : [];
+}
+
+function splitPayerPaidMap(payers) {
+  const map = new Map();
+  for (const payer of payers) {
+    const key = String(payer?.key ?? "").trim();
+    if (key) map.set(key, Boolean(payer?.paid));
+  }
+  return map;
+}
+
+/**
+ * Log one post_booking_paid row per split payer that newly settles (notes.splitBill.payers[].paid).
+ */
+export async function logSplitBillPaymentActivities(
+  booking,
+  { previousNotes, actor = "client", userId = null, defaultClientLabel = "Client" } = {},
+) {
+  if (!booking?.id && !booking?.unique_code) return;
+
+  const nextPayers = splitPayersFromNotes(booking.notes);
+  if (!nextPayers.length) return;
+
+  const prevPaid = splitPayerPaidMap(splitPayersFromNotes(previousNotes));
+  const bookingId = booking.id ?? null;
+  const bookingCode = booking.unique_code ?? null;
+
+  for (const payer of nextPayers) {
+    const key = String(payer?.key ?? "").trim();
+    if (!key) continue;
+    const wasPaid = prevPaid.get(key) ?? false;
+    if (!Boolean(payer?.paid) || wasPaid) continue;
+
+    const role = String(payer?.role ?? "main_client").toLowerCase();
+    const isGuest = role === "guest" || role === "model";
+    const methodRaw = payer?.paymentMethod ?? null;
+    const offline =
+      String(methodRaw ?? "")
+        .toLowerCase()
+        .includes("offline") || actor === "professional";
+    const actorRole = isGuest ? "guest" : offline && actor === "professional" ? "professional" : "client";
+    const label =
+      String(payer?.displayName || payer?.label || "").trim() ||
+      (isGuest ? "Guest" : defaultClientLabel || booking.customer_name || "Client");
+
+    const amount = Number(payer?.paymentAmount);
+    const occurredAt = payer?.paidAt
+      ? new Date(payer.paidAt).toISOString()
+      : new Date().toISOString();
+
+    await appendBookingActivityEvent({
+      bookingId,
+      bookingCode,
+      kind: KIND.POST_BOOKING_PAID,
+      title: isGuest ? "Guest payment completed" : "After-treatment payment completed",
+      actor: actorRole,
+      actorRole,
+      userId: actorRole === "client" ? userId : actorRole === "professional" ? userId : null,
+      actorLabel: label,
+      subtitle: moneySubtitle(amount, methodRaw),
+      payload: {
+        payerKey: key,
+        payerRole: role,
+        paymentMethod: methodRaw,
+        amount: Number.isFinite(amount) ? amount : null,
+      },
+      occurredAt,
+    });
+  }
 }
 
 function parseNotesCancellationReason(notes) {
@@ -348,10 +426,10 @@ export async function logBookingStatusActivity(
         bookingCode,
         kind: KIND.BOOKING_CONFIRMED,
         title: "Confirmed",
-        actor: prepay === "paid" ? "client" : "professional",
-        actorRole: prepay === "paid" ? "client" : "professional",
+        actor: "professional",
+        actorRole: "professional",
         userId: userId || null,
-        actorLabel: prepay === "paid" ? clientLabel : "Professional",
+        actorLabel: "Professional",
         occurredAt: now,
       });
     } else if (status === "confirmed" && prev !== "confirmed" && prev !== "requested" && prev !== "br_accepted") {

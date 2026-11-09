@@ -174,12 +174,57 @@ export function useProfessionalFixedLocationCalendarBookingPersistCheckout(
         parseStoredEbrFromNotes(current.notes),
         parseStoredErFromNotes(current.notes),
       );
+      const bookingId =
+        parseApiCalendarEventId(current.id)?.id ??
+        extractBookingId(current.id) ??
+        current.id;
+      const paidAt = new Date().toISOString();
+      const metaMethod = result.paymentMethod as SalesCheckoutPaymentMethod;
+      const mainShare = shares.find((share) => share.role === "main_client");
+      const discountAmount = result.lines
+        .filter((line) => line.amount < 0)
+        .reduce((sum, line) => sum + Math.abs(line.amount), 0);
+      const payerKeysForMeta =
+        result.mode === "split" ? result.payerKeys : [result.payerKey];
+
+      const cardIdForPayer = (payerKey: string) =>
+        payerKey === mainShare?.key || result.mode === "single"
+          ? `${bookingId}-after-treatment`
+          : `${bookingId}-after-treatment-sub-${payerKey}`;
+
+      const buildCardMetaRecord = (
+        payerKey: string,
+        totalPrice: number,
+        financeTransactionId?: string,
+      ) => ({
+        bookingId,
+        cardKind: "after_treatment" as const,
+        cardId: cardIdForPayer(payerKey),
+        ...(financeTransactionId ? { financeTransactionId } : {}),
+        paymentMethod: metaMethod,
+        dueDate: result.dueDate,
+        paid: isOfflineDirect,
+        paidAt: isOfflineDirect ? paidAt : null,
+        totalPrice,
+        ...(discountAmount > 0 &&
+        (payerKey === mainShare?.key || result.mode === "single")
+          ? { discountAmount }
+          : {}),
+      });
+
+      // In-memory meta before drawer re-render (Checkout footer gate).
+      for (const key of payerKeysForMeta) {
+        const share = shares.find((s) => s.key === key);
+        upsertSalesCardMeta(
+          buildCardMetaRecord(key, share?.paymentAmount ?? result.amount),
+        );
+      }
+
       try {
         await persistEventStatus(editingEventId, nextStatus, {
           notes: nextNotes,
         });
       } catch (error) {
-        // Toast only — return false so BookingCheckoutFlow stays on summary (no Next overlay).
         showSnackbar({
           severity: "error",
           message: getApiErrorMessage(error, "Unable to complete checkout."),
@@ -200,57 +245,27 @@ export function useProfessionalFixedLocationCalendarBookingPersistCheckout(
       );
       setSlotStatus(nextStatus);
 
-      const bookingId =
-        parseApiCalendarEventId(current.id)?.id ??
-        extractBookingId(current.id) ??
-        current.id;
-      const paidAt = new Date().toISOString();
-      const metaMethod = result.paymentMethod as SalesCheckoutPaymentMethod;
-      const mainShare = shares.find((share) => share.role === "main_client");
-      const discountAmount = result.lines
-        .filter((line) => line.amount < 0)
-        .reduce((sum, line) => sum + Math.abs(line.amount), 0);
-
-      const cardIdForPayer = (payerKey: string) =>
-        payerKey === mainShare?.key || result.mode === "single"
-          ? `${bookingId}-after-treatment`
-          : `${bookingId}-after-treatment-sub-${payerKey}`;
-
       const persistCardMeta = (
         payerKey: string,
         totalPrice: number,
         financeTransactionId?: string,
       ) =>
         Promise.resolve(
-          upsertSalesCardMeta({
-            bookingId,
-            cardKind: "after_treatment",
-            cardId: cardIdForPayer(payerKey),
-            ...(financeTransactionId ? { financeTransactionId } : {}),
-            paymentMethod: metaMethod,
-            dueDate: result.dueDate,
-            paid: isOfflineDirect,
-            paidAt: isOfflineDirect ? paidAt : null,
-            totalPrice,
-            ...(discountAmount > 0 &&
-            (payerKey === mainShare?.key || result.mode === "single")
-              ? { discountAmount }
-              : {}),
-          }),
+          upsertSalesCardMeta(
+            buildCardMetaRecord(payerKey, totalPrice, financeTransactionId),
+          ),
         );
 
       // Await PUT so Sales meta survives refresh even if finance create fails.
       try {
         await Promise.all(
-          (result.mode === "split" ? result.payerKeys : [result.payerKey]).map(
-            (key) => {
-              const share = shares.find((s) => s.key === key);
-              return persistCardMeta(
-                key,
-                share?.paymentAmount ?? result.amount,
-              );
-            },
-          ),
+          payerKeysForMeta.map((key) => {
+            const share = shares.find((s) => s.key === key);
+            return persistCardMeta(
+              key,
+              share?.paymentAmount ?? result.amount,
+            );
+          }),
         );
       } catch {
         // Booking notes already saved; finance create may still write sales_card_metadata.
